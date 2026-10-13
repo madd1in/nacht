@@ -397,5 +397,5 @@ const Sprites = (() => {
     plain(['....o...', '.o.oyo..', '.ooyyo..', '.oyywyo.', 'oyywwyyo', 'oyywwyyo', '.oyyyyo.', '..oooo..']),
   ];
 
-  return { S, draw, make, plain, compose, whiteOf, canvas, paint };
+  return { S, draw, make, plain, compose, whiteOf, canvas, paint, fromCanvas: (c, outline = true) => finish(c, outline) };
 })();

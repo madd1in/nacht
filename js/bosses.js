@@ -1,6 +1,88 @@
 // Bosse: Riesenfledermaus, Knochenriese, Graf Nachtmahr.
 'use strict';
 
+// ---------------- Riesenfledermaus: prozedurale Pixel-Art (72x44, symmetrisch) ----------------
+(() => {
+  const Wc = 72, Hc = 44;
+  const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16);
+  const bay = (x, y) => BAY[(y & 3) * 4 + (x & 3)];
+  // Linker Flügel je Pose: Schulter S, Handgelenk W, Fingerspitzen F, Körperansatz B
+  const POSES = {
+    up: { S: [31, 16], W: [18, 4], F: [[2, 0], [4, 12], [14, 21]], B: [30, 26] },
+    midU: { S: [31, 17], W: [15, 10], F: [[0, 6], [2, 20], [16, 27]], B: [30, 27] },
+    down: { S: [31, 18], W: [16, 22], F: [[1, 31], [8, 39], [20, 35]], B: [30, 28] },
+    midD: { S: [31, 17], W: [14, 14], F: [[0, 15], [4, 29], [17, 31]], B: [30, 27] },
+    fold: { S: [31, 15], W: [27, 4], F: [[23, 11], [24, 25], [28, 33]], B: [31, 33] },
+  };
+  const inside = (poly, x, y) => {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  };
+  const segDist = (px, py, [ax, ay], [bx, by]) => {
+    const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(px - ax - dx * t, py - ay - dy * t);
+  };
+  const toward = ([ax, ay], [bx, by], [tx, ty], k) => [(ax + bx) / 2 + (tx - (ax + bx) / 2) * k, (ay + by) / 2 + (ty - (ay + by) / 2) * k];
+
+  function frame(poseName, open, sleep = false) {
+    const P = POSES[poseName], pix = new Array(Wc * Hc).fill(null);
+    const set = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < Wc && y < Hc) { pix[y * Wc + x] = c; pix[y * Wc + (Wc - 1 - x)] = c; } };
+    const get = (x, y) => (x >= 0 && y >= 0 && x < Wc && y < Hc) ? pix[y * Wc + x] : null;
+    const [F1, F2, F3] = P.F;
+    const poly = [P.S, P.W, F1, toward(F1, F2, P.W, 0.35), F2, toward(F2, F3, P.W, 0.35), F3, toward(F3, P.B, P.W, 0.25), P.B];
+    const maxD = Math.max(...P.F.map(([x, y]) => Math.hypot(x - P.S[0], y - P.S[1])));
+    for (let y = 0; y < Hc; y++) for (let x = 0; x < Wc / 2; x++) {
+      if (!inside(poly, x + 0.5, y + 0.5)) continue;
+      const d = Math.hypot(x - P.S[0], y - P.S[1]) / maxD + (bay(x, y) - 0.5) * 0.18;
+      let c = d > 0.72 ? '#7a3a9a' : d > 0.4 ? '#56246e' : '#3a1450';
+      if (P.F.some(f => segDist(x, y, P.W, f) < 0.7)) c = '#200a2e';          // Fingerknochen
+      else if (P.F.some(f => segDist(x, y, P.W, toward(P.W, f, P.S, 0.5)) < 0.5) && bay(x, y) < 0.5) c = '#8c2058'; // Adern
+      set(x, y, c);
+    }
+    for (let x = 0; x < Wc / 2; x++) for (let y = 0; y < Hc; y++) { // helle Hinterkante
+      const c = get(x, y);
+      if (c && c !== '#200a2e' && (!get(x, y + 1) || !get(x - 1, y))) set(x, y, '#a85cc8');
+    }
+    for (let k = 0; k <= 10; k++) { const t = k / 10; set(P.S[0] + (P.W[0] - P.S[0]) * t, P.S[1] + (P.W[1] - P.S[1]) * t, '#1c0828'); set(P.S[0] + (P.W[0] - P.S[0]) * t, P.S[1] + 1 + (P.W[1] - P.S[1]) * t, '#3a1450'); }
+    set(P.W[0], P.W[1] - 1, '#fce0a8'); set(P.W[0] - 1, P.W[1] - 2, '#fce0a8');          // Daumenkralle
+    P.F.forEach(([fx, fy]) => set(fx, fy, '#c8a0d8'));
+    // Körper (Fell)
+    for (let y = 0; y < Hc; y++) for (let x = 0; x < Wc / 2; x++) {
+      const bd = ((x - 36) / 6.5) ** 2 + ((y - 22) / 9.5) ** 2, hd = ((x - 36) / 6.5) ** 2 + ((y - 11) / 5.5) ** 2;
+      if (bd <= 1) set(x, y, bd > 0.75 ? '#2a0c38' : (x < 34 && y < 20) ? '#5c2c70' : (y > 24 && x > 33) ? '#6c3c5c' : ((x + y) % 3 ? '#3a1a48' : '#4a2258'));
+      if (hd <= 1) set(x, y, hd > 0.7 ? '#2a0c38' : y < 10 && x < 34 ? '#5c2c70' : '#3a1a48');
+    }
+    for (let i = 0; i < 8; i++) { set(30 + Math.floor(i / 4), 8 - i, '#3a1a48'); set(31 + Math.floor(i / 3), 8 - i, '#2a0c38'); } // Ohren
+    for (let i = 0; i < 5; i++) set(31, 7 - i, '#c8507c');
+    if (sleep) { set(33, 11, '#5c2c70'); set(34, 11, '#5c2c70'); }
+    else { set(33, 11, '#fc2c2c'); set(34, 11, '#fc2c2c'); set(33, 12, '#a80010'); set(34, 12, '#fc2c2c'); set(33, 11, '#fcfcfc'); }
+    set(35, 13, '#1c0410');
+    if (open) { for (let x = 34; x <= 35; x++) for (let y = 14; y <= 17; y++) set(x, y, '#5c0010'); set(34, 14, '#fcfcfc'); set(34, 17, '#fcfcfc'); set(35, 16, '#c8204c'); }
+    else { set(34, 15, '#1c0410'); set(35, 15, '#1c0410'); set(34, 16, '#fcfcfc'); }
+    set(34, 31, '#fce0a8'); set(33, 32, '#fce0a8');                                         // Fußkrallen
+    const c = Sprites.canvas(Wc, Hc), x = c.getContext('2d');
+    pix.forEach((col, i) => { if (col) { x.fillStyle = col; x.fillRect(i % Wc, Math.floor(i / Wc), 1, 1); } });
+    return Sprites.fromCanvas(c);
+  }
+  const order = ['up', 'midU', 'down', 'midD'];
+  Sprites.S.gbatX = { flap: order.map(p => frame(p, false)), open: order.map(p => frame(p, true)), fold: frame('fold', false, true) };
+})();
+
+// Kleine Fledermäuse, die beim Tod der Riesenfledermaus auseinanderstieben (nur Effekt)
+class SwarmBat extends Ent {
+  constructor(x, y) {
+    super(x, y, 8, 8);
+    const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 1.8;
+    this.vx = Math.cos(a) * sp; this.vy = Math.sin(a) * sp - 0.6; this.ph = Math.random() * 6;
+  }
+  update() { this.t++; this.x += this.vx; this.y += this.vy + Math.sin(this.t * 0.3 + this.ph) * 0.8; if (this.t > 150) this.dead = true; }
+  draw(ctx) { Sprites.draw(ctx, Sprites.S.bat.fly[Math.floor(this.t / 4) % 2], Math.round(this.x - 8 - W.cam.x), Math.round(this.y - W.cam.y), this.vx < 0); }
+}
+
 class Boss extends Enemy {
   constructor(x, y, w, h, hp, dmg) {
     super(x, y, w, h, hp, dmg, 0);
@@ -52,7 +134,7 @@ class Boss extends Enemy {
 
 class GiantBat extends Boss {
   constructor(ax, aw) {
-    super(ax + aw / 2 - 16, 36, 32, 14, 16, 3);
+    super(ax + aw / 2 - 20, 30, 40, 18, 16, 3);
     this.ax = ax; this.aw = aw; this.state = 'sleep'; this.score = 3000;
   }
   pickHover() { this.tx = this.ax + rnd(40, this.aw - 40); this.ty = rnd(40, 90); }
@@ -92,10 +174,26 @@ class GiantBat extends Boss {
     this.y = clamp(this.y, 20, 180);
     if (this.state !== 'sleep') this.touch();
   }
+  updateDeath(len) {
+    if (this.dying === 1) for (let i = 0; i < 14; i++) W.spawn(new SwarmBat(this.cx + rnd(-16, 16), this.cy + rnd(-6, 6)));
+    super.updateDeath(len);
+  }
   draw(ctx) {
     if (this.dying && (this.dying & 2)) return;
-    const s = Sprites.S.gbat[this.state === 'sleep' ? 1 : Math.floor(this.t / (this.state === 'swoop' ? 5 : 8)) % 2];
-    Sprites.draw(ctx, s, Math.round(this.cx - 24 - W.cam.x), Math.round(this.cy - 12 - W.cam.y), false, this.flash);
+    const G = Sprites.S.gbatX, x = Math.round(this.cx - W.cam.x), y = Math.round(this.cy - W.cam.y);
+    let s;
+    if (this.state === 'sleep') s = G.fold;
+    else {
+      const fast = this.state === 'swoop' || this.state === 'rise';
+      const f = Math.floor(this.t / (fast ? 3 : 5)) % 4;
+      s = (this.state === 'swoop' || this.state === 'shoot') ? G.open[f] : G.flap[f];
+      if (f === 2 && this.t % 20 === 0) Audio8.sfx('bat');
+    }
+    ctx.globalAlpha = 0.5;
+    const aura = FX.disc(26, [60, 10, 90], [0.6, 0.38, 0.2, 0.08]);
+    ctx.drawImage(aura, x - 26, y - 24);
+    ctx.globalAlpha = 1;
+    Sprites.draw(ctx, s, x - 36, y - 20, false, this.flash);
   }
 }
 

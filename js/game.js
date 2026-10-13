@@ -455,6 +455,7 @@ const Game = {
     const pad = Input.padName;
     const foot = !Audio8.ready() && this.t > 90 ? 'KLICK ODER TASTE = TON AN' : pad ? pad + ' BEREIT' : '© ANNO 1691  NACHTMAHR';
     Font.draw(ctx, foot, cx, 226, pad && Audio8.ready() ? '#3cbcfc' : '#4c4c4c', { align: 'center' });
+    if (window.BUILD) Font.draw(ctx, 'V' + window.BUILD, View.w - 4, 232, '#2c2c3c', { align: 'right' });
   },
 
   drawOptions(ctx) {

@@ -316,6 +316,7 @@ const W = {
       else if (e.kind === 'item' && e.type === 'orb') L.push({ x, y, r: 44, c: [60, 188, 252], a: 0.6 });
       else if (e instanceof Burst) L.push({ x, y, r: 28, c: [248, 120, 0], a: 0.75 });
       else if (e instanceof Skull) L.push({ x, y: y - 6, r: 20, c: [248, 120, 0], a: 0.4 });
+      else if (e instanceof GiantBat && e.state !== 'sleep' && !e.dying) L.push({ x, y: y - 9, r: 22, c: [252, 40, 40], a: 0.55 });
       else if (e instanceof Count && e.state === 'open') L.push({ x, y: y - 6, r: 34, c: [168, 0, 32], a: 0.45 });
       else if (e instanceof Pillar && e.openT > 0) L.push({ x, y, r: 22, c: [248, 120, 0], a: 0.5 });
     }
