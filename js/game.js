@@ -26,6 +26,8 @@ const Game = {
     W.player = new Player();
     Input.onAny(() => { Audio8.init(); Audio8.setMusicLevel(Options.music / 8); });
     window.addEventListener('resize', () => this.resize());
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', () => this.resize());
+    document.addEventListener('fullscreenchange', () => setTimeout(() => this.resize(), 50));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); }
     });
@@ -47,7 +49,10 @@ const Game = {
 
   resize() {
     const fit = View.fit();
-    if (W.camLock) this.pendingView = fit; else this.applyView(fit);
+    // Bildschirmgröße sofort übernehmen; nur die interne Breite wartet während eines Bosskampfs
+    this.canvas.style.width = fit.cssW + 'px';
+    this.canvas.style.height = fit.cssH + 'px';
+    if (W.camLock && fit.w !== View.w) this.pendingView = fit; else this.applyView(fit);
   },
   applyView(fit) {
     View.w = fit.w; View.scale = fit.scale;

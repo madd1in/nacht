@@ -3,8 +3,15 @@
 
 const View = {
   w: 256, h: 240, fh: 208, scale: 1, min: 256, max: 640,
+  // Tatsächlich sichtbarer Bereich: innerHeight kann in Chrome (Adressleiste, Leisten) größer sein als sichtbar.
+  area() {
+    const vv = window.visualViewport, de = document.documentElement;
+    const iw = Math.min(window.innerWidth, de.clientWidth || Infinity, vv ? vv.width : Infinity);
+    const ih = Math.min(window.innerHeight, de.clientHeight || Infinity, vv ? vv.height : Infinity);
+    return { iw: Math.floor(iw), ih: Math.floor(ih) };
+  },
   fit() {
-    const iw = window.innerWidth, ih = window.innerHeight;
+    const { iw, ih } = this.area();
     const s = ih / this.h;
     const ideal = iw / s;
     if (ideal < this.min) { // Hochformat: Breite füllen, Rest bleibt für Touch-Steuerung

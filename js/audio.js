@@ -2,7 +2,7 @@
 'use strict';
 
 const Audio8 = (() => {
-  let ac = null, master, comp, musicBus, sfxBus, noiseBuf, pulseWaves = {};
+  let ac = null, master, comp, musicBus, melBus, sfxBus, noiseBuf, pulseWaves = {};
   let muted = false;
   const MUSIC_VOL = 0.82;
   let musicLevel = 1;
@@ -18,6 +18,7 @@ const Audio8 = (() => {
     comp.connect(ac.destination);
     master = ac.createGain(); master.gain.value = muted ? 0 : 0.7; master.connect(comp);
     musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(master);
+    melBus = ac.createGain(); melBus.connect(musicBus);
     sfxBus = ac.createGain(); sfxBus.gain.value = 0.7; sfxBus.connect(master);
     noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
     const d = noiseBuf.getChannelData(0);
@@ -132,11 +133,17 @@ const Audio8 = (() => {
   const oct = (lo, hi, n = 4) => rep(`${lo}:2 ${hi}:2`, n);
   const gallop = (lo, hi) => `${lo}:2 ${hi}:1 ${hi}:1 ${lo}:2 ${hi}:1 ${hi}:1 ${lo}:2 ${hi}:1 ${hi}:1 ${lo}:1 ${hi}:1 ${lo}:1 ${hi}:1`;
   const drive = (lo, hi) => rep(`${lo}:1 ${lo}:1 ${hi}:1 ${lo}:1`, 4);
-  const ROCK = 'k:1 h:1 h:1 h:1 s:1 h:1 h:1 k:1 k:1 h:1 k:1 h:1 s:1 h:1 o:1 h:1';
   const ROCKX = 'x:1 h:1 h:1 h:1 s:1 h:1 h:1 k:1 k:1 h:1 k:1 h:1 s:1 h:1 o:1 h:1';
   const FILL = 'k:1 h:1 s:1 h:1 k:1 s:1 s:1 h:1 t:1 t:1 u:1 u:1 s:1 s:1 s:1 s:1';
-  const section = () => [ROCKX, ROCK, ROCK, ROCK, ROCK, ROCK, ROCK, FILL].join(' ');
-  const chordArps = (list, m) => list.map(c => arp4(...m[c])).join(' ');
+  // Treibender Four-on-the-floor-Beat: Kick auf jedem Viertel, Snare 2+4, offene Hats auf den Offbeats
+  const FOUR = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
+  const FOURX = 'x:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
+  const FILLS = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 k:1 k:1 s:1 k:1 s:1 q:1 s:1 s:1 s:1';
+  const FILLB = 'k:1 s:1 s:1 k:1 s:1 s:1 t:1 t:1 u:1 u:1 t:1 u:1 q:1 s:1 q:1 s:1';
+  const section = () => [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB].join(' ');
+  // 3er-Arpeggio gegen den 4er-Takt: verschiebt sich ständig und treibt nach vorn
+  const arp3 = (a, b, c) => Array.from({ length: 16 }, (_, i) => [a, b, c][i % 3] + ':1').join(' ');
+  const chordArps = (list, m) => list.map(c => arp3(...m[c])).join(' ');
   const chordBass = (list, m, fn) => list.map(c => fn(...m[c])).join(' ');
 
   // Stage 1 – Burgsturm (d-Moll, 168 BPM)
@@ -163,7 +170,7 @@ const Audio8 = (() => {
       echo: { delay: 4, vol: 0.3 },
     },
     stage1: {
-      bpm: 168, loop: true, echo: { delay: 3, vol: 0.32 },
+      bpm: 176, loop: true, echo: { delay: 3, vol: 0.32 },
       p1: [
         'd5:2 d5:1 e5:1 f5:2 d5:2 a5:3 g5:1 f5:2 e5:2', 'd5:1 c5:1 d5:2 a4:2 d5:2 f5:2 e5:2 d5:2 c5:2',
         'a#4:2 d5:2 f5:2 a#5:4 a5:2 g5:2 f5:2', 'g5:3 f5:1 e5:2 c5:2 e5:2 g5:2 c6:4',
@@ -174,10 +181,10 @@ const Audio8 = (() => {
         'f5:2 a#5:2 d6:2 f6:4 d6:2 a#5:2 f5:2', 'e5:2 g5:2 c6:2 e6:4 d6:2 c6:2 a#5:2',
         'a5:2 c#6:2 e6:2 a6:4 g6:2 f6:2 e6:2', 'c#6:2 a5:2 e5:2 c#5:2 a4:4 -:4',
       ].join(' '),
-      p2: chordArps(S1C, S1), tri: chordBass(S1C, S1B, gallop), dr: section() + ' ' + section(),
+      p2: chordArps(S1C, S1), tri: chordBass(S1C, S1B, drive), dr: section() + ' ' + section(),
     },
     stage2: {
-      bpm: 152, loop: true, echo: { delay: 3, vol: 0.35 },
+      bpm: 166, loop: true, echo: { delay: 3, vol: 0.35 },
       p1: [
         'a4:2 c5:2 e5:2 a5:3 g5:1 e5:2 c5:2 e5:2', 'd5:2 e5:2 c5:2 a4:2 b4:2 c5:2 b4:2 g4:2',
         'a4:2 c5:2 f5:4 e5:2 d5:2 c5:4', 'b4:2 d5:2 g5:4 f5:2 e5:2 d5:4',
@@ -188,10 +195,10 @@ const Audio8 = (() => {
         'c6:3 b5:1 a5:2 f5:2 a5:2 c6:2 f6:4', 'd6:3 c6:1 b5:2 g5:2 b5:2 d6:2 g6:4',
         'e6:2 d6:2 b5:2 g#5:2 b5:2 g#5:2 e5:2 d5:2', 'b4:2 e5:2 g#5:2 b5:2 e6:8',
       ].join(' '),
-      p2: chordArps(S2C, S2), tri: chordBass(S2C, S2B, gallop), dr: section() + ' ' + section(),
+      p2: chordArps(S2C, S2), tri: chordBass(S2C, S2B, drive), dr: section() + ' ' + section(),
     },
     stage3: {
-      bpm: 176, loop: true, echo: { delay: 3, vol: 0.3 },
+      bpm: 184, loop: true, echo: { delay: 3, vol: 0.3 },
       p1: [
         'e5:2 g5:2 b5:2 e6:3 d6:1 b5:2 g5:2 b5:2', 'a5:2 g5:2 f#5:2 e5:2 f#5:2 g5:2 a5:2 b5:2',
         'c6:3 b5:1 a5:2 g5:2 e5:2 g5:2 c6:4', 'd6:3 c6:1 b5:2 a5:2 f#5:2 a5:2 d6:4',
@@ -202,10 +209,10 @@ const Audio8 = (() => {
         'e6:2 c6:2 g5:2 c6:2 e6:2 g6:2 e6:2 c6:2', 'f#6:2 d6:2 a5:2 d6:2 f#6:2 a6:2 f#6:2 d6:2',
         'd#6:2 f#6:2 b6:4 a6:2 f#6:2 d#6:2 b5:2', 'b5:4 a5:2 g5:2 f#5:4 d#5:4',
       ].join(' '),
-      p2: chordArps(S3C, S3), tri: chordBass(S3C, S3B, gallop), dr: section() + ' ' + section(),
+      p2: chordArps(S3C, S3), tri: chordBass(S3C, S3B, drive), dr: section() + ' ' + section(),
     },
     boss: {
-      bpm: 184, loop: true, echo: { delay: 2, vol: 0.28 },
+      bpm: 192, loop: true, echo: { delay: 2, vol: 0.28 },
       p1: [
         'd5:1 d5:1 d6:2 d5:1 d5:1 c6:2 d5:1 d5:1 a#5:2 a5:2 g#5:2', 'a5:2 f5:2 d5:2 f5:2 a5:2 d6:2 f6:4',
         'd#5:1 d#5:1 d#6:2 d#5:1 d#5:1 c#6:2 d#5:1 d#5:1 b5:2 a#5:2 a5:2', 'a#5:2 g5:2 d#5:2 g5:2 a#5:2 d#6:2 g6:4',
@@ -214,7 +221,7 @@ const Audio8 = (() => {
       ].join(' '),
       p2: [rep('d4:1 d5:1', 16), rep('d#4:1 d#5:1', 16), rep('d4:1 d5:1', 16), rep('c#4:1 c#5:1', 16)].join(' '),
       tri: [drive('d2', 'd3'), drive('d2', 'd3'), drive('d#2', 'd#3'), drive('d#2', 'd#3'), drive('d2', 'd3'), drive('d2', 'd3'), drive('c#2', 'c#3'), drive('c#2', 'c#3')].join(' '),
-      dr: [ROCKX, rep('k:1 h:1 s:1 h:1 k:1 k:1 s:1 h:1 k:1 h:1 s:1 h:1 k:1 k:1 s:1 o:1', 6), FILL].join(' '),
+      dr: [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB].join(' '),
     },
     clear: {
       bpm: 150, loop: false,
@@ -258,8 +265,14 @@ const Audio8 = (() => {
   let song = null, songName = null, pending = null, timer = null;
   let cursors = [];
 
+  // Sidechain: Melodie/Bass kurz absenken, wenn die Kick kommt
+  function duck(t) {
+    melBus.gain.setValueAtTime(0.45, t);
+    melBus.gain.linearRampToValueAtTime(1, t + 0.12);
+  }
   function drum(n, t) {
-    if (n === 'k' || n === 'x') {
+    if (n === 'k' || n === 'x' || n === 'q') {
+      duck(t);
       const o = osc('triangle'), g = ac.createGain();
       o.frequency.setValueAtTime(170, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.11);
       g.gain.setValueAtTime(0.85, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
@@ -267,7 +280,7 @@ const Audio8 = (() => {
       noise(0.02, 0.25, 'lowpass', 2500, null, t, musicBus);
     }
     if (n === 'x' || n === 'c') noise(0.7, 0.22, 'highpass', 6000, 2500, t, musicBus);
-    else if (n === 's') { noise(0.14, 0.36, 'bandpass', 1900, 900, t, musicBus); tone2('triangle', 240, 120, 0.06, 0.25, t); }
+    if (n === 's' || n === 'q') { noise(0.14, 0.38, 'bandpass', 1900, 900, t, musicBus); tone2('triangle', 240, 120, 0.06, 0.25, t); }
     else if (n === 'h') noise(0.03, 0.13, 'highpass', 8000, null, t, musicBus);
     else if (n === 'o') noise(0.12, 0.13, 'highpass', 7000, null, t, musicBus);
     else if (n === 't') tone2('triangle', 300, 120, 0.12, 0.45, t);
@@ -283,8 +296,8 @@ const Audio8 = (() => {
   function note(track, f, t, dur, volMul = 1, dutyOverride) {
     const o = track === 'tri' ? osc('triangle') : osc('pulse', dutyOverride || (track === 'p1' ? 0.25 : 0.125));
     const g = ac.createGain();
-    const vol = (track === 'p1' ? 0.2 : track === 'p2' ? 0.085 : 0.4) * volMul;
-    const gate = Math.max(0.03, dur * (track === 'tri' ? 0.92 : 0.82));
+    const vol = (track === 'p1' ? 0.2 : track === 'p2' ? 0.085 : track === 'pb' ? 0.05 : 0.42) * volMul;
+    const gate = Math.max(0.03, dur * (track === 'tri' ? 0.92 : track === 'pb' ? 0.55 : 0.82));
     o.frequency.setValueAtTime(f, t);
     if (track === 'p1' && dur > 0.22) { // Vibrato bei langen Tönen
       const lfo = ac.createOscillator(), lg = ac.createGain();
@@ -296,7 +309,7 @@ const Audio8 = (() => {
     g.gain.linearRampToValueAtTime(vol, t + 0.005);
     g.gain.setValueAtTime(vol * (track === 'tri' ? 1 : 0.72), t + Math.min(gate, 0.07));
     g.gain.linearRampToValueAtTime(0, t + gate);
-    o.connect(g); g.connect(musicBus);
+    o.connect(g); g.connect(melBus);
     o.start(t); o.stop(t + gate + 0.02);
   }
 
@@ -307,6 +320,7 @@ const Audio8 = (() => {
     if (!f) return;
     const dur = ev.len * stepDur;
     note(track, f, t, dur);
+    if (track === 'tri' && song.loop && dur < 0.2) note('pb', f * 2, t, dur, 1, 0.125); // kratziger Bass
     if (track === 'p1' && song.echo) note('p1', f, t + song.echo.delay * stepDur, dur, song.echo.vol, 0.125);
   }
 
@@ -349,6 +363,7 @@ const Audio8 = (() => {
       old.gain.setTargetAtTime(0, ac.currentTime, 0.02);
       setTimeout(() => old.disconnect(), 300);
       musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(master);
+      melBus = ac.createGain(); melBus.connect(musicBus);
     }
   }
   function toggleMute() {
