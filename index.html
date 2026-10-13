@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="NACHTMAHR – ein 8-Bit Gothic-Action-Platformer im Browser. Peitsche, Kerzen, Treppen, Bosse.">
+<title>NACHTMAHR – 8-Bit Vampirjagd</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Ccircle cx='8' cy='8' r='6' fill='%23d82800'/%3E%3Ccircle cx='10' cy='6' r='5' fill='%23000'/%3E%3C/svg%3E">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; touch-action: none; }
+  body { display: flex; align-items: center; justify-content: center; font-family: monospace; color: #fcfcfc; }
+  #wrap { position: relative; }
+  canvas#screen {
+    display: block; image-rendering: pixelated; image-rendering: crisp-edges;
+    background: #000; box-shadow: 0 0 60px rgba(168, 0, 32, .35);
+  }
+  #touch { position: fixed; inset: 0; pointer-events: none; display: none; user-select: none; -webkit-user-select: none; }
+  body.touch #touch { display: block; }
+  .tbtn {
+    position: absolute; pointer-events: auto; border-radius: 50%;
+    background: rgba(252, 252, 252, .12); border: 2px solid rgba(252, 252, 252, .35);
+    color: rgba(252, 252, 252, .75); font: bold 15px monospace;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tbtn.on { background: rgba(216, 40, 0, .45); }
+  #dpad { position: absolute; left: 18px; bottom: 22px; width: 150px; height: 150px; pointer-events: auto; }
+  #dpad .tbtn { width: 50px; height: 50px; border-radius: 10px; }
+  #tUp { left: 50px; top: 0; } #tDown { left: 50px; top: 100px; }
+  #tLeft { left: 0; top: 50px; } #tRight { left: 100px; top: 50px; }
+  #tJump { right: 22px; bottom: 40px; width: 64px; height: 64px; }
+  #tAtk { right: 96px; bottom: 22px; width: 64px; height: 64px; }
+  #tSub { right: 96px; bottom: 100px; width: 50px; height: 50px; font-size: 12px; }
+  #tStart { right: 22px; bottom: 120px; width: 50px; height: 34px; border-radius: 10px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="screen" width="256" height="240" aria-label="NACHTMAHR Spielfeld"></canvas></div>
+<div id="touch" aria-hidden="true">
+  <div id="dpad">
+    <div class="tbtn" id="tUp" data-k="up">▲</div>
+    <div class="tbtn" id="tDown" data-k="down">▼</div>
+    <div class="tbtn" id="tLeft" data-k="left">◀</div>
+    <div class="tbtn" id="tRight" data-k="right">▶</div>
+  </div>
+  <div class="tbtn" id="tJump" data-k="jump">A</div>
+  <div class="tbtn" id="tAtk" data-k="attack">B</div>
+  <div class="tbtn" id="tSub" data-k="sub">SUB</div>
+  <div class="tbtn" id="tStart" data-k="start">START</div>
+</div>
+<script src="js/font.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/sprites2.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/tiles.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/bosses.js"></script>
+<script src="js/world.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
