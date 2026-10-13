@@ -124,6 +124,8 @@ const Audio8 = (() => {
       });
     },
     boom: () => { noise(2.2, 0.6, 'lowpass', 500, 35); tone('triangle', 70, 28, 1.8, 0.5); tone('pulse', 55, 30, 0.9, 0.12, 0.5); },
+    creak: () => { tone('sawtooth', 74, 56, 0.55, 0.05); noise(0.45, 0.05, 'bandpass', 420, 240); },
+    cog: () => { noise(0.03, 0.1, 'highpass', 3200); tone('pulse', 1900, 1750, 0.025, 0.045, 0.125); },
     latch: () => { tone('pulse', 1800, 2600, 0.06, 0.12, 0.125); noise(0.08, 0.2, 'highpass', 5000); },
     whoosh: () => noise(0.22, 0.28, 'bandpass', 600, 3000),
     djump: () => { tone('pulse', 420, 1250, 0.11, 0.11, 0.25); noise(0.12, 0.12, 'highpass', 3500, 7000); },
@@ -156,10 +158,10 @@ const Audio8 = (() => {
   const FILLS = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 k:1 k:1 s:1 k:1 s:1 q:1 s:1 s:1 s:1';
   const FILLB = 'k:1 s:1 s:1 k:1 s:1 s:1 t:1 t:1 u:1 u:1 t:1 u:1 q:1 s:1 q:1 s:1';
   const section = () => [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB].join(' ');
-  // B-Teil: Doppelbass in 16teln, Snare-Rolls, Riser vor dem Loop
-  const DK = 'z:1 z:1 z:1 z:1 q:1 z:1 z:1 z:1 z:1 z:1 z:1 z:1 q:1 z:1 r:1 r:1';
-  const DKX = 'x:1 z:1 z:1 z:1 q:1 z:1 z:1 z:1 z:1 z:1 z:1 z:1 q:1 z:1 r:1 r:1';
-  const FILLR = 'k:1 s:1 s:1 k:1 r:1 r:1 r:1 r:1 w:8';
+  // B-Teil: galoppierende Kick (kein Dauerfeuer), Tom-Fill und Riser vor dem Loop
+  const DK = 'k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1 k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1';
+  const DKX = 'x:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1 k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1';
+  const FILLR = 'k:1 s:1 s:1 k:1 t:1 t:1 u:1 u:1 w:8';
   const sectionB = () => [DKX, DK, DK, FILLS, DK, DK, DK, FILLR].join(' ');
   // 3er-Arpeggio gegen den 4er-Takt: verschiebt sich ständig und treibt nach vorn
   const arp3 = (a, b, c) => Array.from({ length: 16 }, (_, i) => [a, b, c][i % 3] + ':1').join(' ');
@@ -276,7 +278,7 @@ const Audio8 = (() => {
       return { n, len: parseFloat(l || '1') };
     });
   }
-  // Boss Phase 2: schneller, durchgehend Doppelbass
+  // Boss Phase 2: schneller und härter
   SONGS.boss2 = Object.assign({}, SONGS.boss, { bpm: 212, dr: [DKX, DK, DK, FILLR, DKX, DK, DK, FILLR].join(' ') });
   const parsed = {};
   for (const k in SONGS) {

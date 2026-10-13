@@ -29,6 +29,10 @@ const Levels = (() => {
       platform(x0, x1, y) { r.ents.push({ type: 'platform', x: x0, x1, y }); return api; },
       // Pendel-Kronleuchter: Aufhängepunkt (Kacheln), Seillänge (px), Ausschlag (rad), Phase
       chandelier(px, py, len, amp = 0.45, phase = 0) { r.ents.push({ type: 'chandelier', x: px, y: py, len, amp, phase }); return api; },
+      // XXL-Kronleuchter (Mode-7-Drehung, schräge Standfläche)
+      grand(px, py, len, amp = 0.32, phase = 0) { r.ents.push({ type: 'grand', x: px, y: py, len, amp, phase }); return api; },
+      // Zahnrad-Riesenrad: Mittelpunkt (Kacheln), Radius (px), Anzahl Stege, Drehgeschwindigkeit
+      cog(cx, cy, rad, n = 4, speed = 0.011) { r.ents.push({ type: 'cog', x: cx, y: cy, r: rad, n, speed }); return api; },
       elevator(x, rowLow, rowHigh) { r.ents.push({ type: 'elevator', x, y: rowLow, y1: rowHigh }); return api; },
       crumble(x, y) { r.ents.push({ type: 'crumble', x, y }); return api; },
       statue(x, y) { r.ents.push({ type: 'statue', x, y }); return api; },
@@ -77,14 +81,14 @@ const Levels = (() => {
     .start(2, 27).exitAt(25, 0, 27, 5).done();
 
   const r12 = room(104, 'hall')
-    .ground(0, 15).ground(18, 51).ground(59, 103)
+    .ground(0, 15).ground(18, 51).ground(63, 103)
     .stair(24, 10, 4, 1).fill(28, 7, 44, 7, '=').stair(48, 10, 4, -1)
     .set(38, 10, '=').set(38, 9, 'X')
-    .chandelier(55.5, 0, 140, 0.45, 0)
-    .statue(62, 10)
+    .grand(57.5, 0, 140, 0.32, 0)
+    .statue(64, 10)
     .fill(91, 8, 93, 8, '=').fill(98, 8, 100, 8, '=')
     .candle(5, 9).candle(11, 9, '3').candle(21, 9).candle(33, 9).candle(32, 5).candle(38, 5, 'H').candle(42, 5)
-    .candle(50, 9, '$').candle(55, 7, 'H').candle(60, 9).candle(67, 9).candle(73, 9, 'H').candle(80, 9, '2').candle(86, 9)
+    .candle(50, 9, '$').candle(53, 3, 'H').candle(61, 3).candle(67, 9).candle(73, 9, 'H').candle(80, 9, '2').candle(86, 9)
     .enemy('bat', 14, 3).enemy('bat', 40, 2).enemy('bat', 70, 3)
     .zone('ghoul', 18, 50, { interval: 140, max: 2 })
     .start(2, 10).arena('gbat').done();
@@ -136,13 +140,13 @@ const Levels = (() => {
   // ======================= STAGE 3: Der Bergfried (entschärft) =======================
   const r31 = room(64, 'tower')
     .ground(0, 12).fill(13, 12, 20, 12, '^').ground(21, 63)
-    .platform(13, 18, 9)
+    .cog(16.5, 7, 44, 4, 0.011)
     .statue(24, 10)
     .crumble(34, 8).crumble(37, 8)
     .set(52, 10, 'X')
-    .candle(4, 9).candle(9, 9, 'H').candle(16, 6).candle(28, 9).candle(35, 6, 'H').candle(38, 6, '2')
+    .candle(4, 9).candle(9, 9, 'H').candle(16, 1).candle(28, 9).candle(35, 6, 'H').candle(38, 6, '2')
     .candle(47, 9).candle(56, 9, 'W').candle(60, 9, 'H')
-    .enemy('knight', 31, 10).enemy('pillar', 44, 10).enemy('bat', 50, 3).ring(17, 5)
+    .enemy('knight', 31, 10).enemy('pillar', 44, 10).enemy('bat', 50, 3)
     .zone('skull', 30, 60, { interval: 380, max: 1 })
     .start(2, 10).exit(62).done();
 
@@ -175,10 +179,10 @@ const Levels = (() => {
 
   const r32 = room(88, 'throne')
     .ground(0, 15).ground(26, 87)
-    .chandelier(18.5, 0, 140, 0.42, 0).chandelier(23.5, 0, 140, 0.42, 1.6)
+    .grand(21, 0, 134, 0.3, 0.8)
     .statue(30, 10)
     .fill(75, 7, 77, 7, '=').fill(82, 7, 84, 7, '=')
-    .candle(5, 9, 'H').candle(10, 9).candle(21, 7, 'H').candle(34, 9, '1').candle(40, 9).candle(44, 9, 'U').candle(48, 9, 'R')
+    .candle(5, 9, 'H').candle(10, 9).candle(18, 2, 'H').candle(34, 9, '1').candle(40, 9).candle(44, 9, 'U').candle(48, 9, 'R')
     .enemy('knight', 38, 10).enemy('pillar', 46, 10).enemy('bat', 16, 4).enemy('bat', 40, 3).enemy('ghost', 33, 5)
     .zone('skull', 30, 50, { interval: 420, max: 1 })
     .start(2, 10).arena('count').done();

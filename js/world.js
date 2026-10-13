@@ -38,6 +38,8 @@ const W = {
         case 'chest': this.spawn(new Chest(d)); break;
         case 'platform': this.platforms.push(this.spawn(new Platform(d.x, d.x1, d.y))); break;
         case 'chandelier': this.platforms.push(this.spawn(new Chandelier(d))); break;
+        case 'grand': this.platforms.push(this.spawn(new GrandChandelier(d))); break;
+        case 'cog': { const c = new CogWheel(d); this.platforms.push(this.spawn(c)); c.ledges.forEach(l => this.platforms.push(this.spawn(l))); break; }
         case 'elevator': this.platforms.push(this.spawn(new Elevator(d))); break;
         case 'crumble': this.platforms.push(this.spawn(new Crumble(d))); break;
       }
@@ -299,6 +301,7 @@ const W = {
     if (theme === 'courtyard') this.drawRain(ctx);
     if (storm && FX.stormOn(storm)) { ctx.fillStyle = 'rgba(220,214,255,0.16)'; ctx.fillRect(0, 0, vw, 208); }
     FX.render(ctx, this.collectLights(), theme);
+    Rays.draw(ctx, this.room, this.cam, this.frame);
     const p = this.player;
     if (p.alive && p.hp <= p.maxHp / 4) Drama.drawDanger(ctx, vw, 0.35 + Math.sin(this.frame * 0.14) * 0.2);
     if (this.flash > 0 && (this.flash % 6) < 3) { ctx.fillStyle = 'rgba(252,252,252,0.45)'; ctx.fillRect(-4, -4, vw + 8, 216); }
@@ -347,6 +350,7 @@ const W = {
       const x = e.cx - cx, y = e.cy - cy;
       if (x < -48 || x > View.w + 48 || y < -60 || y > 270) continue;
       if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + flick(e.x), c: [248, 140, 40], a: 0.5 });
+      else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
       else if (e instanceof Chandelier) L.push({ x, y: e.y - cy - 6, r: 42 + flick(e.px), c: [248, 160, 60], a: 0.55 });
       else if (e instanceof Statue && e.active) L.push({ x, y: y - 8, r: 30, c: [60, 188, 252], a: 0.45 });
       else if (e instanceof Chest && e.opened) L.push({ x, y, r: 20, c: [248, 184, 0], a: 0.4 });

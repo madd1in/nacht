@@ -52,7 +52,17 @@ const Sprites = (() => {
       if (d[(py * W2 + px) * 4 + 3] > 0) continue;
       if (solid(px - 1, py) || solid(px + 1, py) || solid(px, py - 1) || solid(px, py + 1)) mark.push((py * W2 + px) * 4);
     }
-    mark.forEach(i => { d[i] = OUTLINE[0]; d[i + 1] = OUTLINE[1]; d[i + 2] = OUTLINE[2]; d[i + 3] = 254; });
+    // 16-Bit-„Sel-out“: Kontur in dunkler Variante der Nachbarfarbe statt reinem Schwarz
+    const cols = mark.map(i => {
+      const q = i / 4, X = q % W2, Y = (q - X) / W2;
+      let r = 0, g = 0, b = 0, n = 0;
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([ox, oy]) => {
+        if (!solid(X + ox, Y + oy)) return;
+        const j = ((Y + oy) * W2 + X + ox) * 4; r += d[j]; g += d[j + 1]; b += d[j + 2]; n++;
+      });
+      return n ? [Math.round(r / n * 0.16 + OUTLINE[0] * 0.6), Math.round(g / n * 0.12 + OUTLINE[1] * 0.6), Math.round(b / n * 0.18 + OUTLINE[2] * 0.6)] : OUTLINE;
+    });
+    mark.forEach((i, k) => { d[i] = cols[k][0]; d[i + 1] = cols[k][1]; d[i + 2] = cols[k][2]; d[i + 3] = 254; });
     x.putImageData(img, 0, 0);
     return c;
   }

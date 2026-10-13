@@ -68,8 +68,26 @@ const FX = (() => {
       ctx.globalAlpha = L.a ?? 0.5;
       ctx.drawImage(disc(r, L.c, GLOW), Math.round(L.x - r), Math.round(L.y - r));
     }
+    for (const L of lights) { // weicher Farbschein (SNES-Farbmathematik) über dem gestuften Licht
+      if (!L.c) continue;
+      const r = Math.round(L.r * 0.45) * 2;
+      ctx.globalAlpha = (L.a ?? 0.5) * 0.32;
+      ctx.drawImage(halo(r, L.c), Math.round(L.x - r), Math.round(L.y - r));
+    }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+  }
+  const halos = new Map();
+  function halo(r, rgb) {
+    const key = r + '|' + rgb;
+    let c = halos.get(key);
+    if (c) return c;
+    c = Sprites.canvas(r * 2, r * 2);
+    const x = c.getContext('2d'), g = x.createRadialGradient(r, r, 0, r, r, r);
+    g.addColorStop(0, `rgba(${rgb},0.9)`); g.addColorStop(0.35, `rgba(${rgb},0.45)`); g.addColorStop(1, `rgba(${rgb},0)`);
+    x.fillStyle = g; x.fillRect(0, 0, r * 2, r * 2);
+    halos.set(key, c);
+    return c;
   }
 
   // ---------------- Nebel ----------------

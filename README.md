@@ -24,9 +24,9 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 - **2 Helden**: Henrik (Peitsche) und Ragnor, Barbar aus dem Norden (Breitschwert + Wurfseil)
 - **3 Stages, 10 Räume** inkl. Kletterschächten und dem *Seelenstrudel* mit rotierendem Mode-7-Tunnel
 - **3 Bosse** mit Kino-Auftritt, Musik-Eskalation in Phase 2 und Zeitlupen-Finale; der Graf verwandelt den Thronsaal in einen Strudel
-- **SNES-Effekte**: Mode-7-Tunnel, Mode-7-Weltkarte, HDMA-Wellen, Mosaik-Übergänge
+- **SNES-Effekte**: Mode-7-Tunnel, Mode-7-Weltkarte, HDMA-Wellen, Mosaik-Übergänge, animierte Lichtstrahlen und weiche Farbsäume
 - **Spielgefühl**: Combos mit Punkte-Multiplikator, Pixel-Zerfall besiegter Gegner, Schockwellen, Trefferstopp, Nachbilder, Look-Ahead-Kamera, Herzschlag bei wenig Leben
-- **Welt**: Gewitter mit Blitzen, Ankerringe, Pendel-Kronleuchter, Aufzüge, Bröckelsteine, Checkpoint-Statuen, Truhen, Gespenster
+- **Welt**: Gewitter mit Blitzen, Ankerringe, Pendel-Kronleuchter mit begehbaren Etagen, drehende Zahnrad-Plattformen, Aufzüge, Bröckelsteine, Checkpoint-Statuen, Truhen, Gespenster
 - **Optionen**: Leicht-Modus (2× Leben, 2× Schaden), maximale Waffe, unendlich Herzen, Musik, Röhren-Look, Vollbild
 - **Musik**: eigener Chiptune-Soundtrack, live synthetisiert (Puls + Echo, Dreieck, Drumkit mit Doppelbass, Orgel-Fläche)
 

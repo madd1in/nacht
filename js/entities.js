@@ -201,7 +201,10 @@ class Player {
     if (this.state === 'stairs') return this.updateStairs(I, P);
     if (this.state === 'toStair') return this.updateToStair(I);
 
-    if (this.plat) { Phys.moveX(this, this.plat.dx); this.y += this.plat.dy || 0; this.plat = null; }
+    if (this.plat) { // Mitnahme; drehende Plattformen liefern die Bewegung des Standpunkts
+      const [cdx, cdy] = this.plat.carryAt ? this.plat.carryAt(this.cx) : [this.plat.dx, this.plat.dy || 0];
+      Phys.moveX(this, cdx); this.y += cdy; this.plat = null;
+    }
 
     if (this.state === 'hurt') {
       this.vy = Math.min(this.vy + GRAV, MAXFALL);
@@ -275,13 +278,18 @@ class Player {
   }
 
   checkPlatforms() {
+    const was = this.ridePlat; this.ridePlat = null;
     if (this.vy < 0) return;
     for (const p of W.platforms) {
       if (p.solid === false) continue;
       const prevFeet = this.feet - this.vy - 0.5;
-      if (this.x + this.w > p.x && this.x < p.x + p.w && prevFeet <= p.y + 3 && this.feet >= p.y - 0.5 && this.feet <= p.y + 10) {
+      let top = p.y, inX = this.x + this.w > p.x && this.x < p.x + p.w;
+      if (p.surfaceAt) { const s = p.surfaceAt(this.cx); inX = s !== null; top = s === null ? 0 : s; } // schräge Fläche
+      const up = was === p ? 6 : 0.5, slack = p.slack || 0; // wer schon draufsteht, bleibt kleben
+      if (inX && prevFeet <= top + 3 + slack && this.feet >= top - up && this.feet <= top + 10 + slack) {
         if (p.onStand) p.onStand();
-        this.y = p.y - this.h; this.vy = 0; this.onGround = true; this.jumping = false; this.canDouble = true; this.flipT = 0;
+        this.ridePlat = p;
+        this.y = top - this.h; this.vy = 0; this.onGround = true; this.jumping = false; this.canDouble = true; this.flipT = 0;
         if (this.state === 'hurt') { this.state = 'normal'; this.vx = 0; }
         this.plat = p;
       }

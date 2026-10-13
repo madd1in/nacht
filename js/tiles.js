@@ -148,6 +148,16 @@ const Tiles = (() => {
       for (let X = 0; X < w; X++) px(x, t > bay(X, y) ? cols[i + 1] : cols[i], X, y0 + y);
     }
   }
+  // HDMA-Verlauf wie auf dem SNES: jede Rasterzeile bekommt ihre eigene, weich interpolierte Farbe
+  function smooth(x, w, h, cols, y0 = 0) {
+    const rgb = cols.map(c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)));
+    const seg = h / (cols.length - 1);
+    for (let y = 0; y < h; y++) {
+      const f = y / seg, i = Math.min(cols.length - 2, Math.floor(f)), t = f - i;
+      x.fillStyle = `rgb(${rgb[i].map((v, k) => Math.round(v + (rgb[i + 1][k] - v) * t))})`;
+      x.fillRect(0, y0 + y, w, 1);
+    }
+  }
   function ditherDisc(x, cx, cy, r0, r1, col, maxD) {
     for (let y = -r1; y <= r1; y++) for (let X = -r1; X <= r1; X++) {
       const d = Math.hypot(X, y);
@@ -259,7 +269,7 @@ const Tiles = (() => {
       L.push({ name: 'tunnel', tunnel: true, par: 0, c: C(1, 1) });
     } else if (theme === 'courtyard') {
       const sky = C(640, 208), x = sky.getContext('2d');
-      gradient(x, 640, 208, ['#000000', '#05010f', '#0c031c', '#160629', '#220a36', '#320e44', '#461250', '#5a1658', '#6c1c5c']);
+      smooth(x, 640, 208, ['#000000', '#05010f', '#0c031c', '#160629', '#220a36', '#320e44', '#461250', '#5a1658', '#6c1c5c']);
       for (let i = 0; i < 160; i++) {
         const sx = ri(0, 639), sy = ri(0, 120), b = rand();
         px(x, b < 0.2 ? '#fcfcfc' : b < 0.6 ? '#9c9cbc' : '#5c5c7c', sx, sy);
@@ -397,7 +407,7 @@ const Tiles = (() => {
       }
     } else if (theme === 'cave') {
       const f = C(512, 208), x = f.getContext('2d');
-      gradient(x, 512, 208, ['#0a0402', '#140a04', '#1c0e06', '#140a04', '#080402']);
+      smooth(x, 512, 208, ['#0a0402', '#140a04', '#1c0e06', '#140a04', '#080402']);
       for (let i = 0; i < 90; i++) {
         const bx = ri(0, 511), by = ri(20, 200), r = ri(3, 12);
         for (let y = -r; y <= r; y++) for (let X = -r; X <= r; X++) if (X * X + y * y <= r * r) px(x, (X + y) < -r * 0.6 ? '#2c1a0c' : '#1e1008', (bx + X + 512) % 512, by + y);
