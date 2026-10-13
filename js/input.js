@@ -18,6 +18,8 @@ const Input = (() => {
   window.addEventListener('keydown', e => {
     lastDevice = 'keys';
     if (anyListener) anyListener();
+    if (e.code === 'KeyF') { Game.toggleFullscreen(); return; }
+    if (e.code !== 'Escape') Game.autoFullscreen();
     if (e.code === 'KeyM') { Audio8.toggleMute(); return; }
     if (e.code === 'KeyV') { Game.toggleCrt(); return; }
     const a = KEYS[e.code];
@@ -31,7 +33,9 @@ const Input = (() => {
     if (a) { kb[a] = false; e.preventDefault(); }
   });
   window.addEventListener('blur', () => ACTIONS.forEach(a => { kb[a] = false; touch[a] = false; }));
-  window.addEventListener('pointerdown', () => { if (anyListener) anyListener(); });
+  window.addEventListener('pointerdown', () => { if (anyListener) anyListener(); Game.autoFullscreen(); });
+  window.addEventListener('pointerup', () => Game.autoFullscreen());
+  window.addEventListener('touchend', () => Game.autoFullscreen());
 
   // ---------------- Gamepad ----------------
   const niceName = (id) => /xbox|xinput|045e/i.test(id) ? 'XBOX CONTROLLER' : /dualsense|dualshock|054c/i.test(id) ? 'PLAYSTATION CONTROLLER' : 'CONTROLLER';
@@ -85,40 +89,66 @@ const Input = (() => {
     } catch (e) { /* nicht unterstützt */ }
   }
 
-  // ---------------- Touch ----------------
+  // ---------------- Touch: schwebender Stick (linke Hälfte) + große Tasten (rechts) ----------------
   function setupTouch() {
     const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     if (isTouch) document.body.classList.add('touch');
-    const btns = document.querySelectorAll('#touch .tbtn');
-    const active = new Map(); // touchId -> action
+    const btns = [...document.querySelectorAll('#touch .tbtn')];
+    const base = document.getElementById('stickBase'), knob = document.getElementById('stickKnob'), hint = document.getElementById('stickHint');
+    const active = new Map(); // touchId -> Taste
+    const stick = { id: null, ox: 0, oy: 0, dx: 0, dy: 0 };
     const refresh = () => {
       ACTIONS.forEach(a => { touch[a] = false; });
       active.forEach(a => { touch[a] = true; });
+      if (stick.id !== null) {
+        const { dx, dy } = stick, dz = 14, ax = Math.abs(dx), ay = Math.abs(dy);
+        if (dx < -dz && ax > ay * 0.45) touch.left = true;
+        if (dx > dz && ax > ay * 0.45) touch.right = true;
+        if (dy < -dz && ay > ax * 0.45) touch.up = true;
+        if (dy > dz && ay > ax * 0.45) touch.down = true;
+      }
       btns.forEach(b => b.classList.toggle('on', !!touch[b.dataset.k]));
     };
-    const hitTest = (x, y) => {
+    const hitTest = (x, y) => { // großzügig: Rand + nächstgelegene Taste
+      let best = null, bd = 1e9;
       for (const b of btns) {
-        const r = b.getBoundingClientRect();
-        if (x >= r.left - 6 && x <= r.right + 6 && y >= r.top - 6 && y <= r.bottom + 6) return b.dataset.k;
+        const r = b.getBoundingClientRect(), cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+        const d = Math.hypot(x - cx, y - cy) - r.width / 2;
+        if (d < bd) { bd = d; best = b.dataset.k; }
       }
-      return null;
+      return bd < 34 ? best : null;
+    };
+    const showStick = () => {
+      base.classList.toggle('on', stick.id !== null);
+      if (stick.id === null) return;
+      base.style.left = stick.ox + 'px'; base.style.top = stick.oy + 'px';
+      const d = Math.hypot(stick.dx, stick.dy), k = d > 40 ? 40 / d : 1;
+      knob.style.transform = `translate(${stick.dx * k}px, ${stick.dy * k}px)`;
     };
     const onTouch = e => {
       lastDevice = 'touch';
       if (anyListener) anyListener();
-      for (const t of e.changedTouches) {
-        if (e.type === 'touchend' || e.type === 'touchcancel') active.delete(t.identifier);
-        else {
-          const a = hitTest(t.clientX, t.clientY);
-          if (a && e.type === 'touchstart') latch[a] = true;
-          if (a) active.set(t.identifier, a); else active.delete(t.identifier);
+      for (const tc of e.changedTouches) {
+        const id = tc.identifier, x = tc.clientX, y = tc.clientY;
+        if (e.type === 'touchstart') {
+          const a = hitTest(x, y);
+          if (a && (x > window.innerWidth * 0.45 || a === 'start')) { latch[a] = true; active.set(id, a); }
+          else if (x < window.innerWidth * 0.5 && stick.id === null) { stick.id = id; stick.ox = x; stick.oy = y; stick.dx = 0; stick.dy = 0; if (hint) hint.style.display = 'none'; }
+        } else if (e.type === 'touchmove') {
+          if (id === stick.id) {
+            stick.dx = x - stick.ox; stick.dy = y - stick.oy;
+            const d = Math.hypot(stick.dx, stick.dy);
+            if (d > 70) { stick.ox += stick.dx * (1 - 70 / d); stick.oy += stick.dy * (1 - 70 / d); stick.dx = x - stick.ox; stick.dy = y - stick.oy; }
+          } else if (active.has(id)) { const a = hitTest(x, y); if (a) active.set(id, a); }
+        } else {
+          if (id === stick.id) { stick.id = null; stick.dx = stick.dy = 0; }
+          active.delete(id);
         }
       }
-      refresh();
+      refresh(); showStick();
       e.preventDefault();
     };
-    ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(ev =>
-      document.addEventListener(ev, onTouch, { passive: false }));
+    ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, onTouch, { passive: false }));
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupTouch); else setupTouch();
 

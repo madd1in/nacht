@@ -111,6 +111,21 @@ const Audio8 = (() => {
     teleport: () => tone('pulse', 200, 1600, 0.35, 0.12, 0.125),
     rise: () => noise(0.4, 0.15, 'lowpass', 400, 1200),
     bat: () => tone('pulse', 2400, 1800, 0.05, 0.05, 0.125),
+    roar: () => { noise(1.4, 0.55, 'lowpass', 900, 90); tone('pulse', 140, 50, 1.2, 0.22, 0.5); tone('triangle', 90, 40, 1.3, 0.4); },
+    beat: () => { if (!ac) return; const t = ac.currentTime; tone('triangle', 75, 38, 0.14, 0.6, 0, t); tone('triangle', 70, 36, 0.12, 0.45, 0, t + 0.19); },
+    bell: () => { // Kirchenglocke: unharmonische Teiltöne mit langem Ausklang
+      if (!ac) return;
+      const t = ac.currentTime, f = 98;
+      [[1, 0.3, 4.5], [2.0, 0.16, 3.2], [2.76, 0.12, 2.6], [4.07, 0.08, 1.8], [5.4, 0.05, 1.2], [0.5, 0.14, 5]].forEach(([m, v, d]) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(f * m, t);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + d);
+        o.connect(g); g.connect(sfxBus); o.start(t); o.stop(t + d + 0.05);
+      });
+    },
+    boom: () => { noise(2.2, 0.6, 'lowpass', 500, 35); tone('triangle', 70, 28, 1.8, 0.5); tone('pulse', 55, 30, 0.9, 0.12, 0.5); },
+    latch: () => { tone('pulse', 1800, 2600, 0.06, 0.12, 0.125); noise(0.08, 0.2, 'highpass', 5000); },
+    whoosh: () => noise(0.22, 0.28, 'bandpass', 600, 3000),
     djump: () => { tone('pulse', 420, 1250, 0.11, 0.11, 0.25); noise(0.12, 0.12, 'highpass', 3500, 7000); },
     ready: () => arp(['e6', 'a6', 'e7'], 0.04, 'pulse', 0.12, 0.125),
     crash: () => { arp(['a4', 'e5', 'a5', 'c#6', 'e6', 'a6', 'c#7'], 0.035, 'pulse', 0.16, 0.5); noise(0.9, 0.4, 'highpass', 5000, 800); tone('triangle', 220, 55, 0.7, 0.4); },
@@ -141,9 +156,16 @@ const Audio8 = (() => {
   const FILLS = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 k:1 k:1 s:1 k:1 s:1 q:1 s:1 s:1 s:1';
   const FILLB = 'k:1 s:1 s:1 k:1 s:1 s:1 t:1 t:1 u:1 u:1 t:1 u:1 q:1 s:1 q:1 s:1';
   const section = () => [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB].join(' ');
+  // B-Teil: Doppelbass in 16teln, Snare-Rolls, Riser vor dem Loop
+  const DK = 'z:1 z:1 z:1 z:1 q:1 z:1 z:1 z:1 z:1 z:1 z:1 z:1 q:1 z:1 r:1 r:1';
+  const DKX = 'x:1 z:1 z:1 z:1 q:1 z:1 z:1 z:1 z:1 z:1 z:1 z:1 q:1 z:1 r:1 r:1';
+  const FILLR = 'k:1 s:1 s:1 k:1 r:1 r:1 r:1 r:1 w:8';
+  const sectionB = () => [DKX, DK, DK, FILLS, DK, DK, DK, FILLR].join(' ');
   // 3er-Arpeggio gegen den 4er-Takt: verschiebt sich ständig und treibt nach vorn
   const arp3 = (a, b, c) => Array.from({ length: 16 }, (_, i) => [a, b, c][i % 3] + ':1').join(' ');
   const chordArps = (list, m) => list.map(c => arp3(...m[c])).join(' ');
+  const arp3f = (a, b, c) => Array.from({ length: 32 }, (_, i) => [a, b, c][i % 3] + ':0.5').join(' '); // 32tel
+  const chordArps2 = (list, m) => list.map((c, i) => (i < 8 ? arp3 : arp3f)(...m[c])).join(' ');
   const chordBass = (list, m, fn) => list.map(c => fn(...m[c])).join(' ');
 
   // Stage 1 – Burgsturm (d-Moll, 168 BPM)
@@ -165,8 +187,9 @@ const Audio8 = (() => {
       p1: 'd5:8 a4:4 f4:4 a#4:8 a4:4 g4:4 a4:6 g4:2 f4:4 e4:4 d4:12 -:4 f5:8 e5:4 d5:4 g5:8 f5:4 e5:4 f5:4 e5:4 d5:4 c#5:4 d5:12 -:4',
       p2: [arp4('d4', 'f4', 'a4', 2, 2), arp4('a#3', 'd4', 'f4', 2, 2), arp4('a3', 'c#4', 'e4', 2, 2), arp4('d4', 'f4', 'a4', 2, 2),
         arp4('d4', 'f4', 'a4', 2, 2), arp4('g3', 'a#3', 'd4', 2, 2), arp4('a3', 'c#4', 'e4', 2, 2), arp4('d4', 'f4', 'a4', 2, 2)].join(' '),
-      tri: 'd2:16 a#1:16 a1:16 d2:16 d2:16 g1:16 a1:16 d2:16',
-      dr: [rep('-:12 h:4', 4), rep('k:4 h:4 s:4 h:4', 3), 'k:2 k:2 s:2 s:2 t:2 t:2 u:2 c:2'].join(' '),
+      tri: ['d2:16 a#1:16 a1:16 d2:16', drive('d2', 'd3'), drive('g1', 'g2'), drive('a1', 'a2'), drive('d2', 'd3')].join(' '),
+      pad: 'd3+f3+a3+d4:16 a#2+d3+f3+a#3:16 a2+c#3+e3+a3:16 d3+f3+a3+d4:16 d3+f3+a3+d4:16 g2+a#2+d3+g3:16 a2+c#3+e3+a3:16 d3+f3+a3+d4:16',
+      dr: [rep('u:4 -:4 u:2 u:2 t:4', 3), 'w:16', FOURX, FOUR, FOUR, FILLR].join(' '),
       echo: { delay: 4, vol: 0.3 },
     },
     stage1: {
@@ -181,7 +204,7 @@ const Audio8 = (() => {
         'f5:2 a#5:2 d6:2 f6:4 d6:2 a#5:2 f5:2', 'e5:2 g5:2 c6:2 e6:4 d6:2 c6:2 a#5:2',
         'a5:2 c#6:2 e6:2 a6:4 g6:2 f6:2 e6:2', 'c#6:2 a5:2 e5:2 c#5:2 a4:4 -:4',
       ].join(' '),
-      p2: chordArps(S1C, S1), tri: chordBass(S1C, S1B, drive), dr: section() + ' ' + section(),
+      p2: chordArps2(S1C, S1), tri: chordBass(S1C, S1B, drive), dr: section() + ' ' + sectionB(),
     },
     stage2: {
       bpm: 166, loop: true, echo: { delay: 3, vol: 0.35 },
@@ -195,7 +218,7 @@ const Audio8 = (() => {
         'c6:3 b5:1 a5:2 f5:2 a5:2 c6:2 f6:4', 'd6:3 c6:1 b5:2 g5:2 b5:2 d6:2 g6:4',
         'e6:2 d6:2 b5:2 g#5:2 b5:2 g#5:2 e5:2 d5:2', 'b4:2 e5:2 g#5:2 b5:2 e6:8',
       ].join(' '),
-      p2: chordArps(S2C, S2), tri: chordBass(S2C, S2B, drive), dr: section() + ' ' + section(),
+      p2: chordArps2(S2C, S2), tri: chordBass(S2C, S2B, drive), dr: section() + ' ' + sectionB(),
     },
     stage3: {
       bpm: 184, loop: true, echo: { delay: 3, vol: 0.3 },
@@ -209,7 +232,7 @@ const Audio8 = (() => {
         'e6:2 c6:2 g5:2 c6:2 e6:2 g6:2 e6:2 c6:2', 'f#6:2 d6:2 a5:2 d6:2 f#6:2 a6:2 f#6:2 d6:2',
         'd#6:2 f#6:2 b6:4 a6:2 f#6:2 d#6:2 b5:2', 'b5:4 a5:2 g5:2 f#5:4 d#5:4',
       ].join(' '),
-      p2: chordArps(S3C, S3), tri: chordBass(S3C, S3B, drive), dr: section() + ' ' + section(),
+      p2: chordArps2(S3C, S3), tri: chordBass(S3C, S3B, drive), dr: section() + ' ' + sectionB(),
     },
     boss: {
       bpm: 192, loop: true, echo: { delay: 2, vol: 0.28 },
@@ -221,7 +244,7 @@ const Audio8 = (() => {
       ].join(' '),
       p2: [rep('d4:1 d5:1', 16), rep('d#4:1 d#5:1', 16), rep('d4:1 d5:1', 16), rep('c#4:1 c#5:1', 16)].join(' '),
       tri: [drive('d2', 'd3'), drive('d2', 'd3'), drive('d#2', 'd#3'), drive('d#2', 'd#3'), drive('d2', 'd3'), drive('d2', 'd3'), drive('c#2', 'c#3'), drive('c#2', 'c#3')].join(' '),
-      dr: [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB].join(' '),
+      dr: [FOURX, DK, FOUR, FILLS, DK, DK, DK, FILLR].join(' '),
     },
     clear: {
       bpm: 150, loop: false,
@@ -250,13 +273,15 @@ const Audio8 = (() => {
   function parse(str) {
     return str.trim().split(/\s+/).map(tok => {
       const [n, l] = tok.split(':');
-      return { n, len: parseInt(l || '1', 10) };
+      return { n, len: parseFloat(l || '1') };
     });
   }
+  // Boss Phase 2: schneller, durchgehend Doppelbass
+  SONGS.boss2 = Object.assign({}, SONGS.boss, { bpm: 212, dr: [DKX, DK, DK, FILLR, DKX, DK, DK, FILLR].join(' ') });
   const parsed = {};
   for (const k in SONGS) {
     const s = SONGS[k];
-    const tracks = ['p1', 'p2', 'tri', 'dr'].map(t => ({ name: t, ev: parse(s[t]) }));
+    const tracks = ['p1', 'p2', 'tri', 'dr', 'pad'].filter(t => s[t]).map(t => ({ name: t, ev: parse(s[t]) }));
     const lens = tracks.map(t => t.ev.reduce((a, e) => a + e.len, 0));
     if (new Set(lens).size > 1) console.warn('Songlänge ungleich', k, lens);
     parsed[k] = { bpm: s.bpm, loop: s.loop, echo: s.echo, tracks, steps: lens[0] };
@@ -270,8 +295,18 @@ const Audio8 = (() => {
     melBus.gain.setValueAtTime(0.45, t);
     melBus.gain.linearRampToValueAtTime(1, t + 0.12);
   }
-  function drum(n, t) {
-    if (n === 'k' || n === 'x' || n === 'q') {
+  function drum(n, t, dur) {
+    if (n === 'w') { // Riser: Rauschen schwillt an und steigt
+      const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+      const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2;
+      f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(9000, t + dur);
+      const g = ac.createGain(); g.gain.setValueAtTime(0.01, t); g.gain.linearRampToValueAtTime(0.38, t + dur * 0.95); g.gain.linearRampToValueAtTime(0, t + dur);
+      src.connect(f); f.connect(g); g.connect(musicBus); src.start(t); src.stop(t + dur + 0.02);
+      return;
+    }
+    if (n === 'r') { noise(0.06, 0.3, 'bandpass', 2000, 1100, t, musicBus); noise(0.06, 0.34, 'bandpass', 2000, 1100, t + dur / 2, musicBus); return; }
+    if (n === 'z') noise(0.03, 0.1, 'highpass', 8000, null, t, musicBus);
+    if (n === 'k' || n === 'x' || n === 'q' || n === 'z') {
       duck(t);
       const o = osc('triangle'), g = ac.createGain();
       o.frequency.setValueAtTime(170, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.11);
@@ -313,9 +348,22 @@ const Audio8 = (() => {
     o.start(t); o.stop(t + gate + 0.02);
   }
 
+  // Orgel/Chor: verstimmte Sägezähne durch Tiefpass, langsamer Einsatz
+  function padNote(f, t, dur) {
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 2;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.045, t + 0.5); g.gain.setValueAtTime(0.045, t + dur * 0.8); g.gain.linearRampToValueAtTime(0, t + dur + 0.6);
+    [-7, 7].forEach(cents => {
+      const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = cents;
+      o.connect(lp); o.start(t); o.stop(t + dur + 0.7);
+    });
+    lp.connect(g); g.connect(melBus);
+  }
+
   function playEvent(track, ev, t, stepDur) {
     if (ev.n === '-') return;
-    if (track === 'dr') { drum(ev.n, t); return; }
+    if (track === 'pad') { ev.n.split('+').forEach(n => { const f = freq(n); if (f) padNote(f, t, ev.len * stepDur); }); return; }
+    if (track === 'dr') { drum(ev.n, t, ev.len * stepDur); return; }
     const f = freq(ev.n);
     if (!f) return;
     const dur = ev.len * stepDur;
@@ -366,6 +414,27 @@ const Audio8 = (() => {
       melBus = ac.createGain(); melBus.connect(musicBus);
     }
   }
+  // Regen-/Wind-Ambiente (gefiltertes Rauschen in Schleife)
+  let rainNode = null;
+  function ambience(on) {
+    if (!ac) return;
+    if (on && !rainNode) {
+      const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+      const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
+      const g = ac.createGain(); g.gain.value = 0;
+      g.gain.setTargetAtTime(0.07, ac.currentTime, 0.8);
+      const lfo = ac.createOscillator(), lg = ac.createGain(); // Windböen
+      lfo.frequency.value = 0.13; lg.gain.value = 0.03; lfo.connect(lg); lg.connect(g.gain); lfo.start();
+      s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master); s.start();
+      rainNode = { s, g, lfo };
+    } else if (!on && rainNode) {
+      const r = rainNode; rainNode = null;
+      r.g.gain.setTargetAtTime(0, ac.currentTime, 0.4);
+      setTimeout(() => { try { r.s.stop(); r.lfo.stop(); } catch (e) { /* schon gestoppt */ } }, 1500);
+    }
+  }
+
   function toggleMute() {
     muted = !muted;
     if (master) master.gain.setTargetAtTime(muted ? 0 : 0.7, ac.currentTime, 0.02);
@@ -374,5 +443,5 @@ const Audio8 = (() => {
   function setMusicVolume(v) { if (musicBus && ac) musicBus.gain.setTargetAtTime(v * (MUSIC_VOL / 0.5) * musicLevel, ac.currentTime, 0.05); }
   function setMusicLevel(l) { musicLevel = l; if (musicBus && ac) musicBus.gain.setTargetAtTime(MUSIC_VOL * l, ac.currentTime, 0.05); }
 
-  return { init, sfx, play, stop, toggleMute, setMusicVolume, setMusicLevel, ready, get current() { return songName; }, _songs: parsed };
+  return { init, sfx, play, stop, ambience, toggleMute, setMusicVolume, setMusicLevel, ready, get current() { return songName; }, _songs: parsed };
 })();

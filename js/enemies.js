@@ -18,7 +18,12 @@ class Ent {
   update() { this.t++; }
   draw() {}
   spr(ctx, s, flip, ox = 0, oy = 0, flash = false) {
-    Sprites.draw(ctx, s, Math.round(this.cx - s.w / 2 + ox - W.cam.x), Math.round(this.y + this.h - s.h + oy - W.cam.y), flip, flash);
+    this.ds(ctx, s, Math.round(this.cx - s.w / 2 + ox - W.cam.x), Math.round(this.y + this.h - s.h + oy - W.cam.y), flip, flash);
+  }
+  // Zeichnen + merken (Weltkoordinaten), damit der Pixel-Zerfall die exakte Figur zerlegen kann
+  ds(ctx, s, x, y, flip = false, flash = false) {
+    this.lastDraw = { s, x: x + W.cam.x, y: y + W.cam.y, flip };
+    Sprites.draw(ctx, s, x, y, flip, flash);
   }
 }
 
@@ -205,6 +210,7 @@ class Enemy extends Ent {
     this.lastHit = id;
     this.hp -= dmg; this.flashT = 10;
     W.spawn(new Spark(this.cx, this.cy));
+    W.comboHit(); W.hitstop = Math.max(W.hitstop, 2);
     if (this.hp <= 0) this.kill(); else Audio8.sfx('hit');
     return true;
   }
@@ -214,7 +220,10 @@ class Enemy extends Ent {
     Audio8.sfx('kill');
     W.spawn(new Burst(this.cx, this.cy));
     W.sparks(this.cx, this.cy, 9);
-    W.addScore(this.score, this.cx, this.y);
+    Drama.disintegrate(this.lastDraw);
+    W.spawn(new Shock(this.cx, this.cy, 22, '#fce0a8', 3));
+    W.hitstop = Math.max(W.hitstop, 4); W.shake = Math.max(W.shake, 4);
+    W.addScore(this.score * W.comboMul(), this.cx, this.y);
     if (Math.random() < 0.1) W.spawn(new Item('heartS', this.cx, this.cy));
   }
   physics() {
@@ -294,7 +303,7 @@ class Bat extends Enemy {
   draw(ctx) {
     const B = Sprites.S.bat;
     const s = this.state === 'perch' ? B.perch : B.fly[Math.floor(this.t / 6) % 2];
-    Sprites.draw(ctx, s, Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - W.cam.y - 1), false, this.flash);
+    this.ds(ctx, s, Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - W.cam.y - 1), false, this.flash);
   }
 }
 
@@ -309,7 +318,7 @@ class Skull extends Enemy {
     if (this.t > 900) this.dead = true;
   }
   draw(ctx) {
-    Sprites.draw(ctx, Sprites.S.skull[Math.floor(this.t / 5) % 2], Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - 4 - W.cam.y), this.dir > 0, this.flash);
+    this.ds(ctx, Sprites.S.skull[Math.floor(this.t / 5) % 2], Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - 4 - W.cam.y), this.dir > 0, this.flash);
   }
 }
 

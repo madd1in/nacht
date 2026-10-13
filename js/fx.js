@@ -30,8 +30,8 @@ const FX = (() => {
     return c;
   }
 
-  const AMB = { courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
-  const TINT = { courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
+  const AMB = { vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
+  const TINT = { vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
   const lc = Sprites.canvas(256, 208), lx = lc.getContext('2d');
   let vignette = null;
 
@@ -74,7 +74,7 @@ const FX = (() => {
 
   // ---------------- Nebel ----------------
   const fogCache = {};
-  const FOG = { courtyard: [120, 70, 170, 0.5], cave: [70, 110, 60, 0.32], crypt: [90, 120, 220, 0.42], tower: [110, 110, 130, 0.22] };
+  const FOG = { vortex: [160, 60, 220, 0.45], courtyard: [120, 70, 170, 0.5], cave: [70, 110, 60, 0.32], crypt: [90, 120, 220, 0.42], tower: [110, 110, 130, 0.22] };
   function fogStrip(theme) {
     if (fogCache[theme]) return fogCache[theme];
     const f = FOG[theme];
@@ -167,6 +167,7 @@ const FX = (() => {
       : ({ x: c.x + Math.random() * View.w, y: c.y + 140 + Math.random() * 60, vx: 0, vy: -0.25, life: 220, col: '#58f898', kind: 'spore' }) },
     crypt: { max: 16, rate: 0.15, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + 150 + Math.random() * 50, vx: 0.15, vy: -0.3, life: 200, col: '#a4e4fc', kind: 'wisp' }) },
     tower: { max: 22, rate: 0.22, make: (c) => ({ x: c.x + Math.random() * (View.w + 44), y: c.y - 4, vx: -0.25, vy: 0.35, life: 600, col: '#7c7c7c', kind: 'ash' }) },
+    vortex: { max: 26, rate: 0.35, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + 205, vx: 0, vy: -0.7, life: 300, col: Math.random() < 0.5 ? '#c860fc' : '#fc3c8c', kind: 'ember' }) },
     throne: { max: 20, rate: 0.2, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + 200, vx: 0, vy: -0.45, life: 380, col: Math.random() < 0.5 ? '#f8b800' : '#d82800', kind: 'ember' }) },
   };
   function resetAmbient() { amb = []; }

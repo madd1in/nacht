@@ -54,6 +54,12 @@ const Phys = {
 const WALK = 1.3, JUMP = -4.3, GRAV = 0.21, MAXFALL = 4.2, ATK_LEN = 22;
 const WHIP_LEN = [0, 26, 26, 42];
 const SWORD_LEN = [0, 20, 22, 30];
+// Peitschen-/Schwertrichtungen: Handposition (relativ zur Figur, nach rechts schauend) und Winkel
+const WHIP_DIRS = {
+  fwd: { hx: 15, hy: 9, a: 0 }, upd: { hx: 14, hy: 1, a: -Math.PI / 4 }, up: { hx: 13, hy: 0, a: -Math.PI / 2 },
+  downd: { hx: 15, hy: 10, a: Math.PI / 4 }, down: { hx: 11, hy: 12, a: Math.PI / 2 },
+};
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 class Player {
   constructor() {
@@ -71,6 +77,7 @@ class Player {
     this.stairUpPose = true; this.deadT = 0; this.plat = null; this.powerT = 0;
     this.canDouble = true; this.flipT = 0; this.scarf = null; this.hidden = false;
     this.chargeT = 0; this.crashT = 0; this.landT = 0; this.lastSafe = { cx: fx, feet: fy };
+    this.atkDir = 'fwd'; this.slideT = 0; this.flingT = 0; this.trail = []; this.dangle = false; this.ring = null;
   }
   get cx() { return this.x + this.w / 2; }
   get cy() { return this.y + this.h / 2; }
@@ -91,28 +98,43 @@ class Player {
     else { this.atkSub = false; Audio8.sfx('whip'); }
     this.atkT = 1; this.atkId = ++W.atkId;
     this.crouchAtk = this.crouch && this.state === 'normal';
+    const I = Input.held, horiz = I.left || I.right;
+    this.atkDir = 'fwd';
+    if (!this.atkSub && this.state === 'normal' && !this.crouchAtk) {
+      if (I.up) this.atkDir = horiz ? 'upd' : 'up';
+      else if (I.down && !this.onGround) this.atkDir = horiz ? 'downd' : 'down';
+    }
   }
 
   tickAttack() {
     if (this.atkT === 0) return;
     this.atkT++;
     if (this.atkSub && this.atkT === 9) this.throwSub();
+    if (!this.atkSub && this.atkT === 12 && this.tryLatch()) return;
     if (!this.atkSub && this.atkT >= 12 && this.atkT <= 17) this.whipHits();
-    if (this.atkT > ATK_LEN) this.atkT = 0;
+    if (this.atkT > ATK_LEN) {
+      this.atkT = 0;
+      if (!this.atkSub && Input.held.attack && this.state === 'normal') this.startDangle(); // Taste gehalten → Peitsche drehen
+    }
   }
   get atkPose() { return this.atkT < 7 ? 0 : this.atkT < 12 ? 1 : 2; }
 
   spriteTop(spr) { return this.y + this.h - spr.h; }
 
+  get dir() { return WHIP_DIRS[this.crouchAtk ? 'fwd' : this.atkDir] || WHIP_DIRS.fwd; }
+  atkTop() { return this.feet - (this.crouchAtk ? 25 : 32); }
+  // Hand in Weltkoordinaten
+  hand() {
+    const D = this.dir, sx = this.x - 3;
+    return { x: this.face > 0 ? sx + D.hx : sx + 16 - D.hx, y: this.atkTop() + D.hy };
+  }
+  // Trefferzonen entlang der Peitsche/Klinge im aktuellen Winkel
   whipBox() {
-    const top = this.feet - (this.crouchAtk ? 24 : 32);
-    const sx = this.x - 3;
-    if (this.sword) { // kürzer, aber hoher Hiebbogen
-      const len = SWORD_LEN[this.whip];
-      return { x: this.face > 0 ? sx + 11 : sx + 5 - len, y: top - 4, w: len, h: 22 };
-    }
-    const len = WHIP_LEN[this.whip];
-    return { x: this.face > 0 ? sx + 15 : sx + 1 - len, y: top + 5, w: len, h: 8 };
+    const D = this.dir, h = this.hand(), len = (this.sword ? SWORD_LEN : WHIP_LEN)[this.whip], rad = this.sword ? 8 : 4;
+    const ca = Math.cos(D.a) * this.face, sa = Math.sin(D.a), n = Math.ceil(len / 6), out = [];
+    for (let k = 1; k <= n; k++) { const px = h.x + ca * len * k / n, py = h.y + sa * len * k / n; out.push({ x: px - rad, y: py - rad, w: rad * 2, h: rad * 2 }); }
+    if (this.sword && this.atkDir === 'fwd') out.push({ x: h.x + (this.face > 0 ? 0 : -len), y: h.y - 16, w: len, h: 14 }); // Hiebbogen
+    return out;
   }
 
   whipHits() {
@@ -129,6 +151,8 @@ class Player {
 
   hurt(dmg, srcX) {
     if (this.inv > 0 || !this.alive || W.cleared) return;
+    this.dangle = false; W.combo.n = 0; W.combo.t = 0;
+    if (this.state === 'swing') { this.state = 'normal'; this.ring = null; }
     this.hp -= dmg;
     Audio8.sfx('hurt'); Input.rumble(0.45, 0.7, 200);
     if (this.hp <= 0) { this.hp = 0; this.die(); return; }
@@ -171,7 +195,9 @@ class Player {
     if (this.inv > 0) this.inv--;
     if (this.crashT > 0) this.crashT--;
     this.updateCharge(I);
+    this.recordTrail();
 
+    if (this.state === 'swing') return this.updateSwing(I, P);
     if (this.state === 'stairs') return this.updateStairs(I, P);
     if (this.state === 'toStair') return this.updateToStair(I);
 
@@ -188,10 +214,14 @@ class Player {
       return;
     }
 
+    if (this.slideT > 0) return this.updateSlide(I);
+
     // Angriff
     if (P.sub) this.tryAttack(true, true);
-    else if (P.attack) this.tryAttack(I.up, false);
+    else if (P.attack && !this.dangle) this.tryAttack(false, false);
     this.tickAttack();
+    if (this.state === 'swing') return;
+    this.updateDangle(I);
 
     // Ducken
     if (this.atkT === 0) this.setCrouch(this.onGround && I.down && !this.findStair(true));
@@ -212,11 +242,13 @@ class Player {
       if (this.atkT > 0 || this.crouch) this.vx = 0;
       else { this.vx = mx * WALK; if (mx) this.face = mx; }
       if (P.jump && this.atkT === 0) {
+        if (I.down && !this.findStair(true)) return this.startSlide(); // Rutschen: Unten + Sprung
         this.setCrouch(false);
         this.vy = JUMP; this.onGround = false; this.jumping = true;
       }
     } else {
-      this.vx = mx * WALK;
+      if (this.flingT > 0) { this.flingT--; this.vx += (mx * WALK - this.vx) * 0.05; } // Schwung nach dem Pendeln
+      else this.vx = mx * WALK;
       if (mx && this.atkT === 0) this.face = mx;
       if (P.jump && this.canDouble) { // Doppelsprung (einmal pro Luftphase)
         this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true;
@@ -234,7 +266,7 @@ class Player {
     this.onGround = r === 1;
     if (this.onGround && !wasGround && this.vy > 2.4) { this.landT = 7; W.dust(this.cx, this.feet, 5); }
     if (r !== 0) { this.vy = 0; }
-    if (this.onGround) { this.jumping = false; this.canDouble = true; this.flipT = 0; }
+    if (this.onGround) { this.jumping = false; this.canDouble = true; this.flipT = 0; this.flingT = 0; }
     this.checkPlatforms();
     if (!this.onGround && wasGround && !this.jumping && this.vy > 0) this.vx = 0;
     this.clampRoom();
@@ -345,7 +377,7 @@ class Player {
   updateStairs(I, P) {
     const s = this.stair;
     if (P.sub) this.tryAttack(true, true);
-    else if (P.attack) this.tryAttack(I.up, false);
+    else if (P.attack) this.tryAttack(false, false);
     if (this.atkT > 0) { this.tickAttack(); return; }
     let m = 0;
     if (I.up || (s.dir > 0 ? I.right : I.left)) m = 1;
@@ -364,16 +396,149 @@ class Player {
     this.placeOnStair();
   }
 
+  // ---------- Ankerringe: Peitsche einhaken und pendeln ----------
+  tryLatch() {
+    if (this.state !== 'normal' || !W.rings || !W.rings.length) return false;
+    const D = this.dir, h = this.hand(), reach = (this.sword ? SWORD_LEN : WHIP_LEN)[this.whip] + 48;
+    const wa = Math.atan2(Math.sin(D.a), Math.cos(D.a) * this.face);
+    for (const r of W.rings) { // großzügig wie bei Super Castlevania IV
+      const dx = r.cx - h.x, dy = r.cy - h.y, d = Math.hypot(dx, dy);
+      if (d > reach || d < 8 || dy > 30 || Math.abs(angDiff(Math.atan2(dy, dx), wa)) > 0.8) continue;
+      this.state = 'swing'; this.ring = r; this.atkT = 0; this.dangle = false; this.setCrouch(false);
+      this.swL = clamp(Math.hypot(this.cx - r.cx, this.cy - r.cy), 26, 76);
+      this.swA = Math.atan2(this.cx - r.cx, this.cy - r.cy);
+      this.swW = clamp((this.vx * Math.cos(this.swA) - this.vy * Math.sin(this.swA)) / this.swL, -0.08, 0.08);
+      this.onGround = false; this.vy = 0;
+      Audio8.sfx('latch'); Input.rumble(0.3, 0.2, 120); W.sparks(r.cx, r.cy, 6);
+      return true;
+    }
+    return false;
+  }
+
+  updateSwing(I, P) {
+    const r = this.ring;
+    this.swW += -(GRAV / this.swL) * Math.sin(this.swA);
+    if (I.left) this.swW -= 0.0034;
+    if (I.right) this.swW += 0.0034;
+    this.swW = clamp(this.swW * 0.996, -0.13, 0.13);
+    if (I.up) this.swL = Math.max(24, this.swL - 0.7);
+    if (I.down) this.swL = Math.min(80, this.swL + 0.7);
+    this.swA += this.swW;
+    if (Math.abs(this.swA) > 1.5) { this.swA = Math.sign(this.swA) * 1.5; this.swW *= -0.3; }
+    const nx = r.cx + Math.sin(this.swA) * this.swL - this.w / 2, ny = r.cy + Math.cos(this.swA) * this.swL - this.h / 2;
+    if (Phys.rectSolid(nx, ny, this.w, this.h)) this.swW *= -0.4;
+    else { this.x = nx; this.y = ny; }
+    if (Math.abs(this.swW) > 0.004) this.face = this.swW > 0 ? 1 : -1;
+    if (W.frame % 18 === 0 && Math.abs(this.swW) > 0.05) Audio8.sfx('whoosh');
+    if (P.jump || P.attack) this.releaseSwing(P.jump);
+    this.clampRoom();
+  }
+
+  releaseSwing(jump) {
+    const L = this.swL, A = this.swA, w = this.swW;
+    this.vx = clamp(Math.cos(A) * w * L, -3.6, 3.6);
+    this.vy = clamp(-Math.sin(A) * w * L, -5, 4) - (jump ? 2.6 : 0);
+    this.state = 'normal'; this.ring = null; this.onGround = false; this.jumping = true; this.canDouble = true; this.flingT = 50;
+    if (jump) { this.flipT = 20; Audio8.sfx('djump'); W.puff(this.cx, this.feet); }
+  }
+
+  // ---------- Peitsche drehen (Taste halten) / Schwertwirbel ----------
+  startDangle() {
+    this.dangle = true; this.dT = 0; this.dAngV = 0;
+    this.dAng = this.face > 0 ? 0 : Math.PI;
+    const n = this.sword ? 5 : [0, 6, 6, 9][this.whip];
+    this.dSeg = Array(n).fill(this.dAng); this.dId = ++W.atkId;
+  }
+  danglePoints() {
+    const hx = this.cx + this.face * 5, hy = this.feet - 22, pts = [];
+    let x = hx, y = hy;
+    for (const a of this.dSeg) { x += Math.cos(a) * (this.sword ? 4.5 : 4); y += Math.sin(a) * (this.sword ? 4.5 : 4); pts.push([x, y]); }
+    return pts;
+  }
+  updateDangle(I) {
+    if (!this.dangle) return;
+    if (!I.attack || this.state !== 'normal' || this.atkT > 0) { this.dangle = false; return; }
+    this.dT++;
+    if (this.sword) this.dAng += 0.3 * this.face;
+    else {
+      const dx = (I.right ? 1 : 0) - (I.left ? 1 : 0), dy = (I.down ? 1 : 0) - (I.up ? 1 : 0);
+      const target = (dx || dy) ? Math.atan2(dy, dx) : Math.PI / 2;
+      this.dAngV = (this.dAngV + angDiff(target, this.dAng) * 0.06) * 0.86;
+      this.dAng += this.dAngV;
+    }
+    this.dSeg[0] = this.dAng;
+    for (let i = 1; i < this.dSeg.length; i++) this.dSeg[i] += angDiff(this.dSeg[i - 1], this.dSeg[i]) * (this.sword ? 1 : 0.4);
+    if (this.dT % 14 === 0) this.dId = ++W.atkId;
+    W.whipAt(this.danglePoints().map(([x, y]) => ({ x: x - 3, y: y - 3, w: 6, h: 6 })), Options.dmgMul, this.dId);
+    if (this.dT % 12 === 0 && (this.sword || Math.abs(this.dAngV) > 0.05)) Audio8.sfx('whoosh');
+  }
+  drawDangle(ctx, cam) {
+    const pts = this.danglePoints(), lvl = this.whip;
+    if (this.sword) {
+      const [x0, y0] = [this.cx + this.face * 5 - cam.x, this.feet - 22 - cam.y], [x1, y1] = pts[pts.length - 1];
+      for (let k = 0; k <= 20; k++) {
+        const t = k / 20, x = Math.round(x0 + (x1 - cam.x - x0) * t), y = Math.round(y0 + (y1 - cam.y - y0) * t);
+        ctx.fillStyle = k < 4 ? '#5c3c20' : k === 4 ? '#f8b800' : (k % 2 ? ['', '#c89040', '#a8b0c8', '#fcfcfc'][lvl] : '#fce0a8');
+        ctx.fillRect(x, y, 2, 2);
+      }
+      return;
+    }
+    pts.forEach(([x, y], i) => {
+      ctx.fillStyle = lvl === 1 ? (i % 3 === 0 ? PAL.B : PAL.b) : (i % 2 ? PAL.g : PAL.W);
+      ctx.fillRect(Math.round(x - cam.x), Math.round(y - cam.y), 2, 2);
+    });
+    if (lvl === 3) { const [x, y] = pts[pts.length - 1]; ctx.fillStyle = PAL.W; ctx.fillRect(Math.round(x - cam.x) - 2, Math.round(y - cam.y) - 2, 5, 5); ctx.fillStyle = PAL.w; ctx.fillRect(Math.round(x - cam.x) - 1, Math.round(y - cam.y) - 1, 2, 2); }
+  }
+
+  // ---------- Rutschen (Unten + Sprung) ----------
+  startSlide() {
+    this.slideT = 26; this.dangle = false; this.setCrouch(true);
+    this.vx = this.face * 3.6; this.inv = Math.max(this.inv, 16);
+    Audio8.sfx('whoosh'); W.dust(this.cx, this.feet, 5);
+  }
+  updateSlide() {
+    this.slideT--;
+    this.vx = this.face * Math.max(0.8, 3.6 * this.slideT / 26 + 0.4);
+    if (this.slideT % 3 === 0) W.dust(this.cx - this.face * 5, this.feet, 1);
+    this.vy = Math.min(this.vy + GRAV, MAXFALL);
+    if (Phys.moveX(this, this.vx)) this.slideT = 0;
+    const r = Phys.moveY(this, this.vy);
+    this.onGround = r === 1;
+    if (r) this.vy = 0;
+    this.checkPlatforms();
+    if (!this.onGround) this.slideT = 0;
+    this.clampRoom(); this.hazards(); this.trackSafe();
+    if (this.slideT === 0) { this.setCrouch(false); if (Phys.rectSolid(this.x, this.y, this.w, this.h)) this.setCrouch(true); }
+  }
+
+  // ---------- Nachbilder bei schnellen Bewegungen ----------
+  recordTrail() {
+    this.trail.forEach(t => t.life--);
+    this.trail = this.trail.filter(t => t.life > 0);
+    const fast = this.flipT > 0 || this.crashT > 0 || this.slideT > 0 || this.state === 'swing' || this.flingT > 25;
+    if (!fast || W.frame % 2) return;
+    const spr = this.sprite();
+    if (spr === this.H.dead) return;
+    this.trail.push({ spr, x: this.x - 3 - (spr.mx || 0), y: this.feet - spr.h, flip: this.face < 0, life: 12 });
+    if (this.trail.length > 6) this.trail.shift();
+  }
+
   sprite() {
     const H = this.H, p = this.atkPose;
     if (this.state === 'dead') return this.onGround ? H.dead : H.hurt;
     if (this.state === 'hurt') return H.hurt;
+    if (this.state === 'swing') return H.jumpUp;
+    if (this.slideT > 0) return H.crouch;
     if (this.state === 'stairs') {
       if (this.atkT) return (this.stairUpPose ? H.satkUp : H.satkDown)[p];
       return (this.stairUpPose ? H.stairUp : H.stairDown)[Math.floor(this.stairPos / 8) % 2];
     }
     if (this.crashT > 0) return H.atk[2];
-    if (this.atkT) return (this.crouchAtk ? H.catk : H.atk)[p];
+    if (this.atkT) {
+      if (this.crouchAtk) return H.catk[p];
+      return H.atk[p === 2 && (this.atkDir === 'up' || this.atkDir === 'upd') ? 1 : p];
+    }
+    if (this.dangle && this.vx === 0 && this.onGround) return H.atk[2];
     if (this.state === 'toStair') return H.walk[Math.floor(this.walkT / 5) % 8];
     if (!this.onGround) return this.vy < 0.6 ? H.jumpUp : H.jumpFall;
     if (this.crouch) return H.crouch;
@@ -392,7 +557,21 @@ class Player {
       Sprites.draw(ctx, spr, this.cx - 16 - cam.x, this.feet - spr.h - cam.y, this.face < 0);
       return;
     }
+    for (const t of this.trail) { // Nachbilder
+      const wc = Sprites.whiteOf(t.spr);
+      ctx.globalAlpha = t.life / 12 * 0.32;
+      ctx.drawImage(t.flip ? wc.f : wc.c, Math.round(t.x - cam.x) - t.spr.pad, Math.round(t.y - cam.y) - t.spr.pad);
+    }
+    ctx.globalAlpha = 1;
     this.drawScarf(ctx, cam);
+    if (this.state === 'swing' && this.ring) { // Seil/Peitsche zum Ankerring
+      const hx = this.cx + this.face * 3 - cam.x, hy = this.y + 4 - cam.y, rx = this.ring.cx - cam.x, ry = this.ring.cy - cam.y;
+      const n = Math.ceil(Math.hypot(rx - hx, ry - hy) / 2);
+      for (let k = 0; k <= n; k++) {
+        ctx.fillStyle = this.sword ? (k % 2 ? '#8c6440' : '#c8a070') : this.whip === 1 ? (k % 3 ? PAL.b : PAL.B) : (k % 2 ? PAL.g : PAL.W);
+        ctx.fillRect(Math.round(hx + (rx - hx) * k / n), Math.round(hy + (ry - hy) * k / n), 2, 2);
+      }
+    }
     if (this.flipT > 0 && !this.atkT && this.state === 'normal' && !this.onGround) { // Salto beim Doppelsprung
       const c = this.H.crouch, step = Math.floor((20 - this.flipT) / 5) % 4;
       ctx.save();
@@ -405,6 +584,7 @@ class Player {
     const sx = Math.round(this.x - 3 - cam.x), sy = Math.round(this.feet - spr.h - cam.y);
     Sprites.draw(ctx, spr, sx - (spr.mx || 0), sy, this.face < 0, flash);
     if (this.atkT && !this.atkSub) (this.sword ? this.drawSword(ctx, sx, sy) : this.drawWhip(ctx, sx, sy));
+    if (this.dangle) this.drawDangle(ctx, cam);
   }
 
   // Wehender Schal: Kette von Punkten, die dem Hals mit Verzögerung folgt.
@@ -459,16 +639,14 @@ class Player {
     if (p === 0) sword(sx + 2, sy + 4, sx - 8, sy - 9);
     else if (p === 1) sword(sx + 13, sy + 1, sx + 5, sy - 15);
     else {
-      const len = SWORD_LEN[lvl];
-      sword(sx + 15, sy + 9, sx + 15 + len, sy + 8);
+      const D = this.dir, len = SWORD_LEN[lvl], top = sy + (this.crouchAtk ? 7 : 0);
+      const hx = sx + D.hx, hy = top + D.hy;
+      sword(hx, hy, hx + Math.cos(D.a) * len, hy + Math.sin(D.a) * len);
       if (this.atkT <= 15) { // Schweif des Hiebs
         ctx.fillStyle = 'rgba(252,252,252,0.5)';
-        for (let a = -1.4; a <= 0.05; a += 0.05) {
-          const r = len + 2, x = sx + 13 + Math.cos(a) * r, y = sy + 9 + Math.sin(a) * r;
-          ctx.fillRect(Math.round(x), Math.round(y), 2, 1);
-        }
+        for (let a = D.a - 1.4; a <= D.a + 0.05; a += 0.05) ctx.fillRect(Math.round(hx - 2 + Math.cos(a) * (len + 2)), Math.round(hy + Math.sin(a) * (len + 2)), 2, 1);
         ctx.fillStyle = 'rgba(252,224,168,0.35)';
-        for (let a = -1.2; a <= 0; a += 0.07) ctx.fillRect(Math.round(sx + 13 + Math.cos(a) * (len - 4)), Math.round(sy + 9 + Math.sin(a) * (len - 4)), 1, 1);
+        for (let a = D.a - 1.2; a <= D.a; a += 0.07) ctx.fillRect(Math.round(hx - 2 + Math.cos(a) * (len - 4)), Math.round(hy + Math.sin(a) * (len - 4)), 1, 1);
       }
     }
     ctx.restore();
@@ -493,10 +671,11 @@ class Player {
     } else if (p === 1) {
       for (let i = 0; i < 9; i++) link(sx + 9 - i * 1.4, sy - i * 0.6, i);
       if (lvl === 3) ball(sx - 6, sy - 7);
-    } else {
-      const len = WHIP_LEN[lvl];
-      for (let i = 0; i < len; i += 2) link(sx + 15 + i, sy + 8, i / 2);
-      if (lvl === 3) ball(sx + 13 + len, sy + 9);
+    } else { // ausgestreckt im gewählten Winkel
+      const D = this.dir, len = WHIP_LEN[lvl], top = sy + (this.crouchAtk ? 7 : 0);
+      const hx = sx + D.hx, hy = top + D.hy, ca = Math.cos(D.a), sa = Math.sin(D.a);
+      for (let i = 0; i < len; i += 2) link(Math.round(hx + ca * i), Math.round(hy + sa * i), i / 2);
+      if (lvl === 3) ball(Math.round(hx + ca * (len - 2)) - 1, Math.round(hy + sa * (len - 2)) + 1);
     }
     ctx.restore();
   }

@@ -8,6 +8,7 @@ const W = {
   camLock: false, camTarget: null, boss: null, arenaOn: false, arenaX: 0, arenaW: 0,
   freeze: 0, hitstop: 0, shake: 0, flash: 0, cleared: false, lightning: 0, lightningCD: 300,
   checkpoint: null, crash: null, exiting: false, storm: { cd: 100, flash: 0, bolt: null },
+  combo: { n: 0, t: 0, best: 0 }, look: 0, cinema: 0, slowmo: 0, bossEnraged: false, vortexBg: 0,
 
   get stageDef() { return Levels.STAGES[this.stage]; },
 
@@ -20,7 +21,7 @@ const W = {
     this.room = { ...def, grid: def.grid.map(r => r.slice()) };
     this.ents = []; this.platforms = []; this.boss = null;
     this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0;
-    this.cleared = false; this.crash = null; this.exiting = false;
+    this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0;
     this.spawners = def.zones.map(z => new Spawner(z));
     const torch = def.theme === 'courtyard';
     def.ents.forEach(d => {
@@ -31,6 +32,8 @@ const W = {
         case 'knight': this.spawn(new Knight(d.x, d.y)); break;
         case 'pillar': this.spawn(new Pillar(d.x, d.y)); break;
         case 'raven': this.spawn(new Raven(d.x, d.y)); break;
+        case 'ghost': this.spawn(new Ghost(d.x, d.y)); break;
+        case 'ring': this.spawn(new Ring(d)); break;
         case 'statue': this.spawn(new Statue(d)); break;
         case 'chest': this.spawn(new Chest(d)); break;
         case 'platform': this.platforms.push(this.spawn(new Platform(d.x, d.x1, d.y))); break;
@@ -40,6 +43,7 @@ const W = {
       }
     });
     this.stairs = this.findStairs();
+    this.rings = this.ents.filter(e => e instanceof Ring);
     this.player.reset(def.start.x * T + 8, (def.start.y + 1) * T);
     this.snapCam();
     Tiles.build(def.theme);
@@ -48,6 +52,7 @@ const W = {
 
   snapCam() {
     const p = this.player, r = this.room;
+    this.look = p.face * 10;
     this.cam.x = this.camXFor(p);
     this.camYf = clamp(p.feet - 136, 0, Math.max(0, r.h * T - View.fh));
     this.cam.y = Math.round(this.camYf);
@@ -57,8 +62,12 @@ const W = {
   camXFor(p) {
     const rw = this.room.w * T;
     if (rw <= View.w) return -Math.floor((View.w - rw) / 2);
-    return Math.round(clamp(p.cx - View.w / 2, 0, rw - View.w));
+    return Math.round(clamp(p.cx + this.look - View.w / 2, 0, rw - View.w));
   },
+
+  // Combo: Treffer in schneller Folge erhöhen den Punkte-Multiplikator
+  comboHit() { const c = this.combo; c.n++; c.t = 150; c.best = Math.max(c.best, c.n); c.pop = 8; },
+  comboMul() { return 1 + Math.min(3, Math.floor(this.combo.n / 5)); },
 
   applyCheckpoint() {
     const c = this.checkpoint;
@@ -87,22 +96,26 @@ const W = {
     return out;
   },
 
+  // box: ein Rechteck oder eine Liste (Peitsche im Winkel = Kette kleiner Trefferzonen)
   whipAt(box, dmg, id) {
+    const boxes = Array.isArray(box) ? box : [box];
+    const hits = (r) => boxes.some(b => Phys.overlap(b, r));
     for (const e of this.ents) {
       if (e.dead) continue;
-      if (e.kind === 'candle') { if (Phys.overlap(box, e)) e.hit(); }
+      if (e.kind === 'candle') { if (hits(e)) e.hit(); }
       else if (e.kind === 'enemy' || e.kind === 'boss') {
         if (e.kind === 'enemy' && e.rise !== undefined && e.rise < 12) continue;
-        if (Phys.overlap(box, e.hurtBox ? e.hurtBox() : e) && e.hit(dmg, id)) Input.rumble(0.15, 0.35, 60);
-      } else if (e.kind === 'eproj' && e.type === 'fire' && Phys.overlap(box, e)) {
+        if (hits(e.hurtBox ? e.hurtBox() : e) && e.hit(dmg, id)) Input.rumble(0.15, 0.35, 60);
+      } else if (e.kind === 'eproj' && e.type === 'fire' && hits(e)) {
         e.dead = true; this.spawn(new Spark(e.cx, e.cy)); Audio8.sfx('hit');
       }
     }
-    const x0 = Math.floor(box.x / T), x1 = Math.floor((box.x + box.w) / T);
-    const y0 = Math.floor(box.y / T), y1 = Math.floor((box.y + box.h) / T);
-    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
-      const ch = Phys.tile(cx, cy);
-      if (ch === 'X' || ch === 'Y') this.breakTile(cx, cy, ch);
+    for (const b of boxes) {
+      const x0 = Math.floor(b.x / T), x1 = Math.floor((b.x + b.w) / T), y0 = Math.floor(b.y / T), y1 = Math.floor((b.y + b.h) / T);
+      for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+        const ch = Phys.tile(cx, cy);
+        if (ch === 'X' || ch === 'Y') this.breakTile(cx, cy, ch);
+      }
     }
   },
 
@@ -161,12 +174,13 @@ const W = {
 
   rosary() {
     this.flash = 18; Input.rumble(0.6, 0.6, 300);
+    this.spawn(new Shock(this.player.cx, this.player.cy, 160, '#a4e4fc', 6));
     for (const e of this.ents) if (e.kind === 'enemy' && !e.dead && e.onScreen(0)) { e.hp = 0; e.kill(); }
     for (const e of this.ents) if (e.kind === 'eproj') e.dead = true;
   },
 
   // „Heiliger Sturm“: Massen-Variante der aktuellen Spezialwaffe
-  startCrash(type) { this.crash = { type, t: 0 }; },
+  startCrash(type) { this.crash = { type, t: 0 }; const p = this.player; this.spawn(new Shock(p.cx, p.cy, 110, '#f8b800', 5)); this.spawn(new Shock(p.cx, p.cy, 70, '#fcfcfc', 4)); },
   updateCrash() {
     const c = this.crash, p = this.player;
     c.t++;
@@ -176,6 +190,14 @@ const W = {
     if (c.type === 'holy' && c.t === 1) for (let i = 0; i < 8; i++) { const s = mk('holy', p.cx, p.cy - 6, i < 4 ? -1 : 1); s.vx = (i - 3.5) * 0.85; s.vy = -2.6 - (i % 3) * 0.7; }
     if (c.type === 'cross' && (c.t === 1 || c.t === 14 || c.t === 28)) [-1, 1].forEach(f => { const s = mk('cross', p.cx, p.cy - 8 + (c.t % 3) * 4, f); s.vx = f * 4; });
     if (c.t > 60) this.crash = null;
+  },
+
+  // Stärke der HDMA-Wellenverzerrung (SNES-Effekt)
+  waveAmp() {
+    let a = this.room.theme === 'vortex' ? 1.3 : 0;
+    if (this.vortexBg > 0) a = Math.max(a, Math.min(1.3, this.vortexBg / 80));
+    if (this.slowmo > 0) a = Math.max(a, this.slowmo / 24);
+    return a;
   },
 
   bossDefeated(b) {
@@ -201,9 +223,15 @@ const W = {
       if (Math.abs(d) < 0.5) {
         this.cam.x = this.camTarget; this.camTarget = null;
         this.boss = this.spawn(new BOSSES[r.arena.boss](this.arenaX, this.arenaW));
-        Audio8.play('boss'); Input.rumble(0.4, 0.2, 300);
+        Audio8.play('boss'); Audio8.sfx('roar'); Input.rumble(0.8, 0.5, 700);
+        this.cinema = 150; this.flash = 8; this.shake = 26;
+        this.spawn(new Shock(this.boss.cx, this.boss.cy, 120, '#d82800', 5));
       }
-    } else if (!this.camLock) this.cam.x = this.camXFor(p);
+    } else if (!this.camLock) {
+      const want = Math.abs(p.vx) > 0.1 ? p.face * 28 : p.face * 10;
+      this.look += (want - this.look) * 0.035;
+      this.cam.x = this.camXFor(p);
+    }
     const maxY = Math.max(0, r.h * T - View.fh);
     if (maxY > 0) {
       const ty = clamp(p.feet - 136, 0, maxY), d = ty - this.camYf;
@@ -227,6 +255,15 @@ const W = {
     this.spawners.forEach(s => s.update());
     for (const e of this.ents) if (!e.dead && e.kind !== 'platform') e.update();
     if (this.crash) this.updateCrash();
+    if (this.cinema > 0) this.cinema--;
+    if (this.bossEnraged && this.room.theme === 'throne') this.vortexBg++;
+    if (this.combo.t > 0 && --this.combo.t === 0) this.combo.n = 0;
+    if (this.combo.pop > 0) this.combo.pop--;
+    const b = this.boss;
+    if (b && !b.dying && !this.bossEnraged && b.hp <= b.maxHp / 2) { // Phase 2: Musik eskaliert
+      this.bossEnraged = true; Audio8.stop(); Audio8.play('boss2'); Audio8.sfx('roar');
+      this.flash = 8; this.shake = 18; this.spawn(new Shock(b.cx, b.cy, 110, '#a80020', 5)); Input.rumble(0.7, 0.4, 500);
+    }
 
     const p = this.player;
     if (p.alive) for (const e of this.ents) if (e.kind === 'item' && !e.dead && Phys.overlap(p, e)) e.collect(p);
@@ -262,6 +299,8 @@ const W = {
     if (theme === 'courtyard') this.drawRain(ctx);
     if (storm && FX.stormOn(storm)) { ctx.fillStyle = 'rgba(220,214,255,0.16)'; ctx.fillRect(0, 0, vw, 208); }
     FX.render(ctx, this.collectLights(), theme);
+    const p = this.player;
+    if (p.alive && p.hp <= p.maxHp / 4) Drama.drawDanger(ctx, vw, 0.35 + Math.sin(this.frame * 0.14) * 0.2);
     if (this.flash > 0 && (this.flash % 6) < 3) { ctx.fillStyle = 'rgba(252,252,252,0.45)'; ctx.fillRect(-4, -4, vw + 8, 216); }
     ctx.restore();
   },
@@ -316,6 +355,8 @@ const W = {
       else if (e.kind === 'item' && e.type === 'orb') L.push({ x, y, r: 44, c: [60, 188, 252], a: 0.6 });
       else if (e instanceof Burst) L.push({ x, y, r: 28, c: [248, 120, 0], a: 0.75 });
       else if (e instanceof Skull) L.push({ x, y: y - 6, r: 20, c: [248, 120, 0], a: 0.4 });
+      else if (e instanceof Ring) L.push({ x, y, r: 14, c: [248, 184, 0], a: 0.35 });
+      else if (e instanceof Ghost && e.alpha > 0) L.push({ x, y, r: 24, c: [120, 180, 252], a: 0.35 * e.alpha });
       else if (e instanceof GiantBat && e.state !== 'sleep' && !e.dying) L.push({ x, y: y - 9, r: 22, c: [252, 40, 40], a: 0.55 });
       else if (e instanceof Count && e.state === 'open') L.push({ x, y: y - 6, r: 34, c: [168, 0, 32], a: 0.45 });
       else if (e instanceof Pillar && e.openT > 0) L.push({ x, y, r: 22, c: [248, 120, 0], a: 0.5 });

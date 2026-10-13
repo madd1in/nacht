@@ -165,6 +165,23 @@ class Chest extends Ent {
   draw(ctx) { Sprites.draw(ctx, Sprites.S.chest[this.opened ? 1 : 0], Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y)); }
 }
 
+// ---------------- Ankerring (Peitsche schräg nach oben: einhaken und pendeln) ----------------
+class Ring extends Ent {
+  constructor(d) { super(d.x * T + 3, d.y * T + 3, 10, 10); this.kind = 'prop'; }
+  update() { this.t++; }
+  draw(ctx) {
+    const x = Math.round(this.cx - W.cam.x), y = Math.round(this.cy - W.cam.y), p = W.player;
+    ctx.fillStyle = '#3c3c3c'; for (let k = 7; k < 18; k += 3) ctx.fillRect(x, y - k, 1, 2);
+    const near = p.alive && Math.hypot(p.cx - this.cx, p.cy - this.cy) < 80 && p.cy > this.cy;
+    for (let a = 0; a < Math.PI * 2; a += 0.2) {
+      const px = x + Math.round(Math.cos(a) * 4), py = y + Math.round(Math.sin(a) * 4);
+      ctx.fillStyle = (a > 3.4 && a < 5.2) ? '#fce0a8' : (a > 0.2 && a < 2.2) ? '#9c6400' : '#f8b800';
+      ctx.fillRect(px, py, 1, 1);
+    }
+    if (near && (this.t >> 3) % 2) { ctx.fillStyle = '#fcfcfc'; ctx.fillRect(x - 3, y - 3, 1, 1); ctx.fillRect(x + 3, y + 3, 1, 1); }
+  }
+}
+
 // ---------------- Rabe: sitzt, stürzt sich schräg herab, fliegt davon ----------------
 class Raven extends Enemy {
   constructor(tx, ty) { super(tx * T + 3, (ty + 1) * T - 9, 10, 8, 1, 2, 200); this.state = 'perch'; }
@@ -188,6 +205,6 @@ class Raven extends Enemy {
   draw(ctx) {
     const R = Sprites.S.raven;
     const s = this.state === 'perch' ? R.perch : R.fly[Math.floor(this.t / 5) % 2];
-    Sprites.draw(ctx, s, Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - (this.state === 'perch' ? 1 : 0) - W.cam.y), this.face < 0, this.flash);
+    this.ds(ctx, s, Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - (this.state === 'perch' ? 1 : 0) - W.cam.y), this.face < 0, this.flash);
   }
 }

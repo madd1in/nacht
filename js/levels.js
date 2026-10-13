@@ -32,6 +32,7 @@ const Levels = (() => {
       elevator(x, rowLow, rowHigh) { r.ents.push({ type: 'elevator', x, y: rowLow, y1: rowHigh }); return api; },
       crumble(x, y) { r.ents.push({ type: 'crumble', x, y }); return api; },
       statue(x, y) { r.ents.push({ type: 'statue', x, y }); return api; },
+      ring(x, y) { r.ents.push({ type: 'ring', x, y }); return api; },
       chest(x, y, loot = 'rnd') { r.ents.push({ type: 'chest', x, y, loot }); return api; },
       start(x, y) { r.start = { x, y }; return api; },
       exit(x) { r.exit = { x0: x, y0: 0, x1: w - 1, y1: h - 1 }; r.door = { x }; return api; },
@@ -55,7 +56,7 @@ const Levels = (() => {
     .fill(44, 10, 45, 10, '=')
     .candle(5, 9).candle(11, 9, 'W').candle(17, 9).candle(23, 9, 'H').candle(29, 7)
     .candle(35, 9, '1').candle(41, 9).candle(47, 9, 'W').candle(53, 9, '$').candle(59, 9).candle(64, 9, 'H')
-    .enemy('raven', 29, 8).enemy('raven', 45, 9)
+    .enemy('raven', 29, 8).enemy('raven', 45, 9).ring(37, 4)
     .chest(62, 10)
     .zone('ghoul', 14, 60, { interval: 110, max: 3 })
     .start(2, 10).exit(70).done();
@@ -97,7 +98,7 @@ const Levels = (() => {
     .statue(43, 9)
     .candle(5, 9).candle(12, 9, 'H').candle(23, 7).candle(35, 6, 'H').candle(46, 8).candle(51, 7, '4')
     .candle(62, 7).candle(68, 7, '$').candle(84, 9).candle(90, 9, 'H')
-    .enemy('skel', 46, 9)
+    .enemy('skel', 46, 9).ring(26, 4).ring(48, 4).ring(66, 4)
     .zone('fish', 20, 78, { interval: 170, max: 2 })
     .zone('skull', 50, 78, { interval: 280, max: 1 })
     .start(2, 10).exit(94).done();
@@ -115,7 +116,7 @@ const Levels = (() => {
     .fill(10, 5, 27, 5, '=')
     .candle(11, 24, 'H').candle(21, 20).candle(13, 15, '3').candle(16, 15).candle(3, 11, 'H').candle(14, 3).candle(20, 3, 'H')
     .chest(25, 4, 'life')
-    .enemy('skel', 15, 16).enemy('bat', 20, 10).enemy('bat', 3, 7)
+    .enemy('skel', 15, 16).enemy('bat', 20, 10).enemy('bat', 3, 7).enemy('ghost', 20, 14)
     .zone('fish', 7, 27, { interval: 220, max: 1 })
     .start(2, 27).exitAt(24, 0, 27, 4).done();
 
@@ -129,7 +130,7 @@ const Levels = (() => {
     .candle(48, 9, 'W').candle(56, 9).candle(60, 9, 'H').candle(66, 9).candle(72, 9, 'H')
     .chest(24, 5, 'big')
     .enemy('skel', 18, 5).enemy('skel', 45, 10).enemy('knight', 50, 10)
-    .enemy('bat', 30, 3).enemy('bat', 54, 4)
+    .enemy('bat', 30, 3).enemy('bat', 54, 4).enemy('ghost', 60, 6)
     .start(2, 10).arena('giant').done();
 
   // ======================= STAGE 3: Der Bergfried (entschärft) =======================
@@ -141,7 +142,7 @@ const Levels = (() => {
     .set(52, 10, 'X')
     .candle(4, 9).candle(9, 9, 'H').candle(16, 6).candle(28, 9).candle(35, 6, 'H').candle(38, 6, '2')
     .candle(47, 9).candle(56, 9, 'W').candle(60, 9, 'H')
-    .enemy('knight', 31, 10).enemy('pillar', 44, 10).enemy('bat', 50, 3)
+    .enemy('knight', 31, 10).enemy('pillar', 44, 10).enemy('bat', 50, 3).ring(17, 5)
     .zone('skull', 30, 60, { interval: 380, max: 1 })
     .start(2, 10).exit(62).done();
 
@@ -158,8 +159,19 @@ const Levels = (() => {
     .candle(8, 18, 'H').candle(6, 13, 'H').candle(10, 13).candle(18, 14).candle(21, 14, '$').candle(20, 5, 'H')
     .candle(6, 2).candle(10, 2, '1')
     .chest(19, 6, 'life')
-    .enemy('bat', 18, 11).enemy('bat', 9, 1)
+    .enemy('bat', 18, 11).enemy('bat', 9, 1).enemy('ghost', 14, 12)
     .start(6, 29).exitAt(3, 0, 6, 3).done();
+
+  // Seelenstrudel: schwebende Steine über dem Nichts, Ankerringe, rotierender Mode-7-Tunnel
+  const vx = room(64, 'vortex')
+    .ground(0, 7).ground(57, 63)
+    .fill(11, 9, 13, 9, '=').crumble(17, 8).ring(22, 4).fill(26, 9, 28, 9, '=').ring(32, 4).fill(36, 8, 38, 8, '=')
+    .ring(42, 4).crumble(46, 9).ring(50, 4).fill(53, 9, 55, 9, '=')
+    .statue(4, 10)
+    .candle(12, 7, 'H').candle(27, 7).candle(37, 6, 'H').candle(54, 7, '$').candle(60, 9, 'H')
+    .enemy('ghost', 20, 6).enemy('ghost', 44, 6)
+    .zone('skull', 10, 56, { interval: 320, max: 1 })
+    .start(2, 10).exit(62).done();
 
   const r32 = room(88, 'throne')
     .ground(0, 15).ground(26, 87)
@@ -167,14 +179,14 @@ const Levels = (() => {
     .statue(30, 10)
     .fill(75, 7, 77, 7, '=').fill(82, 7, 84, 7, '=')
     .candle(5, 9, 'H').candle(10, 9).candle(21, 7, 'H').candle(34, 9, '1').candle(40, 9).candle(44, 9, 'U').candle(48, 9, 'R')
-    .enemy('knight', 38, 10).enemy('pillar', 46, 10).enemy('bat', 16, 4).enemy('bat', 40, 3)
+    .enemy('knight', 38, 10).enemy('pillar', 46, 10).enemy('bat', 16, 4).enemy('bat', 40, 3).enemy('ghost', 33, 5)
     .zone('skull', 30, 50, { interval: 420, max: 1 })
     .start(2, 10).arena('count').done();
 
   const STAGES = [
     { name: 'DER BURGHOF', music: 'stage1', time: 400, rooms: [r11, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
-    { name: 'DER BERGFRIED', music: 'stage3', time: 520, rooms: [r31, v3, r32], boss: 'GRAF NACHTMAHR' },
+    { name: 'DER BERGFRIED', music: 'stage3', time: 640, rooms: [r31, v3, vx, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
   return { STAGES };

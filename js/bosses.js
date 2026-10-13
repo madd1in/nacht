@@ -96,7 +96,9 @@ class Boss extends Enemy {
     this.hp -= dmg; this.flashT = 12; this.invT = 16;
     Audio8.sfx('bossHit');
     W.spawn(new Spark(this.cx + rnd(-4, 4), this.cy + rnd(-6, 6)));
-    W.hitstop = 3;
+    W.spawn(new Shock(this.cx, this.cy, 28, '#f8b800', 3));
+    W.comboHit(); W.shake = Math.max(W.shake, 5);
+    W.hitstop = 4;
     if (this.hp <= 0) { this.hp = 0; this.dying = 1; Audio8.stop(); W.addScore(this.score || 3000, this.cx, this.y); }
     return true;
   }
@@ -107,12 +109,18 @@ class Boss extends Enemy {
   }
   updateDeath(len = 110) {
     this.dying++;
+    if (this.dying === 1) { W.slowmo = 80; W.flash = 14; W.shake = 30; Input.rumble(1, 1, 900); }
+    if (this.dying === 1 || this.dying === 9 || this.dying === 18) W.spawn(new Shock(this.cx, this.cy, 90 + this.dying * 3, this.dying === 9 ? '#f8b800' : '#fcfcfc', 5));
     if (this.dying % 7 === 0) {
       W.spawn(new Burst(this.x + rnd(0, this.w), this.y + rnd(0, this.h)));
       Audio8.sfx('explode');
     }
     if (this.dying % 20 === 0) W.shake = 10;
-    if (this.dying >= len) { this.dead = true; W.bossDefeated(this); }
+    if (this.dying >= len) {
+      Drama.disintegrate(this.lastDraw, 1.6);
+      W.spawn(new Shock(this.cx, this.cy, 140, '#fcfcfc', 6)); W.flash = 10; W.shake = 20;
+      this.dead = true; W.bossDefeated(this);
+    }
   }
   moveToward(tx, ty, speed) {
     if (!Number.isFinite(tx) || !Number.isFinite(ty)) return true; // ungültiges Ziel nie übernehmen
@@ -193,7 +201,7 @@ class GiantBat extends Boss {
     const aura = FX.disc(26, [60, 10, 90], [0.6, 0.38, 0.2, 0.08]);
     ctx.drawImage(aura, x - 26, y - 24);
     ctx.globalAlpha = 1;
-    Sprites.draw(ctx, s, x - 36, y - 20, false, this.flash);
+    this.ds(ctx, s, x - 36, y - 20, false, this.flash);
   }
 }
 
@@ -308,7 +316,7 @@ class Count extends Boss {
     const C = Sprites.S.count;
     if ((this.state === 'appear' || this.state === 'vanish') && (this.t & 2)) return;
     const s = this.state === 'open' ? C.open : C.closed;
-    Sprites.draw(ctx, s, Math.round(this.cx - 12 - W.cam.x), Math.round(this.y + this.h - 40 - W.cam.y), false, this.flash);
+    this.ds(ctx, s, Math.round(this.cx - 12 - W.cam.x), Math.round(this.y + this.h - 40 - W.cam.y), false, this.flash);
     if (this.state === 'open' && this.timer < 10) { // Augenblitz
       ctx.fillStyle = (this.t & 2) ? PAL.r : PAL.w;
       ctx.fillRect(Math.round(this.cx - 3 - W.cam.x), Math.round(this.y + 5 - W.cam.y), 1, 1);

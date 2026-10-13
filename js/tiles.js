@@ -18,6 +18,7 @@ const Tiles = (() => {
     crypt: { a: ['#9cb4fc', '#6078cc', '#3c4c94', '#24305c', '#0a0e22'], b: ['#c8c8e4', '#9898b8', '#6c6c8c', '#46465e', '#141426'] },
     tower: { a: ['#c8c8c8', '#9a9a9a', '#6e6e6e', '#464646', '#141414'], b: ['#a4e4fc', '#3cbcfc', '#0078f8', '#0040a8', '#001038'] },
     throne: { a: ['#fce0a8', '#f8b800', '#a80020', '#680010', '#1c0008'], b: ['#e0d0fc', '#a088f8', '#6844fc', '#4428bc', '#120628'] },
+    vortex: { a: ['#e8b8fc', '#a868d8', '#6c2c9c', '#401060', '#14041c'], b: ['#fca0cc', '#d84080', '#9c1c50', '#5c0c2c', '#1c0410'] },
   };
 
   // ---------------- Kacheln ----------------
@@ -254,7 +255,9 @@ const Tiles = (() => {
     seed = 7;
     const L = [];
     const add = (name, c, par, extra = {}) => L.push({ name, c, par, wrap: c.width >= 512, ...extra });
-    if (theme === 'courtyard') {
+    if (theme === 'vortex') {
+      L.push({ name: 'tunnel', tunnel: true, par: 0, c: C(1, 1) });
+    } else if (theme === 'courtyard') {
       const sky = C(640, 208), x = sky.getContext('2d');
       gradient(x, 640, 208, ['#000000', '#05010f', '#0c031c', '#160629', '#220a36', '#320e44', '#461250', '#5a1658', '#6c1c5c']);
       for (let i = 0; i < 160; i++) {
@@ -465,7 +468,7 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o) }[theme];
+    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true })) : ground;
     const alt = [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
@@ -483,6 +486,7 @@ const Tiles = (() => {
   function layer(theme, name) { return build(theme).bg.find(l => l.name === name); }
 
   function drawLayer(ctx, l, cam, frame, vt = false) {
+    if (l.tunnel) { Mode7.drawTunnel(ctx, View.w, frame); return; }
     const img = l.frames ? l.frames[Math.floor(frame / (60 / l.fps)) % l.frames.length] : l.c;
     if (l.right !== undefined) { ctx.drawImage(img, Math.round(View.w - l.right - img.width / 2), l.y || 0); return; }
     if (!l.wrap) { ctx.drawImage(img, 0, 0); return; }
@@ -497,6 +501,7 @@ const Tiles = (() => {
   function drawBg(ctx, room, cam, frame = 0, onSky = null) {
     const vt = room.h > 13;
     build(room.theme).bg.forEach(l => { drawLayer(ctx, l, cam, frame, vt); if (onSky && l.name === 'clouds') onSky(ctx); });
+    if (room.theme === 'throne' && W.vortexBg > 0) Mode7.drawTunnel(ctx, View.w, frame, Math.min(1, W.vortexBg / 90)); // Graf Phase 2
   }
 
   // ---------------- Vordergrund-Silhouetten (Parallax 1.3) ----------------

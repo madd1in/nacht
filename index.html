@@ -18,20 +18,22 @@
   #touch { position: fixed; inset: 0; pointer-events: none; display: none; user-select: none; -webkit-user-select: none; }
   body.touch #touch { display: block; }
   .tbtn {
-    position: absolute; pointer-events: auto; border-radius: 50%;
-    background: rgba(252, 252, 252, .12); border: 2px solid rgba(252, 252, 252, .35);
-    color: rgba(252, 252, 252, .75); font: bold 15px monospace;
+    position: absolute; pointer-events: none; border-radius: 50%;
+    background: rgba(252, 252, 252, .07); border: 2px solid rgba(252, 252, 252, .26);
+    color: rgba(252, 252, 252, .6); font: bold 16px monospace;
     display: flex; align-items: center; justify-content: center;
   }
-  .tbtn.on { background: rgba(216, 40, 0, .45); }
-  #dpad { position: absolute; left: 18px; bottom: 22px; width: 150px; height: 150px; pointer-events: auto; }
-  #dpad .tbtn { width: 50px; height: 50px; border-radius: 10px; }
-  #tUp { left: 50px; top: 0; } #tDown { left: 50px; top: 100px; }
-  #tLeft { left: 0; top: 50px; } #tRight { left: 100px; top: 50px; }
-  #tJump { right: 22px; bottom: 40px; width: 64px; height: 64px; }
-  #tAtk { right: 96px; bottom: 22px; width: 64px; height: 64px; }
-  #tSub { right: 96px; bottom: 100px; width: 50px; height: 50px; font-size: 12px; }
-  #tStart { right: 22px; bottom: 120px; width: 50px; height: 34px; border-radius: 10px; font-size: 11px; }
+  .tbtn.on { background: rgba(216, 40, 0, .4); border-color: rgba(252, 220, 160, .7); }
+  #tJump { right: 16px; bottom: 30px; width: 80px; height: 80px; }
+  #tAtk { right: 104px; bottom: 16px; width: 80px; height: 80px; }
+  #tSub { right: 64px; bottom: 118px; width: 58px; height: 58px; font-size: 12px; }
+  #tStart { right: 12px; top: 12px; width: 46px; height: 32px; border-radius: 10px; font-size: 12px; }
+  #stickBase { position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%;
+    border: 2px solid rgba(252, 252, 252, .25); background: rgba(252, 252, 252, .05); display: none; }
+  #stickBase.on { display: block; }
+  #stickKnob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+    background: rgba(216, 40, 0, .45); border: 2px solid rgba(252, 252, 252, .5); }
+  #stickHint { position: absolute; left: 16px; bottom: 16px; font: 11px monospace; color: rgba(252, 252, 252, .35); }
   #crt {
     position: absolute; inset: 0; pointer-events: none; --s: 3px; --a: 1.6px;
     background:
@@ -45,34 +47,32 @@
 <body>
 <div id="wrap"><canvas id="screen" width="256" height="240" aria-label="NACHTMAHR Spielfeld"></canvas><div id="crt"></div></div>
 <div id="touch" aria-hidden="true">
-  <div id="dpad">
-    <div class="tbtn" id="tUp" data-k="up">▲</div>
-    <div class="tbtn" id="tDown" data-k="down">▼</div>
-    <div class="tbtn" id="tLeft" data-k="left">◀</div>
-    <div class="tbtn" id="tRight" data-k="right">▶</div>
-  </div>
+  <div id="stickBase"><div id="stickKnob"></div></div>
+  <div id="stickHint">LINKE HÄLFTE: STEUERN</div>
   <div class="tbtn" id="tJump" data-k="jump">A</div>
   <div class="tbtn" id="tAtk" data-k="attack">B</div>
   <div class="tbtn" id="tSub" data-k="sub">SUB</div>
-  <div class="tbtn" id="tStart" data-k="start">START</div>
+  <div class="tbtn" id="tStart" data-k="start">II</div>
 </div>
-<script>window.BUILD = '20261013-2342';</script>
-<script src="js/view.js?v=20261013-2342"></script>
-<script src="js/options.js?v=20261013-2342"></script>
-<script src="js/font.js?v=20261013-2342"></script>
-<script src="js/sprites.js?v=20261013-2342"></script>
-<script src="js/sprites2.js?v=20261013-2342"></script>
-<script src="js/hero.js?v=20261013-2342"></script>
-<script src="js/audio.js?v=20261013-2342"></script>
-<script src="js/input.js?v=20261013-2342"></script>
-<script src="js/levels.js?v=20261013-2342"></script>
-<script src="js/tiles.js?v=20261013-2342"></script>
-<script src="js/fx.js?v=20261013-2342"></script>
-<script src="js/entities.js?v=20261013-2342"></script>
-<script src="js/enemies.js?v=20261013-2342"></script>
-<script src="js/props.js?v=20261013-2342"></script>
-<script src="js/bosses.js?v=20261013-2342"></script>
-<script src="js/world.js?v=20261013-2342"></script>
-<script src="js/game.js?v=20261013-2342"></script>
+<script>window.BUILD = '20261014-0038';</script>
+<script src="js/view.js?v=20261014-0038"></script>
+<script src="js/options.js?v=20261014-0038"></script>
+<script src="js/font.js?v=20261014-0038"></script>
+<script src="js/sprites.js?v=20261014-0038"></script>
+<script src="js/sprites2.js?v=20261014-0038"></script>
+<script src="js/hero.js?v=20261014-0038"></script>
+<script src="js/audio.js?v=20261014-0038"></script>
+<script src="js/input.js?v=20261014-0038"></script>
+<script src="js/levels.js?v=20261014-0038"></script>
+<script src="js/tiles.js?v=20261014-0038"></script>
+<script src="js/fx.js?v=20261014-0038"></script>
+<script src="js/entities.js?v=20261014-0038"></script>
+<script src="js/enemies.js?v=20261014-0038"></script>
+<script src="js/props.js?v=20261014-0038"></script>
+<script src="js/drama.js?v=20261014-0038"></script>
+<script src="js/mode7.js?v=20261014-0038"></script>
+<script src="js/bosses.js?v=20261014-0038"></script>
+<script src="js/world.js?v=20261014-0038"></script>
+<script src="js/game.js?v=20261014-0038"></script>
 </body>
 </html>
