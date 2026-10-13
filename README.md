@@ -13,28 +13,30 @@ Lokal: `index.html` über einen beliebigen statischen Server öffnen, z. B. `pyt
 
 ## Steuerung
 
-| Aktion | Tastatur | Gamepad | Touch |
+| Aktion | Tastatur | Xbox-Controller (Edge/Chrome) | Touch |
 |---|---|---|---|
-| Laufen / Ducken / Treppen | Pfeile oder WASD | D-Pad / Stick | D-Pad |
-| Springen / Doppelsprung (in der Luft nochmal) | Z, K, Leertaste | A | A |
-| Peitsche | X, J | X / B | B |
-| Spezialwaffe | C, L oder Oben + Peitsche | Y / RB | SUB |
-| Pause | Enter, Esc, P | Start | START |
-| Ton an/aus | M | – | – |
-| Röhren-Look (Scanlines) an/aus | V | – | – |
+| Laufen / Ducken / Treppen | Pfeile oder WASD | Linker Stick / Steuerkreuz | D-Pad |
+| Springen / Doppelsprung | Z, K, Leertaste | A | A |
+| Angriff (Peitsche/Schwert) | X, J | X oder B | B |
+| Spezialwaffe | C, L oder Oben + Angriff | Y, RB oder RT | SUB |
+| Heiliger Sturm (ab 10 Herzen) | C gedrückt halten | Y gedrückt halten | SUB halten |
+| Pause | Enter, Esc, P | Menü-Taste | START |
+| Ton an/aus | M | Ansicht-Taste | – |
+| Röhren-Look an/aus | V | – | – |
 
-Treppen: Am Fuß der Treppe **Oben** halten, oben auf der Treppe **Unten** halten.
+Controller vibrieren bei Treffern, Bossen und Blitzen. Treppen: am Fuß **Oben** halten, oben **Unten** halten.
 
 ## Inhalt
 
-- 3 Stages mit 6 Räumen: Burghof, Eingangshalle, Katakomben, Gruft, Bergfried, Thronsaal
-- 3 Bosse: Riesenfledermaus, Knochenriese, Graf Nachtmahr (mit zweiter Phase)
-- Gegner: Ghule, Fledermäuse, Flammenschädel, Skelette, Ritter, Sumpfmänner, Knochensäulen
-- Peitsche in 3 Stufen, 4 Spezialwaffen (Dolch, Axt, Weihwasser, Kreuz), Rosenkranz, Braten in der Wand
-- Klassische Treppen, Doppelsprung mit Salto, Rückstoß bei Treffern, Wasser, Stacheln, bewegliche Plattformen
-- Dynamisches Licht (Kerzen, Fackeln, Feuerbälle), Bodennebel, Umgebungspartikel, Parallax-Hintergründe mit animierten Wolken und Zahnrädern, optionaler Röhren-Look
-- Eigener Chiptune-Soundtrack und Soundeffekte, live per WebAudio synthetisiert (2× Puls, Dreieck, Rauschen wie beim NES)
-- Highscore wird lokal gespeichert, Touch-Steuerung für Smartphones
+- **2 Helden**: Henrik (Vampirjäger, Morgenstern-Peitsche) oder Ragnor (Barbar aus dem Norden, Breitschwert mit Hiebbogen)
+- **3 Stages, 9 Räume**: Burghof im Gewitter, Glockenturm, Eingangshalle, Katakomben, Brunnenschacht, Gruft, Turmsockel, Uhrwerk, Thronsaal – inklusive drei vertikaler Kletterabschnitte
+- **3 Bosse**: Riesenfledermaus, Knochenriese, Graf Nachtmahr (mit zweiter Phase)
+- **Gegner**: Ghule, Fledermäuse, Raben, Flammenschädel, Skelette, Ritter, Sumpfmänner, Knochensäulen
+- **Mechaniken**: Doppelsprung mit Salto, schwingende Kronleuchter als Plattformen, Aufzüge, bröckelnde Steine, Checkpoint-Engelsstatuen, Schatztruhen, Treppen, „Heiliger Sturm“-Spezialangriff
+- **Optionen**: Leicht-Modus (doppelte Lebensleiste und doppelter Schaden), maximale Waffe ab Start, unendlich Herzen, Musiklautstärke, Röhren-Look
+- **Fair**: Abgründe, Wasser und Stacheln kosten Leben statt eines ganzen Versuchs und setzen auf den letzten sicheren Stand zurück
+- **Darstellung**: randloses Vollbild in jedem Seitenverhältnis (Breite passt sich an), dynamisches Licht, Wasserspiegelungen, Nebel, Parallax
+- **Musik**: eigener Chiptune-Soundtrack, live per WebAudio synthetisiert (2× Puls + Echo, Dreieck, Rausch-Drumkit)
 
 ## Technik
 
@@ -44,6 +46,8 @@ Vanilla JavaScript + Canvas 2D (256×240, NES-Auflösung), alle Pixel-Grafiken s
 |---|---|
 | `js/font.js` | 5×7-Bitmap-Schrift |
 | `js/sprites.js`, `js/sprites2.js` | Pixel-Art: Held, Items, Gegner, Bosse |
+| `js/view.js`, `js/options.js` | Bildbreite und Optionen |
+| `js/hero.js` | Helden-Baukasten (Kopf/Torso + berechnete Beine) |
 | `js/tiles.js` | Kacheln und Parallax-Hintergründe |
 | `js/fx.js` | Licht, Vignette, Nebel, Umgebungspartikel |
 | `js/audio.js` | Chiptune-Engine, Musik und SFX |
@@ -51,9 +55,10 @@ Vanilla JavaScript + Canvas 2D (256×240, NES-Auflösung), alle Pixel-Grafiken s
 | `js/levels.js` | Leveldaten (Builder-API) |
 | `js/entities.js` | Physik und Spielerfigur |
 | `js/enemies.js` | Gegner, Items, Projektile, Effekte |
+| `js/props.js` | Kronleuchter, Aufzüge, Bröckelsteine, Statuen, Truhen, Raben |
 | `js/bosses.js` | Bosskämpfe |
 | `js/world.js`, `js/game.js` | Spielwelt, Zustände, HUD, Hauptschleife |
 
-Debug: `?stage=2` bzw. `?stage=3` startet direkt in einer späteren Stage.
+Debug: `?stage=2&room=2` startet direkt in Stage 2, Raum 2.
 
 Ein Fan-Projekt mit eigenen Figuren, eigener Grafik und eigener Musik.

@@ -53,11 +53,14 @@ const Phys = {
 
 const WALK = 1.3, JUMP = -4.3, GRAV = 0.21, MAXFALL = 4.2, ATK_LEN = 22;
 const WHIP_LEN = [0, 26, 26, 42];
+const SWORD_LEN = [0, 20, 22, 30];
 
 class Player {
   constructor() {
     this.w = 10; this.h = 28;
-    this.hp = 16; this.hearts = 5; this.sub = null; this.whip = 1;
+    this.H = HEROES.get(Options.character); this.def = this.H.def; this.sword = this.def.weapon === 'sword';
+    this.maxHp = Options.maxHp; this.hp = this.maxHp;
+    this.hearts = Options.infHearts ? 99 : 5; this.sub = null; this.whip = Options.maxWhip ? 3 : 1;
     this.reset(40, 176);
   }
   reset(fx, fy) {
@@ -67,6 +70,7 @@ class Player {
     this.inv = 0; this.walkT = 0; this.jumping = false; this.stair = null; this.stairPos = 0;
     this.stairUpPose = true; this.deadT = 0; this.plat = null; this.powerT = 0;
     this.canDouble = true; this.flipT = 0; this.scarf = null; this.hidden = false;
+    this.chargeT = 0; this.crashT = 0; this.landT = 0; this.lastSafe = { cx: fx, feet: fy };
   }
   get cx() { return this.x + this.w / 2; }
   get cy() { return this.y + this.h / 2; }
@@ -82,7 +86,7 @@ class Player {
   tryAttack(wantSub, strict) {
     if (this.atkT > 0) return;
     if (wantSub && this.sub && this.hearts >= 1 && W.subCount() < 2) {
-      this.atkSub = true; this.hearts -= 1;
+      this.atkSub = true; if (!Options.infHearts) this.hearts -= 1;
     } else if (strict) return;
     else { this.atkSub = false; Audio8.sfx('whip'); }
     this.atkT = 1; this.atkId = ++W.atkId;
@@ -101,15 +105,19 @@ class Player {
   spriteTop(spr) { return this.y + this.h - spr.h; }
 
   whipBox() {
-    const len = WHIP_LEN[this.whip];
     const top = this.feet - (this.crouchAtk ? 24 : 32);
     const sx = this.x - 3;
+    if (this.sword) { // kürzer, aber hoher Hiebbogen
+      const len = SWORD_LEN[this.whip];
+      return { x: this.face > 0 ? sx + 11 : sx + 5 - len, y: top - 4, w: len, h: 22 };
+    }
+    const len = WHIP_LEN[this.whip];
     return { x: this.face > 0 ? sx + 15 : sx + 1 - len, y: top + 5, w: len, h: 8 };
   }
 
   whipHits() {
     const box = this.whipBox();
-    const dmg = this.whip >= 2 ? 2 : 1;
+    const dmg = (this.whip >= 2 ? 2 : 1) * Options.dmgMul;
     W.whipAt(box, dmg, this.atkId, this.face);
   }
 
@@ -122,7 +130,7 @@ class Player {
   hurt(dmg, srcX) {
     if (this.inv > 0 || !this.alive || W.cleared) return;
     this.hp -= dmg;
-    Audio8.sfx('hurt');
+    Audio8.sfx('hurt'); Input.rumble(0.45, 0.7, 200);
     if (this.hp <= 0) { this.hp = 0; this.die(); return; }
     this.inv = 100;
     if (this.state === 'stairs' || this.state === 'toStair') { if (this.state === 'toStair') this.state = 'normal'; return; }
@@ -137,7 +145,7 @@ class Player {
     this.setCrouch(false);
     this.state = 'dead'; this.deadT = 0; this.atkT = 0; this.vx = 0; this.vy = silent ? 0 : -2.5;
     this.onGround = false; this.inv = 0; this.hidden = !!silent;
-    Audio8.stop(); Audio8.sfx('die');
+    Audio8.stop(); Audio8.sfx('die'); Input.rumble(1, 1, 600);
   }
 
   findStair(top) {
@@ -158,13 +166,16 @@ class Player {
     const I = Input.held, P = Input.pressed;
     if (this.powerT > 0) this.powerT--;
     if (this.flipT > 0) this.flipT--;
+    if (this.landT > 0) this.landT--;
     if (this.state === 'dead') return this.updateDead();
     if (this.inv > 0) this.inv--;
+    if (this.crashT > 0) this.crashT--;
+    this.updateCharge(I);
 
     if (this.state === 'stairs') return this.updateStairs(I, P);
     if (this.state === 'toStair') return this.updateToStair(I);
 
-    if (this.plat) { Phys.moveX(this, this.plat.dx); this.plat = null; }
+    if (this.plat) { Phys.moveX(this, this.plat.dx); this.y += this.plat.dy || 0; this.plat = null; }
 
     if (this.state === 'hurt') {
       this.vy = Math.min(this.vy + GRAV, MAXFALL);
@@ -214,26 +225,30 @@ class Player {
       }
       if (!I.jump && this.vy < -1.6) this.vy = -1.6;
     }
-    if (this.vx !== 0 && this.onGround) this.walkT++; else if (this.onGround) this.walkT = 0;
+    if (this.vx !== 0 && this.onGround) { this.walkT++; if (this.walkT % 20 === 1) W.dust(this.cx - this.face * 4, this.feet, 1); } else if (this.onGround) this.walkT = 0;
 
     this.vy = Math.min(this.vy + GRAV, MAXFALL);
     Phys.moveX(this, this.vx);
     const wasGround = this.onGround;
     const r = Phys.moveY(this, this.vy);
     this.onGround = r === 1;
+    if (this.onGround && !wasGround && this.vy > 2.4) { this.landT = 7; W.dust(this.cx, this.feet, 5); }
     if (r !== 0) { this.vy = 0; }
     if (this.onGround) { this.jumping = false; this.canDouble = true; this.flipT = 0; }
     this.checkPlatforms();
     if (!this.onGround && wasGround && !this.jumping && this.vy > 0) this.vx = 0;
     this.clampRoom();
     this.hazards();
+    this.trackSafe();
   }
 
   checkPlatforms() {
     if (this.vy < 0) return;
     for (const p of W.platforms) {
+      if (p.solid === false) continue;
       const prevFeet = this.feet - this.vy - 0.5;
-      if (this.x + this.w > p.x && this.x < p.x + p.w && prevFeet <= p.y + 1 && this.feet >= p.y && this.feet <= p.y + 8) {
+      if (this.x + this.w > p.x && this.x < p.x + p.w && prevFeet <= p.y + 3 && this.feet >= p.y - 0.5 && this.feet <= p.y + 10) {
+        if (p.onStand) p.onStand();
         this.y = p.y - this.h; this.vy = 0; this.onGround = true; this.jumping = false; this.canDouble = true; this.flipT = 0;
         if (this.state === 'hurt') { this.state = 'normal'; this.vx = 0; }
         this.plat = p;
@@ -242,24 +257,66 @@ class Player {
   }
 
   clampRoom() {
-    const lock = W.camLock && W.room.arena;
-    const minX = lock ? W.room.arena.x0 * T : 0;
-    const maxX = lock ? W.room.arena.x0 * T + 256 : W.room.w * T;
+    const lock = W.camLock && W.arenaW;
+    const minX = lock ? W.arenaX : 0;
+    const maxX = lock ? W.arenaX + W.arenaW : W.room.w * T;
     if (this.x < minX) this.x = minX;
     if (this.x + this.w > maxX) this.x = maxX - this.w;
   }
 
+  // Wasser, Stacheln und Abgründe kosten Leben und setzen auf den letzten sicheren Stand zurück.
   hazards() {
     const fc = Math.floor(this.cx / T);
     if (Phys.tile(fc, Math.floor((this.feet - 6) / T)) === '~') {
       W.splash(this.cx, Math.floor((this.feet - 6) / T) * T);
-      this.die(true); return;
+      return this.fallPenalty(4);
     }
-    if (this.onGround && Phys.tile(fc, Math.floor((this.feet + 1) / T)) === '^') {
-      this.hurt(4, this.cx - this.face);
-      if (this.state === 'hurt') { this.vy = -4.6; this.vx = -this.face * 1.3; }
+    if (this.onGround && Phys.tile(fc, Math.floor((this.feet + 1) / T)) === '^') return this.fallPenalty(3);
+    if (this.y > W.room.h * T + 8) this.fallPenalty(4);
+  }
+
+  fallPenalty(dmg) {
+    if (!this.alive || W.cleared) return;
+    if (this.hp <= dmg) { this.hp = 0; this.die(true); return; }
+    this.hp -= dmg;
+    Audio8.sfx('hurt'); Input.rumble(0.5, 0.8, 250);
+    const s = this.lastSafe;
+    this.setCrouch(false);
+    this.state = 'normal'; this.atkT = 0; this.vx = 0; this.vy = 0; this.flipT = 0; this.plat = null;
+    this.x = s.cx - this.w / 2; this.y = s.feet - this.h; this.onGround = true; this.inv = 120;
+    W.popup(this.cx, this.y - 6, '-' + dmg, '#fc7460'); W.puff(this.cx, this.feet); W.shake = 6;
+  }
+
+  trackSafe() {
+    if (!this.onGround || this.plat || this.state !== 'normal') return;
+    const row = Math.floor((this.feet + 1) / T);
+    const ok = (c) => { const ch = Phys.tile(c, row); return ch === '#' || ch === '='; };
+    if (ok(Math.floor((this.x - 3) / T)) && ok(Math.floor((this.x + this.w + 3) / T))) this.lastSafe = { cx: this.cx, feet: this.feet };
+  }
+
+  // Sub-Taste halten (ab 10 Herzen) lädt den „Heiligen Sturm“; Loslassen entfesselt ihn.
+  updateCharge(I) {
+    const can = this.sub && this.hearts >= 10 && (this.state === 'normal' || this.state === 'stairs');
+    if (I.sub && can && this.atkT === 0) {
+      this.chargeT++;
+      if (this.chargeT === 50) Audio8.sfx('ready');
+      if (this.chargeT > 14 && W.frame % 3 === 0) {
+        const a = W.frame * 0.4;
+        W.spawn(new Particle(this.cx + Math.cos(a) * 12, this.cy + Math.sin(a) * 16, -Math.cos(a) * 0.5, -Math.sin(a) * 0.5, this.chargeT >= 50 ? '#fcfcfc' : '#f8b800', 16, 1, 0));
+      }
+    } else {
+      if (this.chargeT >= 50 && !I.sub && can) this.itemCrash();
+      this.chargeT = 0;
     }
-    if (this.y > W.room.h * T + 8) this.die(true);
+  }
+
+  itemCrash() {
+    if (!Options.infHearts) this.hearts -= 10;
+    this.chargeT = 0; this.crashT = 34;
+    this.inv = Math.max(this.inv, 110);
+    W.startCrash(this.sub, this);
+    Audio8.sfx('crash'); Input.rumble(1, 1, 450);
+    W.flash = 8; W.shake = 14;
   }
 
   updateDead() {
@@ -308,43 +365,46 @@ class Player {
   }
 
   sprite() {
-    const H = Sprites.S.hero, p = this.atkPose;
+    const H = this.H, p = this.atkPose;
     if (this.state === 'dead') return this.onGround ? H.dead : H.hurt;
     if (this.state === 'hurt') return H.hurt;
     if (this.state === 'stairs') {
       if (this.atkT) return (this.stairUpPose ? H.satkUp : H.satkDown)[p];
-      return (Math.floor(this.stairPos / 8) % 2) ? H.stand : (this.stairUpPose ? H.stairUp : H.stairDown);
+      return (this.stairUpPose ? H.stairUp : H.stairDown)[Math.floor(this.stairPos / 8) % 2];
     }
+    if (this.crashT > 0) return H.atk[2];
     if (this.atkT) return (this.crouchAtk ? H.catk : H.atk)[p];
-    if (this.state === 'toStair') return [H.walk1, H.walk2, H.stand, H.walk2][Math.floor(this.walkT / 7) % 4];
-    if (!this.onGround) return this.jumping && this.vy > -3 && this.vy < 2.5 ? H.crouch : H.stand;
+    if (this.state === 'toStair') return H.walk[Math.floor(this.walkT / 5) % 8];
+    if (!this.onGround) return this.vy < 0.6 ? H.jumpUp : H.jumpFall;
     if (this.crouch) return H.crouch;
-    if (this.vx !== 0) return [H.walk2, H.walk1, H.walk2, H.stand][Math.floor(this.walkT / 7) % 4];
-    return H.stand;
+    if (this.landT > 0) return H.land;
+    if (this.vx !== 0) return H.walk[Math.floor(this.walkT / 5) % 8];
+    if (W.frame % 230 < 7) return H.blink;
+    return H.idle[Math.floor(W.frame / 40) % 2];
   }
 
   draw(ctx, cam) {
     if (this.hidden) return;
     if (this.inv > 0 && this.alive && (W.frame & 2)) return;
     const spr = this.sprite();
-    const flash = this.powerT > 0 && (W.frame & 4);
-    if (spr === Sprites.S.hero.dead) {
+    const flash = (this.powerT > 0 || this.chargeT >= 50 || this.crashT > 0) && (W.frame & 4);
+    if (spr === this.H.dead) {
       Sprites.draw(ctx, spr, this.cx - 16 - cam.x, this.feet - spr.h - cam.y, this.face < 0);
       return;
     }
     this.drawScarf(ctx, cam);
     if (this.flipT > 0 && !this.atkT && this.state === 'normal' && !this.onGround) { // Salto beim Doppelsprung
-      const c = Sprites.S.hero.crouch, step = Math.floor((20 - this.flipT) / 5) % 4;
+      const c = this.H.crouch, step = Math.floor((20 - this.flipT) / 5) % 4;
       ctx.save();
-      ctx.translate(Math.round(this.cx - cam.x), Math.round(this.feet - 14 - cam.y));
+      ctx.translate(Math.round(this.cx - cam.x), Math.round(this.feet - 12 - cam.y));
       ctx.rotate(step * Math.PI / 2 * this.face);
-      ctx.drawImage(this.face < 0 ? c.f : c.c, -8 - c.pad, -12 - c.pad);
+      ctx.drawImage(this.face < 0 ? c.f : c.c, -10 - c.pad, -20 - c.pad);
       ctx.restore();
       return;
     }
     const sx = Math.round(this.x - 3 - cam.x), sy = Math.round(this.feet - spr.h - cam.y);
-    Sprites.draw(ctx, spr, sx, sy, this.face < 0, flash);
-    if (this.atkT && !this.atkSub) this.drawWhip(ctx, sx, sy);
+    Sprites.draw(ctx, spr, sx - (spr.mx || 0), sy, this.face < 0, flash);
+    if (this.atkT && !this.atkSub) (this.sword ? this.drawSword(ctx, sx, sy) : this.drawWhip(ctx, sx, sy));
   }
 
   // Wehender Schal: Kette von Punkten, die dem Hals mit Verzögerung folgt.
@@ -365,12 +425,53 @@ class Player {
 
   drawScarf(ctx, cam) {
     if (!this.scarf) return;
-    const s = this.scarf;
+    const s = this.scarf, sc = this.def.scarf;
     for (let i = s.length - 1; i >= 1; i--) {
-      const x = Math.round(s[i].x - cam.x), y = Math.round(s[i].y - cam.y), w = i > 5 ? 1 : 2;
-      ctx.fillStyle = PAL.R; ctx.fillRect(x, y + 1, w, w);
-      ctx.fillStyle = i % 3 === 0 ? PAL.m : PAL.r; ctx.fillRect(x, y, w, w);
+      const x = Math.round(s[i].x - cam.x), y = Math.round(s[i].y - cam.y), w = i > 5 ? Math.max(1, sc.w - 1) : sc.w;
+      ctx.fillStyle = sc.d; ctx.fillRect(x, y + 1, w, w);
+      ctx.fillStyle = i % 3 === 0 ? sc.b : sc.a; ctx.fillRect(x, y, w, w);
     }
+  }
+
+  // Breitschwert (Ragnor): Bronze → Stahl → Flammenschwert, mit Hiebbogen-Schweif
+  drawSword(ctx, sx, sy) {
+    const p = this.atkPose, lvl = this.whip;
+    const blade = ['', '#c89040', '#a8b0c8', '#fcfcfc'][lvl], edge = ['', '#fce0a8', '#fcfcfc', '#fce0a8'][lvl];
+    ctx.save();
+    if (this.face < 0) { ctx.translate(sx * 2 + 16, 0); ctx.scale(-1, 1); }
+    const seg = (x0, y0, x1, y1, c, w) => {
+      ctx.fillStyle = c;
+      const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2);
+      for (let k = 0; k <= n; k++) ctx.fillRect(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), w, w);
+    };
+    const sword = (hx, hy, tx, ty) => {
+      const dx = tx - hx, dy = ty - hy, d = Math.hypot(dx, dy), nx = -dy / d, ny = dx / d;
+      seg(hx - dx / d * 3, hy - dy / d * 3, hx, hy, '#5c3c20', 2);              // Griff
+      seg(hx + nx * 3, hy + ny * 3, hx - nx * 3, hy - ny * 3, '#f8b800', 1);     // Parierstange
+      seg(hx, hy, tx, ty, blade, 2);
+      seg(hx + nx * 0.6, hy + ny * 0.6, tx, ty, edge, 1);
+      if (lvl === 3) for (let k = 0; k < 5; k++) { // Flammen am Blatt
+        const f = (k + 1) / 6, fx = hx + dx * f, fy = hy + dy * f, fl = (W.frame + k * 3) % 6 < 3;
+        ctx.fillStyle = fl ? '#f87800' : '#f8b800';
+        ctx.fillRect(Math.round(fx + nx * 2), Math.round(fy + ny * 2 - (fl ? 1 : 0)), 1, 2);
+      }
+    };
+    if (p === 0) sword(sx + 2, sy + 4, sx - 8, sy - 9);
+    else if (p === 1) sword(sx + 13, sy + 1, sx + 5, sy - 15);
+    else {
+      const len = SWORD_LEN[lvl];
+      sword(sx + 15, sy + 9, sx + 15 + len, sy + 8);
+      if (this.atkT <= 15) { // Schweif des Hiebs
+        ctx.fillStyle = 'rgba(252,252,252,0.5)';
+        for (let a = -1.4; a <= 0.05; a += 0.05) {
+          const r = len + 2, x = sx + 13 + Math.cos(a) * r, y = sy + 9 + Math.sin(a) * r;
+          ctx.fillRect(Math.round(x), Math.round(y), 2, 1);
+        }
+        ctx.fillStyle = 'rgba(252,224,168,0.35)';
+        for (let a = -1.2; a <= 0; a += 0.07) ctx.fillRect(Math.round(sx + 13 + Math.cos(a) * (len - 4)), Math.round(sy + 9 + Math.sin(a) * (len - 4)), 1, 1);
+      }
+    }
+    ctx.restore();
   }
 
   drawWhip(ctx, sx, sy) {

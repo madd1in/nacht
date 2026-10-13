@@ -30,18 +30,18 @@ const FX = (() => {
     return c;
   }
 
-  const AMB = { courtyard: 0.2, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
+  const AMB = { courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
   const TINT = { courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
   const lc = Sprites.canvas(256, 208), lx = lc.getContext('2d');
   let vignette = null;
 
-  function makeVignette() {
-    const c = Sprites.canvas(256, 208), x = c.getContext('2d'), img = x.createImageData(256, 208), d = img.data;
-    for (let py = 0; py < 208; py++) for (let px = 0; px < 256; px++) {
-      const nx = (px - 128) / 128, ny = (py - 104) / 104;
+  function makeVignette(w) {
+    const c = Sprites.canvas(w, 208), x = c.getContext('2d'), img = x.createImageData(w, 208), d = img.data;
+    for (let py = 0; py < 208; py++) for (let px = 0; px < w; px++) {
+      const nx = (px - w / 2) / (w / 2), ny = (py - 104) / 104;
       const v = Math.max(0, Math.hypot(nx * 0.9, ny) - 0.62) * 1.4;
       const a = Math.min(0.7, Math.floor((v + bayer(px, py) * 0.18) * 5) / 5);
-      d[(py * 256 + px) * 4 + 3] = Math.round(a * 255);
+      d[(py * w + px) * 4 + 3] = Math.round(a * 255);
     }
     x.putImageData(img, 0, 0);
     return c;
@@ -49,11 +49,11 @@ const FX = (() => {
 
   // lights: [{x, y, r, c:[r,g,b], a}] in Bildschirmkoordinaten (Spielfeld).
   function render(ctx, lights, theme) {
-    if (!vignette) vignette = makeVignette();
+    if (!vignette || lc.width !== View.w) { lc.width = View.w; vignette = makeVignette(View.w); }
     lx.globalCompositeOperation = 'source-over';
-    lx.clearRect(0, 0, 256, 208);
+    lx.clearRect(0, 0, View.w, 208);
     lx.fillStyle = `rgba(${TINT[theme] || '0,0,0'},${AMB[theme] ?? 0.3})`;
-    lx.fillRect(0, 0, 256, 208);
+    lx.fillRect(0, 0, View.w, 208);
     lx.drawImage(vignette, 0, 0);
     lx.globalCompositeOperation = 'destination-out';
     for (const L of lights) {
@@ -102,25 +102,72 @@ const FX = (() => {
     fogCache[theme] = c;
     return c;
   }
-  function drawFog(ctx, theme, cam, frame) {
+  // bottomY: Bildschirm-y der Raumunterkante (Nebel liegt am Boden des Raums)
+  function drawFog(ctx, theme, cam, frame, bottomY = 208) {
     const c = fogStrip(theme);
     if (!c) return;
+    const y = Math.round(bottomY) - 56;
+    if (y > 208 || y < -56) return;
     const off = Math.floor(cam.x * 1.15 + frame * 0.25) % 512;
-    ctx.drawImage(c, -off, 208 - 56);
-    ctx.drawImage(c, 512 - off, 208 - 56);
+    for (let x = -off; x < View.w; x += 512) ctx.drawImage(c, x, y);
+  }
+
+  // ---------------- Gewitter ----------------
+  const FLICKER = [0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1];
+  function makeBolt(w) {
+    const pts = [];
+    let x = 30 + Math.random() * (w - 60), y = -2;
+    pts.push([x, y]);
+    const end = 90 + Math.random() * 50;
+    while (y < end) { x += (Math.random() - 0.5) * 16; y += 5 + Math.random() * 8; pts.push([x, y]); }
+    const branches = [];
+    for (let i = 2; i < pts.length - 2; i += 2) if (Math.random() < 0.55) {
+      let [bx, by] = pts[i];
+      const b = [[bx, by]], dir = Math.random() < 0.5 ? -1 : 1;
+      for (let k = 0; k < 3 + Math.floor(Math.random() * 3); k++) { bx += dir * (3 + Math.random() * 8); by += 4 + Math.random() * 6; b.push([bx, by]); }
+      branches.push(b);
+    }
+    return { pts, branches };
+  }
+  function updateStorm(st, w, onStrike) {
+    if (st.flash > 0) st.flash--;
+    if (--st.cd <= 0) {
+      st.bolt = makeBolt(w); st.flash = FLICKER.length;
+      st.cd = Math.random() < 0.3 ? 40 + Math.random() * 40 : 170 + Math.random() * 260; // manchmal Doppelschlag
+      if (onStrike) onStrike();
+    }
+  }
+  const stormOn = st => st && st.flash > 0 && FLICKER[FLICKER.length - st.flash] === 1;
+  function line(ctx, pts, col, wd) {
+    ctx.fillStyle = col;
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2);
+      for (let k = 0; k <= n; k++) ctx.fillRect(Math.round(x0 + (x1 - x0) * k / n) - (wd >> 1), Math.round(y0 + (y1 - y0) * k / n), wd, 1);
+    }
+  }
+  // Wird nach den Himmelsebenen gezeichnet: Burg & Bäume bleiben davor als Silhouette.
+  function drawStormSky(ctx, st, w) {
+    if (!st || st.flash <= 0) return;
+    const on = stormOn(st);
+    ctx.fillStyle = on ? 'rgba(196,186,255,0.55)' : 'rgba(120,100,200,0.18)';
+    ctx.fillRect(0, 0, w, 208);
+    if (!on || !st.bolt) return;
+    st.bolt.branches.forEach(b => { line(ctx, b, 'rgba(164,164,252,0.7)', 2); line(ctx, b, '#e8e8fc', 1); });
+    line(ctx, st.bolt.pts, 'rgba(164,164,252,0.55)', 4);
+    line(ctx, st.bolt.pts, '#fcfcfc', 2);
   }
 
   // ---------------- Umgebungspartikel ----------------
   let amb = [];
   const CFG = {
-    courtyard: { max: 14, rate: 0.12, make: (c) => ({ x: c.x + Math.random() * 256, y: 110 + Math.random() * 60, vx: 0, vy: 0, life: 240, col: '#c8f818', kind: 'firefly' }) },
-    hall: { max: 26, rate: 0.25, make: (c) => ({ x: c.x + Math.random() * 256, y: Math.random() * 176, vx: 0.08, vy: 0.04, life: 300, col: '#fce0a8', kind: 'dust' }) },
+    courtyard: { max: 14, rate: 0.12, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + 110 + Math.random() * 60, vx: 0, vy: 0, life: 240, col: '#c8f818', kind: 'firefly' }) },
+    hall: { max: 26, rate: 0.25, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 176, vx: 0.08, vy: 0.04, life: 300, col: '#fce0a8', kind: 'dust' }) },
     cave: { max: 18, rate: 0.2, make: (c) => Math.random() < 0.35
-      ? ({ x: c.x + Math.random() * 256, y: 0, vx: 0, vy: 2.6, life: 120, col: '#3cbcfc', kind: 'drip' })
-      : ({ x: c.x + Math.random() * 256, y: 140 + Math.random() * 60, vx: 0, vy: -0.25, life: 220, col: '#58f898', kind: 'spore' }) },
-    crypt: { max: 16, rate: 0.15, make: (c) => ({ x: c.x + Math.random() * 256, y: 150 + Math.random() * 50, vx: 0.15, vy: -0.3, life: 200, col: '#a4e4fc', kind: 'wisp' }) },
-    tower: { max: 22, rate: 0.22, make: (c) => ({ x: c.x + Math.random() * 300, y: -4, vx: -0.25, vy: 0.35, life: 600, col: '#7c7c7c', kind: 'ash' }) },
-    throne: { max: 20, rate: 0.2, make: (c) => ({ x: c.x + Math.random() * 256, y: 200, vx: 0, vy: -0.45, life: 380, col: Math.random() < 0.5 ? '#f8b800' : '#d82800', kind: 'ember' }) },
+      ? ({ x: c.x + Math.random() * View.w, y: c.y, vx: 0, vy: 2.6, life: 120, col: '#3cbcfc', kind: 'drip' })
+      : ({ x: c.x + Math.random() * View.w, y: c.y + 140 + Math.random() * 60, vx: 0, vy: -0.25, life: 220, col: '#58f898', kind: 'spore' }) },
+    crypt: { max: 16, rate: 0.15, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + 150 + Math.random() * 50, vx: 0.15, vy: -0.3, life: 200, col: '#a4e4fc', kind: 'wisp' }) },
+    tower: { max: 22, rate: 0.22, make: (c) => ({ x: c.x + Math.random() * (View.w + 44), y: c.y - 4, vx: -0.25, vy: 0.35, life: 600, col: '#7c7c7c', kind: 'ash' }) },
+    throne: { max: 20, rate: 0.2, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + 200, vx: 0, vy: -0.45, life: 380, col: Math.random() < 0.5 ? '#f8b800' : '#d82800', kind: 'ember' }) },
   };
   function resetAmbient() { amb = []; }
   function updateAmbient(theme, cam) {
@@ -137,7 +184,7 @@ const FX = (() => {
         if (Phys.solidTile(Math.floor(p.x / T), Math.floor(p.y / T)) || Phys.tile(Math.floor(p.x / T), Math.floor(p.y / T)) === '~') p.t = p.life;
       } else { p.x += p.vx + w * 0.2; p.y += p.vy; }
     }
-    amb = amb.filter(p => p.t < p.life && p.x > cam.x - 40 && p.x < cam.x + 300);
+    amb = amb.filter(p => p.t < p.life && p.x > cam.x - 40 && p.x < cam.x + View.w + 44 && p.y > cam.y - 60 && p.y < cam.y + 270);
   }
   function drawAmbient(ctx, cam) {
     for (const p of amb) {
@@ -155,5 +202,5 @@ const FX = (() => {
     }
   }
 
-  return { render, drawFog, updateAmbient, drawAmbient, resetAmbient, disc };
+  return { render, drawFog, updateAmbient, drawAmbient, resetAmbient, disc, updateStorm, drawStormSky, stormOn };
 })();

@@ -13,7 +13,7 @@ class Ent {
   get cy() { return this.y + this.h / 2; }
   onScreen(m = 0) {
     const c = W.cam;
-    return this.x + this.w > c.x - m && this.x < c.x + 256 + m && this.y + this.h > c.y - m && this.y < c.y + 208 + m;
+    return this.x + this.w > c.x - m && this.x < c.x + View.w + m && this.y + this.h > c.y - m && this.y < c.y + View.fh + m;
   }
   update() { this.t++; }
   draw() {}
@@ -77,7 +77,7 @@ class Item extends Ent {
     this.t++;
     if (!this.landed) {
       if (this.type === 'heartS') { this.vy = 0.55; this.vx = Math.sin(this.t / 9) * 0.9; Phys.moveX(this, this.vx); }
-      else this.vy = Math.min(this.vy + 0.15, 2.4);
+      else { this.vy = Math.min(this.vy + 0.15, 2.4); if (this.vx) { Phys.moveX(this, this.vx); this.vx *= 0.97; } }
       if (Phys.moveY(this, this.vy) === 1) { this.landed = true; this.vx = 0; }
       if (this.y > W.room.h * T) this.dead = true;
     }
@@ -98,10 +98,10 @@ class Item extends Ent {
         if (p.whip < 3) { p.whip++; p.powerT = 45; W.freeze = 45; }
         else p.hearts = Math.min(99, p.hearts + 5);
         Audio8.sfx('bigItem'); break;
-      case 'roast': p.hp = Math.min(16, p.hp + 8); Audio8.sfx('bigItem'); W.popup(this.cx, this.y, '+LEBEN', '#f8b800'); break;
+      case 'roast': p.hp = Math.min(p.maxHp, p.hp + p.maxHp / 2); Audio8.sfx('bigItem'); W.popup(this.cx, this.y, '+LEBEN', '#f8b800'); break;
       case 'oneUp': W.lives++; Audio8.sfx('oneUp'); W.popup(this.cx, this.y, '1UP', '#3cbcfc'); break;
       case 'rosary': W.rosary(); Audio8.sfx('rosary'); break;
-      case 'orb': p.hp = 16; Audio8.sfx('orb'); W.stageClear(); break;
+      case 'orb': p.hp = p.maxHp; Audio8.sfx('orb'); W.stageClear(); break;
       default: p.sub = this.type; Audio8.sfx('item'); break;
     }
   }
@@ -345,7 +345,7 @@ class Skeleton extends Enemy {
 
 class Knight extends Enemy {
   constructor(tx, ty) {
-    super(tx * T + 2, (ty + 1) * T - 24, 12, 24, 6, 3, 500);
+    super(tx * T + 2, (ty + 1) * T - 24, 12, 24, 5, 2, 500);
     this.face = -1;
   }
   hit(dmg, id) {
@@ -406,8 +406,8 @@ class Fishman extends Enemy {
 
 class Pillar extends Enemy {
   constructor(tx, ty) {
-    super(tx * T + 1, (ty + 1) * T - 32, 14, 32, 8, 2, 400);
-    this.cd = 60; this.top = true; this.openT = 0;
+    super(tx * T + 1, (ty + 1) * T - 32, 14, 32, 6, 2, 400);
+    this.cd = 90; this.top = true; this.openT = 0;
   }
   update() {
     super.update();
@@ -415,7 +415,7 @@ class Pillar extends Enemy {
     this.face = Math.sign(p.cx - this.cx) || this.face;
     if (this.openT > 0) this.openT--;
     if (this.onScreen(-8) && --this.cd <= 0) {
-      this.cd = 85; this.openT = 16;
+      this.cd = 120; this.openT = 16;
       W.spawn(new EProj('fire', this.cx + this.face * 8, this.y + (this.top ? 8 : 24), this.face * 1.4, 0, 0));
       Audio8.sfx('fire');
       this.top = !this.top;
@@ -427,9 +427,9 @@ class Pillar extends Enemy {
 
 // ---------------- Gegner-Projektile ----------------
 class EProj extends Ent {
-  constructor(type, x, y, vx, vy, grav) {
+  constructor(type, x, y, vx, vy, grav, dmg = 2) {
     super(x - 3, y - 3, 6, 6);
-    this.type = type; this.kind = 'eproj'; this.vx = vx; this.vy = vy; this.grav = grav; this.dmg = type === 'bone' ? 2 : 3;
+    this.type = type; this.kind = 'eproj'; this.vx = vx; this.vy = vy; this.grav = grav; this.dmg = dmg;
   }
   update() {
     this.t++;
@@ -461,7 +461,7 @@ class EProj extends Ent {
 class Platform extends Ent {
   constructor(tx0, tx1, ty) {
     super(tx0 * T, ty * T, 32, 8);
-    this.kind = 'platform'; this.x0 = tx0 * T; this.x1 = tx1 * T; this.dir = 1; this.dx = 0;
+    this.kind = 'platform'; this.x0 = tx0 * T; this.x1 = tx1 * T; this.dir = 1; this.dx = 0; this.dy = 0;
   }
   update() {
     this.t++;
@@ -484,7 +484,7 @@ class Spawner {
   constructor(z) { this.z = z; this.timer = z.interval * 0.5; this.kids = []; }
   update() {
     const z = this.z, p = W.player, c = W.cam;
-    const center = c.x + 128;
+    const center = c.x + View.w / 2;
     if (center < z.x0 * T || center > z.x1 * T || !p.alive || W.camLock) return;
     this.kids = this.kids.filter(k => !k.dead);
     if (this.kids.length >= z.max) return;
@@ -495,8 +495,8 @@ class Spawner {
   }
   spawn_ghoul(p, c) {
     let side = Math.random() < 0.6 ? p.face : -p.face;
-    let x = side > 0 ? c.x + 256 - 22 : c.x + 10;
-    if (Math.abs(x - p.cx) < 60) { side = -side; x = side > 0 ? c.x + 256 - 22 : c.x + 10; }
+    let x = side > 0 ? c.x + View.w - 22 : c.x + 10;
+    if (Math.abs(x - p.cx) < 60) { side = -side; x = side > 0 ? c.x + View.w - 22 : c.x + 10; }
     const col = Math.floor((x + 5) / T), row = Math.floor((p.feet + 2) / T);
     if (!Phys.solidTile(col, row) || Phys.solidTile(col, row - 1) || Phys.solidTile(col, row - 2)) return null;
     if (x < 0 || x > W.room.w * T - 16) return null;
@@ -504,13 +504,13 @@ class Spawner {
   }
   spawn_skull(p, c) {
     const side = Math.random() < 0.5 ? 1 : -1;
-    const x = side > 0 ? c.x + 256 + 2 : c.x - 14;
+    const x = side > 0 ? c.x + View.w + 2 : c.x - 14;
     return new Skull(x, clamp(p.y + rnd(-14, 10), c.y + 24, c.y + 170), -side);
   }
   spawn_fish(p, c) {
     for (let tries = 0; tries < 6; tries++) {
       const x = p.cx + (Math.random() < 0.5 ? -1 : 1) * rnd(36, 100);
-      if (x < c.x + 8 || x > c.x + 248) continue;
+      if (x < c.x + 8 || x > c.x + View.w - 8) continue;
       const col = Math.floor(x / T);
       for (let r = 0; r < W.room.h; r++) if (Phys.tile(col, r) === '~') return new Fishman(x, r * T);
     }

@@ -40,6 +40,13 @@ const Sprites = (() => {
     x.drawImage(src, 1, 1);
     const img = x.getImageData(0, 0, c.width, c.height), d = img.data, W2 = c.width, H2 = c.height;
     const solid = (px, py) => px >= 0 && py >= 0 && px < W2 && py < H2 && d[(py * W2 + px) * 4 + 3] > 0 && d[(py * W2 + px) * 4 + 3] !== 254;
+    const shade = []; // Randlicht oben-links, Schatten unten-rechts
+    for (let py = 0; py < H2; py++) for (let px = 0; px < W2; px++) {
+      if (!solid(px, py)) continue;
+      const lit = !solid(px, py - 1) || !solid(px - 1, py), dark = !solid(px, py + 1) || !solid(px + 1, py);
+      if (lit !== dark) shade.push([(py * W2 + px) * 4, lit]);
+    }
+    shade.forEach(([i, lit]) => { for (let j = 0; j < 3; j++) d[i + j] = lit ? Math.round(d[i + j] + (255 - d[i + j]) * 0.24) : Math.round(d[i + j] * 0.74); });
     const mark = [];
     for (let py = 0; py < H2; py++) for (let px = 0; px < W2; px++) {
       if (d[(py * W2 + px) * 4 + 3] > 0) continue;

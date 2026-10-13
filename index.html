@@ -13,7 +13,7 @@
   #wrap { position: relative; }
   canvas#screen {
     display: block; image-rendering: pixelated; image-rendering: crisp-edges;
-    background: #000; box-shadow: 0 0 60px rgba(168, 0, 32, .35);
+    background: #000;
   }
   #touch { position: fixed; inset: 0; pointer-events: none; display: none; user-select: none; -webkit-user-select: none; }
   body.touch #touch { display: block; }
@@ -56,9 +56,12 @@
   <div class="tbtn" id="tSub" data-k="sub">SUB</div>
   <div class="tbtn" id="tStart" data-k="start">START</div>
 </div>
+<script src="js/view.js"></script>
+<script src="js/options.js"></script>
 <script src="js/font.js"></script>
 <script src="js/sprites.js"></script>
 <script src="js/sprites2.js"></script>
+<script src="js/hero.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/input.js"></script>
 <script src="js/levels.js"></script>
@@ -66,6 +69,7 @@
 <script src="js/fx.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/enemies.js"></script>
+<script src="js/props.js"></script>
 <script src="js/bosses.js"></script>
 <script src="js/world.js"></script>
 <script src="js/game.js"></script>

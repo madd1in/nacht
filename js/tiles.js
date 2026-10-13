@@ -253,17 +253,29 @@ const Tiles = (() => {
   function buildBg(theme) {
     seed = 7;
     const L = [];
-    const add = (name, c, par, extra = {}) => L.push({ name, c, par, wrap: c.width > 256, ...extra });
+    const add = (name, c, par, extra = {}) => L.push({ name, c, par, wrap: c.width >= 512, ...extra });
     if (theme === 'courtyard') {
-      const sky = C(256, 208), x = sky.getContext('2d');
-      gradient(x, 256, 208, ['#000000', '#05010f', '#0c031c', '#160629', '#220a36', '#320e44', '#461250', '#5a1658', '#6c1c5c']);
-      for (let i = 0; i < 70; i++) {
-        const sx = ri(0, 255), sy = ri(0, 120), b = rand();
+      const sky = C(640, 208), x = sky.getContext('2d');
+      gradient(x, 640, 208, ['#000000', '#05010f', '#0c031c', '#160629', '#220a36', '#320e44', '#461250', '#5a1658', '#6c1c5c']);
+      for (let i = 0; i < 160; i++) {
+        const sx = ri(0, 639), sy = ri(0, 120), b = rand();
         px(x, b < 0.2 ? '#fcfcfc' : b < 0.6 ? '#9c9cbc' : '#5c5c7c', sx, sy);
         if (b < 0.06) { px(x, '#7c7c9c', sx - 1, sy); px(x, '#7c7c9c', sx + 1, sy); px(x, '#7c7c9c', sx, sy - 1); px(x, '#7c7c9c', sx, sy + 1); }
       }
-      moon(x, 196, 46, 24);
-      add('sky', sky, 0);
+      add('sky', sky, 0, { wrap: false });
+      const mc = C(96, 96);
+      moon(mc.getContext('2d'), 48, 48, 24);
+      add('moon', mc, 0, { wrap: false, right: 70, y: -2 });
+      const sc = C(512, 208), sx2 = sc.getContext('2d'); // Sturmwolkenbank
+      for (let i = 0; i < 46; i++) {
+        const cx = ri(0, 511), cy = ri(-6, 34), rx = ri(14, 34), ry = ri(6, 14);
+        for (let y = -ry; y <= ry; y++) for (let X = -rx; X <= rx; X++) {
+          const q = (X * X) / (rx * rx) + (y * y) / (ry * ry);
+          if (q > 1 || bay(X + cx, y + cy) < (q - 0.7) * 3) continue;
+          px(sx2, y > ry * 0.45 ? '#2a1240' : '#120620', (cx + X + 512) % 512, cy + y);
+        }
+      }
+      add('storm', sc, 0.08, { drift: 0.32 });
       const cl = C(512, 208), cx = cl.getContext('2d');
       for (let i = 0; i < 9; i++) {
         const y = ri(28, 96), x0 = ri(0, 511), len = ri(50, 140), th = ri(2, 4);
@@ -327,6 +339,7 @@ const Tiles = (() => {
       const c = C(512, 208), x = c.getContext('2d');
       if (theme === 'hall') wallBricks(x, 512, 208, ['#5c2414', '#3c1008', '#140000']);
       else wallBricks(x, 512, 208, ['#4c1430', '#300818', '#0c0008'], 24, 12);
+      const vtile = theme === 'hall';
       shade(x, 512, 208, '#000000', 0, 50);
       if (theme === 'hall') {
         [64, 320].forEach((wx, wi) => {
@@ -364,7 +377,7 @@ const Tiles = (() => {
         banner(x, 300, 10, 26, 96, '#4428bc', '#f8b800', '#a80020');
       }
       [0, 236, 488].forEach(cx => pillar(x, cx, 22, 208));
-      add('wall', c, 0.5);
+      add('wall', c, 0.5, { vtile });
       if (theme === 'throne') { // Kronleuchter vorne
         const n = C(512, 208), x2 = n.getContext('2d');
         [100, 360].forEach(cx => {
@@ -387,7 +400,7 @@ const Tiles = (() => {
         for (let y = -r; y <= r; y++) for (let X = -r; X <= r; X++) if (X * X + y * y <= r * r) px(x, (X + y) < -r * 0.6 ? '#2c1a0c' : '#1e1008', (bx + X + 512) % 512, by + y);
       }
       stalactites(x, 512, '#1e1008', '#2c1a0c', 26, 50, false, 208);
-      add('far', f, 0.3);
+      add('far', f, 0.3, { vtile: true });
       const n = C(512, 208), x2 = n.getContext('2d');
       stalactites(x2, 512, '#2a160a', '#4a2c14', 14, 70, false, 208);
       stalactites(x2, 512, '#2a160a', '#4a2c14', 10, 40, true, 208);
@@ -396,7 +409,7 @@ const Tiles = (() => {
         ditherDisc(x2, kx, ky - h / 2, 1, 10, '#14506c', 0.3);
         for (let r = 0; r < h; r++) { const w = Math.max(1, Math.round((1 - r / h) * 4)); px(x2, '#3cbcfc', kx - Math.floor(w / 2), ky - r, w, 1); px(x2, '#a4e4fc', kx - Math.floor(w / 2), ky - r, 1, 1); }
       }
-      add('near', n, 0.55);
+      add('near', n, 0.55, { vtile: true });
     } else if (theme === 'crypt') {
       const c = C(512, 208), x = c.getContext('2d');
       wallBricks(x, 512, 208, ['#283460', '#161e40', '#04040c']);
@@ -415,7 +428,7 @@ const Tiles = (() => {
         px(x, '#fce0a8', nx + 10, ny + 18, 2, 4); px(x, '#f8b800', nx + 10, ny + 15, 2, 2); ditherDisc(x, nx + 11, ny + 17, 1, 9, '#5c3c1c', 0.35);
       }
       for (let i = 0; i < 5; i++) { const cx = ri(0, 500), len = ri(20, 60); for (let y = 0; y < len; y += 3) px(x, y % 6 ? '#3c3c4c' : '#6c6c7c', cx, y, 2, 2); }
-      add('wall', c, 0.5);
+      add('wall', c, 0.5, { vtile: true });
     } else if (theme === 'tower') {
       const c = C(512, 208), x = c.getContext('2d');
       wallBricks(x, 512, 208, ['#34343c', '#202028', '#08080c']);
@@ -430,7 +443,7 @@ const Tiles = (() => {
       for (let i = 0; i < 22; i++) px(x, '#1c1408', cx + Math.round(Math.cos(-1.2) * i * 0.9), cy + Math.round(Math.sin(-1.2) * i * 0.9), 2, 2);
       for (let i = 0; i < 16; i++) px(x, '#1c1408', cx + Math.round(Math.cos(0.4) * i), cy + Math.round(Math.sin(0.4) * i), 2, 2);
       [40, 250, 470].forEach(wx => { px(x, '#000', wx, 40, 6, 30); px(x, '#a80020', wx + 1, 46, 4, 6); lightShaft(x, wx, 70, 6, 60, '#5c0818', 0.4); });
-      add('wall', c, 0.5);
+      add('wall', c, 0.5, { vtile: true });
       const frames = [];
       for (let f = 0; f < 8; f++) {
         const g = C(512, 208), gx = g.getContext('2d');
@@ -442,7 +455,7 @@ const Tiles = (() => {
         });
         frames.push(g);
       }
-      L.push({ name: 'gears', c: frames[0], frames, fps: 6, par: 0.5, wrap: true });
+      L.push({ name: 'gears', c: frames[0], frames, fps: 6, par: 0.5, wrap: true, vtile: true });
     }
     return L;
   }
@@ -469,30 +482,65 @@ const Tiles = (() => {
 
   function layer(theme, name) { return build(theme).bg.find(l => l.name === name); }
 
-  function drawLayer(ctx, l, cam, frame) {
+  function drawLayer(ctx, l, cam, frame, vt = false) {
     const img = l.frames ? l.frames[Math.floor(frame / (60 / l.fps)) % l.frames.length] : l.c;
+    if (l.right !== undefined) { ctx.drawImage(img, Math.round(View.w - l.right - img.width / 2), l.y || 0); return; }
     if (!l.wrap) { ctx.drawImage(img, 0, 0); return; }
     const off = ((Math.floor(cam.x * l.par + (l.drift ? frame * l.drift : 0)) % img.width) + img.width) % img.width;
-    ctx.drawImage(img, -off, 0);
-    ctx.drawImage(img, img.width - off, 0);
+    const oy = vt && l.vtile ? ((Math.floor(cam.y * l.par) % img.height) + img.height) % img.height : 0;
+    for (const yy of oy ? [-oy, img.height - oy] : [0]) {
+      for (let x = -off; x < View.w; x += img.width) ctx.drawImage(img, x, yy);
+    }
   }
 
-  function drawBg(ctx, room, cam, frame = 0) {
-    build(room.theme).bg.forEach(l => drawLayer(ctx, l, cam, frame));
+  // onSky: wird nach den Himmelsebenen aufgerufen (Blitze hinter Burg & Bäumen)
+  function drawBg(ctx, room, cam, frame = 0, onSky = null) {
+    const vt = room.h > 13;
+    build(room.theme).bg.forEach(l => { drawLayer(ctx, l, cam, frame, vt); if (onSky && l.name === 'clouds') onSky(ctx); });
+  }
+
+  // ---------------- Vordergrund-Silhouetten (Parallax 1.3) ----------------
+  const fronts = {};
+  function buildFront(theme) {
+    seed = 913;
+    const c = C(640, 208), x = c.getContext('2d'), dark = '#05020a';
+    if (theme === 'courtyard') {
+      for (let X = 0; X < 640; X++) { const h = 3 + Math.round(Math.abs(Math.sin(X * 0.21) * 4 + Math.sin(X * 0.07) * 3)); px(x, dark, X, 208 - h, 1, h); }
+      [60, 300, 520].forEach(bx => { for (let i = 0; i < 26; i++) px(x, dark, bx + i, 190 + Math.abs(13 - i) / 2, 1, 18); });
+      [140, 430].forEach(tx => { for (let i = 0; i < 70; i++) px(x, dark, tx + i, Math.floor(i * 0.35), 3, 2); for (let i = 0; i < 20; i++) px(x, dark, tx + 30 + i, 12 + i, 1, 1); });
+    } else if (theme === 'hall' || theme === 'throne') {
+      [0, 320].forEach(cx => {
+        for (let X = 0; X < 120; X++) { const h = 10 + Math.round(Math.sin(X / 120 * Math.PI) * -6 + 6 + (X % 8 < 4 ? 1 : 0)); px(x, '#1c0006', cx + X, 0, 1, h + 10); px(x, '#3c0010', cx + X, h + 9, 1, 1); }
+        px(x, '#a87000', cx + 2, 0, 2, 30); px(x, '#a87000', cx + 116, 0, 2, 30);
+      });
+    } else if (theme === 'cave') {
+      for (let i = 0; i < 12; i++) { const sx = ri(0, 620), len = ri(12, 36), w = ri(6, 14); for (let r = 0; r < len; r++) px(x, dark, sx + Math.floor((w - w * (1 - r / len)) / 2), r, Math.max(1, Math.round(w * (1 - r / len))), 1); }
+      for (let i = 0; i < 9; i++) { const sx = ri(0, 620), w = ri(8, 18); for (let r = 0; r < 6; r++) px(x, dark, sx + r, 207 - r, w - r * 2, 1); }
+    } else if (theme === 'crypt' || theme === 'tower') {
+      for (let i = 0; i < 6; i++) { const cx = ri(0, 630), len = ri(30, 80); for (let y = 0; y < len; y += 4) { px(x, '#0c0c14', cx, y, 3, 3); px(x, '#1c1c28', cx + 1, y + 1, 1, 1); } px(x, '#0c0c14', cx - 2, len, 7, 3); }
+      if (theme === 'crypt') for (let i = 0; i < 28; i++) px(x, 'rgba(160,160,200,0.35)', i, 0, 1, 28 - i);
+    }
+    return c;
+  }
+  function drawFront(ctx, room, cam) {
+    const c = fronts[room.theme] || (fronts[room.theme] = buildFront(room.theme));
+    const off = ((Math.floor(cam.x * 1.3) % 640) + 640) % 640;
+    for (let x = -off; x < View.w; x += 640) ctx.drawImage(c, x, 0);
   }
 
   const DECO_SOLID = new Set(['#', '=', 'X', 'Y']);
   function drawTiles(ctx, room, cam, frame) {
     const t = build(room.theme), g = room.grid;
-    const x0 = Math.max(0, Math.floor(cam.x / T)), x1 = Math.min(room.w - 1, x0 + 17);
+    const x0 = Math.floor(cam.x / T), x1 = x0 + Math.ceil(View.w / T) + 1;
     const y0 = Math.max(0, Math.floor(cam.y / T)), y1 = Math.min(room.h - 1, y0 + 14);
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
     const deco = [];
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
-      const ch = g[cy][cx];
+      const out = cx < 0 || cx >= room.w; // außerhalb schmaler Räume: Mauer
+      const ch = out ? '#' : g[cy][cx];
       if (ch === '.') continue;
-      const X = cx * T + ox, Y = cy * T + oy, v = (cx * 7 + cy * 3) % 4;
-      const above = cy > 0 ? g[cy - 1][cx] : '.', below = cy < room.h - 1 ? g[cy + 1][cx] : '#';
+      const X = cx * T + ox, Y = cy * T + oy, v = ((cx * 7 + cy * 3) % 4 + 4) % 4;
+      const above = out ? '#' : cy > 0 ? g[cy - 1][cx] : '.', below = out ? '#' : cy < room.h - 1 ? g[cy + 1][cx] : '#';
       let img = null;
       if (ch === '#') img = (above === '#' ? t.ground : t.groundTop)[v];
       else if (ch === '=') img = t.alt[v % 3];
@@ -530,5 +578,5 @@ const Tiles = (() => {
     }
   }
 
-  return { build, drawBg, drawTiles, layer, drawLayer };
+  return { build, drawBg, drawTiles, drawFront, layer, drawLayer };
 })();

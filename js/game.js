@@ -1,21 +1,30 @@
-// Spielzustände, HUD, Bildschirme, Hauptschleife.
+// Spielzustände, HUD, Bildschirme, Hauptschleife. Alle Layouts richten sich nach View.w.
 'use strict';
 
+const LOGO = ['#fcbca0', '#fc7460', '#e83c20', '#d82800', '#a80020', '#880c00', '#580008'];
+const OPTION_ITEMS = [
+  { key: 'easy', label: 'LEICHT-MODUS', hint: 'DOPPELTE LEBEN + DOPPELTER SCHADEN' },
+  { key: 'maxWhip', label: 'MAXIMALE PEITSCHE', hint: 'MORGENSTERN AB SPIELBEGINN' },
+  { key: 'infHearts', label: 'UNENDLICH HERZEN', hint: 'SPEZIALWAFFEN OHNE LIMIT' },
+  { key: 'music', label: 'MUSIK', hint: 'PFEIL LINKS/RECHTS' },
+  { key: 'crt', label: 'RÖHRENLOOK', hint: 'SCANLINES + VIGNETTE' },
+  { key: 'back', label: 'ZURÜCK', hint: '' },
+];
+const BAY4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
 const Game = {
-  state: 'title', t: 0, hi: 0, sel: 0, tallyPhase: 0, bossName: 0,
+  state: 'title', t: 0, hi: 0, sel: 0, tallyPhase: 0, bossName: 0, crt: true, pendingView: null,
   canvas: null, ctx: null, bigCanvas: null,
 
   init() {
     this.canvas = document.getElementById('screen');
     this.ctx = this.canvas.getContext('2d');
-    this.ctx.imageSmoothingEnabled = false;
-    this.bigCanvas = Sprites.canvas(256, 8);
+    this.bigCanvas = Sprites.canvas(512, 8);
     try { this.hi = parseInt(localStorage.getItem('nachtmahr.hi') || '0', 10) || 0; } catch (e) { this.hi = 0; }
-    let crt = true;
-    try { crt = localStorage.getItem('nachtmahr.crt') !== '0'; } catch (e) { /* privat */ }
-    this.setCrt(crt);
+    this.setCrt(Options.crt);
+    this.menu = 0; this.optSel = 0;
     W.player = new Player();
-    Input.onAny(() => Audio8.init());
+    Input.onAny(() => { Audio8.init(); Audio8.setMusicLevel(Options.music / 8); });
     window.addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); }
@@ -23,6 +32,7 @@ const Game = {
     this.resize();
     const q = new URLSearchParams(location.search);
     this.debugStage = q.has('stage') ? clamp(parseInt(q.get('stage'), 10) - 1, 0, 2) : null;
+    this.debugRoom = q.has('room') ? Math.max(0, parseInt(q.get('room'), 10) - 1) : 0;
     this.toTitle();
     let acc = 0, last = performance.now();
     const loop = (now) => {
@@ -36,12 +46,19 @@ const Game = {
   },
 
   resize() {
-    const s = Math.min(window.innerWidth / 256, window.innerHeight / 240);
-    const scale = s >= 2 ? Math.floor(s) : s;
-    this.canvas.style.width = Math.floor(256 * scale) + 'px';
-    this.canvas.style.height = Math.floor(240 * scale) + 'px';
+    const fit = View.fit();
+    if (W.camLock) this.pendingView = fit; else this.applyView(fit);
+  },
+  applyView(fit) {
+    View.w = fit.w; View.scale = fit.scale;
+    if (this.canvas.width !== View.w) this.canvas.width = View.w;
+    this.ctx.imageSmoothingEnabled = false;
+    this.canvas.style.width = fit.cssW + 'px';
+    this.canvas.style.height = fit.cssH + 'px';
     const crt = document.getElementById('crt');
-    if (crt) { crt.style.setProperty('--s', scale + 'px'); crt.style.setProperty('--a', (scale * 0.55) + 'px'); }
+    if (crt) { crt.style.setProperty('--s', fit.scale + 'px'); crt.style.setProperty('--a', (fit.scale * 0.55) + 'px'); }
+    if (W.room) W.snapCam();
+    this.pendingView = null;
   },
 
   setCrt(on) {
@@ -49,7 +66,7 @@ const Game = {
     const el = document.getElementById('crt');
     if (el) el.classList.toggle('off', !on);
     this.canvas.classList.toggle('crt', on);
-    try { localStorage.setItem('nachtmahr.crt', on ? '1' : '0'); } catch (e) { /* privat */ }
+    Options.set('crt', on);
   },
   toggleCrt() { this.setCrt(!this.crt); },
 
@@ -61,18 +78,18 @@ const Game = {
   },
 
   go(state) { this.state = state; this.t = 0; },
-
   toTitle() { this.saveHi(); this.go('title'); Audio8.play('title'); },
 
-  newGame(stage = 0) {
+  newGame(stage = 0, room = 0) {
     W.score = 0; W.lives = 3; W.nextLife = 20000;
     W.player = new Player();
-    this.startStage(stage);
+    this.startStage(stage, room);
   },
 
-  startStage(s) {
-    W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0;
-    W.loadRoom(s, 0);
+  startStage(s, room = 0) {
+    W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0; W.checkpoint = null;
+    if (this.pendingView) this.applyView(this.pendingView);
+    W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1));
     Audio8.stop();
     this.go('card');
   },
@@ -87,7 +104,7 @@ const Game = {
     W.lives--;
     if (W.lives < 0) { this.saveHi(); this.sel = 0; this.go('gameover'); Audio8.play('over'); return; }
     const p = W.player;
-    p.hp = 16; p.hearts = 5; p.whip = Math.max(1, p.whip - 1);
+    p.hp = p.maxHp; p.hearts = Options.infHearts ? 99 : Math.max(5, p.hearts); p.whip = Options.maxWhip ? 3 : Math.max(1, p.whip - 1);
     this.go('respawn');
   },
 
@@ -100,11 +117,25 @@ const Game = {
     this.t++;
     switch (this.state) {
       case 'title':
+        if (P.up || P.down) { this.menu = 1 - this.menu; Audio8.sfx('select'); }
         if (P.start || P.jump || P.attack) {
           Audio8.init(); Audio8.sfx('select');
-          if (this.debugStage !== null) this.newGame(this.debugStage); else { this.go('intro'); Audio8.stop(); }
+          if (this.menu === 1) { this.go('options'); this.optSel = 0; break; }
+          this.go('charsel');
         }
         break;
+      case 'options': this.updateOptions(P); break;
+      case 'charsel': {
+        if (P.left || P.right) {
+          const ids = HEROES.list.map(d => d.id), i = ids.indexOf(Options.character);
+          Options.set('character', ids[(i + (P.right ? 1 : ids.length - 1)) % ids.length]); Audio8.sfx('select');
+        }
+        if ((P.start || P.jump || P.attack) && this.t > 10) {
+          Audio8.sfx('bigItem');
+          if (this.debugStage !== null) this.newGame(this.debugStage, this.debugRoom); else { this.go('intro'); Audio8.stop(); }
+        }
+        break;
+      }
       case 'intro':
         if ((P.start || P.attack || P.jump) && this.t > 20) this.newGame(0);
         if (this.t > 60 * 13) this.newGame(0);
@@ -117,11 +148,14 @@ const Game = {
         if (P.start) { this.go('play'); Audio8.setMusicVolume(0.5); Audio8.sfx('pause'); }
         break;
       case 'fade':
-        if (this.t === 32) W.loadRoom(W.stage, W.roomIdx + 1);
+        if (this.t === 32) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); }
         if (this.t > 52) this.state = 'play';
         break;
       case 'respawn':
-        if (this.t === 50) { W.loadRoom(W.stage, W.roomIdx); W.time = W.stageDef.time; }
+        if (this.t === 50) {
+          if (this.pendingView) this.applyView(this.pendingView);
+          W.loadRoom(W.stage, W.roomIdx); W.applyCheckpoint(); W.time = W.stageDef.time;
+        }
         if (this.t > 70) { this.go('play'); Audio8.play(W.stageDef.music); }
         break;
       case 'clear': this.updateClear(); break;
@@ -134,16 +168,32 @@ const Game = {
         }
         break;
       case 'ending':
-        if (this.t % 50 === 0 && this.t < 330) { Audio8.sfx('wall'); }
+        if (this.t % 50 === 0 && this.t < 330) { Audio8.sfx('wall'); Input.rumble(0.3, 0.5, 200); }
         if (this.t > 60 * 30 && (P.start || P.jump || P.attack)) this.toTitle();
         break;
     }
   },
 
+  updateOptions(P) {
+    const n = OPTION_ITEMS.length;
+    if (P.up) { this.optSel = (this.optSel + n - 1) % n; Audio8.sfx('select'); }
+    if (P.down) { this.optSel = (this.optSel + 1) % n; Audio8.sfx('select'); }
+    const it = OPTION_ITEMS[this.optSel];
+    const left = P.left, right = P.right || P.jump || P.attack;
+    if (P.start || (it.key === 'back' && (P.jump || P.attack))) { this.go('title'); Audio8.sfx('pause'); return; }
+    if (!(left || right)) return;
+    if (it.key === 'music') {
+      Options.set('music', clamp(Options.music + (left ? -1 : 1), 0, 10));
+      Audio8.setMusicLevel(Options.music / 8);
+    } else if (it.key === 'crt') this.toggleCrt();
+    else if (it.key !== 'back') Options.toggle(it.key);
+    Audio8.sfx('item');
+  },
+
   updatePlay(P) {
     if (P.start && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); Audio8.sfx('pause'); return; }
     W.update();
-    if (W.boss && this.bossName < 140) this.bossName++;
+    if (W.boss && this.bossName < 150) this.bossName++;
     const p = W.player;
     if (p.alive && !W.cleared && W.freeze === 0 && ++W.timeSub >= 40) {
       W.timeSub = 0; W.time--;
@@ -157,78 +207,105 @@ const Game = {
     if (this.tallyPhase === 0 && this.t > 150) this.tallyPhase = 1;
     if (this.tallyPhase === 1) {
       if (W.time > 0) {
-        const n = Math.min(2, W.time); W.time -= n; W.addScore(n * 10);
+        const n = Math.min(3, W.time); W.time -= n; W.addScore(n * 10);
         if (this.t % 3 === 0) Audio8.sfx('tick');
       } else { this.tallyPhase = 2; this.t2 = this.t; W.addScore(W.player.hearts * 100); Audio8.sfx('money'); }
     }
     if (this.tallyPhase === 2 && this.t - this.t2 > 120) {
-      if (W.stage + 1 < Levels.STAGES.length) {
-        const p = W.player; p.hp = 16;
-        this.startStage(W.stage + 1);
-      } else { this.saveHi(); this.go('ending'); Audio8.play('ending'); this.rubble = []; }
+      if (W.stage + 1 < Levels.STAGES.length) { W.player.hp = W.player.maxHp; this.startStage(W.stage + 1); }
+      else { this.saveHi(); this.go('ending'); Audio8.play('ending'); this.rubble = []; }
     }
   },
 
   // ---------------- Render ----------------
   render() {
-    const ctx = this.ctx;
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 256, 240);
+    const ctx = this.ctx, w = View.w;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, 240);
     switch (this.state) {
       case 'title': this.drawTitle(ctx); break;
+      case 'options': this.drawOptions(ctx); break;
+      case 'charsel': this.drawCharSel(ctx); break;
       case 'intro': this.drawIntro(ctx); break;
       case 'card': this.drawHud(ctx); this.drawCard(ctx); break;
       case 'gameover': this.drawGameOver(ctx); break;
       case 'ending': this.drawEnding(ctx); break;
       default:
         W.draw(ctx); this.drawHud(ctx);
-        if (this.state === 'pause') this.panel(ctx, 'PAUSE', 'START DRÜCKEN');
-        if (this.state === 'fade') this.fade(ctx, this.t < 32 ? this.t / 32 : 1 - (this.t - 32) / 20);
-        if (this.state === 'respawn') this.fade(ctx, this.t < 50 ? this.t / 30 : 1 - (this.t - 50) / 20);
-        if (this.state === 'play' && W.boss && this.bossName > 0 && this.bossName < 140 && (this.bossName & 8)) {
-          Font.draw(ctx, W.stageDef.boss, 128, 46, '#f8b800', { align: 'center', shadow: '#000' });
-        }
+        if (this.state === 'pause') this.panel(ctx, 'PAUSE', Input.device === 'pad' ? 'MENÜ-TASTE DRÜCKEN' : 'START DRÜCKEN');
+        if (this.state === 'fade') this.dissolve(ctx, this.t < 32 ? this.t / 30 : 1 - (this.t - 32) / 20);
+        if (this.state === 'respawn') this.dissolve(ctx, this.t < 50 ? this.t / 30 : 1 - (this.t - 50) / 20);
+        if (this.state === 'play' && W.boss && this.bossName > 0 && this.bossName < 150) this.drawBossBanner(ctx);
         if (this.state === 'clear') this.drawClear(ctx);
     }
+    this.drawToast(ctx);
   },
 
-  fade(ctx, a) { ctx.fillStyle = `rgba(0,0,0,${clamp(a, 0, 1)})`; ctx.fillRect(0, 32, 256, 208); },
+  // Pixel-Dissolve: 8x8-Blöcke in Bayer-Reihenfolge
+  dissolve(ctx, a) {
+    a = clamp(a, 0, 1);
+    if (a <= 0) return;
+    ctx.fillStyle = '#000';
+    for (let by = 0; by < 26; by++) for (let bx = 0; bx < Math.ceil(View.w / 8); bx++) {
+      if (a * 16 > BAY4[(by & 3) * 4 + (bx & 3)] + ((bx + by) % 3) * 0.3) ctx.fillRect(bx * 8, 32 + by * 8, 8, 8);
+    }
+  },
 
   panel(ctx, title, sub) {
-    ctx.fillStyle = '#000'; ctx.fillRect(68, 110, 120, 40);
-    ctx.strokeStyle = '#d82800'; ctx.strokeRect(68.5, 110.5, 119, 39);
-    Font.draw(ctx, title, 128, 118, '#fcfcfc', { align: 'center' });
-    if ((this.t >> 5) % 2 === 0) Font.draw(ctx, sub, 128, 134, '#bcbcbc', { align: 'center' });
+    const cx = View.cx;
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - 64, 110, 128, 40);
+    ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - 63.5, 110.5, 127, 39);
+    Font.draw(ctx, title, cx, 118, '#fcfcfc', { align: 'center' });
+    if ((this.t >> 5) % 2 === 0) Font.draw(ctx, sub, cx, 134, '#bcbcbc', { align: 'center' });
+    if (!Audio8.ready()) Font.draw(ctx, 'KLICK = TON AN', cx, 156, '#7c7c7c', { align: 'center' });
   },
 
-  big(ctx, text, x, y, scale, color, shadow) {
+  drawToast(ctx) {
+    const t = Input.toast;
+    if (!t) return;
+    const w = Font.width(t.text) + 16, x = Math.round(View.cx - w / 2), y = 36;
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(x, y, w, 13);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + 12, w, 1);
+    Font.draw(ctx, t.text, View.cx, y + 3, '#a4e4fc', { align: 'center' });
+  },
+
+  // Großschrift mit Zeilen-Farbverlauf, optionaler Kontur und Schatten
+  big(ctx, text, cx, y, scale, colors, shadow, outline) {
     const b = this.bigCanvas, bx = b.getContext('2d');
-    bx.clearRect(0, 0, b.width, b.height);
-    Font.draw(bx, text, 0, 0, color);
-    const w = Font.width(text) + 1;
-    ctx.imageSmoothingEnabled = false;
-    const dx = Math.round(x - (w * scale) / 2);
-    if (shadow) {
-      bx.globalCompositeOperation = 'source-in'; bx.fillStyle = shadow; bx.fillRect(0, 0, b.width, b.height);
-      bx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(b, 0, 0, w, 7, dx + scale, y + scale, w * scale, 7 * scale);
+    const w = Font.width(text) + 1, dx = Math.round(cx - (w * scale) / 2);
+    const paintRows = (cols) => {
       bx.clearRect(0, 0, b.width, b.height);
-      Font.draw(bx, text, 0, 0, color);
+      for (let r = 0; r < 7; r++) {
+        bx.save(); bx.beginPath(); bx.rect(0, r, b.width, 1); bx.clip();
+        Font.draw(bx, text, 0, 0, Array.isArray(cols) ? cols[r] : cols);
+        bx.restore();
+      }
+    };
+    ctx.imageSmoothingEnabled = false;
+    if (outline) {
+      paintRows(outline);
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([ox, oy]) => ctx.drawImage(b, 0, 0, w, 7, dx + ox, y + oy, w * scale, 7 * scale));
     }
+    if (shadow) { paintRows(shadow); ctx.drawImage(b, 0, 0, w, 7, dx + scale, y + scale, w * scale, 7 * scale); }
+    paintRows(colors);
     ctx.drawImage(b, 0, 0, w, 7, dx, y, w * scale, 7 * scale);
     return { x: dx, w: w * scale };
   },
 
   drawHud(ctx) {
+    const Wd = View.w;
     const R = (c, x, y, w, h) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
-    ['#120a1c', '#0e0716', '#0a0512', '#07030c'].forEach((c, i) => R(c, 0, i * 8, 256, 8));
-    R('#2c1808', 0, 29, 256, 1); R('#c89020', 0, 30, 256, 1); R('#3c2008', 0, 31, 256, 1);
-    for (let i = 4; i < 256; i += 32) { R('#c89020', i, 28, 3, 1); R('#fce0a8', i + 1, 28, 1, 1); }
+    ['#120a1c', '#0e0716', '#0a0512', '#07030c'].forEach((c, i) => R(c, 0, i * 8, Wd, 8));
+    R('#2c1808', 0, 29, Wd, 1); R('#c89020', 0, 30, Wd, 1); R('#3c2008', 0, 31, Wd, 1);
+    for (let i = 4; i < Wd; i += 32) { R('#c89020', i, 28, 3, 1); R('#fce0a8', i + 1, 28, 1, 1); }
     const p = W.player, pad = (n, l) => String(Math.max(0, n)).padStart(l, '0');
     const label = '#b0a080', val = '#fcfcfc';
+    const right = Wd - 98, boxCx = Math.round((116 + right) / 2);
     Font.draw(ctx, 'SCORE', 6, 3, label); Font.draw(ctx, pad(W.score, 6), 40, 3, val, { shadow: '#000' });
-    Font.draw(ctx, 'ZEIT', 100, 3, label);
-    Font.draw(ctx, pad(W.time, 4), 128, 3, W.time <= 30 && (W.frame & 16) ? '#fc7460' : val, { shadow: '#000' });
-    Font.draw(ctx, 'STAGE', 190, 3, label); Font.draw(ctx, pad(W.stage + 1, 2), 226, 3, val, { shadow: '#000' });
+    if (Options.easy) Font.draw(ctx, 'LEICHT', 82, 3, '#58f898');
+    Font.draw(ctx, 'ZEIT', boxCx - 37, 3, label);
+    Font.draw(ctx, pad(W.time, 4), boxCx - 9, 3, W.time <= 30 && (W.frame & 16) ? '#fc7460' : val, { shadow: '#000' });
+    Font.draw(ctx, 'STAGE', Wd - 66, 3, label);
+    Font.draw(ctx, pad(W.stage + 1, 1) + '-' + (W.roomIdx + 1), Wd - 30, 3, val, { shadow: '#000' });
     Font.draw(ctx, 'SPIELER', 6, 13, label);
     Font.draw(ctx, 'GEGNER', 6, 22, label);
     const bar = (y, v, cols) => {
@@ -238,52 +315,65 @@ const Game = {
         R(c[1], 52 + i * 4, y, 3, 6); R(c[0], 52 + i * 4, y, 3, 1); R(c[2], 52 + i * 4, y + 5, 3, 1);
       }
     };
-    bar(13, p.hp, p.hp <= 4 && (W.frame & 16) ? ['#fcfcfc', '#fc7460', '#a80020'] : ['#fcbca0', '#e83c20', '#880c00']);
+    bar(13, Math.ceil(p.hp / p.maxHp * 16), p.hp <= p.maxHp / 4 && (W.frame & 16) ? ['#fcfcfc', '#fc7460', '#a80020'] : ['#fcbca0', '#e83c20', '#880c00']);
     let bv = 16;
     if (W.boss) bv = Math.ceil((W.boss.hp / W.boss.maxHp) * 16);
     else if (W.arenaOn) bv = 0;
     bar(22, bv, ['#fce0a8', '#f8b800', '#9c6400']);
-    R('#c89020', 121, 10, 33, 21); R('#3c0810', 122, 11, 31, 19); R('#120610', 123, 12, 29, 17);
-    R('#07030c', 121, 10, 1, 1); R('#07030c', 153, 10, 1, 1); R('#07030c', 121, 30, 1, 1); R('#07030c', 153, 30, 1, 1);
+    const bx = boxCx - 16;
+    R('#c89020', bx, 10, 33, 21); R('#3c0810', bx + 1, 11, 31, 19); R('#120610', bx + 2, 12, 29, 17);
+    if (p.chargeT > 0) { R(p.chargeT >= 50 && (W.frame & 4) ? '#fcfcfc' : '#f8b800', bx + 2, 28, Math.min(29, Math.round(p.chargeT / 50 * 29)), 2); }
     if (p.sub) {
       const s = ITEM_SPR[p.sub]();
-      Sprites.draw(ctx, s, 138 - Math.floor(s.w / 2), 21 - Math.floor(s.h / 2));
+      Sprites.draw(ctx, s, boxCx - Math.floor(s.w / 2), 21 - Math.floor(s.h / 2));
     }
-    Sprites.draw(ctx, Sprites.S.heartS, 159, 12);
-    Font.draw(ctx, pad(p.hearts, 2), 169, 13, val, { shadow: '#000' });
-    const head = ['..hhh..', '.hhhhh.', 'hhsssh.', 'hhsksk.', '.hssss.', '..sss..'];
-    head.forEach((row, y) => [...row].forEach((ch, x) => { if (PAL[ch]) R(PAL[ch], 159 + x, 22 + y, 1, 1); }));
-    Font.draw(ctx, pad(W.lives, 2), 169, 22, val, { shadow: '#000' });
-    Font.draw(ctx, 'PEITSCHE', 196, 13, label);
+    Sprites.draw(ctx, Sprites.S.heartS, right + 1, 12);
+    Font.draw(ctx, pad(p.hearts, 2), right + 11, 13, p.hearts >= 10 && p.sub ? '#f8b800' : val, { shadow: '#000' });
+    const hd = p.def;
+    hd.icon.forEach((row, y) => [...row].forEach((ch, x) => { if (hd.iconPal[ch]) R(hd.iconPal[ch], right + 1 + x, 22 + y, 1, 1); }));
+    Font.draw(ctx, pad(W.lives, 2), right + 11, 22, val, { shadow: '#000' });
+    Font.draw(ctx, p.sword ? 'SCHWERT' : 'PEITSCHE', Wd - 60, 13, label);
     for (let i = 0; i < 3; i++) {
-      const on = i < p.whip, x = 202 + i * 12, y = 22;
+      const on = i < p.whip, x = Wd - 54 + i * 12, y = 22;
       R(on ? '#9c6400' : '#2c2c2c', x + 1, y, 5, 7); R(on ? '#f8b800' : '#4c4c4c', x, y + 1, 7, 5);
       R(on ? '#fce0a8' : '#5c5c5c', x + 2, y + 2, 2, 2);
     }
   },
 
+  drawBossBanner(ctx) {
+    const t = this.bossName, cx = View.cx;
+    const slide = t < 20 ? (20 - t) * 12 : t > 130 ? (t - 130) * -12 : 0;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 40, View.w, 22);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(0, 40, View.w, 1); ctx.fillRect(0, 61, View.w, 1);
+    this.big(ctx, W.stageDef.boss, cx + slide, 44, 2, ['#fce0a8', '#fce0a8', '#f8b800', '#f8b800', '#c89020', '#9c6400', '#6c4000'], null, '#000');
+  },
+
   drawCard(ctx) {
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 32, 256, 208);
+    const cx = View.cx;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 32, View.w, 208);
     const st = W.stageDef;
-    Font.draw(ctx, 'STAGE 0' + (W.stage + 1), 128, 90, '#fcfcfc', { align: 'center' });
-    this.big(ctx, st.name, 128, 108, 2, '#d82800', '#500000');
-    for (let i = 0; i < Levels.STAGES.length; i++) {
-      const x = 92 + i * 36;
+    Font.draw(ctx, 'STAGE 0' + (W.stage + 1), cx, 86, '#b0a080', { align: 'center' });
+    this.big(ctx, st.name, cx, 102, 3, LOGO, '#300000', '#000');
+    const n = Levels.STAGES.length;
+    for (let i = 0; i < n; i++) {
+      const x = cx - 56 + i * 48;
       ctx.fillStyle = i < W.stage ? '#7c7c7c' : i === W.stage ? ((this.t >> 3) & 1 ? '#d82800' : '#f8b800') : '#3c3c3c';
       ctx.fillRect(x, 150, 8, 8);
-      if (i < Levels.STAGES.length - 1) { ctx.fillStyle = '#3c3c3c'; ctx.fillRect(x + 10, 153, 24, 2); }
+      if (i < n - 1) { ctx.fillStyle = '#3c3c3c'; ctx.fillRect(x + 12, 153, 32, 2); }
     }
-    Font.draw(ctx, 'LEBEN ' + Math.max(0, W.lives), 128, 176, '#bcbcbc', { align: 'center' });
+    Font.draw(ctx, 'LEBEN ' + Math.max(0, W.lives), cx, 176, '#bcbcbc', { align: 'center' });
+    Font.draw(ctx, 'BOSS: ' + st.boss, cx, 190, '#7c7c7c', { align: 'center' });
   },
 
   drawClear(ctx) {
     if (this.tallyPhase === 0) return;
-    ctx.fillStyle = '#000'; ctx.fillRect(48, 70, 160, 64);
-    ctx.strokeStyle = '#f8b800'; ctx.strokeRect(48.5, 70.5, 159, 63);
-    Font.draw(ctx, 'STAGE GESCHAFFT!', 128, 80, '#f8b800', { align: 'center' });
-    Font.draw(ctx, 'ZEITBONUS', 60, 98); Font.draw(ctx, String(W.time * 10), 196, 98, '#fcfcfc', { align: 'right' });
+    const cx = View.cx;
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - 80, 70, 160, 64);
+    ctx.strokeStyle = '#f8b800'; ctx.strokeRect(cx - 79.5, 70.5, 159, 63);
+    Font.draw(ctx, 'STAGE GESCHAFFT!', cx, 80, '#f8b800', { align: 'center' });
+    Font.draw(ctx, 'ZEITBONUS', cx - 68, 98); Font.draw(ctx, String(W.time * 10), cx + 68, 98, '#fcfcfc', { align: 'right' });
     if (this.tallyPhase === 2) {
-      Font.draw(ctx, 'HERZBONUS', 60, 112); Font.draw(ctx, String(W.player.hearts * 100), 196, 112, '#fcfcfc', { align: 'right' });
+      Font.draw(ctx, 'HERZBONUS', cx - 68, 112); Font.draw(ctx, String(W.player.hearts * 100), cx + 68, 112, '#fcfcfc', { align: 'right' });
     }
   },
 
@@ -291,99 +381,179 @@ const Game = {
     const L = (n) => Tiles.layer('courtyard', n), cam0 = { x: 0, y: 0 };
     ctx.save(); ctx.translate(0, 32);
     Tiles.drawLayer(ctx, L('sky'), cam0, this.t);
+    Tiles.drawLayer(ctx, L('moon'), cam0, this.t);
     Tiles.drawLayer(ctx, L('clouds'), cam0, this.t);
     Tiles.drawLayer(ctx, L('mountains'), { x: 1500, y: 0 }, this.t);
-    ctx.drawImage(L('castle').c, -280 + (shake ? Math.round(rnd(-2, 2)) : 0), sink);
+    ctx.drawImage(L('castle').c, Math.round(View.w * 0.5 - 408) + (shake ? Math.round(rnd(-2, 2)) : 0), sink);
     FX.drawFog(ctx, 'courtyard', cam0, this.t);
     ctx.restore();
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 256, 32);
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 208, 256, 32);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, View.w, 32); ctx.fillRect(0, 208, View.w, 32);
+  },
+
+  drawHeroOnRock(ctx, x, y) {
+    ctx.fillStyle = '#0a0410';
+    for (let i = 0; i < 70; i++) ctx.fillRect(x - 30 + i, y + 32 - Math.round(Math.sin(i / 70 * Math.PI) * 10), 1, 30);
+    for (let i = 0; i < 8; i++) {
+      const sx = x + 4 - i * 2, sy = y + 8 + Math.round(Math.sin(this.t * 0.2 + i * 0.9) * (0.5 + i * 0.3));
+      const scf = HEROES.get(Options.character).def.scarf;
+      ctx.fillStyle = i % 3 === 0 ? scf.b : scf.a; ctx.fillRect(sx, sy, i > 5 ? 1 : scf.w, i > 5 ? 1 : scf.w);
+    }
+    const H = HEROES.get(Options.character), sc = H.def.scarf;
+    Sprites.draw(ctx, H.idle[Math.floor(this.t / 40) % 2], x - H.stand.mx, y);
+  },
+
+  controlLines() {
+    if (Input.device === 'pad' || Input.padName) return [
+      ['STICK/KREUZ  LAUFEN, DUCKEN, TREPPEN', '#f8b800'], ['A    SPRINGEN  2X = DOPPELSPRUNG', '#bcbcbc'],
+      ['X/B  PEITSCHE     Y/RB SPEZIALWAFFE', '#bcbcbc'], ['Y HALTEN (10 HERZEN) = HEILIGER STURM', '#a4e4fc'],
+      ['MENÜ PAUSE    ANSICHT TON', '#bcbcbc'],
+    ];
+    return [
+      ['PFEILE  LAUFEN, DUCKEN, TREPPEN', '#f8b800'], ['Z       SPRINGEN  2X = DOPPELSPRUNG', '#bcbcbc'],
+      ['X  PEITSCHE     C  SPEZIALWAFFE', '#bcbcbc'], ['C HALTEN (10 HERZEN) = HEILIGER STURM', '#a4e4fc'],
+      ['ENTER PAUSE  M TON  V RÖHRENLOOK', '#bcbcbc'],
+    ];
   },
 
   drawTitle(ctx) {
+    const cx = View.cx;
     this.drawSkyScene(ctx);
-    if (this.t % 600 > 590) { ctx.fillStyle = 'rgba(164,164,252,0.3)'; ctx.fillRect(0, 32, 256, 176); }
+    if (this.t % 600 > 590) { ctx.fillStyle = 'rgba(164,164,252,0.3)'; ctx.fillRect(0, 32, View.w, 176); }
     const fb = Sprites.S.bat.fly;
     for (let i = 0; i < 3; i++) {
-      const bx = ((this.t * (0.6 + i * 0.25) + i * 120) % 320) - 32, by = 60 + i * 22 + Math.sin(this.t / 15 + i) * 6;
+      const bx = ((this.t * (0.6 + i * 0.25) + i * 120) % (View.w + 64)) - 32, by = 60 + i * 22 + Math.sin(this.t / 15 + i) * 6;
       Sprites.draw(ctx, fb[(this.t >> 3) % 2], bx, by);
     }
-    const r = this.big(ctx, 'NACHTMAHR', 128, 30, 4, '#d82800', '#400000');
+    if (View.w >= 320) this.drawHeroOnRock(ctx, 30, 150);
+    const r = this.big(ctx, 'NACHTMAHR', cx, 30, 4, LOGO, '#200000', '#000');
     for (let i = 0; i < 9; i++) { // Blutstropfen
       const dx = r.x + 8 + i * 24, len = ((this.t / 3 + i * 13) % 40);
       ctx.fillStyle = '#a80020'; ctx.fillRect(dx, 58, 2, Math.min(10, len / 3));
       if (len > 30) ctx.fillRect(dx, 58 + len - 20, 2, 2);
     }
-    Font.draw(ctx, 'EIN 8-BIT VAMPIRJÄGER-ABENTEUER', 128, 66, '#bcbcbc', { align: 'center', shadow: '#000' });
-    if ((this.t >> 5) % 2 === 0) Font.draw(ctx, 'START DRÜCKEN', 128, 120, '#fcfcfc', { align: 'center', shadow: '#000' });
-    const lines = ['PFEILE  LAUFEN, DUCKEN, TREPPEN', 'Z       SPRINGEN  2X = DOPPELSPRUNG', 'X       PEITSCHE', 'C / OBEN+X  SPEZIALWAFFE', 'ENTER PAUSE  M TON  V RÖHRENLOOK'];
-    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(18, 139, 220, 58);
-    ctx.fillStyle = '#c89020'; ctx.fillRect(18, 139, 220, 1); ctx.fillRect(18, 196, 220, 1);
-    lines.forEach((l, i) => Font.draw(ctx, l, 24, 145 + i * 10, i === 0 ? '#f8b800' : '#bcbcbc'));
-    Font.draw(ctx, 'HI-SCORE ' + String(this.hi).padStart(6, '0'), 128, 214, '#7c7c7c', { align: 'center' });
-    Font.draw(ctx, '© ANNO 1691  NACHTMAHR', 128, 226, '#4c4c4c', { align: 'center' });
+    const sh = (this.t % 240) * 3 - 60; // Glanzlicht über das Logo
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    for (let k = 0; k < 4; k++) ctx.fillRect(r.x + sh + k, 30, 2, 28);
+    Font.draw(ctx, 'EIN 8-BIT VAMPIRJÄGER-ABENTEUER', cx, 66, '#bcbcbc', { align: 'center', shadow: '#000' });
+    ['SPIEL STARTEN', 'OPTIONEN'].forEach((m, i) => {
+      const on = this.menu === i;
+      Font.draw(ctx, m, cx - 30, 104 + i * 12, on ? '#fcfcfc' : '#8c8c8c', { shadow: '#000' });
+      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 44, 103 + i * 12);
+    });
+    const tags = [Options.easy && 'LEICHT', Options.maxWhip && 'MAX-PEITSCHE', Options.infHearts && 'HERZEN 99'].filter(Boolean);
+    if (tags.length) Font.draw(ctx, tags.join(' + '), cx, 128, '#58f898', { align: 'center', shadow: '#000' });
+    const lines = this.controlLines();
+    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(cx - 116, 136, 232, 60);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 116, 136, 232, 1); ctx.fillRect(cx - 116, 195, 232, 1);
+    lines.forEach(([l, c], i) => Font.draw(ctx, l, cx - 110, 141 + i * 10, c));
+    Font.draw(ctx, 'HI-SCORE ' + String(this.hi).padStart(6, '0'), cx, 214, '#7c7c7c', { align: 'center' });
+    const pad = Input.padName;
+    const foot = !Audio8.ready() && this.t > 90 ? 'KLICK ODER TASTE = TON AN' : pad ? pad + ' BEREIT' : '© ANNO 1691  NACHTMAHR';
+    Font.draw(ctx, foot, cx, 226, pad && Audio8.ready() ? '#3cbcfc' : '#4c4c4c', { align: 'center' });
+  },
+
+  drawOptions(ctx) {
+    const cx = View.cx;
+    this.drawSkyScene(ctx);
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(cx - 124, 38, 248, 168);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 124, 38, 248, 1); ctx.fillRect(cx - 124, 205, 248, 1);
+    this.big(ctx, 'OPTIONEN', cx, 44, 2, LOGO, null, '#000');
+    OPTION_ITEMS.forEach((it, i) => {
+      const y = 68 + i * 22, on = this.optSel === i;
+      if (on) { ctx.fillStyle = 'rgba(200,144,32,0.18)'; ctx.fillRect(cx - 118, y - 3, 236, 20); }
+      Font.draw(ctx, it.label, cx - 110, y, on ? '#fcfcfc' : '#9c9c9c');
+      if (it.hint) Font.draw(ctx, it.hint, cx - 110, y + 9, '#5c5c7c');
+      let val = '';
+      if (it.key === 'music') {
+        for (let k = 0; k < 10; k++) { ctx.fillStyle = k < Options.music ? '#f8b800' : '#3c3c3c'; ctx.fillRect(cx + 54 + k * 6, y, 4, 7); }
+      } else if (it.key === 'crt') val = this.crt ? 'AN' : 'AUS';
+      else if (it.key !== 'back') val = Options[it.key] ? 'AN' : 'AUS';
+      if (val) Font.draw(ctx, val, cx + 110, y, val === 'AN' ? '#58f898' : '#d82800', { align: 'right' });
+    });
+    const hint = Input.device === 'pad' ? 'KREUZ WÄHLEN  A ÄNDERN  MENÜ ZURÜCK' : 'PFEILE WÄHLEN  Z ÄNDERN  ENTER ZURÜCK';
+    Font.draw(ctx, hint, cx, 214, '#7c7c7c', { align: 'center' });
+  },
+
+  drawCharSel(ctx) {
+    const cx = View.cx;
+    this.drawSkyScene(ctx);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, View.w, 176);
+    this.big(ctx, 'WÄHLE DEINEN HELDEN', cx, 40, 2, LOGO, null, '#000');
+    HEROES.list.forEach((d, i) => {
+      const on = Options.character === d.id, pw = 134, px = cx + (i === 0 ? -pw - 4 : 4), py = 62, mid = px + pw / 2;
+      ctx.fillStyle = on ? 'rgba(200,144,32,0.22)' : 'rgba(0,0,0,0.6)'; ctx.fillRect(px, py, pw, 136);
+      ctx.fillStyle = on ? '#f8b800' : '#4c4c4c';
+      ctx.fillRect(px, py, pw, 1); ctx.fillRect(px, py + 135, pw, 1); ctx.fillRect(px, py, 1, 136); ctx.fillRect(px + pw - 1, py, 1, 136);
+      const H = HEROES.get(d.id), spr = on ? H.walk[Math.floor(this.t / 5) % 8] : H.idle[Math.floor(this.t / 40) % 2];
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(spr.c, mid - spr.c.width, py + 8, spr.c.width * 2, spr.c.height * 2);
+      Font.draw(ctx, d.name, mid, py + 82, on ? '#fcfcfc' : '#8c8c8c', { align: 'center' });
+      Font.draw(ctx, d.title, mid, py + 93, on ? '#f8b800' : '#6c6c6c', { align: 'center' });
+      d.desc.forEach((l, k) => Font.draw(ctx, l, mid, py + 108 + k * 10, on ? '#bcbcbc' : '#5c5c5c', { align: 'center' }));
+      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, mid - 4, py + 125);
+    });
+    const hint = Input.device === 'pad' ? 'STICK WÄHLEN   A = LOS' : 'PFEILE WÄHLEN   Z / ENTER = LOS';
+    Font.draw(ctx, hint, cx, 214, '#9c9c9c', { align: 'center' });
   },
 
   drawIntro(ctx) {
+    const cx = View.cx;
     this.drawSkyScene(ctx);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, 256, 176);
-    const text = [
-      'ANNO 1691.',
-      'ALLE HUNDERT JAHRE ERWACHT',
-      'GRAF NACHTMAHR UNTER DEM BLUTMOND.',
-      '',
-      'HENRIK MORGENSTERN ERGREIFT',
-      'DIE PEITSCHE SEINER AHNEN',
-      'UND BETRITT DIE VERFLUCHTE BURG ...',
-    ];
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, View.w, 176);
+    const text = ['ANNO 1691.', 'ALLE HUNDERT JAHRE ERWACHT', 'GRAF NACHTMAHR UNTER DEM BLUTMOND.', '',
+      ...(Options.character === 'ragnor'
+        ? ['RAGNOR, BARBAR AUS DEM NORDEN,', 'ZIEHT SEIN BREITSCHWERT GEGEN DIE NACHT', 'UND STÜRMT DIE VERFLUCHTE BURG ...']
+        : ['HENRIK MORGENSTERN ERGREIFT', 'DIE PEITSCHE SEINER AHNEN', 'UND BETRITT DIE VERFLUCHTE BURG ...'])];
     let budget = Math.floor(this.t / 3);
     text.forEach((l, i) => {
       const s = l.slice(0, Math.max(0, budget)); budget -= l.length + 6;
-      Font.draw(ctx, s, 128, 70 + i * 12, i < 3 ? '#fcfcfc' : '#f8b800', { align: 'center' });
+      Font.draw(ctx, s, cx, 70 + i * 12, i < 3 ? '#fcfcfc' : '#f8b800', { align: 'center' });
     });
-    const H = Sprites.S.hero;
-    const hx = Math.min(120, -20 + this.t * 0.5);
-    Sprites.draw(ctx, hx < 120 ? [H.walk2, H.walk1, H.walk2, H.stand][(this.t >> 3) % 4] : H.stand, hx, 172);
-    ctx.fillStyle = '#202020'; ctx.fillRect(0, 204, 256, 4);
-    if (this.t > 60 && (this.t >> 5) % 2) Font.draw(ctx, 'START = WEITER', 250, 228, '#7c7c7c', { align: 'right' });
+    const H = HEROES.get(Options.character);
+    const hx = Math.min(cx - 8, -20 + this.t * 0.5);
+    const hs = hx < cx - 8 ? H.walk[Math.floor(this.t / 5) % 8] : H.stand;
+    Sprites.draw(ctx, hs, hx - hs.mx, 172);
+    ctx.fillStyle = '#202020'; ctx.fillRect(0, 204, View.w, 4);
+    if (this.t > 60 && (this.t >> 5) % 2) Font.draw(ctx, 'START = WEITER', View.w - 6, 228, '#7c7c7c', { align: 'right' });
   },
 
   drawGameOver(ctx) {
-    this.big(ctx, 'GAME OVER', 128, 80, 3, '#d82800', '#400000');
-    Font.draw(ctx, 'SCORE ' + String(W.score).padStart(6, '0'), 128, 120, '#bcbcbc', { align: 'center' });
+    const cx = View.cx;
+    this.big(ctx, 'GAME OVER', cx, 80, 3, LOGO, '#200000', '#000');
+    Font.draw(ctx, 'SCORE ' + String(W.score).padStart(6, '0'), cx, 120, '#bcbcbc', { align: 'center' });
     ['WEITERSPIELEN', 'ZUM TITEL'].forEach((s, i) => {
-      Font.draw(ctx, s, 112, 150 + i * 14, i === this.sel ? '#fcfcfc' : '#7c7c7c');
-      if (i === this.sel) Sprites.draw(ctx, Sprites.S.heartS, 98, 149 + i * 14);
+      Font.draw(ctx, s, cx - 16, 150 + i * 14, i === this.sel ? '#fcfcfc' : '#7c7c7c');
+      if (i === this.sel) Sprites.draw(ctx, Sprites.S.heartS, cx - 30, 149 + i * 14);
     });
   },
 
   drawEnding(ctx) {
-    const t = this.t;
+    const t = this.t, cx = View.cx, w = View.w;
     const sink = Math.min(150, Math.max(0, t - 60) * 0.5);
     this.drawSkyScene(ctx, t < 360, sink);
-    if (t < 360 && t % 4 === 0) this.rubble.push({ x: rnd(40, 250), y: 60 + sink * 0.5, vy: 0, c: Math.random() < 0.5 ? '#3c3c3c' : '#140818' });
+    if (t < 360 && t % 4 === 0) this.rubble.push({ x: rnd(20, w - 6), y: 60 + sink * 0.5, vy: 0, c: Math.random() < 0.5 ? '#3c3c3c' : '#140818' });
     this.rubble.forEach(r => { r.vy += 0.12; r.y += r.vy; ctx.fillStyle = r.c; ctx.fillRect(r.x, r.y, 3, 3); });
     this.rubble = this.rubble.filter(r => r.y < 210);
     if (t > 300) { // Morgendämmerung
       const a = Math.min(0.55, (t - 300) / 600);
-      ctx.fillStyle = `rgba(252,160,68,${a})`; ctx.fillRect(0, 140, 256, 68);
-      ctx.fillStyle = `rgba(248,120,88,${a * 0.6})`; ctx.fillRect(0, 100, 256, 40);
+      ctx.fillStyle = `rgba(252,160,68,${a})`; ctx.fillRect(0, 140, w, 68);
+      ctx.fillStyle = `rgba(248,120,88,${a * 0.6})`; ctx.fillRect(0, 100, w, 40);
     }
     const lines = [
       ['DER BLUTMOND VERBLASST.', '#fcfcfc'], ['GRAF NACHTMAHR IST BESIEGT,', '#fcfcfc'], ['SEINE BURG ZERFÄLLT ZU STAUB.', '#fcfcfc'],
-      ['', ''], ['HENRIK MORGENSTERN KEHRT HEIM -', '#f8b800'], ['BIS ZUM NÄCHSTEN JAHRHUNDERT ...', '#f8b800'],
+      ['', ''], [Options.character === 'ragnor' ? 'RAGNOR ZIEHT WEITER GEN NORDEN -' : 'HENRIK MORGENSTERN KEHRT HEIM -', '#f8b800'], ['BIS ZUM NÄCHSTEN JAHRHUNDERT ...', '#f8b800'],
       ['', ''], ['', ''], ['NACHTMAHR', '#d82800'], ['EIN 8-BIT ABENTEUER', '#bcbcbc'], ['', ''],
       ['PROGRAMM, GRAFIK, MUSIK', '#7c7c7c'], ['ERSTELLT MIT CLAUDE CODE', '#bcbcbc'], ['', ''],
       ['ENDPUNKTZAHL ' + String(W.score).padStart(6, '0'), '#f8b800'], ['', ''], ['DANKE FÜRS SPIELEN!', '#fcfcfc'],
     ];
     if (t > 380) {
       const y0 = Math.max(70, 240 - (t - 380) * 0.4);
-      ctx.save(); ctx.beginPath(); ctx.rect(0, 32, 256, 176); ctx.clip();
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(16, 32, 224, 176);
-      lines.forEach(([s, c], i) => { if (s) Font.draw(ctx, s, 128, y0 + i * 11, c, { align: 'center', shadow: '#000' }); });
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 32, w, 176); ctx.clip();
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(cx - 112, 32, 224, 176);
+      lines.forEach(([s, c], i) => { if (s) Font.draw(ctx, s, cx, y0 + i * 11, c, { align: 'center', shadow: '#000' }); });
       ctx.restore();
     }
-    if (t > 60 * 30 && (t >> 5) % 2) Font.draw(ctx, 'START DRÜCKEN', 128, 222, '#7c7c7c', { align: 'center' });
+    if (t > 60 * 30 && (t >> 5) % 2) Font.draw(ctx, 'START DRÜCKEN', cx, 222, '#7c7c7c', { align: 'center' });
   },
 };
 

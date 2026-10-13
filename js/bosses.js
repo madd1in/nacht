@@ -51,11 +51,11 @@ class Boss extends Enemy {
 }
 
 class GiantBat extends Boss {
-  constructor(ax) {
-    super(ax + 112, 36, 32, 14, 16, 3);
-    this.ax = ax; this.state = 'sleep'; this.score = 3000;
+  constructor(ax, aw) {
+    super(ax + aw / 2 - 16, 36, 32, 14, 16, 3);
+    this.ax = ax; this.aw = aw; this.state = 'sleep'; this.score = 3000;
   }
-  pickHover() { this.tx = this.ax + rnd(40, 216); this.ty = rnd(40, 90); }
+  pickHover() { this.tx = this.ax + rnd(40, this.aw - 40); this.ty = rnd(40, 90); }
   update() {
     this.tick();
     if (this.dying) return this.updateDeath();
@@ -76,7 +76,7 @@ class GiantBat extends Boss {
       case 'swoop':
         if (this.moveToward(this.tx, this.ty, half ? 2.9 : 2.5) || this.timer > 100) {
           this.state = 'rise'; this.timer = 0;
-          this.tx = clamp(this.cx + (p.cx < this.cx ? 70 : -70), this.ax + 30, this.ax + 226); this.ty = 40;
+          this.tx = clamp(this.cx + (p.cx < this.cx ? 70 : -70), this.ax + 30, this.ax + this.aw - 30); this.ty = 40;
         }
         break;
       case 'rise':
@@ -87,8 +87,8 @@ class GiantBat extends Boss {
         if (this.timer > 45) { this.state = 'hover'; this.timer = 0; this.pickHover(); }
         break;
     }
-    if (!Number.isFinite(this.x) || !Number.isFinite(this.y)) { this.x = this.ax + 112; this.y = 36; this.state = 'hover'; this.pickHover(); }
-    this.x = clamp(this.x, this.ax + 8, this.ax + 248 - this.w);
+    if (!Number.isFinite(this.x) || !Number.isFinite(this.y)) { this.x = this.ax + this.aw / 2 - 16; this.y = 36; this.state = 'hover'; this.pickHover(); }
+    this.x = clamp(this.x, this.ax + 8, this.ax + this.aw - 8 - this.w);
     this.y = clamp(this.y, 20, 180);
     if (this.state !== 'sleep') this.touch();
   }
@@ -100,9 +100,9 @@ class GiantBat extends Boss {
 }
 
 class GiantSkeleton extends Boss {
-  constructor(ax) {
-    super(ax + 196, 176 - 44, 20, 44, 24, 4);
-    this.ax = ax; this.state = 'rise'; this.face = -1; this.next = 'throw'; this.score = 4000;
+  constructor(ax, aw) {
+    super(ax + aw - 60, 176 - 44, 20, 44, 24, 3);
+    this.ax = ax; this.aw = aw; this.state = 'rise'; this.face = -1; this.next = 'throw'; this.score = 4000;
   }
   update() {
     this.tick();
@@ -135,13 +135,13 @@ class GiantSkeleton extends Boss {
         this.state = 'walk'; this.timer = 0; this.vx = 0;
         W.shake = 14; Audio8.sfx('wall');
         for (let i = 0; i < (half ? 3 : 2); i++) {
-          W.spawn(new EProj('rock', this.ax + rnd(16, 240), W.cam.y - 8 - i * 30, 0, 0.5, 0.12));
+          W.spawn(new EProj('rock', this.ax + rnd(16, this.aw - 16), W.cam.y - 8 - i * 30, 0, 0.5, 0.12));
         }
       }
     }
     this.physics();
     if (this.x < this.ax + 4) this.x = this.ax + 4;
-    if (this.x + this.w > this.ax + 252) this.x = this.ax + 252 - this.w;
+    if (this.x + this.w > this.ax + this.aw - 4) this.x = this.ax + this.aw - 4 - this.w;
     this.touch();
   }
   draw(ctx) {
@@ -161,12 +161,12 @@ class GiantSkeleton extends Boss {
 }
 
 class Count extends Boss {
-  constructor(ax) {
-    super(ax + 176, 176 - 40, 16, 40, 30, 4);
-    this.ax = ax; this.state = 'appear'; this.timer = 0; this.cycle = 0; this.score = 10000;
+  constructor(ax, aw) {
+    super(ax + aw - 80, 176 - 40, 16, 40, 24, 3);
+    this.ax = ax; this.aw = aw; this.state = 'appear'; this.timer = 0; this.cycle = 0; this.score = 10000;
   }
   vulnerable() { return this.state === 'open'; }
-  hurtBox() { return { x: this.x - 2, y: this.y, w: this.w + 4, h: 24 }; }
+  hurtBox() { return { x: this.x - 3, y: this.y, w: this.w + 6, h: 28 }; }
   update() {
     this.tick();
     if (this.dying) {
@@ -183,14 +183,14 @@ class Count extends Boss {
         if (this.timer > (phase2 ? 14 : 22)) { this.state = 'open'; this.timer = 0; }
         break;
       case 'open':
-        if (this.timer === 8) this.aimFire(phase2 ? 5 : 3, 0.26, phase2 ? 1.9 : 1.6);
+        if (this.timer === 10) this.aimFire(phase2 ? 4 : 3, 0.28, phase2 ? 1.7 : 1.45);
         if (phase2 && this.timer === 30 && this.cycle % 2 === 1) this.summonBats();
-        if (this.timer > (phase2 ? 58 : 72)) { this.state = 'vanish'; this.timer = 0; Audio8.sfx('teleport'); }
+        if (this.timer > (phase2 ? 80 : 100)) { this.state = 'vanish'; this.timer = 0; Audio8.sfx('teleport'); }
         break;
       case 'vanish':
         if (this.timer > 28) {
           let nx, tries = 0;
-          do { nx = this.ax + rnd(24, 216); } while (Math.abs(nx + 8 - p.cx) < 64 && ++tries < 20);
+          do { nx = this.ax + rnd(24, this.aw - 40); } while (Math.abs(nx + 8 - p.cx) < 64 && ++tries < 20);
           this.x = nx; this.state = 'appear'; this.timer = 0; this.cycle++;
         }
         break;
@@ -200,8 +200,8 @@ class Count extends Boss {
   summonBats() {
     [-1, 1].forEach(side => {
       const b = new Bat(0, 0);
-      b.x = side < 0 ? W.cam.x + 4 : W.cam.x + 242; b.y = 30;
-      b.state = 'fly'; b.dir = -side; b.face = -side; b.baseY = 30; b.seen = true;
+      b.x = side < 0 ? W.cam.x + 4 : W.cam.x + View.w - 14; b.y = W.cam.y + 30;
+      b.state = 'fly'; b.dir = -side; b.face = -side; b.baseY = b.y; b.seen = true;
       W.spawn(b);
     });
   }
