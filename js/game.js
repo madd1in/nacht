@@ -26,12 +26,15 @@ const Game = {
     this.menu = 0; this.optSel = 0; this.tStorm = { cd: 90, flash: 0, bolt: null };
     W.player = new Player();
     Input.onAny(() => { Audio8.init(); Audio8.setMusicLevel(Options.music / 8); });
-    window.addEventListener('resize', () => this.resize());
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', () => this.resize());
+    // Chrome meldet neue Maße teils erst nach Leisten-/Drehanimationen → mehrfach nachmessen
+    const settle = () => { View.trim = 0; this.resize(); [80, 250, 600, 1200].forEach(ms => setTimeout(() => this.resize(), ms)); };
+    window.addEventListener('resize', settle);
+    window.addEventListener('orientationchange', settle);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', settle);
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement && this.fsActive) this.fsDismissed = true; // selbst verlassen → nicht zurückzwingen
       this.fsActive = !!document.fullscreenElement;
-      setTimeout(() => this.resize(), 50);
+      settle();
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); }
@@ -58,6 +61,10 @@ const Game = {
     this.canvas.style.width = fit.cssW + 'px';
     this.canvas.style.height = fit.cssH + 'px';
     if (W.camLock && fit.w !== View.w) this.pendingView = fit; else this.applyView(fit);
+    requestAnimationFrame(() => { // Sicherheitsnetz: tatsächlich abgeschnitten? → um den Überhang verkleinern
+      const over = View.overflow(this.canvas);
+      if (over > 0 && View.trim < 400) { View.trim += over; this.resize(); }
+    });
   },
   applyView(fit) {
     View.w = fit.w; View.scale = fit.scale;

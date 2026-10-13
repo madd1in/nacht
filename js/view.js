@@ -4,11 +4,25 @@
 const View = {
   w: 256, h: 240, fh: 208, scale: 1, min: 256, max: 640,
   // Tatsächlich sichtbarer Bereich: innerHeight kann in Chrome (Adressleiste, Leisten) größer sein als sichtbar.
+  // Zusätzlich: sichere Bereiche (Navigationsleiste, Notch) abziehen und Messfehler nachträglich korrigieren.
+  trim: 0,
   area() {
     const vv = window.visualViewport, de = document.documentElement;
     const iw = Math.min(window.innerWidth, de.clientWidth || Infinity, vv ? vv.width : Infinity);
     const ih = Math.min(window.innerHeight, de.clientHeight || Infinity, vv ? vv.height : Infinity);
-    return { iw: Math.floor(iw), ih: Math.floor(ih) };
+    let sl = 0, sr = 0, st = 0, sb = 0;
+    try {
+      const cs = getComputedStyle(document.body);
+      sl = parseFloat(cs.paddingLeft) || 0; sr = parseFloat(cs.paddingRight) || 0;
+      st = parseFloat(cs.paddingTop) || 0; sb = parseFloat(cs.paddingBottom) || 0;
+    } catch (e) { /* noch kein body */ }
+    return { iw: Math.floor(iw - sl - sr), ih: Math.floor(ih - st - sb - this.trim) };
+  },
+  // Ragt die Leinwand nach dem Layout doch über den sichtbaren Bereich hinaus? → Überhang in Pixeln
+  overflow(canvas) {
+    const vv = window.visualViewport, r = canvas.getBoundingClientRect();
+    const visBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    return Math.max(0, Math.ceil(Math.max(0, r.bottom - visBottom) + Math.max(0, -r.top) - 0.5)); // zentriert: oben + unten
   },
   fit() {
     const { iw, ih } = this.area();
