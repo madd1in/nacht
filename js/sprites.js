@@ -31,46 +31,68 @@ const Sprites = (() => {
     });
   }
 
-  function finish(c) {
-    const f = canvas(c.width, c.height);
+  const OUTLINE = [12, 4, 20];
+
+  // Dunkle 1px-Kontur um alle deckenden Pixel (Leinwand wächst um 1px je Seite).
+  function outlined(src) {
+    const c = canvas(src.width + 2, src.height + 2);
+    const x = c.getContext('2d');
+    x.drawImage(src, 1, 1);
+    const img = x.getImageData(0, 0, c.width, c.height), d = img.data, W2 = c.width, H2 = c.height;
+    const solid = (px, py) => px >= 0 && py >= 0 && px < W2 && py < H2 && d[(py * W2 + px) * 4 + 3] > 0 && d[(py * W2 + px) * 4 + 3] !== 254;
+    const mark = [];
+    for (let py = 0; py < H2; py++) for (let px = 0; px < W2; px++) {
+      if (d[(py * W2 + px) * 4 + 3] > 0) continue;
+      if (solid(px - 1, py) || solid(px + 1, py) || solid(px, py - 1) || solid(px, py + 1)) mark.push((py * W2 + px) * 4);
+    }
+    mark.forEach(i => { d[i] = OUTLINE[0]; d[i + 1] = OUTLINE[1]; d[i + 2] = OUTLINE[2]; d[i + 3] = 254; });
+    x.putImageData(img, 0, 0);
+    return c;
+  }
+
+  function finish(c, outline = true) {
+    const w = c.width, h = c.height;
+    const src = outline ? outlined(c) : c;
+    const f = canvas(src.width, src.height);
     const fx = f.getContext('2d');
-    fx.translate(c.width, 0); fx.scale(-1, 1); fx.drawImage(c, 0, 0);
-    return { w: c.width, h: c.height, c, f, white: null };
+    fx.translate(src.width, 0); fx.scale(-1, 1); fx.drawImage(src, 0, 0);
+    return { w, h, c: src, f, pad: outline ? 1 : 0, white: null };
   }
 
   // layers: [{rows, x, y}] -> sprite
-  function compose(w, h, layers, pal) {
+  function compose(w, h, layers, pal, outline = true) {
     const c = canvas(w, h);
     const x = c.getContext('2d');
     layers.forEach(l => paint(x, l.rows, l.x || 0, l.y || 0, pal));
-    return finish(c);
+    return finish(c, outline);
   }
 
-  function make(rows, pal) {
+  function make(rows, pal, outline = true) {
     const w = Math.max(...rows.map(r => r.length));
-    return compose(w, rows.length, [{ rows }], pal);
+    return compose(w, rows.length, [{ rows }], pal, outline);
   }
+  const plain = (rows) => make(rows, PAL, false);
 
   function whiteOf(spr) {
     if (spr.white) return spr.white;
     const mk = (src) => {
-      const c = canvas(spr.w, spr.h);
+      const c = canvas(src.width, src.height);
       const x = c.getContext('2d');
       x.drawImage(src, 0, 0);
       x.globalCompositeOperation = 'source-in';
-      x.fillStyle = '#fcfcfc'; x.fillRect(0, 0, spr.w, spr.h);
+      x.fillStyle = '#fcfcfc'; x.fillRect(0, 0, c.width, c.height);
       return c;
     };
     spr.white = { c: mk(spr.c), f: mk(spr.f) };
     return spr.white;
   }
 
-  // Zeichnet Sprite; x/y = linke obere Ecke (Bildschirm). flip = nach links schauen.
+  // Zeichnet Sprite; x/y = linke obere Ecke der Figur (ohne Kontur). flip = nach links schauen.
   function draw(ctx, spr, x, y, flip = false, flash = false) {
     if (!spr) return;
     let img = flip ? spr.f : spr.c;
     if (flash) { const w = whiteOf(spr); img = flip ? w.f : w.c; }
-    ctx.drawImage(img, Math.round(x), Math.round(y));
+    ctx.drawImage(img, Math.round(x) - spr.pad, Math.round(y) - spr.pad);
   }
 
   // ---------------- Held: Oberkörper (16x16) + Beine (16x16) ----------------
@@ -326,8 +348,8 @@ const Sprites = (() => {
     '.yyyyy..', '..yyy...', '...y....', '...y....', '..yyy...', '.yyyyy..',
   ];
   S.candle = [
-    make(['...y....', '..yoy...', '..yoy...', '...o....', ...candleBase]),
-    make(['....y...', '...oy...', '..yoy...', '...o....', ...candleBase]),
+    plain(['...y....', '..yoy...', '..yoy...', '...o....', ...candleBase]),
+    plain(['....y...', '...oy...', '..yoy...', '...o....', ...candleBase]),
   ];
   const torchBase = [
     'yyyyyyyyyyyy', '.yggggggggy.', '..gggggggg..', '...gggggg...', '....gggg....',
@@ -335,38 +357,38 @@ const Sprites = (() => {
     '.....gg.....', '.....gg.....', '....gggg....', '...gggggg...',
   ];
   S.torch = [
-    make(['.....o......', '....oyo..o..', '...oyyyo.o..', '..oyywyyoo..', '..oyywwyyo..', '...oyyyyo...', ...torchBase]),
-    make(['......o.....', '..o..oyo....', '..o.oyyyo...', '..ooyywyyo..', '..oyywwyyo..', '...oyyyyo...', ...torchBase]),
+    plain(['.....o......', '....oyo..o..', '...oyyyo.o..', '..oyywyyoo..', '..oyywwyyo..', '...oyyyyo...', ...torchBase]),
+    plain(['......o.....', '..o..oyo....', '..o.oyyyo...', '..ooyywyyo..', '..oyywwyyo..', '...oyyyyo...', ...torchBase]),
   ];
 
   // ---------------- Effekte ----------------
   S.burst = [
-    make([
+    plain([
       '................', '................', '................', '................',
       '................', '......o.........', '.....ooo..o.....', '....oyyoo.oo....',
       '...ooyyyooyo....', '...oyywyyyyo....', '...oyywwyyoo....', '....oyyyyyo.....',
       '.....ooooo......',
     ]),
-    make([
+    plain([
       '................', '................', '.......o........', '......oo...o....',
       '..o..oyo..oo....', '..oo.oyyooyo....', '...ooyyyyyyo....', '..oyyywwyyyoo...',
       '..oyywwwwyyyo...', '..oyywwwwwyyo...', '..ooyywwwyyoo...', '...ooyyyyyoo....',
       '....oooooooo....',
     ]),
-    make([
+    plain([
       '....o.......o...', '...o.....o..o...', '...oo...oo..o...', '..o.oo..o.oo....',
       '..o..o.....o....', '.o...o..o...o...', '.o......o....o..', '..o..r......o...',
       '..r...r...r.r...', '...r.....r..r...', '....r..r........', '....rr...rr.....',
       '......rrr.......',
     ]),
   ];
-  S.spark = make([
+  S.spark = plain([
     'w..w..w.', '.w.w.w..', '..www...', 'wwwwwww.', '..www...', '.w.w.w..', 'w..w..w.',
   ]);
   S.flame = [
-    make(['...o....', '..oyo...', '.oyyo.o.', '.oywyoo.', 'oyywwyo.', 'oyywwyyo', '.oyyyyo.', '..oooo..']),
-    make(['....o...', '.o.oyo..', '.ooyyo..', '.oyywyo.', 'oyywwyyo', 'oyywwyyo', '.oyyyyo.', '..oooo..']),
+    plain(['...o....', '..oyo...', '.oyyo.o.', '.oywyoo.', 'oyywwyo.', 'oyywwyyo', '.oyyyyo.', '..oooo..']),
+    plain(['....o...', '.o.oyo..', '.ooyyo..', '.oyywyo.', 'oyywwyyo', 'oyywwyyo', '.oyyyyo.', '..oooo..']),
   ];
 
-  return { S, draw, make, compose, whiteOf, canvas, paint };
+  return { S, draw, make, plain, compose, whiteOf, canvas, paint };
 })();

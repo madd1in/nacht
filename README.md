@@ -16,11 +16,12 @@ Lokal: `index.html` über einen beliebigen statischen Server öffnen, z. B. `pyt
 | Aktion | Tastatur | Gamepad | Touch |
 |---|---|---|---|
 | Laufen / Ducken / Treppen | Pfeile oder WASD | D-Pad / Stick | D-Pad |
-| Springen | Z, K, Leertaste | A | A |
+| Springen / Doppelsprung (in der Luft nochmal) | Z, K, Leertaste | A | A |
 | Peitsche | X, J | X / B | B |
 | Spezialwaffe | C, L oder Oben + Peitsche | Y / RB | SUB |
 | Pause | Enter, Esc, P | Start | START |
 | Ton an/aus | M | – | – |
+| Röhren-Look (Scanlines) an/aus | V | – | – |
 
 Treppen: Am Fuß der Treppe **Oben** halten, oben auf der Treppe **Unten** halten.
 
@@ -30,7 +31,8 @@ Treppen: Am Fuß der Treppe **Oben** halten, oben auf der Treppe **Unten** halte
 - 3 Bosse: Riesenfledermaus, Knochenriese, Graf Nachtmahr (mit zweiter Phase)
 - Gegner: Ghule, Fledermäuse, Flammenschädel, Skelette, Ritter, Sumpfmänner, Knochensäulen
 - Peitsche in 3 Stufen, 4 Spezialwaffen (Dolch, Axt, Weihwasser, Kreuz), Rosenkranz, Braten in der Wand
-- Klassische Treppen, Rückstoß bei Treffern, Wasser, Stacheln, bewegliche Plattformen
+- Klassische Treppen, Doppelsprung mit Salto, Rückstoß bei Treffern, Wasser, Stacheln, bewegliche Plattformen
+- Dynamisches Licht (Kerzen, Fackeln, Feuerbälle), Bodennebel, Umgebungspartikel, Parallax-Hintergründe mit animierten Wolken und Zahnrädern, optionaler Röhren-Look
 - Eigener Chiptune-Soundtrack und Soundeffekte, live per WebAudio synthetisiert (2× Puls, Dreieck, Rauschen wie beim NES)
 - Highscore wird lokal gespeichert, Touch-Steuerung für Smartphones
 
@@ -43,6 +45,7 @@ Vanilla JavaScript + Canvas 2D (256×240, NES-Auflösung), alle Pixel-Grafiken s
 | `js/font.js` | 5×7-Bitmap-Schrift |
 | `js/sprites.js`, `js/sprites2.js` | Pixel-Art: Held, Items, Gegner, Bosse |
 | `js/tiles.js` | Kacheln und Parallax-Hintergründe |
+| `js/fx.js` | Licht, Vignette, Nebel, Umgebungspartikel |
 | `js/audio.js` | Chiptune-Engine, Musik und SFX |
 | `js/input.js` | Tastatur, Gamepad, Touch |
 | `js/levels.js` | Leveldaten (Builder-API) |

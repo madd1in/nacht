@@ -17,6 +17,7 @@ const Input = (() => {
   window.addEventListener('keydown', e => {
     if (anyListener) anyListener();
     if (e.code === 'KeyM') { Audio8.toggleMute(); return; }
+    if (e.code === 'KeyV') { Game.toggleCrt(); return; }
     const a = KEYS[e.code];
     if (!a) return;
     e.preventDefault();

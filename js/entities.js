@@ -66,8 +66,10 @@ class Player {
     this.state = 'normal'; this.atkT = 0; this.atkSub = false; this.crouch = false; this.crouchAtk = false;
     this.inv = 0; this.walkT = 0; this.jumping = false; this.stair = null; this.stairPos = 0;
     this.stairUpPose = true; this.deadT = 0; this.plat = null; this.powerT = 0;
+    this.canDouble = true; this.flipT = 0; this.scarf = null; this.hidden = false;
   }
   get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
   get feet() { return this.y + this.h; }
   get alive() { return this.state !== 'dead'; }
 
@@ -155,6 +157,7 @@ class Player {
   update() {
     const I = Input.held, P = Input.pressed;
     if (this.powerT > 0) this.powerT--;
+    if (this.flipT > 0) this.flipT--;
     if (this.state === 'dead') return this.updateDead();
     if (this.inv > 0) this.inv--;
 
@@ -204,6 +207,11 @@ class Player {
     } else {
       this.vx = mx * WALK;
       if (mx && this.atkT === 0) this.face = mx;
+      if (P.jump && this.canDouble) { // Doppelsprung (einmal pro Luftphase)
+        this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true;
+        if (this.atkT === 0) this.flipT = 20;
+        Audio8.sfx('djump'); W.puff(this.cx, this.feet);
+      }
       if (!I.jump && this.vy < -1.6) this.vy = -1.6;
     }
     if (this.vx !== 0 && this.onGround) this.walkT++; else if (this.onGround) this.walkT = 0;
@@ -214,7 +222,7 @@ class Player {
     const r = Phys.moveY(this, this.vy);
     this.onGround = r === 1;
     if (r !== 0) { this.vy = 0; }
-    if (this.onGround) this.jumping = false;
+    if (this.onGround) { this.jumping = false; this.canDouble = true; this.flipT = 0; }
     this.checkPlatforms();
     if (!this.onGround && wasGround && !this.jumping && this.vy > 0) this.vx = 0;
     this.clampRoom();
@@ -226,7 +234,7 @@ class Player {
     for (const p of W.platforms) {
       const prevFeet = this.feet - this.vy - 0.5;
       if (this.x + this.w > p.x && this.x < p.x + p.w && prevFeet <= p.y + 1 && this.feet >= p.y && this.feet <= p.y + 8) {
-        this.y = p.y - this.h; this.vy = 0; this.onGround = true; this.jumping = false;
+        this.y = p.y - this.h; this.vy = 0; this.onGround = true; this.jumping = false; this.canDouble = true; this.flipT = 0;
         if (this.state === 'hurt') { this.state = 'normal'; this.vx = 0; }
         this.plat = p;
       }
@@ -324,9 +332,45 @@ class Player {
       Sprites.draw(ctx, spr, this.cx - 16 - cam.x, this.feet - spr.h - cam.y, this.face < 0);
       return;
     }
+    this.drawScarf(ctx, cam);
+    if (this.flipT > 0 && !this.atkT && this.state === 'normal' && !this.onGround) { // Salto beim Doppelsprung
+      const c = Sprites.S.hero.crouch, step = Math.floor((20 - this.flipT) / 5) % 4;
+      ctx.save();
+      ctx.translate(Math.round(this.cx - cam.x), Math.round(this.feet - 14 - cam.y));
+      ctx.rotate(step * Math.PI / 2 * this.face);
+      ctx.drawImage(this.face < 0 ? c.f : c.c, -8 - c.pad, -12 - c.pad);
+      ctx.restore();
+      return;
+    }
     const sx = Math.round(this.x - 3 - cam.x), sy = Math.round(this.feet - spr.h - cam.y);
     Sprites.draw(ctx, spr, sx, sy, this.face < 0, flash);
     if (this.atkT && !this.atkSub) this.drawWhip(ctx, sx, sy);
+  }
+
+  // Wehender Schal: Kette von Punkten, die dem Hals mit Verzögerung folgt.
+  updateScarf() {
+    if (!this.alive) { this.scarf = null; return; }
+    const low = this.h === 20 || (this.atkT && this.crouchAtk);
+    const ax = this.cx - this.face * 3, ay = this.feet - (low ? 17 : 25);
+    if (!this.scarf) this.scarf = Array.from({ length: 8 }, (_, i) => ({ x: ax - this.face * i * 2, y: ay + i * 0.4 }));
+    const s = this.scarf;
+    s[0].x = ax; s[0].y = ay;
+    const t = W.frame * 0.22, speed = Math.abs(this.vx) + Math.abs(this.vy) * 0.5;
+    for (let i = 1; i < s.length; i++) {
+      const tx = s[i - 1].x - this.face * (1.6 + speed * 0.5) - this.vx * 0.3;
+      const ty = s[i - 1].y + 0.9 - speed * 0.35 + Math.sin(t + i * 0.8) * (0.4 + speed * 0.35) - this.vy * 0.12;
+      s[i].x += (tx - s[i].x) * 0.5; s[i].y += (ty - s[i].y) * 0.5;
+    }
+  }
+
+  drawScarf(ctx, cam) {
+    if (!this.scarf) return;
+    const s = this.scarf;
+    for (let i = s.length - 1; i >= 1; i--) {
+      const x = Math.round(s[i].x - cam.x), y = Math.round(s[i].y - cam.y), w = i > 5 ? 1 : 2;
+      ctx.fillStyle = PAL.R; ctx.fillRect(x, y + 1, w, w);
+      ctx.fillStyle = i % 3 === 0 ? PAL.m : PAL.r; ctx.fillRect(x, y, w, w);
+    }
   }
 
   drawWhip(ctx, sx, sy) {

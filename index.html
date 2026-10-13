@@ -32,10 +32,18 @@
   #tAtk { right: 96px; bottom: 22px; width: 64px; height: 64px; }
   #tSub { right: 96px; bottom: 100px; width: 50px; height: 50px; font-size: 12px; }
   #tStart { right: 22px; bottom: 120px; width: 50px; height: 34px; border-radius: 10px; font-size: 11px; }
+  #crt {
+    position: absolute; inset: 0; pointer-events: none; --s: 3px; --a: 1.6px;
+    background:
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(0,0,0,.42) 100%),
+      repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--a), rgba(0,0,0,.2) var(--a), rgba(0,0,0,.2) var(--s));
+  }
+  #crt.off { display: none; }
+  canvas#screen.crt { filter: saturate(1.15) contrast(1.06) brightness(1.06); }
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="screen" width="256" height="240" aria-label="NACHTMAHR Spielfeld"></canvas></div>
+<div id="wrap"><canvas id="screen" width="256" height="240" aria-label="NACHTMAHR Spielfeld"></canvas><div id="crt"></div></div>
 <div id="touch" aria-hidden="true">
   <div id="dpad">
     <div class="tbtn" id="tUp" data-k="up">▲</div>
@@ -55,6 +63,7 @@
 <script src="js/input.js"></script>
 <script src="js/levels.js"></script>
 <script src="js/tiles.js"></script>
+<script src="js/fx.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/bosses.js"></script>

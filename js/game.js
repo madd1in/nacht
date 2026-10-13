@@ -11,6 +11,9 @@ const Game = {
     this.ctx.imageSmoothingEnabled = false;
     this.bigCanvas = Sprites.canvas(256, 8);
     try { this.hi = parseInt(localStorage.getItem('nachtmahr.hi') || '0', 10) || 0; } catch (e) { this.hi = 0; }
+    let crt = true;
+    try { crt = localStorage.getItem('nachtmahr.crt') !== '0'; } catch (e) { /* privat */ }
+    this.setCrt(crt);
     W.player = new Player();
     Input.onAny(() => Audio8.init());
     window.addEventListener('resize', () => this.resize());
@@ -37,7 +40,18 @@ const Game = {
     const scale = s >= 2 ? Math.floor(s) : s;
     this.canvas.style.width = Math.floor(256 * scale) + 'px';
     this.canvas.style.height = Math.floor(240 * scale) + 'px';
+    const crt = document.getElementById('crt');
+    if (crt) { crt.style.setProperty('--s', scale + 'px'); crt.style.setProperty('--a', (scale * 0.55) + 'px'); }
   },
+
+  setCrt(on) {
+    this.crt = on;
+    const el = document.getElementById('crt');
+    if (el) el.classList.toggle('off', !on);
+    this.canvas.classList.toggle('crt', on);
+    try { localStorage.setItem('nachtmahr.crt', on ? '1' : '0'); } catch (e) { /* privat */ }
+  },
+  toggleCrt() { this.setCrt(!this.crt); },
 
   saveHi() {
     if (W.score > this.hi) {
@@ -205,33 +219,47 @@ const Game = {
   },
 
   drawHud(ctx) {
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 256, 32);
+    const R = (c, x, y, w, h) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+    ['#120a1c', '#0e0716', '#0a0512', '#07030c'].forEach((c, i) => R(c, 0, i * 8, 256, 8));
+    R('#2c1808', 0, 29, 256, 1); R('#c89020', 0, 30, 256, 1); R('#3c2008', 0, 31, 256, 1);
+    for (let i = 4; i < 256; i += 32) { R('#c89020', i, 28, 3, 1); R('#fce0a8', i + 1, 28, 1, 1); }
     const p = W.player, pad = (n, l) => String(Math.max(0, n)).padStart(l, '0');
-    Font.draw(ctx, 'SCORE-' + pad(W.score, 6), 6, 3);
-    Font.draw(ctx, 'TIME ' + pad(W.time, 4), 104, 3, W.time <= 30 && (W.frame & 16) ? '#d82800' : '#fcfcfc');
-    Font.draw(ctx, 'STAGE ' + pad(W.stage + 1, 2), 190, 3);
-    Font.draw(ctx, 'SPIELER', 6, 13);
-    Font.draw(ctx, 'GEGNER', 6, 22);
-    const bar = (y, val, col) => {
+    const label = '#b0a080', val = '#fcfcfc';
+    Font.draw(ctx, 'SCORE', 6, 3, label); Font.draw(ctx, pad(W.score, 6), 40, 3, val, { shadow: '#000' });
+    Font.draw(ctx, 'ZEIT', 100, 3, label);
+    Font.draw(ctx, pad(W.time, 4), 128, 3, W.time <= 30 && (W.frame & 16) ? '#fc7460' : val, { shadow: '#000' });
+    Font.draw(ctx, 'STAGE', 190, 3, label); Font.draw(ctx, pad(W.stage + 1, 2), 226, 3, val, { shadow: '#000' });
+    Font.draw(ctx, 'SPIELER', 6, 13, label);
+    Font.draw(ctx, 'GEGNER', 6, 22, label);
+    const bar = (y, v, cols) => {
+      R('#000', 51, y - 1, 65, 8);
       for (let i = 0; i < 16; i++) {
-        ctx.fillStyle = i < val ? col : '#3c1800';
-        ctx.fillRect(52 + i * 4, y, 3, 6);
+        const c = i < v ? cols : ['#2c1010', '#1c0808', '#120404'];
+        R(c[1], 52 + i * 4, y, 3, 6); R(c[0], 52 + i * 4, y, 3, 1); R(c[2], 52 + i * 4, y + 5, 3, 1);
       }
     };
-    bar(13, p.hp, '#fc7460');
+    bar(13, p.hp, p.hp <= 4 && (W.frame & 16) ? ['#fcfcfc', '#fc7460', '#a80020'] : ['#fcbca0', '#e83c20', '#880c00']);
     let bv = 16;
     if (W.boss) bv = Math.ceil((W.boss.hp / W.boss.maxHp) * 16);
     else if (W.arenaOn) bv = 0;
-    bar(22, bv, '#f8b800');
-    ctx.strokeStyle = '#d82800'; ctx.strokeRect(122.5, 11.5, 30, 18);
+    bar(22, bv, ['#fce0a8', '#f8b800', '#9c6400']);
+    R('#c89020', 121, 10, 33, 21); R('#3c0810', 122, 11, 31, 19); R('#120610', 123, 12, 29, 17);
+    R('#07030c', 121, 10, 1, 1); R('#07030c', 153, 10, 1, 1); R('#07030c', 121, 30, 1, 1); R('#07030c', 153, 30, 1, 1);
     if (p.sub) {
       const s = ITEM_SPR[p.sub]();
       Sprites.draw(ctx, s, 138 - Math.floor(s.w / 2), 21 - Math.floor(s.h / 2));
     }
-    Font.draw(ctx, '♥-' + pad(p.hearts, 2), 160, 13, '#fcfcfc');
-    Font.draw(ctx, 'P-' + pad(W.lives, 2), 160, 22);
-    for (let i = 0; i < 3; i++) { ctx.fillStyle = i < p.whip ? '#f8b800' : '#3c3c3c'; ctx.fillRect(200 + i * 6, 23, 4, 5); }
-    Font.draw(ctx, 'PEITSCHE', 199, 13, '#7c7c7c');
+    Sprites.draw(ctx, Sprites.S.heartS, 159, 12);
+    Font.draw(ctx, pad(p.hearts, 2), 169, 13, val, { shadow: '#000' });
+    const head = ['..hhh..', '.hhhhh.', 'hhsssh.', 'hhsksk.', '.hssss.', '..sss..'];
+    head.forEach((row, y) => [...row].forEach((ch, x) => { if (PAL[ch]) R(PAL[ch], 159 + x, 22 + y, 1, 1); }));
+    Font.draw(ctx, pad(W.lives, 2), 169, 22, val, { shadow: '#000' });
+    Font.draw(ctx, 'PEITSCHE', 196, 13, label);
+    for (let i = 0; i < 3; i++) {
+      const on = i < p.whip, x = 202 + i * 12, y = 22;
+      R(on ? '#9c6400' : '#2c2c2c', x + 1, y, 5, 7); R(on ? '#f8b800' : '#4c4c4c', x, y + 1, 7, 5);
+      R(on ? '#fce0a8' : '#5c5c5c', x + 2, y + 2, 2, 2);
+    }
   },
 
   drawCard(ctx) {
@@ -260,10 +288,13 @@ const Game = {
   },
 
   drawSkyScene(ctx, shake = 0, sink = 0) {
-    const bg = Tiles.build('courtyard').bg;
+    const L = (n) => Tiles.layer('courtyard', n), cam0 = { x: 0, y: 0 };
     ctx.save(); ctx.translate(0, 32);
-    ctx.drawImage(bg[0].c, 0, 0);
-    ctx.drawImage(bg[1].c, -280 + (shake ? Math.round(rnd(-2, 2)) : 0), sink);
+    Tiles.drawLayer(ctx, L('sky'), cam0, this.t);
+    Tiles.drawLayer(ctx, L('clouds'), cam0, this.t);
+    Tiles.drawLayer(ctx, L('mountains'), { x: 1500, y: 0 }, this.t);
+    ctx.drawImage(L('castle').c, -280 + (shake ? Math.round(rnd(-2, 2)) : 0), sink);
+    FX.drawFog(ctx, 'courtyard', cam0, this.t);
     ctx.restore();
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 256, 32);
     ctx.fillStyle = '#000'; ctx.fillRect(0, 208, 256, 32);
@@ -285,9 +316,10 @@ const Game = {
     }
     Font.draw(ctx, 'EIN 8-BIT VAMPIRJÄGER-ABENTEUER', 128, 66, '#bcbcbc', { align: 'center', shadow: '#000' });
     if ((this.t >> 5) % 2 === 0) Font.draw(ctx, 'START DRÜCKEN', 128, 120, '#fcfcfc', { align: 'center', shadow: '#000' });
-    const lines = ['PFEILE  LAUFEN, DUCKEN, TREPPEN', 'Z       SPRINGEN', 'X       PEITSCHE', 'C / OBEN+X  SPEZIALWAFFE', 'ENTER   PAUSE     M  TON AUS'];
-    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(28, 140, 200, 56);
-    lines.forEach((l, i) => Font.draw(ctx, l, 36, 145 + i * 10, i === 0 ? '#f8b800' : '#bcbcbc'));
+    const lines = ['PFEILE  LAUFEN, DUCKEN, TREPPEN', 'Z       SPRINGEN  2X = DOPPELSPRUNG', 'X       PEITSCHE', 'C / OBEN+X  SPEZIALWAFFE', 'ENTER PAUSE  M TON  V RÖHRENLOOK'];
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(18, 139, 220, 58);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(18, 139, 220, 1); ctx.fillRect(18, 196, 220, 1);
+    lines.forEach((l, i) => Font.draw(ctx, l, 24, 145 + i * 10, i === 0 ? '#f8b800' : '#bcbcbc'));
     Font.draw(ctx, 'HI-SCORE ' + String(this.hi).padStart(6, '0'), 128, 214, '#7c7c7c', { align: 'center' });
     Font.draw(ctx, '© ANNO 1691  NACHTMAHR', 128, 226, '#4c4c4c', { align: 'center' });
   },

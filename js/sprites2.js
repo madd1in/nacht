@@ -2,19 +2,19 @@
 'use strict';
 
 (() => {
-  const { S, make, canvas } = Sprites;
+  const { S, make, plain, canvas } = Sprites;
   const mirror = (rows) => rows.map(r => r + r.split('').reverse().join(''));
   const swapLegs = (rows, from, legs) => rows.slice(0, from).concat(legs);
 
   function scale2(spr) {
-    const c = canvas(spr.w * 2, spr.h * 2);
+    const c = canvas(spr.c.width * 2, spr.c.height * 2);
     const x = c.getContext('2d');
     x.imageSmoothingEnabled = false;
-    x.drawImage(spr.c, 0, 0, spr.w * 2, spr.h * 2);
+    x.drawImage(spr.c, 0, 0, c.width, c.height);
     const f = canvas(c.width, c.height);
     const fx = f.getContext('2d');
     fx.translate(c.width, 0); fx.scale(-1, 1); fx.drawImage(c, 0, 0);
-    return { w: c.width, h: c.height, c, f, white: null };
+    return { w: spr.w * 2, h: spr.h * 2, c, f, pad: spr.pad * 2, white: null };
   }
 
   // ---------- Ghul (Zombie) ----------
@@ -120,8 +120,8 @@
 
   // ---------- Projektile ----------
   S.fire = [
-    make(['..oo....', '.oyyo...', 'oyywyoo.', 'oywwyyyo', '.oyyoo..', '..oo....']),
-    make(['...oo...', '.ooyyo..', 'oyywyyo.', 'oywwyyoo', 'oyyyoo..', '.oo.....']),
+    plain(['..oo....', '.oyyo...', 'oyywyoo.', 'oywwyyyo', '.oyyoo..', '..oo....']),
+    plain(['...oo...', '.ooyyo..', 'oyywyyo.', 'oywwyyoo', 'oyyyoo..', '.oo.....']),
   ];
 
   // ---------- Knochensäule ----------

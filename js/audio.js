@@ -104,6 +104,7 @@ const Audio8 = (() => {
     teleport: () => tone('pulse', 200, 1600, 0.35, 0.12, 0.125),
     rise: () => noise(0.4, 0.15, 'lowpass', 400, 1200),
     bat: () => tone('pulse', 2400, 1800, 0.05, 0.05, 0.125),
+    djump: () => { tone('pulse', 420, 1250, 0.11, 0.11, 0.25); noise(0.12, 0.12, 'highpass', 3500, 7000); },
   };
   function sfx(name) {
     if (!ac || !SFX[name]) return;

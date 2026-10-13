@@ -127,6 +127,7 @@ class Candle extends Ent {
     this.dead = true;
     Audio8.sfx('candle');
     W.spawn(new Burst(this.cx, this.cy));
+    W.sparks(this.cx, this.y + 2, 5);
     W.spawn(new Item(rollDrop(this.drop), this.cx, this.cy));
   }
   draw(ctx) {
@@ -186,7 +187,7 @@ class SubWeapon extends Ent {
       ctx.save();
       ctx.translate(x + this.w / 2, y + this.h / 2);
       ctx.rotate((Math.floor(this.t / 4) % 4) * Math.PI / 2 * this.face);
-      ctx.drawImage(s.c, -Math.floor(s.w / 2), -Math.floor(s.h / 2));
+      ctx.drawImage(s.c, -Math.floor(s.w / 2) - s.pad, -Math.floor(s.h / 2) - s.pad);
       ctx.restore();
     }
   }
@@ -212,6 +213,7 @@ class Enemy extends Ent {
     if (silent) return;
     Audio8.sfx('kill');
     W.spawn(new Burst(this.cx, this.cy));
+    W.sparks(this.cx, this.cy, 9);
     W.addScore(this.score, this.cx, this.y);
     if (Math.random() < 0.1) W.spawn(new Item('heartS', this.cx, this.cy));
   }
@@ -259,8 +261,8 @@ class Ghoul extends Enemy {
     const s = Sprites.S.ghul[Math.floor(this.t / 12) % 2];
     if (this.rise < 25) {
       const sy = Math.round(this.groundY - this.rise - W.cam.y), sx = Math.round(this.cx - 8 - W.cam.x);
-      const vis = Math.max(1, Math.floor(this.rise));
-      ctx.drawImage(this.face < 0 ? s.f : s.c, 0, 0, s.w, vis, sx, sy, s.w, vis);
+      const vis = Math.max(1, Math.floor(this.rise)) + s.pad, cw = s.c.width;
+      ctx.drawImage(this.face < 0 ? s.f : s.c, 0, 0, cw, vis, sx - s.pad, sy - s.pad, cw, vis);
       if (this.t % 6 < 3) { ctx.fillStyle = PAL.B; ctx.fillRect(sx + rnd(0, 14), Math.round(this.groundY - W.cam.y) - 2, 2, 2); }
       return;
     }

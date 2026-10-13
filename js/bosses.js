@@ -33,6 +33,7 @@ class Boss extends Enemy {
     if (this.dying >= len) { this.dead = true; W.bossDefeated(this); }
   }
   moveToward(tx, ty, speed) {
+    if (!Number.isFinite(tx) || !Number.isFinite(ty)) return true; // ungültiges Ziel nie übernehmen
     const dx = tx - this.cx, dy = ty - this.cy, d = Math.hypot(dx, dy);
     if (d < speed) { this.x += dx; this.y += dy; return true; }
     this.x += dx / d * speed; this.y += dy / d * speed;
@@ -86,6 +87,7 @@ class GiantBat extends Boss {
         if (this.timer > 45) { this.state = 'hover'; this.timer = 0; this.pickHover(); }
         break;
     }
+    if (!Number.isFinite(this.x) || !Number.isFinite(this.y)) { this.x = this.ax + 112; this.y = 36; this.state = 'hover'; this.pickHover(); }
     this.x = clamp(this.x, this.ax + 8, this.ax + 248 - this.w);
     this.y = clamp(this.y, 20, 180);
     if (this.state !== 'sleep') this.touch();
@@ -147,8 +149,10 @@ class GiantSkeleton extends Boss {
     const G = Sprites.S.giant;
     if (this.state === 'rise') {
       const s = G[0], vis = Math.min(s.h, Math.floor(this.timer * 0.8));
+      if (vis <= 0) return;
       const sx = Math.round(this.cx - s.w / 2 - W.cam.x), gy = Math.round(this.y + this.h - W.cam.y);
-      ctx.drawImage(this.face < 0 ? s.f : s.c, 0, 0, s.w, vis, sx, gy - vis, s.w, vis);
+      const cw = s.c.width, v = vis + s.pad;
+      ctx.drawImage(this.face < 0 ? s.f : s.c, 0, 0, cw, v, sx - s.pad, gy - vis - s.pad, cw, v);
       return;
     }
     const s = this.state === 'throw' && this.timer < 22 ? G[2] : G[this.state === 'walk' && this.vx ? Math.floor(this.t / 12) % 2 : 0];

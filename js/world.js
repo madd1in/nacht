@@ -35,6 +35,7 @@ const W = {
     this.player.reset(def.start.x * T + 8, (def.start.y + 1) * T);
     this.cam.x = clamp(this.player.cx - 128, 0, this.room.w * T - 256); this.cam.y = 0;
     Tiles.build(def.theme);
+    FX.resetAmbient();
   },
 
   findStairs() {
@@ -161,7 +162,9 @@ const W = {
 
     this.platforms.forEach(p => p.update());
     this.player.update();
+    this.player.updateScarf();
     this.updateCam();
+    FX.updateAmbient(this.room.theme, this.cam);
     this.spawners.forEach(s => s.update());
     for (const e of this.ents) if (!e.dead && e.kind !== 'platform') e.update();
 
@@ -179,18 +182,55 @@ const W = {
 
   draw(ctx) {
     const sx = this.shake ? Math.round(rnd(-2, 2)) : 0, sy = this.shake ? Math.round(rnd(-1, 1)) : 0;
+    const theme = this.room.theme;
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 32, 256, 208); ctx.clip();
     ctx.translate(sx, 32 + sy);
-    Tiles.drawBg(ctx, this.room, this.cam);
+    Tiles.drawBg(ctx, this.room, this.cam, this.frame);
     if (this.lightning > 0 && this.lightning % 4 < 2) { ctx.fillStyle = 'rgba(164,164,252,0.35)'; ctx.fillRect(0, 0, 256, 208); }
     this.drawDoor(ctx);
     Tiles.drawTiles(ctx, this.room, this.cam, this.frame);
     const order = ['candle', 'platform', 'item', 'enemy', 'boss', 'sub', 'eproj', 'fx'];
     order.forEach(k => { for (const e of this.ents) if (e.kind === k) e.draw(ctx); if (k === 'boss') this.player.draw(ctx, this.cam); });
-    if (this.room.theme === 'courtyard') this.drawRain(ctx);
+    FX.drawAmbient(ctx, this.cam);
+    FX.drawFog(ctx, theme, this.cam, this.frame);
+    if (theme === 'courtyard') this.drawRain(ctx);
+    FX.render(ctx, this.collectLights(), theme);
     if (this.flash > 0 && (this.flash % 6) < 3) { ctx.fillStyle = 'rgba(252,252,252,0.45)'; ctx.fillRect(-4, -4, 264, 216); }
     ctx.restore();
+  },
+
+  collectLights() {
+    const L = [], cx = this.cam.x, cy = this.cam.y, f = this.frame;
+    const flick = (k) => Math.sin(f * 0.3 + k) * 1.5 + Math.sin(f * 0.13 + k * 2) * 1.5;
+    const p = this.player;
+    if (p.alive && !p.hidden) L.push({ x: p.cx - cx, y: p.cy - cy, r: 46 });
+    for (const e of this.ents) {
+      if (e.dead) continue;
+      const x = e.cx - cx, y = e.cy - cy;
+      if (x < -48 || x > 304) continue;
+      if (e.kind === 'candle') L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + flick(e.x), c: [248, 140, 40], a: 0.5 });
+      else if (e.kind === 'eproj' && e.type === 'fire') L.push({ x, y, r: 20, c: [248, 120, 0], a: 0.65 });
+      else if (e.kind === 'sub' && e.type === 'holy' && e.burnT >= 0) L.push({ x, y, r: 30 + flick(1), c: [60, 188, 252], a: 0.55 });
+      else if (e.kind === 'item' && e.type === 'orb') L.push({ x, y, r: 44, c: [60, 188, 252], a: 0.6 });
+      else if (e instanceof Burst) L.push({ x, y, r: 28, c: [248, 120, 0], a: 0.75 });
+      else if (e instanceof Skull) L.push({ x, y: y - 6, r: 20, c: [248, 120, 0], a: 0.4 });
+      else if (e instanceof Count && e.state === 'open') L.push({ x, y: y - 6, r: 34, c: [168, 0, 32], a: 0.45 });
+      else if (e instanceof Pillar && e.openT > 0) L.push({ x, y, r: 22, c: [248, 120, 0], a: 0.5 });
+    }
+    if (this.lightning > 0 && this.lightning % 4 < 2) L.push({ x: 128, y: 0, r: 260 });
+    return L;
+  },
+
+  puff(x, y) {
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2;
+      this.spawn(new Particle(x + Math.cos(a) * 3, y - 1, Math.cos(a) * 1.2, Math.sin(a) * 0.35 + 0.15, i % 2 ? '#fcfcfc' : '#a4a4c8', 14, 1, 0));
+    }
+  },
+  sparks(x, y, n = 7) {
+    const cols = ['#f8b800', '#f87800', '#fce0a8'];
+    for (let i = 0; i < n; i++) this.spawn(new Particle(x, y, rnd(-1.9, 1.9), rnd(-2.6, -0.4), cols[i % 3], 18 + (i % 3) * 6, 1, 0.12));
   },
 
   drawDoor(ctx) {
