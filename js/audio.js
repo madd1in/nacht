@@ -2,7 +2,7 @@
 'use strict';
 
 const Audio8 = (() => {
-  let ac = null, master, comp, musicBus, melBus, sfxBus, noiseBuf, pulseWaves = {};
+  let ac = null, master, comp, musicBus, melBus, sfxBus, duckBus, voiceBus, noiseBuf, pulseWaves = {};
   let muted = false;
   const MUSIC_VOL = 0.82;
   let musicLevel = 1;
@@ -17,7 +17,9 @@ const Audio8 = (() => {
     comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.15;
     comp.connect(ac.destination);
     master = ac.createGain(); master.gain.value = muted ? 0 : 0.7; master.connect(comp);
-    musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(master);
+    duckBus = ac.createGain(); duckBus.connect(master); // wird während der Sprachausgabe abgesenkt
+    voiceBus = ac.createGain(); voiceBus.gain.value = 1.3; voiceBus.connect(master);
+    musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(duckBus);
     melBus = ac.createGain(); melBus.connect(musicBus);
     sfxBus = ac.createGain(); sfxBus.gain.value = 0.7; sfxBus.connect(master);
     noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
@@ -157,29 +159,21 @@ const Audio8 = (() => {
   const FOURX = 'x:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
   const FILLS = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 h:1 q:1 h:1 t:1 u:1';
   const FILLB = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 t:1 u:1 q:1 h:1 o:1 h:1';
-  const CALM_DR = 'h:16'; // ein leiser Puls pro Takt als Atem zwischen den Action-Parts
-  const phaseMix = (calmBars, actionBars, block = 4) => actionBars.map((bar, i) =>
-    i % (block * 2) < block ? calmBars[i] : bar
-  ).join(' ');
-  const contrastLead = (chords, m, actionBars, block = 4) =>
-    phaseMix(chords.map(c => `${m[c][0]}:8 ${m[c][1]}:8`), actionBars, block);
-  const section = () => phaseMix(Array(8).fill(CALM_DR), [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB]);
+  // Aufbau der Stage-Songs: 32 Takte ohne Pause – die Melodie läuft durch, die zweite Hälfte legt
+  // mit 32tel-Arpeggien und galoppierender Kick zu, ein Riser führt zurück an den Anfang.
+  const contrastLead = (chords, m, bars) => bars.join(' ') + ' ' + bars.join(' ');
+  const section = () => rep([FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB].join(' '), 2);
   // B-Teil: galoppierende Kick (kein Dauerfeuer), Tom-Fill und Riser vor dem Loop
   const DK = 'k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1 k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1';
   const DKX = 'x:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1 k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1';
   const FILLR = 'k:1 h:1 o:1 h:1 q:1 h:1 t:1 u:1 w:8';
-  const sectionB = () => phaseMix(Array(8).fill(CALM_DR), [DKX, DK, DK, FILLS, DK, DK, DK, FILLR]);
+  const sectionB = () => [DKX, DK, DK, FILLS, DK, DK, DK, FILLB, DKX, DK, DK, FILLS, DK, DK, DK, FILLR].join(' ');
   // 3er-Arpeggio gegen den 4er-Takt: verschiebt sich ständig und treibt nach vorn
   const arp3 = (a, b, c) => Array.from({ length: 16 }, (_, i) => [a, b, c][i % 3] + ':1').join(' ');
   const chordArps = (list, m) => list.map(c => arp3(...m[c])).join(' ');
   const arp3f = (a, b, c) => Array.from({ length: 32 }, (_, i) => [a, b, c][i % 3] + ':0.5').join(' '); // 32tel
-  const chordArps2 = (list, m) => phaseMix(
-    list.map(c => `${m[c][0]}:8 ${m[c][2]}:8`),
-    list.map((c, i) => (i < 8 ? arp3 : arp3f)(...m[c]))
-  );
-  const chordBass = (list, m, fn) => phaseMix(
-    list.map(c => `${m[c][0]}:12 -:4`), list.map(c => fn(...m[c]))
-  );
+  const chordArps2 = (list, m) => list.map(c => arp3(...m[c])).join(' ') + ' ' + list.map(c => arp3f(...m[c])).join(' ');
+  const chordBass = (list, m, fn) => rep(list.map(c => fn(...m[c])).join(' '), 2);
 
   // Stage 1 – Burgsturm (d-Moll, 168 BPM)
   const S1 = { Dm: ['d4', 'f4', 'a4'], Bb: ['a#3', 'd4', 'f4'], C: ['c4', 'e4', 'g4'], A: ['a3', 'c#4', 'e4'], Gm: ['g3', 'a#3', 'd4'] };
@@ -249,27 +243,15 @@ const Audio8 = (() => {
     },
     boss: {
       bpm: 192, loop: true, echo: { delay: 2, vol: 0.28 },
-      p1: phaseMix([
-        'd5:8 a4:8', 'd5:8 f5:8', 'd#5:8 a#4:8', 'd#5:8 f#5:8',
-        'd5:8 a4:8', 'd5:8 f5:8', 'c#5:8 g#4:8', 'c#5:8 e5:8',
-      ], [
+      p1: [
         'd5:1 d5:1 d6:2 d5:1 d5:1 c6:2 d5:1 d5:1 a#5:2 a5:2 g#5:2', 'a5:2 f5:2 d5:2 f5:2 a5:2 d6:2 f6:4',
         'd#5:1 d#5:1 d#6:2 d#5:1 d#5:1 c#6:2 d#5:1 d#5:1 b5:2 a#5:2 a5:2', 'a#5:2 g5:2 d#5:2 g5:2 a#5:2 d#6:2 g6:4',
         'f6:2 e6:2 d6:2 a5:2 f6:2 e6:2 d6:2 a5:2', 'g6:2 f6:2 e6:2 c#6:2 a5:4 e5:4',
         'c#6:1 d6:1 e6:2 c#6:1 d6:1 e6:2 f6:2 e6:2 d6:2 c#6:2', 'e6:4 c#6:4 a5:4 e5:2 g5:2',
-      ], 2),
-      p2: phaseMix([
-        'd4:8 -:8', 'd4:8 -:8', 'd#4:8 -:8', 'd#4:8 -:8',
-        'd4:8 -:8', 'd4:8 -:8', 'c#4:8 -:8', 'c#4:8 -:8',
-      ], [
-        rep('d4:1 d5:1', 8), rep('d4:1 d5:1', 8), rep('d#4:1 d#5:1', 8), rep('d#4:1 d#5:1', 8),
-        rep('d4:1 d5:1', 8), rep('d4:1 d5:1', 8), rep('c#4:1 c#5:1', 8), rep('c#4:1 c#5:1', 8),
-      ], 2),
-      tri: phaseMix([
-        'd2:12 -:4', 'd2:12 -:4', 'd#2:12 -:4', 'd#2:12 -:4',
-        'd2:12 -:4', 'd2:12 -:4', 'c#2:12 -:4', 'c#2:12 -:4',
-      ], [drive('d2', 'd3'), drive('d2', 'd3'), drive('d#2', 'd#3'), drive('d#2', 'd#3'), drive('d2', 'd3'), drive('d2', 'd3'), drive('c#2', 'c#3'), drive('c#2', 'c#3')], 2),
-      dr: phaseMix(Array(8).fill(CALM_DR), [FOURX, DK, FOUR, FILLS, DK, DK, DK, FILLR], 2),
+      ].join(' '),
+      p2: [rep('d4:1 d5:1', 16), rep('d#4:1 d#5:1', 16), rep('d4:1 d5:1', 16), rep('c#4:1 c#5:1', 16)].join(' '),
+      tri: [drive('d2', 'd3'), drive('d2', 'd3'), drive('d#2', 'd#3'), drive('d#2', 'd#3'), drive('d2', 'd3'), drive('d2', 'd3'), drive('c#2', 'c#3'), drive('c#2', 'c#3')].join(' '),
+      dr: [FOURX, DK, FOUR, FILLS, DK, DK, DK, FILLR].join(' '),
     },
     clear: {
       bpm: 150, loop: false,
@@ -435,7 +417,7 @@ const Audio8 = (() => {
       const old = musicBus;
       old.gain.setTargetAtTime(0, ac.currentTime, 0.02);
       setTimeout(() => old.disconnect(), 300);
-      musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(master);
+      musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(duckBus);
       melBus = ac.createGain(); melBus.connect(musicBus);
     }
   }
@@ -468,5 +450,8 @@ const Audio8 = (() => {
   function setMusicVolume(v) { if (musicBus && ac) musicBus.gain.setTargetAtTime(v * (MUSIC_VOL / 0.5) * musicLevel, ac.currentTime, 0.05); }
   function setMusicLevel(l) { musicLevel = l; if (musicBus && ac) musicBus.gain.setTargetAtTime(MUSIC_VOL * l, ac.currentTime, 0.05); }
 
-  return { init, sfx, play, stop, ambience, toggleMute, setMusicVolume, setMusicLevel, ready, get current() { return songName; }, _songs: parsed };
+  function duck(on) { if (duckBus && ac) duckBus.gain.setTargetAtTime(on ? 0.3 : 1, ac.currentTime, on ? 0.06 : 0.5); }
+
+  return { init, sfx, play, stop, ambience, toggleMute, setMusicVolume, setMusicLevel, ready, duck,
+    context: () => ac, voiceOut: () => voiceBus, get muted() { return muted; }, get current() { return songName; }, _songs: parsed };
 })();

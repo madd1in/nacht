@@ -136,7 +136,7 @@ class Statue extends Ent {
     const p = W.player;
     p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.375));
     Audio8.sfx('checkpoint'); Input.rumble(0.3, 0.2, 150);
-    W.popup(this.cx, this.y - 8, 'CHECKPOINT', '#a4e4fc');
+    W.popup(this.cx, this.y - 8, tr('checkpoint'), '#a4e4fc');
     for (let i = 0; i < 14; i++) W.spawn(new Particle(this.cx + rnd(-8, 8), this.y + rnd(0, 30), rnd(-0.4, 0.4), rnd(-1.6, -0.4), i % 2 ? '#a4e4fc' : '#fcfcfc', 40, 1, 0));
   }
   draw(ctx) {

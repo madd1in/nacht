@@ -196,8 +196,7 @@ const W = {
 
   // Stärke der HDMA-Wellenverzerrung (SNES-Effekt)
   waveAmp() {
-    let a = this.room.theme === 'vortex' ? 1.3 : 0;
-    if (this.vortexBg > 0) a = Math.max(a, Math.min(1.3, this.vortexBg / 80));
+    let a = 0; // Dauer-Welle im Strudel entfernt (störte das Springen und kostete mobil viel Leistung)
     if (this.slowmo > 0) a = Math.max(a, this.slowmo / 24);
     return a;
   },
@@ -264,6 +263,7 @@ const W = {
     const b = this.boss;
     if (b && !b.dying && !this.bossEnraged && b.hp <= b.maxHp / 2) { // Phase 2: Musik eskaliert
       this.bossEnraged = true; Audio8.stop(); Audio8.play('boss2'); Audio8.sfx('roar');
+      if (this.room.theme === 'throne') Voice.say('taunt'); // der Graf spottet
       this.flash = 8; this.shake = 18; this.spawn(new Shock(b.cx, b.cy, 110, '#a80020', 5)); Input.rumble(0.7, 0.4, 500);
     }
 

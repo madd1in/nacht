@@ -22,12 +22,14 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 ## Inhalt
 
 - **2 Helden**: Henrik (Peitsche) und Ragnor, Barbar aus dem Norden (Breitschwert + Wurfseil)
-- **3 Stages, 10 Räume** inkl. Kletterschächten und dem *Seelenstrudel* mit rotierendem Mode-7-Tunnel
+- **3 Stages, 10 Räume** inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
 - **3 Bosse** mit Kino-Auftritt, Musik-Eskalation in Phase 2 und Zeitlupen-Finale; der Graf verwandelt den Thronsaal in einen Strudel
-- **SNES-Effekte**: Mode-7-Tunnel, Mode-7-Weltkarte, HDMA-Wellen, Mosaik-Übergänge, animierte Lichtstrahlen und weiche Farbsäume
+- **6 Sprachen**: Deutsch, Englisch, Französisch, Spanisch, Japanisch, Chinesisch (Optionen → Sprache)
+- **Sprachausgabe**: Erzähler, Stage-Ansagen, Boss-Auftritte und Spott des Grafen – Studioaufnahmen (ElevenLabs) für EN/FR/ES/JA/ZH, Deutsch über die Browser-Stimme
+- **SNES-Effekte**: drehende HDMA-Walze, XXL-Kronleuchter mit Mode-7-Drehung, Mode-7-Weltkarte, Mosaik-Übergänge, animierte Lichtstrahlen und weiche Farbsäume
 - **Spielgefühl**: Combos mit Punkte-Multiplikator, Pixel-Zerfall besiegter Gegner, Schockwellen, Trefferstopp, Nachbilder, Look-Ahead-Kamera, Herzschlag bei wenig Leben
 - **Welt**: Gewitter mit Blitzen, Ankerringe, Pendel-Kronleuchter mit begehbaren Etagen, drehende Zahnrad-Plattformen, Aufzüge, Bröckelsteine, Checkpoint-Statuen, Truhen, Gespenster
-- **Optionen**: Leicht-Modus (2× Leben, 2× Schaden), maximale Waffe, unendlich Herzen, Musik, Röhren-Look, Vollbild
+- **Optionen**: Leicht-Modus (2× Leben, 2× Schaden), maximale Waffe, unendlich Herzen, Musik, Sprachausgabe, Sprache, Röhren-Look, Vollbild
 - **Musik**: eigener Chiptune-Soundtrack, live synthetisiert (Puls + Echo, Dreieck, Drumkit mit Doppelbass, Orgel-Fläche)
 
 ## Technik

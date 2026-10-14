@@ -103,7 +103,7 @@ class Item extends Ent {
         if (p.whip < 3) { p.whip++; p.powerT = 45; W.freeze = 45; }
         else p.hearts = Math.min(99, p.hearts + 5);
         Audio8.sfx('bigItem'); break;
-      case 'roast': p.hp = Math.min(p.maxHp, p.hp + p.maxHp / 2); Audio8.sfx('bigItem'); W.popup(this.cx, this.y, '+LEBEN', '#f8b800'); break;
+      case 'roast': p.hp = Math.min(p.maxHp, p.hp + p.maxHp / 2); Audio8.sfx('bigItem'); W.popup(this.cx, this.y, tr('plusLife'), '#f8b800'); break;
       case 'oneUp': W.lives++; Audio8.sfx('oneUp'); W.popup(this.cx, this.y, '1UP', '#3cbcfc'); break;
       case 'rosary': W.rosary(); Audio8.sfx('rosary'); break;
       case 'orb': p.hp = p.maxHp; Audio8.sfx('orb'); W.stageClear(); break;

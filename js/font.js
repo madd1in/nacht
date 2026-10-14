@@ -1,4 +1,5 @@
-// 5x7 Bitmap-Font im NES-Stil. Jede Zeile ist eine 5-Bit-Maske.
+// 5x7 Bitmap-Font im NES-Stil (mit Akzenten für FR/ES). Jede Zeile ist eine 5-Bit-Maske.
+// Zeichen ohne Bitmap (Japanisch/Chinesisch) kommen aus der Systemschrift, hart binarisiert → bleiben pixelig.
 'use strict';
 
 const Font = (() => {
@@ -23,6 +24,16 @@ const Font = (() => {
     '8': [0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E], '9': [0x0E,0x11,0x11,0x0F,0x01,0x02,0x0C],
     'Ä': [0x0A,0x00,0x0E,0x11,0x1F,0x11,0x11], 'Ö': [0x0A,0x00,0x0E,0x11,0x11,0x11,0x0E],
     'Ü': [0x0A,0x00,0x11,0x11,0x11,0x11,0x0E],
+    'É': [0x02,0x04,0x1F,0x10,0x1E,0x10,0x1F], 'È': [0x08,0x04,0x1F,0x10,0x1E,0x10,0x1F],
+    'Ê': [0x04,0x0A,0x1F,0x10,0x1E,0x10,0x1F], 'Ë': [0x0A,0x00,0x1F,0x10,0x1E,0x10,0x1F],
+    'À': [0x08,0x04,0x0E,0x11,0x1F,0x11,0x11], 'Á': [0x02,0x04,0x0E,0x11,0x1F,0x11,0x11],
+    'Â': [0x04,0x0A,0x0E,0x11,0x1F,0x11,0x11], 'Ç': [0x0E,0x11,0x10,0x11,0x0E,0x04,0x0C],
+    'Í': [0x02,0x04,0x0E,0x04,0x04,0x04,0x0E], 'Î': [0x04,0x0A,0x0E,0x04,0x04,0x04,0x0E],
+    'Ï': [0x0A,0x00,0x0E,0x04,0x04,0x04,0x0E], 'Ó': [0x02,0x04,0x0E,0x11,0x11,0x11,0x0E],
+    'Ô': [0x04,0x0A,0x0E,0x11,0x11,0x11,0x0E], 'Ú': [0x02,0x04,0x11,0x11,0x11,0x11,0x0E],
+    'Ù': [0x08,0x04,0x11,0x11,0x11,0x11,0x0E], 'Û': [0x04,0x0A,0x11,0x11,0x11,0x11,0x0E],
+    'Ñ': [0x0D,0x16,0x11,0x19,0x15,0x13,0x11],
+    '¡': [0x04,0x00,0x04,0x04,0x04,0x04,0x04], '¿': [0x04,0x00,0x04,0x08,0x10,0x11,0x0E],
     ' ': [0,0,0,0,0,0,0],
     '.': [0,0,0,0,0,0x0C,0x0C], ',': [0,0,0,0,0x0C,0x04,0x08],
     '!': [0x04,0x04,0x04,0x04,0x04,0x00,0x04], '?': [0x0E,0x11,0x01,0x02,0x04,0x00,0x04],
@@ -57,25 +68,67 @@ const Font = (() => {
   }
 
   function norm(str) {
-    return String(str).toUpperCase().replace(/–|—/g, '-');
+    return String(str).toUpperCase().replace(/–|—/g, '-').replace(/…/g, '...');
   }
 
-  function width(str) { return norm(str).length * ADV - 1; }
+  // ---------------- Ersatz-Glyphen (CJK) ----------------
+  const FONT_JA = '"MS Gothic","Yu Gothic UI","Meiryo","Hiragino Kaku Gothic ProN","Noto Sans CJK JP","Noto Sans JP",sans-serif';
+  const FONT_ZH = '"Microsoft YaHei","SimHei","PingFang SC","Noto Sans CJK SC","Noto Sans SC","Hiragino Sans GB",sans-serif';
+  let fbFont = FONT_JA;
+  const FB = new Map(), FBC = new Map();
+  function setCJK(lang) {
+    const f = lang === 'zh' ? FONT_ZH : FONT_JA;
+    if (f !== fbFont) { fbFont = f; FB.clear(); FBC.clear(); }
+  }
+  function fb(ch) {
+    let g = FB.get(ch);
+    if (g) return g;
+    const S = 14, c = document.createElement('canvas'); c.width = S; c.height = S;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    x.font = `11px ${fbFont}`; x.textBaseline = 'alphabetic'; x.fillStyle = '#fff';
+    x.fillText(ch, 0, 10);
+    const img = x.getImageData(0, 0, S, S), d = img.data;
+    let maxX = -1;
+    for (let i = 0; i < S * S; i++) {
+      const on = d[i * 4 + 3] > 100;
+      d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 255; d[i * 4 + 3] = on ? 255 : 0;
+      if (on) maxX = Math.max(maxX, i % S);
+    }
+    x.putImageData(img, 0, 0);
+    const w = Math.ceil(x.measureText(ch).width);
+    g = { c, adv: Math.max(4, Math.min(13, Math.max(w, maxX + 1) + 1)) };
+    FB.set(ch, g);
+    return g;
+  }
+  function tinted(ch, color) {
+    const k = ch + '|' + color;
+    let t = FBC.get(k);
+    if (t) return t;
+    const g = fb(ch);
+    t = document.createElement('canvas'); t.width = g.c.width; t.height = g.c.height;
+    const x = t.getContext('2d');
+    x.drawImage(g.c, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, t.width, t.height);
+    FBC.set(k, t);
+    return t;
+  }
+  const adv = (ch) => INDEX.has(ch) ? ADV : fb(ch).adv;
+  function width(str) { let w = 0; for (const ch of norm(str)) w += adv(ch); return w - 1; }
+  function hasFB(str) { for (const ch of norm(str)) if (!INDEX.has(ch)) return true; return false; }
 
   // opts: { align: 'left'|'center'|'right', shadow: color }
   function draw(ctx, str, x, y, color = '#fcfcfc', opts = {}) {
     const s = norm(str);
     let sx = Math.round(x);
-    if (opts.align === 'center') sx = Math.round(x - (s.length * ADV - 1) / 2);
-    else if (opts.align === 'right') sx = Math.round(x - (s.length * ADV - 1));
+    if (opts.align === 'center') sx = Math.round(x - width(s) / 2);
+    else if (opts.align === 'right') sx = Math.round(x - width(s));
     if (opts.shadow) draw(ctx, s, sx + 1, y + 1, opts.shadow);
-    const a = atlas(color);
-    for (let i = 0; i < s.length; i++) {
-      const gi = INDEX.get(s[i]);
-      if (gi === undefined || s[i] === ' ') continue;
-      ctx.drawImage(a, gi * ADV, 0, 5, 7, sx + i * ADV, Math.round(y), 5, 7);
+    const a = atlas(color), yy = Math.round(y);
+    for (const ch of s) {
+      const gi = INDEX.get(ch);
+      if (gi !== undefined) { if (ch !== ' ') ctx.drawImage(a, gi * ADV, 0, 5, 7, sx, yy, 5, 7); sx += ADV; }
+      else { ctx.drawImage(tinted(ch, color), sx, yy - 3); sx += fb(ch).adv; }
     }
   }
 
-  return { draw, width, ADV, LINE };
+  return { draw, width, hasFB, setCJK, ADV, LINE };
 })();

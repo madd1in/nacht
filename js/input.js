@@ -41,11 +41,11 @@ const Input = (() => {
   const niceName = (id) => /xbox|xinput|045e/i.test(id) ? 'XBOX CONTROLLER' : /dualsense|dualshock|054c/i.test(id) ? 'PLAYSTATION CONTROLLER' : 'CONTROLLER';
   window.addEventListener('gamepadconnected', e => {
     padName = niceName(e.gamepad.id); padIndex = e.gamepad.index; lastDevice = 'pad';
-    toast = { text: padName + ' VERBUNDEN', t: 180 };
+    toast = { text: tr('padOn', padName), t: 180 };
     rumble(0.3, 0.3, 150);
   });
   window.addEventListener('gamepaddisconnected', e => {
-    if (e.gamepad.index === padIndex) { padIndex = -1; toast = { text: 'CONTROLLER GETRENNT', t: 150 }; }
+    if (e.gamepad.index === padIndex) { padIndex = -1; toast = { text: tr('padOff'), t: 150 }; }
   });
 
   function activePad() {
@@ -131,6 +131,7 @@ const Input = (() => {
       for (const tc of e.changedTouches) {
         const id = tc.identifier, x = tc.clientX, y = tc.clientY;
         if (e.type === 'touchstart') {
+          if (window.Game && Game.state === 'pause') { latch.start = true; continue; } // Pause: Tippen irgendwo = weiter
           const a = hitTest(x, y);
           if (a && (x > window.innerWidth * 0.45 || a === 'start')) { latch[a] = true; active.set(id, a); }
           else if (x < window.innerWidth * 0.5 && stick.id === null) { stick.id = id; stick.ox = x; stick.oy = y; stick.dx = 0; stick.dy = 0; if (hint) hint.style.display = 'none'; }

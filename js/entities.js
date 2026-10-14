@@ -75,7 +75,7 @@ class Player {
     this.state = 'normal'; this.atkT = 0; this.atkSub = false; this.crouch = false; this.crouchAtk = false;
     this.inv = 0; this.walkT = 0; this.jumping = false; this.stair = null; this.stairPos = 0;
     this.stairUpPose = true; this.deadT = 0; this.plat = null; this.powerT = 0;
-    this.canDouble = true; this.flipT = 0; this.scarf = null; this.hidden = false;
+    this.canDouble = true; this.flipT = 0; this.scarf = null; this.hidden = false; this.coyote = 0; this.jumpBuf = 0;
     this.chargeT = 0; this.crashT = 0; this.landT = 0; this.lastSafe = { cx: fx, feet: fy };
     this.atkDir = 'fwd'; this.slideT = 0; this.flingT = 0; this.trail = []; this.dangle = false; this.ring = null;
   }
@@ -103,7 +103,22 @@ class Player {
     if (!this.atkSub && this.state === 'normal' && !this.crouchAtk) {
       if (I.up) this.atkDir = horiz ? 'upd' : 'up';
       else if (I.down && !this.onGround) this.atkDir = horiz ? 'downd' : 'down';
+      else this.ringAssist();
     }
+  }
+  // Ziel-Hilfe: Ring in Reichweite über dem Spieler → automatisch dorthin peitschen (vor allem für Touch)
+  ringAssist() {
+    if (!W.rings || !W.rings.length) return;
+    const reach = (this.sword ? SWORD_LEN : WHIP_LEN)[this.whip] + 52;
+    let best = null, bd = 1e9;
+    for (const r of W.rings) {
+      const dx = r.cx - this.cx, dy = r.cy - (this.y + 8), d = Math.hypot(dx, dy);
+      if (dy < -6 && d < reach && d < bd) { best = r; bd = d; }
+    }
+    if (!best) return;
+    const dx = best.cx - this.cx;
+    if (Math.abs(dx) < 14) this.atkDir = 'up';
+    else { this.atkDir = 'upd'; this.face = Math.sign(dx); }
   }
 
   tickAttack() {
@@ -244,7 +259,9 @@ class Player {
     if (this.onGround) {
       if (this.atkT > 0 || this.crouch) this.vx = 0;
       else { this.vx = mx * WALK; if (mx) this.face = mx; }
-      if (P.jump && this.atkT === 0) {
+      this.coyote = 7;
+      if ((P.jump || (this.jumpBuf > 0 && I.jump)) && this.atkT === 0) {
+        this.jumpBuf = 0;
         if (I.down && !this.findStair(true)) return this.startSlide(); // Rutschen: Unten + Sprung
         this.setCrouch(false);
         this.vy = JUMP; this.onGround = false; this.jumping = true;
@@ -253,7 +270,12 @@ class Player {
       if (this.flingT > 0) { this.flingT--; this.vx += (mx * WALK - this.vx) * 0.05; } // Schwung nach dem Pendeln
       else this.vx = mx * WALK;
       if (mx && this.atkT === 0) this.face = mx;
-      if (P.jump && this.canDouble) { // Doppelsprung (einmal pro Luftphase)
+      if (this.coyote > 0) this.coyote--;
+      if (this.jumpBuf > 0) this.jumpBuf--;
+      if (P.jump && this.coyote > 0 && !this.jumping) { // Coyote-Time: kurz nach der Kante zählt noch als Bodensprung
+        this.coyote = 0; this.vy = JUMP; this.jumping = true;
+      } else if (P.jump && !this.canDouble) this.jumpBuf = 8; // Sprungpuffer: kurz vor der Landung gedrückt
+      else if (P.jump && this.canDouble) { // Doppelsprung (einmal pro Luftphase)
         this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true;
         if (this.atkT === 0) this.flipT = 20;
         Audio8.sfx('djump'); W.puff(this.cx, this.feet);

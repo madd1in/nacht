@@ -171,10 +171,10 @@ const Levels = (() => {
     .ground(0, 7).ground(57, 63)
     .fill(11, 9, 13, 9, '=').crumble(17, 8).ring(22, 4).fill(26, 9, 28, 9, '=').ring(32, 4).fill(36, 8, 38, 8, '=')
     .ring(42, 4).crumble(46, 9).ring(50, 4).fill(53, 9, 55, 9, '=')
+    .fill(21, 9, 22, 9, '=').fill(32, 8, 33, 8, '=').fill(42, 9, 43, 9, '=').fill(49, 9, 50, 9, '=')
     .statue(4, 10)
-    .candle(12, 7, 'H').candle(27, 7).candle(37, 6, 'H').candle(54, 7, '$').candle(60, 9, 'H')
-    .enemy('ghost', 20, 6).enemy('ghost', 44, 6)
-    .zone('skull', 10, 56, { interval: 320, max: 1 })
+    .candle(12, 7, 'H').candle(27, 7).candle(37, 6, 'H').candle(54, 7, '$').candle(60, 9, 'H').candle(32, 2, '1').candle(50, 2, 'W')
+    .zone('skull', 10, 56, { interval: 640, max: 1 })
     .start(2, 10).exit(62).done();
 
   const r32 = room(88, 'throne')

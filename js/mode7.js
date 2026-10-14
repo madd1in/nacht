@@ -7,60 +7,59 @@ const Mode7 = (() => {
   const MOBILE_RENDER = !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   let lastMobileDraw = -Infinity;
 
-  // ---------------- Tunnel ----------------
-  const TEX = 64;
-  let tex = null;
+  // ---------------- Drehende Walze (wie der rotierende Raum in Super Castlevania IV) ----------------
+  // Die Wand ist ein Zylinder, dessen Achse waagerecht entlang des Gangs liegt. Pro Rasterzeile wird die
+  // passende Texturzeile gewählt (HDMA-Prinzip): v = asin(y/R) → nur ~200 Streifen-Kopien pro Bild, auch mobil flott.
+  const TW = 256, TH = 256;
+  let tex = null, shadeC = null, shadeW = 0;
   function makeTex() {
-    tex = new Uint32Array(TEX * TEX);
-    for (let y = 0; y < TEX; y++) for (let x = 0; x < TEX; x++) {
-      const row = Math.floor(y / 8), bx = (x + (row % 2) * 8) % 16, by = y % 8, v = (x * 7 + y * 13) % 5;
-      let c = (by === 0 || bx === 0) ? RGB(18, 4, 26) : by === 1 ? RGB(130, 52, 150) : RGB(74 + v * 6, 22 + v * 3, 98 + v * 6);
-      if ((x * 3 + y * 5) % 37 === 0) c = RGB(230, 40, 70);       // glühende Runen
-      if (by === 1 && bx === 1) c = RGB(170, 90, 190);
-      tex[y * TEX + x] = c;
+    tex = Sprites.canvas(TW * 4, TH);
+    const x = tex.getContext('2d');
+    let seed = 11;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const P = (c, X, Y, w = 1, h = 1) => { x.fillStyle = c; x.fillRect(X, Y, w, h); };
+    P('#12041c', 0, 0, TW, TH);
+    for (let r = 0; r < TH / 16; r++) for (let b = -1; b < TW / 32 + 1; b++) {
+      const bx = b * 32 + (r % 2) * 16, by = r * 16, v = rnd();
+      P(v < 0.15 ? '#3a1450' : v < 0.6 ? '#4c1c66' : '#58227a', bx + 1, by + 1, 30, 14);
+      P('#7c3ca0', bx + 1, by + 1, 30, 1); P('#2c0c3c', bx + 1, by + 14, 30, 1);
+      if (v > 0.86) { // glühende Rune
+        const rx = bx + 10 + Math.floor(rnd() * 8), ry = by + 4;
+        P('#a80030', rx, ry, 2, 7); P('#a80030', rx - 2, ry + 3, 6, 1); P('#fc5070', rx, ry + 1, 1, 4);
+      }
+      if (v > 0.5 && v < 0.53) { P('#2c0c3c', bx + 8, by + 6, 10, 1); P('#2c0c3c', bx + 14, by + 7, 6, 1); } // Riss
+    }
+    for (let X = 0; X < TW; X += 128) { // goldene Stützrippen quer zur Achse
+      P('#2c1400', X, 0, 12, TH); P('#8c5800', X + 1, 0, 10, TH); P('#e8b030', X + 2, 0, 3, TH); P('#5c3400', X + 9, 0, 2, TH);
+      for (let Y = 4; Y < TH; Y += 16) { P('#fcd880', X + 4, Y, 3, 3); P('#5c3400', X + 5, Y + 3, 2, 1); }
+    }
+    for (let k = 1; k < 4; k++) x.drawImage(tex, 0, 0, TW, TH, k * TW, 0, TW, TH);
+  }
+  function makeShade(w) { // Rundung: zu den Rändern hin dunkler (weicher Verlauf + violetter Saum)
+    shadeW = w; shadeC = Sprites.canvas(w, 208);
+    const x = shadeC.getContext('2d'), R = 104 * 1.12;
+    for (let y = 0; y < 208; y++) {
+      const c = Math.cos(Math.asin((y + 0.5 - 104) / R));
+      x.fillStyle = `rgba(6,0,14,${Math.min(0.95, (1 - c) * 1.5)})`; x.fillRect(0, y, w, 1);
+      if (c > 0.97) { x.fillStyle = 'rgba(255,180,255,0.05)'; x.fillRect(0, y, w, 1); } // Glanz vorne
     }
   }
-  let L = null;
-  function setup(w, h) {
-    const c = Sprites.canvas(w, h), x = c.getContext('2d'), img = x.createImageData(w, h);
-    L = { w, h, c, x, img, buf: new Uint32Array(img.data.buffer), a: new Int32Array(w * h), d: new Int32Array(w * h), s: new Float32Array(w * h), b: new Float32Array(w * h) };
-    for (let y = 0; y < h; y++) for (let X = 0; X < w; X++) {
-      const dx = X - w / 2, dy = (y - h / 2) * 1.2, r = Math.hypot(dx, dy) + 0.5, i = y * w + X;
-      L.a[i] = Math.floor((Math.atan2(dy, dx) / (Math.PI * 2) + 1) * TEX * 2);
-      L.d[i] = Math.floor(TEX * 26 / r);
-      L.s[i] = Math.min(1, r / (Math.min(w, h * 1.2) * 0.55));
-      L.b[i] = BAY[(y & 3) * 4 + (X & 3)];
-    }
-  }
-  // Mobile refreshed tunnel pixels at 30 Hz and quarter resolution; desktop keeps half resolution/full rate.
   function drawTunnel(ctx, w, t, alpha = 1) {
     if (!tex) makeTex();
-    const scale = MOBILE_RENDER ? 4 : 2;
-    const tw = Math.ceil(w / scale), th = 208 / scale;
-    const resized = !L || L.w !== tw || L.h !== th;
-    if (resized) setup(tw, th);
-    const now = MOBILE_RENDER ? performance.now() : 0;
-    if (!MOBILE_RENDER || resized || now - lastMobileDraw >= 1000 / 30) {
-      const rot = Math.floor(t * 0.55), mv = Math.floor(t * 1.1), pulse = 0.8 + 0.2 * Math.sin(t * 0.05);
-      const { buf, a, d, s, b } = L;
-      for (let i = 0, n = tw * th; i < n; i++) {
-        const c = tex[((d[i] + mv) & (TEX - 1)) * TEX + ((a[i] + rot) & (TEX - 1))];
-        const k = Math.min(1, Math.floor(s[i] * pulse * 6 + b[i]) / 6); // gestufte, geditherte Tiefe
-        buf[i] = (255 << 24) | ((((c >> 16) & 255) * k) << 16) | ((((c >> 8) & 255) * k) << 8) | ((c & 255) * k);
-      }
-      L.x.putImageData(L.img, 0, 0);
-      if (MOBILE_RENDER) lastMobileDraw = now;
-    }
+    if (!shadeC || shadeW !== w) makeShade(w);
+    const camX = (typeof W !== 'undefined' && W.cam) ? W.cam.x : 0;
+    const R = 104 * 1.12, rot = t * 0.9, step = MOBILE_RENDER ? 2 : 1;
+    const sx = ((Math.floor(camX * 0.35) % TW) + TW) % TW;
     ctx.save();
     ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(L.c, 0, 0, tw, th, 0, 0, w, 208);
-    ctx.globalCompositeOperation = 'lighter'; // glühender Kern
-    const core = FX.disc(30, [200, 30, 70], [0.55, 0.32, 0.16, 0.06]);
-    ctx.globalAlpha = alpha * (0.6 + 0.3 * Math.sin(t * 0.08));
-    ctx.drawImage(core, Math.round(w / 2 - 30), 104 - 30);
+    for (let y = 0; y < 208; y += step) {
+      const th = Math.asin((y + step / 2 - 104) / R); // Winkel auf dem Zylinder
+      const v = ((Math.floor(th * TH * 0.55 + rot) % TH) + TH) % TH;
+      ctx.drawImage(tex, sx, v, w, 1, 0, y, w, step);
+    }
+    ctx.drawImage(shadeC, 0, 0);
     ctx.restore();
   }
-
   // ---------------- Mode-7-Weltkarte ----------------
   const MS = 256;
   let map = null;
@@ -114,14 +113,17 @@ const Mode7 = (() => {
   }
 
   // ---------------- HDMA-Welle & Mosaik ----------------
+  let wc = null;
   function wave(ctx, y0, h, w, amp, t, freq = 0.09) {
     if (amp <= 0.05) return;
-    const cv = ctx.canvas;
-    const band = MOBILE_RENDER ? 4 : 1;
+    if (!wc || wc.width !== w || wc.height !== h) wc = Sprites.canvas(w, h);
+    const wx = wc.getContext('2d');
+    wx.clearRect(0, 0, w, h); wx.drawImage(ctx.canvas, 0, y0, w, h, 0, 0, w, h);
+    const band = MOBILE_RENDER ? 4 : 2;
     for (let y = 0; y < h; y += band) {
       const rows = Math.min(band, h - y);
       const off = Math.round(Math.sin((y + rows / 2) * freq + t * 0.12) * amp);
-      if (off) ctx.drawImage(cv, 0, y0 + y, w, rows, off, y0 + y, w, rows);
+      if (off) ctx.drawImage(wc, 0, y, w, rows, off, y0 + y, w, rows);
     }
   }
   let mc = null;
