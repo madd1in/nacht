@@ -1,5 +1,6 @@
 // Leveldaten. Normale Räume sind 13 Kacheln hoch (Boden-Oberkante Reihe 11), Kletterräume höher.
 // Terrain: '#','=' massiv | 'X' zerbrechlich (Braten) | 'Y' zerbrechlich (Geldsack)
+// Kerzen-Drops: Ziffern = Sub-Waffen, W Peitsche, H Herz, $ Geld, U 1UP, R Rosenkranz, M Blutmond (rote Kerze)
 //          '/' Treppe hoch-rechts | '\\' Treppe hoch-links | '~' Wasser | '^' Stacheln
 // Bossarenen sind immer die letzten View.w Pixel eines Raums (Breite passt sich dem Bildschirm an).
 'use strict';
@@ -89,7 +90,7 @@ const Levels = (() => {
     .grand(57.5, 0, 140, 0.32, 0)
     .statue(64, 10)
     .fill(91, 8, 93, 8, '=').fill(98, 8, 100, 8, '=')
-    .candle(5, 9).candle(11, 9, '5').candle(21, 9).candle(33, 9).candle(32, 5).candle(38, 5, 'H').candle(42, 5)
+    .candle(5, 9).candle(11, 9, '5').candle(21, 9).candle(33, 9).candle(32, 5).candle(38, 5, 'H').candle(42, 5, 'M')
     .candle(50, 9, '$').candle(53, 3, 'H').candle(61, 3).candle(67, 9).candle(73, 9, 'H').candle(80, 9, '2').candle(86, 9)
     .enemy('bat', 14, 3).enemy('bat', 40, 2).enemy('bat', 70, 3)
     .zone('ghoul', 18, 50, { interval: 140, max: 2 })
@@ -132,7 +133,7 @@ const Levels = (() => {
     .set(40, 9, 'X').set(40, 10, 'Y')
     .statue(34, 10)
     .fill(83, 8, 85, 8, '=').fill(90, 8, 92, 8, '=')
-    .candle(4, 9).candle(16, 4).candle(23, 4, 'H').candle(20, 9, '$').candle(37, 9, '3').candle(44, 9)
+    .candle(4, 9).candle(16, 4, 'M').candle(23, 4, 'H').candle(20, 9, '$').candle(37, 9, '3').candle(44, 9)
     .candle(48, 9, 'W').candle(56, 9).candle(60, 9, 'H').candle(66, 9).candle(72, 9, 'H')
     .chest(24, 5, 'big')
     .enemy('skel', 18, 5).enemy('skel', 45, 10).enemy('knight', 50, 10)
@@ -147,7 +148,7 @@ const Levels = (() => {
     .statue(24, 10)
     .crumble(34, 8).crumble(37, 8)
     .set(52, 10, 'X')
-    .candle(4, 9).candle(9, 9, 'H').candle(16, 1).candle(28, 9).candle(35, 6, 'H').candle(38, 6, '5')
+    .candle(4, 9).candle(9, 9, 'H').candle(16, 1, 'M').candle(28, 9).candle(35, 6, 'H').candle(38, 6, '5')
     .candle(47, 9).candle(56, 9, 'W').candle(60, 9, 'H')
     .enemy('knight', 31, 10).enemy('pillar', 44, 10).enemy('bat', 50, 3)
     .zone('skull', 30, 60, { interval: 380, max: 1 })

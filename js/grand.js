@@ -118,7 +118,7 @@ class GrandChandelier extends Ent {
     }
     // Knarzen an den Umkehrpunkten
     const v = this.ang - this.prevAng;
-    if (this.lastV !== undefined && Math.sign(v) !== Math.sign(this.lastV) && this.onScreen(40)) Audio8.sfx('creak');
+    if (this.lastV !== undefined && Math.sign(v) !== Math.sign(this.lastV) && this.onScreen(40)) Audio8.sfx('creak', this.cx);
     this.lastV = v;
   }
   lights(L, cx, cy, flick) {
@@ -179,7 +179,7 @@ class CogWheel extends Ent {
     this.img = cogSprite(this.R, 18, this.n * 2);
     this.ledges = Array.from({ length: this.n }, (_, i) => new CogLedge(this, i));
   }
-  update() { this.t++; this.ang += this.sp; if (this.t % 24 === 0 && Math.abs(this.x - W.player.cx) < View.w * 0.7) Audio8.sfx('cog'); }
+  update() { this.t++; this.ang += this.sp; if (this.t % 24 === 0 && Math.abs(this.x - W.player.cx) < View.w * 0.7) Audio8.sfx('cog', this.x); }
   draw(ctx) {
     const sx = this.x - W.cam.x, sy = this.y - W.cam.y;
     if (sx < -120 || sx > View.w + 120) return;
@@ -287,7 +287,7 @@ class Pendulum extends Ent {
     this.t++;
     const prev = this.ang;
     this.ang = this.amp * Math.sin(this.t * this.sp + this.phase);
-    if (Math.sign(prev) !== Math.sign(this.ang) && Math.abs(this.x - W.player.cx) < View.w * 0.6) Audio8.sfx('whoosh');
+    if (Math.sign(prev) !== Math.sign(this.ang) && Math.abs(this.x - W.player.cx) < View.w * 0.6) Audio8.sfx('whoosh', this.x);
     const p = W.player;
     if (!p.alive || p.inv > 0) return;
     const [tx, ty] = this.tip(), c = Math.cos(this.ang), s = Math.sin(this.ang);

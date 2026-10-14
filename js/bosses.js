@@ -94,7 +94,7 @@ class Boss extends Enemy {
     if (id && this.lastHit === id) return false;
     this.lastHit = id;
     this.hp -= dmg; this.flashT = 12; this.invT = 16;
-    Audio8.sfx('bossHit');
+    Audio8.sfx('bossHit', this.cx);
     W.spawn(new Spark(this.cx + rnd(-4, 4), this.cy + rnd(-6, 6)));
     W.spawn(new Shock(this.cx, this.cy, 28, '#f8b800', 3));
     W.comboHit(); W.shake = Math.max(W.shake, 5);
@@ -113,7 +113,7 @@ class Boss extends Enemy {
     if (this.dying === 1 || this.dying === 9 || this.dying === 18) W.spawn(new Shock(this.cx, this.cy, 90 + this.dying * 3, this.dying === 9 ? '#f8b800' : '#fcfcfc', 5));
     if (this.dying % 7 === 0) {
       W.spawn(new Burst(this.x + rnd(0, this.w), this.y + rnd(0, this.h)));
-      Audio8.sfx('explode');
+      Audio8.sfx('explode', this.cx);
     }
     if (this.dying % 20 === 0) W.shake = 10;
     if (this.dying >= len) {
@@ -136,7 +136,7 @@ class Boss extends Enemy {
       const k = i - (n - 1) / 2, ang = a + k * spread;
       W.spawn(new EProj('fire', this.cx, this.cy, Math.cos(ang) * speed, Math.sin(ang) * speed, 0));
     }
-    Audio8.sfx('fire');
+    Audio8.sfx('fire', this.cx);
   }
 }
 
@@ -233,13 +233,13 @@ class GiantSkeleton extends Boss {
       if (this.timer === 16) {
         const n = half ? 5 : 3;
         for (let i = 0; i < n; i++) W.spawn(new EProj('bone', this.cx, this.y + 4, this.face * (0.7 + i * 0.55), -4.4 - i * 0.25, 0.16));
-        Audio8.sfx('throw');
+        Audio8.sfx('throw', this.cx);
       }
       if (this.timer > 34) { this.state = 'walk'; this.timer = 0; }
     } else if (this.state === 'jump') {
       if (this.onGround && this.timer > 5) {
         this.state = 'walk'; this.timer = 0; this.vx = 0;
-        W.shake = 14; Audio8.sfx('wall');
+        W.shake = 14; Audio8.sfx('wall', this.cx);
         for (let i = 0; i < (half ? 3 : 2); i++) {
           W.spawn(new EProj('rock', this.ax + rnd(16, this.aw - 16), W.cam.y - 8 - i * 30, 0, 0.5, 0.12));
         }

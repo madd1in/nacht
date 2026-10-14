@@ -89,7 +89,7 @@ class Ghost extends Enemy {
       this.phase = 'in'; this.timer = 40;
       this.x = clamp(p.cx + (Math.random() < 0.5 ? -1 : 1) * rnd(50, 90), W.cam.x + 10, W.cam.x + View.w - 20);
       this.baseY = clamp(p.y - rnd(0, 24), W.cam.y + 20, W.cam.y + 170);
-      Audio8.sfx('rise');
+      Audio8.sfx('rise', this.cx);
     } else if (this.phase === 'in') { this.alpha = 1 - this.timer / 40; if (this.timer <= 0) { this.phase = 'vis'; this.timer = 150; } }
     else if (this.phase === 'vis') { this.alpha = 1; if (this.timer <= 0) { this.phase = 'out'; this.timer = 40; } }
     else if (this.phase === 'out') { this.alpha = this.timer / 40; if (this.timer <= 0) { this.phase = 'hidden'; this.timer = 60; this.alpha = 0; } }

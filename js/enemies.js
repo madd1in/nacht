@@ -126,18 +126,40 @@ class Candle extends Ent {
     const w = torch ? 12 : 8, h = torch ? 20 : 16;
     super(tx * T + (T - w) / 2, ty * T + T - h, w, h);
     this.kind = 'candle'; this.drop = drop; this.torch = torch; this.t = (tx * 7) % 20;
+    this.blood = drop === 'M'; // Blutmond-Kerze: löst den Blutmond aus
+  }
+  update() {
+    this.t++;
+    if (!this.onScreen(8)) return;
+    if (this.t % (this.torch ? 7 : 11) === 0) // Rauchfaden über der Flamme
+      W.spawn(new Particle(this.cx + rnd(-0.5, 0.5), this.y - 1, rnd(-0.08, 0.08), -rnd(0.25, 0.45),
+        this.blood ? 'rgba(252,60,60,0.55)' : 'rgba(150,146,160,0.45)', 46, 1, -0.003));
+    if (this.blood && this.t % 13 === 0) W.spawn(new Particle(this.cx + rnd(-5, 5), this.y + rnd(2, 12), 0, -rnd(0.3, 0.6), '#fc3c3c', 30, 1, -0.004));
   }
   hit() {
     if (this.dead) return;
     this.dead = true;
-    Audio8.sfx('candle');
+    Audio8.sfx('candle', this.cx);
     W.spawn(new Burst(this.cx, this.cy));
     W.sparks(this.cx, this.y + 2, 5);
+    if (this.blood) { W.bloodMoon(this.cx, this.cy); W.spawn(new Item('heartB', this.cx, this.cy)); return; }
     W.spawn(new Item(rollDrop(this.drop), this.cx, this.cy));
   }
   draw(ctx) {
     const s = (this.torch ? Sprites.S.torch : Sprites.S.candle)[Math.floor(this.t / 8) % 2];
-    Sprites.draw(ctx, s, Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y));
+    Sprites.draw(ctx, this.blood ? Candle.redOf(s) : s, Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y));
+  }
+  // Rot eingefärbte Kopie eines Sprites (zwischengespeichert)
+  static redOf(s) {
+    if (s.red) return s.red;
+    const mk = (src) => {
+      const c = Sprites.canvas(src.width, src.height), x = c.getContext('2d');
+      x.drawImage(src, 0, 0);
+      x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(232,16,48,0.6)'; x.fillRect(0, 0, c.width, c.height);
+      return c;
+    };
+    s.red = { c: mk(s.c), f: mk(s.f), w: s.w, h: s.h, pad: s.pad };
+    return s.red;
   }
 }
 
@@ -165,12 +187,12 @@ class SubWeapon extends Ent {
         this.vy += 0.22;
         Phys.moveX(this, this.vx);
         if (Phys.moveY(this, this.vy) === 1 || this.y > W.room.h * T) {
-          this.burnT = 0; Audio8.sfx('holy');
+          this.burnT = 0; Audio8.sfx('holy', this.cx);
           this.x = this.cx - 12; this.w = 24; this.y = this.y + this.h - 14; this.h = 14;
         }
       } else {
         if (++this.burnT > 75) this.dead = true;
-        if (this.burnT % 10 === 0) Audio8.sfx('flameTick');
+        if (this.burnT % 10 === 0) Audio8.sfx('flameTick', this.cx);
       }
     } else if (tp === 'cross') {
       this.vx -= this.face * 0.085;
@@ -211,20 +233,20 @@ class Enemy extends Ent {
     this.hp -= dmg; this.flashT = 10;
     W.spawn(new Spark(this.cx, this.cy));
     W.comboHit(); W.hitstop = Math.max(W.hitstop, 2);
-    if (this.hp <= 0) this.kill(); else Audio8.sfx('hit');
+    if (this.hp <= 0) this.kill(); else Audio8.sfx('hit', this.cx);
     return true;
   }
   kill(silent) {
     this.dead = true;
     if (silent) return;
-    Audio8.sfx('kill');
+    Audio8.sfx('kill', this.cx);
     W.spawn(new Burst(this.cx, this.cy));
     W.sparks(this.cx, this.cy, 9);
     Drama.disintegrate(this.lastDraw);
     W.spawn(new Shock(this.cx, this.cy, 22, '#fce0a8', 3));
     W.hitstop = Math.max(W.hitstop, 4); W.shake = Math.max(W.shake, 4);
     W.addScore(this.score * W.comboMul(), this.cx, this.y);
-    if (Math.random() < 0.1) W.spawn(new Item('heartS', this.cx, this.cy));
+    if (Math.random() < (W.bloodT > 0 ? 0.35 : 0.1)) W.spawn(new Item('heartS', this.cx, this.cy)); // Blutmond: mehr Herzen
   }
   physics() {
     this.vy = Math.min(this.vy + GRAV, MAXFALL);
@@ -255,7 +277,7 @@ class Ghoul extends Enemy {
   constructor(x, groundY, dir) {
     super(x, groundY - 28, 10, 28, 1, 2, 100);
     this.dir = dir; this.face = dir; this.rise = 0; this.groundY = groundY;
-    Audio8.sfx('rise');
+    Audio8.sfx('rise', this.cx);
   }
   update() {
     super.update();
@@ -290,7 +312,7 @@ class Bat extends Enemy {
     if (this.state === 'perch') {
       if (this.onScreen(0) && Math.abs(p.cx - this.cx) < 100 && p.y + 8 > this.y && p.y - this.y < 140) {
         this.state = 'fly'; this.dir = Math.sign(p.cx - this.cx) || 1; this.face = this.dir; this.baseY = this.y; this.t = 0;
-        Audio8.sfx('bat');
+        Audio8.sfx('bat', this.cx);
       }
       return;
     }
@@ -394,7 +416,7 @@ class Fishman extends Enemy {
     } else {
       if (this.shootT > 0) {
         this.vx = 0;
-        if (--this.shootT === 10) { W.spawn(new EProj('fire', this.cx + this.face * 10, this.y + 4, this.face * 1.5, 0, 0)); Audio8.sfx('fire'); }
+        if (--this.shootT === 10) { W.spawn(new EProj('fire', this.cx + this.face * 10, this.y + 4, this.face * 1.5, 0, 0)); Audio8.sfx('fire', this.cx); }
       } else {
         this.vx = this.face * 0.5;
         if (--this.shootCD <= 0) { this.shootT = 24; this.shootCD = 140; this.face = Math.sign(p.cx - this.cx) || this.face; }
@@ -426,7 +448,7 @@ class Pillar extends Enemy {
     if (this.onScreen(-8) && --this.cd <= 0) {
       this.cd = 120; this.openT = 16;
       W.spawn(new EProj('fire', this.cx + this.face * 8, this.y + (this.top ? 8 : 24), this.face * 1.4, 0, 0));
-      Audio8.sfx('fire');
+      Audio8.sfx('fire', this.cx);
       this.top = !this.top;
     }
     this.touch();

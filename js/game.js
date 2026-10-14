@@ -139,7 +139,7 @@ const Game = {
   },
 
   startStage(s, room = 0) {
-    W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0; W.checkpoint = null;
+    W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0;
     if (this.pendingView) this.applyView(this.pendingView);
     W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1));
     Audio8.stop();
@@ -161,7 +161,17 @@ const Game = {
     this.go('respawn');
   },
 
-  startClear() { this.go('clear'); this.tallyPhase = 0; Audio8.play('clear'); Voice.say('clear'); },
+  startClear() { this.go('clear'); this.tallyPhase = 0; Audio8.play('clear'); Voice.say('clear'); this.recordTime(); },
+
+  // Bestzeit pro Stage (getrennt für den Leicht-Modus), dauerhaft im Browser gespeichert
+  recordTime() {
+    const key = 'nachtmahr.best' + W.stage + (Options.easy ? 'e' : ''), t = W.stageFrames;
+    let best = 0;
+    try { best = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) { best = 0; }
+    this.clearTime = t; this.newBest = !best || t < best; this.bestTime = this.newBest ? t : best;
+    if (this.newBest) try { localStorage.setItem(key, String(t)); } catch (e) { /* privater Modus */ }
+  },
+  fmtTime(f) { const s = f / 60, m = Math.floor(s / 60), r = s - m * 60; return m + ':' + (r < 10 ? '0' : '') + r.toFixed(1); },
 
   // ---------------- Update ----------------
   step() {
@@ -178,7 +188,7 @@ const Game = {
     if (this.revealed && this.revealT !== undefined) this.revealT++;
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
     const titleish = this.state === 'title' || this.state === 'options' || this.state === 'charsel' || this.state === 'intro';
-    Audio8.ambience(titleish || ((this.state === 'play' || this.state === 'pause') && W.room && W.room.theme === 'courtyard'));
+    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause') && W.room ? W.room.theme : null);
     if (this.state === 'title' || this.state === 'options' || this.state === 'charsel' || this.state === 'intro') {
       FX.updateStorm(this.tStorm, View.w, () => { if (Audio8.ready()) setTimeout(() => Audio8.sfx('thunder'), 250 + Math.random() * 600); });
     }
@@ -271,6 +281,7 @@ const Game = {
     if (P.start && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); Audio8.sfx('pause'); return; }
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; } // Zeitlupe
     W.update();
+    if (!W.cleared) W.stageFrames++;
     if (this.hurryT > 0) this.hurryT--;
     if (W.boss && this.bossName < 150) { if (this.bossName === 0) Voice.say('boss' + (W.stage + 1)); this.bossName++; }
     const p = W.player;
@@ -484,12 +495,17 @@ const Game = {
   drawClear(ctx) {
     if (this.tallyPhase === 0) return;
     const cx = View.cx;
-    ctx.fillStyle = '#000'; ctx.fillRect(cx - 80, 70, 160, 64);
-    ctx.strokeStyle = '#f8b800'; ctx.strokeRect(cx - 79.5, 70.5, 159, 63);
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - 80, 70, 160, 96);
+    ctx.strokeStyle = '#f8b800'; ctx.strokeRect(cx - 79.5, 70.5, 159, 95);
     Font.draw(ctx, tr('clear'), cx, 80, '#f8b800', { align: 'center' });
     Font.draw(ctx, tr('timeBonus'), cx - 68, 98); Font.draw(ctx, String(W.time * 10), cx + 68, 98, '#fcfcfc', { align: 'right' });
     if (this.tallyPhase === 2) {
       Font.draw(ctx, tr('heartBonus'), cx - 68, 112); Font.draw(ctx, String(W.player.hearts * 100), cx + 68, 112, '#fcfcfc', { align: 'right' });
+    }
+    if (this.clearTime) { // Stage-Zeit + Bestzeit
+      Font.draw(ctx, tr('stageTime'), cx - 68, 132, '#a4e4fc'); Font.draw(ctx, this.fmtTime(this.clearTime), cx + 68, 132, '#fcfcfc', { align: 'right' });
+      if (this.newBest) { if (this.t & 16) Font.draw(ctx, tr('newBest'), cx, 148, '#f8b800', { align: 'center' }); }
+      else { Font.draw(ctx, tr('bestTime'), cx - 68, 148, '#7c7c7c'); Font.draw(ctx, this.fmtTime(this.bestTime), cx + 68, 148, '#bcbcbc', { align: 'right' }); }
     }
   },
 

@@ -100,7 +100,7 @@ class Crumble extends Ent {
     this.kind = 'platform'; this.home = { x: this.x, y: this.y }; this.state = 'idle'; this.timer = 0; this.dx = 0; this.dy = 0; this.vy = 0;
   }
   get solid() { return this.state === 'idle' || this.state === 'shake'; }
-  onStand() { if (this.state === 'idle') { this.state = 'shake'; this.timer = 34; Audio8.sfx('crumble'); } }
+  onStand() { if (this.state === 'idle') { this.state = 'shake'; this.timer = 34; Audio8.sfx('crumble', this.cx); } }
   update() {
     this.t++; this.dy = 0;
     if (this.state === 'shake' && --this.timer <= 0) { this.state = 'fall'; this.vy = 0; W.debris(this.cx, this.y + 4, '#8c7c6c', 6); }
@@ -135,7 +135,7 @@ class Statue extends Ent {
     if (!fresh) return;
     const p = W.player;
     p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.375));
-    Audio8.sfx('checkpoint'); Input.rumble(0.3, 0.2, 150);
+    Audio8.sfx('checkpoint', this.cx); Input.rumble(0.3, 0.2, 150);
     W.popup(this.cx, this.y - 8, tr('checkpoint'), '#a4e4fc');
     for (let i = 0; i < 14; i++) W.spawn(new Particle(this.cx + rnd(-8, 8), this.y + rnd(0, 30), rnd(-0.4, 0.4), rnd(-1.6, -0.4), i % 2 ? '#a4e4fc' : '#fcfcfc', 40, 1, 0));
   }
@@ -155,7 +155,7 @@ class Chest extends Ent {
   hit() {
     if (this.opened) return;
     this.opened = true;
-    Audio8.sfx('chest'); W.sparks(this.cx, this.y, 10);
+    Audio8.sfx('chest', this.cx); W.sparks(this.cx, this.y, 10);
     const loot = { big: ['bagBig', 'bagBig', 'heartB', 'roast'], life: ['oneUp', 'bagBig', 'heartB'] }[this.loot] || ['bag', 'heartB', 'heartS', 'heartS'];
     loot.forEach((type, i) => {
       const it = W.spawn(new Item(type, this.cx, this.y - 4));
@@ -192,7 +192,7 @@ class Raven extends Enemy {
       this.face = Math.sign(p.cx - this.cx) || -1;
       if (this.onScreen(0) && Math.abs(p.cx - this.cx) < 110 && p.feet > this.y - 10) {
         this.state = 'dive'; this.dir = this.face; this.vx = this.dir * 1.9;
-        this.vy = clamp((p.cy - this.cy) / 45, 0.3, 1.8); Audio8.sfx('raven');
+        this.vy = clamp((p.cy - this.cy) / 45, 0.3, 1.8); Audio8.sfx('raven', this.cx);
       }
       return;
     }

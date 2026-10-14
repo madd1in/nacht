@@ -64,6 +64,7 @@ const Audio8 = (() => {
   }
 
   // ---------------- SFX ----------------
+  let outBus = null; // während sfx(name, x): Stereo-Panner der aktuellen Quelle
   function tone(type, f0, f1, dur, vol, duty, t0) {
     if (!ac) return;
     const t = t0 || ac.currentTime;
@@ -72,7 +73,7 @@ const Audio8 = (() => {
     if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g); g.connect(sfxBus);
+    o.connect(g); g.connect(outBus || sfxBus);
     o.start(t); o.stop(t + dur + 0.02);
   }
   function noise(dur, vol, fType, f0, f1, t0, bus) {
@@ -84,7 +85,7 @@ const Audio8 = (() => {
     if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
     const g = ac.createGain();
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    s.connect(f); f.connect(g); g.connect(bus || sfxBus);
+    s.connect(f); f.connect(g); g.connect(bus || outBus || sfxBus);
     s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
   }
   const arp = (notes, step, type, vol, duty) => {
@@ -151,13 +152,22 @@ const Audio8 = (() => {
     chest: () => { tone('triangle', 140, 90, 0.2, 0.3); arp(['c6', 'e6', 'g6', 'c7'], 0.05, 'pulse', 0.13, 0.25); },
     crumble: () => noise(0.25, 0.25, 'lowpass', 1200, 200),
     raven: () => { tone('pulse', 900, 500, 0.12, 0.08, 0.125); noise(0.1, 0.1, 'bandpass', 2000, 900); },
+    step: () => { noise(0.045, 0.07, 'lowpass', 1100, 250); tone('triangle', 120, 70, 0.04, 0.05); },
+    stepWet: () => { noise(0.07, 0.06, 'bandpass', 2600, 900); noise(0.04, 0.05, 'lowpass', 900, 250); },
   };
-  function sfx(name) {
+  // x (optional): Weltposition der Quelle → Stereo-Position relativ zur Bildmitte
+  function sfx(name, x) {
     if (!ac || !SFX[name]) return;
     const now = ac.currentTime;
     if (last[name] && now - last[name] < 0.035) return;
     last[name] = now;
-    SFX[name]();
+    if (typeof x === 'number' && ac.createStereoPanner && typeof W !== 'undefined' && W.cam) {
+      const pan = ac.createStereoPanner();
+      pan.pan.value = Math.max(-1, Math.min(1, (x - W.cam.x - View.w / 2) / (View.w * 0.55))) * 0.8;
+      pan.connect(sfxBus);
+      outBus = pan;
+      try { SFX[name](); } finally { outBus = null; }
+    } else SFX[name]();
   }
 
   // ---------------- Musik ----------------
@@ -437,25 +447,97 @@ const Audio8 = (() => {
       melBus = ac.createGain(); melBus.connect(musicBus);
     }
   }
-  // Regen-/Wind-Ambiente (gefiltertes Rauschen in Schleife)
-  let rainNode = null;
-  function ambience(on) {
-    if (!ac) return;
-    if (on && !rainNode) {
-      const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
-      const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
-      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
-      const g = ac.createGain(); g.gain.value = 0;
-      g.gain.setTargetAtTime(0.024, ac.currentTime, 0.8); // Regen leise unter der Musik
-      const lfo = ac.createOscillator(), lg = ac.createGain(); // Windböen
-      lfo.frequency.value = 0.13; lg.gain.value = 0.01; lfo.connect(lg); lg.connect(g.gain); lfo.start();
-      s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master); s.start();
-      rainNode = { s, g, lfo };
-    } else if (!on && rainNode) {
-      const r = rainNode; rainNode = null;
-      r.g.gain.setTargetAtTime(0, ac.currentTime, 0.4);
-      setTimeout(() => { try { r.s.stop(); r.lfo.stop(); } catch (e) { /* schon gestoppt */ } }, 1500);
+  // ---------------- Ambiente pro Gebiet ----------------
+  // Dauerhaftes Klangbett (Regen, Wind, Dröhnen, Orgel) + seltene Einzelgeräusche (Uhrwerk, Tropfen, Ketten).
+  let amb = null, ambTheme = null, ambT = 0;
+  function ambNoise(nodes, out, type, freq, q) {
+    const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (q) f.Q.value = q;
+    s.connect(f); f.connect(out); s.start(0, Math.random()); nodes.push(s);
+    return f;
+  }
+  function ambLfo(nodes, param, rate, depth) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.value = rate; g.gain.value = depth; o.connect(g); g.connect(param); o.start(); nodes.push(o);
+  }
+  function ambDrone(nodes, out, type, freq, vol) {
+    const o = osc(type), g = ac.createGain(); o.frequency.value = freq; g.gain.value = vol;
+    o.connect(g); g.connect(out); o.start(); nodes.push(o);
+    return o;
+  }
+  function startAmb(theme) {
+    const nodes = [], out = ac.createGain(), t = ac.currentTime;
+    out.gain.value = 0; out.connect(master);
+    let level = 0.024;
+    if (theme === 'courtyard') { // Regen + Windböen
+      const hp = ambNoise(nodes, out, 'highpass', 700), lp = ac.createBiquadFilter();
+      hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 5200; hp.connect(lp); lp.connect(out);
+      ambLfo(nodes, out.gain, 0.13, 0.01);
+    } else if (theme === 'hall' || theme === 'tower') { // heulender Wind durch die Turmfenster
+      const bp = ambNoise(nodes, out, 'bandpass', 520, 7);
+      ambLfo(nodes, bp.frequency, 0.07, 260); ambLfo(nodes, out.gain, 0.11, 0.008);
+      level = 0.03;
+    } else if (theme === 'cave') { // tiefes Grollen unter der Erde
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 140; lp.connect(out);
+      ambDrone(nodes, lp, 'sawtooth', 41.2, 0.5); ambDrone(nodes, lp, 'sawtooth', 61.7, 0.3);
+      ambNoise(nodes, out, 'lowpass', 220);
+      ambLfo(nodes, out.gain, 0.09, 0.012);
+      level = 0.03;
+    } else if (theme === 'crypt') { // kaltes Dröhnen, leicht schwebend
+      ambDrone(nodes, out, 'sine', 55, 0.6); ambDrone(nodes, out, 'sine', 55.7, 0.6); ambDrone(nodes, out, 'triangle', 82.4, 0.25);
+      level = 0.034;
+    } else if (theme === 'throne') { // ferne Orgel (D-Moll-Quinte), schwillt langsam an und ab
+      ambDrone(nodes, out, 'triangle', 73.4, 0.5); ambDrone(nodes, out, 'triangle', 110, 0.35); ambDrone(nodes, out, 'sine', 146.8, 0.2);
+      ambLfo(nodes, out.gain, 0.05, 0.01);
+      level = 0.022;
+    } else if (theme === 'vortex') { // Sog: schnell kreisender Wind
+      const bp = ambNoise(nodes, out, 'bandpass', 900, 4);
+      ambLfo(nodes, bp.frequency, 0.6, 500);
+      level = 0.028;
+    } else { out.disconnect(); return null; }
+    out.gain.setTargetAtTime(level, t, 0.8);
+    return { nodes, out };
+  }
+  function stopAmb() {
+    if (!amb) return;
+    const a = amb; amb = null;
+    a.out.gain.setTargetAtTime(0, ac.currentTime, 0.4);
+    setTimeout(() => { a.nodes.forEach(n => { try { n.stop(); } catch (e) { /* schon gestoppt */ } }); a.out.disconnect(); }, 1600);
+  }
+  // Einzelgeräusche über dem Klangbett (einmal pro Spiel-Frame aufgerufen)
+  function ambEvents(theme) {
+    ambT++;
+    const t = ac.currentTime;
+    if (theme === 'tower' && ambT % 32 === 0) { // Uhrwerk: Tick-Tack
+      tone('triangle', ambT % 64 ? 1250 : 940, 0, 0.035, 0.035, 0, t);
+      noise(0.025, 0.03, 'highpass', 4200, 0, t);
+    } else if (theme === 'cave' && Math.random() < 0.006) drip(null, 0.6);
+    else if (theme === 'crypt' && Math.random() < 0.0025) { // ferne Ketten
+      for (let i = 0; i < 5; i++) noise(0.05, 0.035, 'bandpass', 3000 + Math.random() * 2000, 0, t + i * 0.07 + Math.random() * 0.03);
+    } else if (theme === 'hall' && Math.random() < 0.0015) { // Gebälk knarzt
+      tone('sawtooth', 70 + Math.random() * 20, 50, 0.6, 0.025, 0, t);
     }
+  }
+  // Wassertropfen: hohes „Plink" mit Hall; x = Weltposition (für Stereo), vol = Lautstärke
+  function drip(x, vol = 1) {
+    if (!ac || muted) return;
+    const f = 1300 + Math.random() * 1100, t = ac.currentTime;
+    const o = osc('sine'), g = ac.createGain();
+    o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.55, t + 0.09);
+    g.gain.setValueAtTime(0.06 * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    let dst = sfxBus;
+    if (typeof x === 'number' && ac.createStereoPanner && typeof W !== 'undefined' && W.cam) {
+      const p = ac.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, (x - W.cam.x - View.w / 2) / (View.w * 0.55))) * 0.8; p.connect(sfxBus); dst = p;
+    }
+    o.connect(g); g.connect(dst); o.start(t); o.stop(t + 0.18);
+  }
+  // theme: Raumthema (string) oder null; true = Regen wie im Burghof (Titel)
+  function ambience(theme) {
+    if (!ac) return;
+    if (theme === true) theme = 'courtyard';
+    theme = theme || null;
+    if (theme !== ambTheme) { stopAmb(); ambTheme = theme; if (theme) amb = startAmb(theme); }
+    if (theme && ac.state === 'running') ambEvents(theme);
   }
 
   function toggleMute() {
@@ -469,6 +551,6 @@ const Audio8 = (() => {
   function tempo(m) { tempoMul = m; }
   function duck(on) { if (duckBus && ac) duckBus.gain.setTargetAtTime(on ? 0.3 : 1, ac.currentTime, on ? 0.06 : 0.5); }
 
-  return { init, sfx, play, stop, ambience, toggleMute, setMusicVolume, setMusicLevel, ready, duck, tempo,
+  return { init, sfx, play, stop, ambience, drip, toggleMute, setMusicVolume, setMusicLevel, ready, duck, tempo,
     context: () => ac, voiceOut: () => voiceBus, get muted() { return muted; }, get current() { return songName; }, _songs: parsed };
 })();

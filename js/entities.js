@@ -289,7 +289,7 @@ class Player {
       }
       if (!I.jump && this.vy < -1.6) this.vy = -1.6;
     }
-    if (this.vx !== 0 && this.onGround) { this.walkT++; if (this.walkT % 20 === 1) W.dust(this.cx - this.face * 4, this.feet, 1); } else if (this.onGround) this.walkT = 0;
+    if (this.vx !== 0 && this.onGround) { this.walkT++; if (this.walkT % 20 === 1) { W.dust(this.cx - this.face * 4, this.feet, 1); this.footstep(); } } else if (this.onGround) this.walkT = 0;
 
     this.vy = Math.min(this.vy + GRAV, MAXFALL);
     Phys.moveX(this, this.vx);
@@ -546,6 +546,13 @@ class Player {
     if (!this.onGround) this.slideT = 0;
     this.clampRoom(); this.hazards(); this.trackSafe();
     if (this.slideT === 0) { this.setCrouch(false); if (Phys.rectSolid(this.x, this.y, this.w, this.h)) this.setCrouch(true); }
+  }
+
+  // Schritt: leiser Tritt, im Regen (Burghof) platschend mit kleinen Wasserspritzern
+  footstep() {
+    const wet = W.room.theme === 'courtyard';
+    Audio8.sfx(wet ? 'stepWet' : 'step', this.cx);
+    if (wet) for (let i = 0; i < 3; i++) W.spawn(new Particle(this.cx - this.face * 3 + rnd(-3, 3), this.feet - 1, rnd(-0.6, 0.6), -rnd(0.8, 1.6), i % 2 ? '#a4e4fc' : '#7c8cc8', 14, 1, 0.18));
   }
 
   // ---------- Nachbilder bei schnellen Bewegungen ----------

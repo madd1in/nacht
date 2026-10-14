@@ -200,10 +200,44 @@ const FX = (() => {
       if (p.kind === 'firefly') { p.x += w * 0.35; p.y += Math.cos(p.t * 0.04 + p.seed) * 0.25; }
       else if (p.kind === 'drip') {
         p.y += p.vy;
-        if (Phys.solidTile(Math.floor(p.x / T), Math.floor(p.y / T)) || Phys.tile(Math.floor(p.x / T), Math.floor(p.y / T)) === '~') p.t = p.life;
-      } else { p.x += p.vx + w * 0.2; p.y += p.vy; }
+        const tx = Math.floor(p.x / T), ty = Math.floor(p.y / T), wet = Phys.tile(tx, ty) === '~';
+        if (Phys.solidTile(tx, ty) || wet) { // Aufprall: Wellenring auf Wasser, Spritzer auf Stein, „Plink"
+          p.t = p.life;
+          let row = ty;
+          if (wet) while (row > 0 && Phys.tile(tx, row - 1) === '~') row--;
+          hits.push({ x: p.x, y: row * T, vx: 0, vy: 0, life: wet ? 30 : 12, col: p.col, kind: wet ? 'ripple' : 'splat', t: 0, seed: 0 });
+          Audio8.drip(p.x, wet ? 1 : 0.55);
+        }
+      } else if (p.kind !== 'ripple' && p.kind !== 'splat') { p.x += p.vx + w * 0.2; p.y += p.vy; }
     }
+    if (hits.length) { amb.push(...hits); hits.length = 0; }
     amb = amb.filter(p => p.t < p.life && p.x > cam.x - 40 && p.x < cam.x + View.w + 44 && p.y > cam.y - 60 && p.y < cam.y + 270);
+  }
+  const hits = [];
+
+  // ---------------- Fledermausschwärme vor dem Blutmond (Burghof-Himmel) ----------------
+  let flock = null, flockCd = 240;
+  function updateFlock(w) {
+    if (!flock) {
+      if (--flockCd > 0) return;
+      const dir = Math.random() < 0.5 ? 1 : -1, n = 6 + Math.floor(Math.random() * 7);
+      flock = { dir, x: dir > 0 ? -20 : w + 20, y: 26 + Math.random() * 46, t: 0,
+        bats: Array.from({ length: n }, () => ({ dx: Math.random() * 50, dy: Math.random() * 26 - 13, ph: Math.random() * 60 })) };
+      return;
+    }
+    flock.t++; flock.x += flock.dir * 0.85;
+    if ((flock.dir > 0 && flock.x - 60 > w) || (flock.dir < 0 && flock.x + 60 < 0)) { flock = null; flockCd = 600 + Math.random() * 900; }
+  }
+  const BAT_UP = [[0, 0], [4, 0], [0, 1], [1, 1], [3, 1], [4, 1], [1, 2], [2, 2], [3, 2]];
+  const BAT_DN = [[1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [3, 1], [4, 1], [0, 2], [4, 2]];
+  function drawFlock(ctx) {
+    if (!flock) return;
+    ctx.fillStyle = '#08040c';
+    for (const b of flock.bats) {
+      const k = flock.t + b.ph;
+      const x = Math.round(flock.x - flock.dir * b.dx + Math.sin(k * 0.05) * 3), y = Math.round(flock.y + b.dy + Math.sin(k * 0.11) * 2);
+      for (const [px, py] of ((k >> 2) & 1 ? BAT_UP : BAT_DN)) ctx.fillRect(x + px, y + py, 1, 1);
+    }
   }
   function drawAmbient(ctx, cam) {
     for (const p of amb) {
@@ -211,7 +245,17 @@ const FX = (() => {
       if (p.kind === 'firefly') {
         if ((p.t + Math.floor(p.seed * 10)) % 40 < 22) { ctx.fillStyle = p.col; ctx.fillRect(x, y, 1, 1); ctx.fillStyle = 'rgba(200,248,24,0.25)'; ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3); }
       } else if (p.kind === 'drip') { ctx.fillStyle = p.col; ctx.fillRect(x, y, 1, 3); }
-      else {
+      else if (p.kind === 'ripple') { // sich ausbreitender Wellenring (flach, perspektivisch)
+        const r = 1 + p.t * 0.32, a = 1 - p.t / p.life;
+        ctx.globalAlpha = 0.75 * a; ctx.fillStyle = '#a4e4fc';
+        ctx.fillRect(Math.round(x - r), y, 2, 1); ctx.fillRect(Math.round(x + r) - 1, y, 2, 1);
+        if (p.t > 7) { const r2 = (p.t - 7) * 0.32; ctx.fillRect(Math.round(x - r2), y, 1, 1); ctx.fillRect(Math.round(x + r2), y, 1, 1); }
+        if (p.t < 6) ctx.fillRect(x, y - 1 - Math.round(Math.sin(p.t / 6 * Math.PI) * 3), 1, 1); // hochspringendes Tröpfchen
+        ctx.globalAlpha = 1;
+      } else if (p.kind === 'splat') { // Spritzer auf Stein
+        ctx.fillStyle = p.col; const d = Math.round(p.t * 0.4);
+        ctx.fillRect(x - 1 - d, y - 1 - (p.t < 6 ? 1 : 0), 1, 1); ctx.fillRect(x + 1 + d, y - 1 - (p.t < 6 ? 1 : 0), 1, 1);
+      } else {
         const fade = p.t > p.life - 30 ? (p.t & 2) : 1;
         if (!fade) continue;
         ctx.fillStyle = p.col;
@@ -221,5 +265,5 @@ const FX = (() => {
     }
   }
 
-  return { render, drawFog, updateAmbient, drawAmbient, resetAmbient, disc, updateStorm, drawStormSky, stormOn };
+  return { render, drawFog, updateAmbient, drawAmbient, resetAmbient, disc, updateStorm, drawStormSky, stormOn, updateFlock, drawFlock };
 })();

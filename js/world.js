@@ -4,7 +4,7 @@
 const W = {
   room: null, stage: 0, roomIdx: 0, ents: [], platforms: [], stairs: [], spawners: [],
   player: null, cam: { x: 0, y: 0 }, camYf: 0, frame: 0, atkId: 0,
-  score: 0, lives: 3, time: 300, timeSub: 0, nextLife: 20000,
+  score: 0, lives: 3, time: 300, timeSub: 0, nextLife: 20000, bloodT: 0, stageFrames: 0,
   camLock: false, camTarget: null, boss: null, arenaOn: false, arenaX: 0, arenaW: 0,
   freeze: 0, hitstop: 0, shake: 0, flash: 0, cleared: false, lightning: 0, lightningCD: 300,
   checkpoint: null, crash: null, exiting: false, storm: { cd: 100, flash: 0, bolt: null },
@@ -22,6 +22,7 @@ const W = {
     this.ents = []; this.platforms = []; this.boss = null;
     this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0;
     this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
+    if (this.bloodT > 0) { this.bloodT = 0; Audio8.tempo(1); }
     this.spawners = def.zones.map(z => new Spawner(z));
     const torch = def.theme === 'courtyard';
     def.ents.forEach(d => {
@@ -76,7 +77,15 @@ const W = {
       this.popup(p.cx, p.y - 10, tr('rage'), '#fc3c3c'); Audio8.sfx('roar'); Input.rumble(0.6, 0.8, 300); this.shake = 8;
     }
   },
-  comboMul() { return 1 + Math.min(3, Math.floor(this.combo.n / 5)); },
+  comboMul() { return (1 + Math.min(3, Math.floor(this.combo.n / 5))) * (this.bloodT > 0 ? 2 : 1); }, // Blutmond: doppelte Punkte
+
+  // Blutmond (rote Kerze): 12 s doppelte Punkte, mehr Herzen, rote Nacht, Musik zieht an
+  bloodMoon(x, y) {
+    this.bloodT = 720; this.flash = 10; this.shake = 12;
+    this.spawn(new Shock(x, y, 140, '#d82800', 5)); this.spawn(new Shock(x, y, 90, '#fc3c3c', 4));
+    this.popup(x, y - 12, tr('bloodMoon') + '!', '#fc3c3c');
+    Audio8.sfx('roar', x); Audio8.sfx('bell'); Audio8.tempo(1.15); Input.rumble(0.7, 0.5, 600);
+  },
 
   applyCheckpoint() {
     const c = this.checkpoint;
@@ -121,7 +130,7 @@ const W = {
           e.reflected = true; e.vx = p.face * Math.max(2.6, Math.abs(e.vx) * 1.5); e.vy = -0.3; e.grav = 0;
           this.popup(e.cx, e.cy - 6, tr('riposte'), '#a4e4fc'); this.addScore(200); this.hitstop = Math.max(this.hitstop || 0, 4);
         } else { e.dead = true; this.addScore(50); }
-        this.spawn(new Spark(e.cx, e.cy)); Audio8.sfx('hit'); Input.rumble(0.2, 0.4, 80);
+        this.spawn(new Spark(e.cx, e.cy)); Audio8.sfx('hit', e.cx); Input.rumble(0.2, 0.4, 80);
       }
     }
     for (const b of boxes) {
@@ -149,7 +158,7 @@ const W = {
 
   breakTile(cx, cy, ch) {
     this.room.grid[cy][cx] = '.';
-    Audio8.sfx('wall'); Input.rumble(0.3, 0.3, 120);
+    Audio8.sfx('wall', cx * T + 8); Input.rumble(0.3, 0.3, 120);
     this.debris(cx * T + 8, cy * T + 8, '#7c7c7c', 8);
     this.spawn(new Item(ch === 'X' ? 'roast' : 'bagBig', cx * T + 8, cy * T + 8));
     this.shake = 6;
@@ -159,7 +168,7 @@ const W = {
     for (let i = 0; i < n; i++) this.spawn(new Particle(x, y, rnd(-1.6, 1.6), rnd(-3.5, -1), i % 2 ? color : '#bcbcbc', 45, i % 3 ? 2 : 3));
   },
   splash(x, y) {
-    Audio8.sfx('splash');
+    Audio8.sfx('splash', x);
     for (let i = 0; i < 10; i++) this.spawn(new Particle(x + rnd(-6, 6), y, rnd(-1.2, 1.2), rnd(-4, -1.5), i % 2 ? '#3cbcfc' : '#a4e4fc', 40, 2, 0.2));
   },
   popup(x, y, text, color) { this.spawn(new Popup(x, y - 4, text, color)); },
@@ -266,6 +275,7 @@ const W = {
     this.updateCam();
     FX.updateAmbient(this.room.theme, this.cam);
     if (this.stopT > 0) this.stopT--;
+    if (this.bloodT > 0 && --this.bloodT === 0) Audio8.tempo(this.time <= 60 ? 1.12 : 1);
     if (this.player.rageT > 0) this.player.rageT--;
     const stopped = this.stopT > 0;
     if (!stopped) this.spawners.forEach(s => s.update());
@@ -291,6 +301,7 @@ const W = {
       this.exiting = true; Game.nextRoom();
     }
 
+    if (this.room.theme === 'courtyard') FX.updateFlock(View.w);
     if (this.room.theme === 'courtyard') FX.updateStorm(this.storm, View.w, () => {
       setTimeout(() => Audio8.sfx('thunder'), 150 + Math.random() * 700);
       Input.rumble(0.35, 0.15, 450); this.shake = Math.max(this.shake, 4);
@@ -304,7 +315,7 @@ const W = {
     ctx.beginPath(); ctx.rect(0, 32, vw, 208); ctx.clip();
     ctx.translate(sx, 32 + sy);
     const storm = theme === 'courtyard' ? this.storm : null;
-    Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => FX.drawStormSky(c, storm, vw) : null);
+    Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); FX.drawFlock(c); } : null);
     this.drawDoor(ctx);
     Tiles.drawTiles(ctx, this.room, this.cam, this.frame);
     const order = ['prop', 'candle', 'platform', 'item', 'enemy', 'boss', 'sub', 'eproj', 'fx'];
@@ -317,11 +328,19 @@ const W = {
     if (storm && FX.stormOn(storm)) { ctx.fillStyle = 'rgba(220,214,255,0.16)'; ctx.fillRect(0, 0, vw, 208); }
     FX.render(ctx, this.collectLights(), theme);
     Rays.draw(ctx, this.room, this.cam, this.frame);
+    if (this.bloodT > 0) this.drawBloodMoon(ctx, vw);
     if (this.stopT > 0 && (this.stopT > 50 || (this.stopT & 4))) { ctx.fillStyle = 'rgba(120,150,230,0.16)'; ctx.fillRect(0, 0, vw, 208); } // angehaltene Zeit
     const p = this.player;
     if (p.alive && p.hp <= p.maxHp / 4) Drama.drawDanger(ctx, vw, 0.35 + Math.sin(this.frame * 0.14) * 0.2);
     if (this.flash > 0 && (this.flash % 6) < 3) { ctx.fillStyle = 'rgba(252,252,252,0.45)'; ctx.fillRect(-4, -4, vw + 8, 216); }
     ctx.restore();
+  },
+
+  drawBloodMoon(ctx, vw) {
+    const k = Math.min(1, this.bloodT / 60, (720 - this.bloodT) / 20); // ein-/ausblenden
+    ctx.fillStyle = `rgba(150,0,24,${((0.19 + Math.sin(this.frame * 0.09) * 0.05) * k).toFixed(3)})`;
+    ctx.fillRect(0, 0, vw, 208);
+    if (this.bloodT > 120 || (this.frame & 8)) Font.draw(ctx, tr('bloodMoon') + ' X2  ' + Math.ceil(this.bloodT / 60), vw / 2, 4, '#fc3c3c', { align: 'center', shadow: '#000' });
   },
 
   // Gespiegelte, wellige Szene auf Wasseroberflächen
@@ -365,7 +384,7 @@ const W = {
       if (e.dead) continue;
       const x = e.cx - cx, y = e.cy - cy;
       if (x < -48 || x > View.w + 48 || y < -60 || y > 270) continue;
-      if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + flick(e.x), c: [248, 140, 40], a: 0.5 });
+      if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + (e.blood ? 10 + Math.sin(f * 0.15) * 4 : 0) + flick(e.x), c: e.blood ? [232, 24, 48] : [248, 140, 40], a: e.blood ? 0.65 : 0.5 });
       else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
       else if (e instanceof Chandelier) L.push({ x, y: e.y - cy - 6, r: 42 + flick(e.px), c: [248, 160, 60], a: 0.55 });
       else if (e instanceof Statue && e.active) L.push({ x, y: y - 8, r: 30, c: [60, 188, 252], a: 0.45 });
