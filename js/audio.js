@@ -157,18 +157,29 @@ const Audio8 = (() => {
   const FOURX = 'x:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
   const FILLS = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 h:1 q:1 h:1 t:1 u:1';
   const FILLB = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 t:1 u:1 q:1 h:1 o:1 h:1';
-  const section = () => [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB].join(' ');
+  const CALM_DR = 'h:16'; // ein leiser Puls pro Takt als Atem zwischen den Action-Parts
+  const phaseMix = (calmBars, actionBars, block = 4) => actionBars.map((bar, i) =>
+    i % (block * 2) < block ? calmBars[i] : bar
+  ).join(' ');
+  const contrastLead = (chords, m, actionBars, block = 4) =>
+    phaseMix(chords.map(c => `${m[c][0]}:8 ${m[c][1]}:8`), actionBars, block);
+  const section = () => phaseMix(Array(8).fill(CALM_DR), [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB]);
   // B-Teil: galoppierende Kick (kein Dauerfeuer), Tom-Fill und Riser vor dem Loop
   const DK = 'k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1 k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1';
   const DKX = 'x:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1 k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1';
   const FILLR = 'k:1 h:1 o:1 h:1 q:1 h:1 t:1 u:1 w:8';
-  const sectionB = () => [DKX, DK, DK, FILLS, DK, DK, DK, FILLR].join(' ');
+  const sectionB = () => phaseMix(Array(8).fill(CALM_DR), [DKX, DK, DK, FILLS, DK, DK, DK, FILLR]);
   // 3er-Arpeggio gegen den 4er-Takt: verschiebt sich ständig und treibt nach vorn
   const arp3 = (a, b, c) => Array.from({ length: 16 }, (_, i) => [a, b, c][i % 3] + ':1').join(' ');
   const chordArps = (list, m) => list.map(c => arp3(...m[c])).join(' ');
   const arp3f = (a, b, c) => Array.from({ length: 32 }, (_, i) => [a, b, c][i % 3] + ':0.5').join(' '); // 32tel
-  const chordArps2 = (list, m) => list.map((c, i) => (i < 8 ? arp3 : arp3f)(...m[c])).join(' ');
-  const chordBass = (list, m, fn) => list.map(c => fn(...m[c])).join(' ');
+  const chordArps2 = (list, m) => phaseMix(
+    list.map(c => `${m[c][0]}:8 ${m[c][2]}:8`),
+    list.map((c, i) => (i < 8 ? arp3 : arp3f)(...m[c]))
+  );
+  const chordBass = (list, m, fn) => phaseMix(
+    list.map(c => `${m[c][0]}:12 -:4`), list.map(c => fn(...m[c]))
+  );
 
   // Stage 1 – Burgsturm (d-Moll, 168 BPM)
   const S1 = { Dm: ['d4', 'f4', 'a4'], Bb: ['a#3', 'd4', 'f4'], C: ['c4', 'e4', 'g4'], A: ['a3', 'c#4', 'e4'], Gm: ['g3', 'a#3', 'd4'] };
@@ -196,7 +207,7 @@ const Audio8 = (() => {
     },
     stage1: {
       bpm: 176, loop: true, echo: { delay: 3, vol: 0.32 },
-      p1: [
+      p1: contrastLead(S1C, S1, [
         'd5:2 d5:1 e5:1 f5:2 d5:2 a5:3 g5:1 f5:2 e5:2', 'd5:1 c5:1 d5:2 a4:2 d5:2 f5:2 e5:2 d5:2 c5:2',
         'a#4:2 d5:2 f5:2 a#5:4 a5:2 g5:2 f5:2', 'g5:3 f5:1 e5:2 c5:2 e5:2 g5:2 c6:4',
         'd5:2 d5:1 e5:1 f5:2 d5:2 a5:3 g5:1 f5:2 e5:2', 'f5:2 g5:2 a5:2 d6:4 c6:2 a5:2 f5:2',
@@ -205,12 +216,12 @@ const Audio8 = (() => {
         'a5:3 f5:1 d5:2 f5:2 a5:2 d6:2 c6:2 a5:2', 'd6:6 c6:1 a#5:1 a5:4 f5:4',
         'f5:2 a#5:2 d6:2 f6:4 d6:2 a#5:2 f5:2', 'e5:2 g5:2 c6:2 e6:4 d6:2 c6:2 a#5:2',
         'a5:2 c#6:2 e6:2 a6:4 g6:2 f6:2 e6:2', 'c#6:2 a5:2 e5:2 c#5:2 a4:4 -:4',
-      ].join(' '),
+      ]),
       p2: chordArps2(S1C, S1), tri: chordBass(S1C, S1B, drive), dr: section() + ' ' + sectionB(),
     },
     stage2: {
       bpm: 166, loop: true, echo: { delay: 3, vol: 0.35 },
-      p1: [
+      p1: contrastLead(S2C, S2, [
         'a4:2 c5:2 e5:2 a5:3 g5:1 e5:2 c5:2 e5:2', 'd5:2 e5:2 c5:2 a4:2 b4:2 c5:2 b4:2 g4:2',
         'a4:2 c5:2 f5:4 e5:2 d5:2 c5:4', 'b4:2 d5:2 g5:4 f5:2 e5:2 d5:4',
         'e5:3 e5:1 a5:2 e5:2 c6:3 b5:1 a5:2 g5:2', 'a5:2 g5:2 e5:2 c5:2 d5:2 e5:2 c5:2 a4:2',
@@ -219,12 +230,12 @@ const Audio8 = (() => {
         'e5:3 d5:1 c5:2 a4:2 c5:2 e5:2 a5:4', 'b5:2 a5:2 g5:2 e5:2 a5:8',
         'c6:3 b5:1 a5:2 f5:2 a5:2 c6:2 f6:4', 'd6:3 c6:1 b5:2 g5:2 b5:2 d6:2 g6:4',
         'e6:2 d6:2 b5:2 g#5:2 b5:2 g#5:2 e5:2 d5:2', 'b4:2 e5:2 g#5:2 b5:2 e6:8',
-      ].join(' '),
+      ]),
       p2: chordArps2(S2C, S2), tri: chordBass(S2C, S2B, drive), dr: section() + ' ' + sectionB(),
     },
     stage3: {
       bpm: 184, loop: true, echo: { delay: 3, vol: 0.3 },
-      p1: [
+      p1: contrastLead(S3C, S3, [
         'e5:2 g5:2 b5:2 e6:3 d6:1 b5:2 g5:2 b5:2', 'a5:2 g5:2 f#5:2 e5:2 f#5:2 g5:2 a5:2 b5:2',
         'c6:3 b5:1 a5:2 g5:2 e5:2 g5:2 c6:4', 'd6:3 c6:1 b5:2 a5:2 f#5:2 a5:2 d6:4',
         'e6:2 e6:1 e6:1 d6:2 b5:2 e6:2 g6:2 f#6:2 e6:2', 'd6:2 b5:2 g5:2 b5:2 e5:4 g5:4',
@@ -233,20 +244,32 @@ const Audio8 = (() => {
         'g5:3 b5:1 e6:4 d6:2 b5:2 a5:2 g5:2', 'f#5:2 g5:2 a5:2 b5:2 e5:8',
         'e6:2 c6:2 g5:2 c6:2 e6:2 g6:2 e6:2 c6:2', 'f#6:2 d6:2 a5:2 d6:2 f#6:2 a6:2 f#6:2 d6:2',
         'd#6:2 f#6:2 b6:4 a6:2 f#6:2 d#6:2 b5:2', 'b5:4 a5:2 g5:2 f#5:4 d#5:4',
-      ].join(' '),
+      ]),
       p2: chordArps2(S3C, S3), tri: chordBass(S3C, S3B, drive), dr: section() + ' ' + sectionB(),
     },
     boss: {
       bpm: 192, loop: true, echo: { delay: 2, vol: 0.28 },
-      p1: [
+      p1: phaseMix([
+        'd5:8 a4:8', 'd5:8 f5:8', 'd#5:8 a#4:8', 'd#5:8 f#5:8',
+        'd5:8 a4:8', 'd5:8 f5:8', 'c#5:8 g#4:8', 'c#5:8 e5:8',
+      ], [
         'd5:1 d5:1 d6:2 d5:1 d5:1 c6:2 d5:1 d5:1 a#5:2 a5:2 g#5:2', 'a5:2 f5:2 d5:2 f5:2 a5:2 d6:2 f6:4',
         'd#5:1 d#5:1 d#6:2 d#5:1 d#5:1 c#6:2 d#5:1 d#5:1 b5:2 a#5:2 a5:2', 'a#5:2 g5:2 d#5:2 g5:2 a#5:2 d#6:2 g6:4',
         'f6:2 e6:2 d6:2 a5:2 f6:2 e6:2 d6:2 a5:2', 'g6:2 f6:2 e6:2 c#6:2 a5:4 e5:4',
         'c#6:1 d6:1 e6:2 c#6:1 d6:1 e6:2 f6:2 e6:2 d6:2 c#6:2', 'e6:4 c#6:4 a5:4 e5:2 g5:2',
-      ].join(' '),
-      p2: [rep('d4:1 d5:1', 16), rep('d#4:1 d#5:1', 16), rep('d4:1 d5:1', 16), rep('c#4:1 c#5:1', 16)].join(' '),
-      tri: [drive('d2', 'd3'), drive('d2', 'd3'), drive('d#2', 'd#3'), drive('d#2', 'd#3'), drive('d2', 'd3'), drive('d2', 'd3'), drive('c#2', 'c#3'), drive('c#2', 'c#3')].join(' '),
-      dr: [FOURX, DK, FOUR, FILLS, DK, DK, DK, FILLR].join(' '),
+      ], 2),
+      p2: phaseMix([
+        'd4:8 -:8', 'd4:8 -:8', 'd#4:8 -:8', 'd#4:8 -:8',
+        'd4:8 -:8', 'd4:8 -:8', 'c#4:8 -:8', 'c#4:8 -:8',
+      ], [
+        rep('d4:1 d5:1', 8), rep('d4:1 d5:1', 8), rep('d#4:1 d#5:1', 8), rep('d#4:1 d#5:1', 8),
+        rep('d4:1 d5:1', 8), rep('d4:1 d5:1', 8), rep('c#4:1 c#5:1', 8), rep('c#4:1 c#5:1', 8),
+      ], 2),
+      tri: phaseMix([
+        'd2:12 -:4', 'd2:12 -:4', 'd#2:12 -:4', 'd#2:12 -:4',
+        'd2:12 -:4', 'd2:12 -:4', 'c#2:12 -:4', 'c#2:12 -:4',
+      ], [drive('d2', 'd3'), drive('d2', 'd3'), drive('d#2', 'd#3'), drive('d#2', 'd#3'), drive('d2', 'd3'), drive('d2', 'd3'), drive('c#2', 'c#3'), drive('c#2', 'c#3')], 2),
+      dr: phaseMix(Array(8).fill(CALM_DR), [FOURX, DK, FOUR, FILLS, DK, DK, DK, FILLR], 2),
     },
     clear: {
       bpm: 150, loop: false,
