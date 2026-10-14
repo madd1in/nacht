@@ -260,6 +260,86 @@ const Tiles = (() => {
     return c;
   }
 
+  // ---------------- Turmuhr (16-Bit) ----------------
+  const CLOCK = { x: 380, y: 66, r: 32 };
+  const GOLDR = ['#3c2400', '#7c5000', '#b88018', '#f0c040', '#fcf0a0'];
+  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const ROMAN = { I: ['1', '1', '1', '1', '1'], V: ['1.1', '1.1', '1.1', '1.1', '.1.'], X: ['1.1', '1.1', '.1.', '1.1', '1.1'] };
+  const NUM = ['XII', 'I', 'II', 'III', 'IIII', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+  function clockFace(x, cx, cy, r) {
+    // Uhrgehäuse mit Pendelkasten
+    const bw = 22, by0 = cy + r + 2, bh = 46;
+    px(x, '#140c08', cx - bw / 2 - 2, by0 - 4, bw + 4, bh + 6);
+    for (let X = 0; X < bw; X++) px(x, ['#2c1c10', '#3c2814', '#4c3418', '#3c2814'][X % 4], cx - bw / 2 + X, by0 - 2, 1, bh);
+    px(x, GOLDR[3], cx - bw / 2, by0 - 2, bw, 1); px(x, GOLDR[2], cx - bw / 2, by0 + bh - 2, bw, 2);
+    px(x, '#06040a', cx - 7, by0 + 4, 14, bh - 12); // Glasfenster (Pendel wird live gezeichnet)
+    px(x, '#20283c', cx - 7, by0 + 4, 1, bh - 12); px(x, GOLDR[2], cx - 8, by0 + 3, 16, 1); px(x, GOLDR[1], cx - 8, by0 + bh - 8, 16, 1);
+    for (let y = -r - 7; y <= r + 7; y++) for (let X = -r - 7; X <= r + 7; X++) {
+      const d = Math.hypot(X, y), a = Math.atan2(y, X);
+      if (d > r + 7) continue;
+      if (d > r + 3) { // Eisenrahmen mit Goldknäufen
+        const knob = Math.abs(((a / (Math.PI * 2) * 24) % 1 + 1) % 1 - 0.5) < 0.18 && d < r + 6;
+        const l = (-X - y) / d;
+        px(x, knob ? GOLDR[l > 0.3 ? 4 : l > -0.3 ? 3 : 1] : (l > 0.4 ? '#4c4458' : l > -0.4 ? '#2c2838' : '#16141c'), cx + X, cy + y);
+      } else if (d > r - 1) { // Goldlünette
+        const l = (-X - y) / d * 0.6 + (d - (r - 1)) * -0.15;
+        px(x, GOLDR[Math.max(0, Math.min(4, Math.round(2 + l * 2.2)))], cx + X, cy + y);
+      } else { // Elfenbein-Zifferblatt mit weichem Verlauf
+        const t = Math.min(1, Math.max(0, 0.35 + (y + X * 0.4) / (r * 2.2) + (d / r) * 0.35));
+        const c = mix([248, 240, 212], [150, 136, 100], t);
+        px(x, `rgb(${c})`, cx + X, cy + y);
+        if (Math.abs(d - (r - 12)) < 0.5) px(x, '#8c7c54', cx + X, cy + y); // Ziffernring
+        if (Math.abs(d - (r - 3.5)) < 0.5) px(x, '#6c5c3c', cx + X, cy + y); // Minutenring
+      }
+    }
+    for (let i = 0; i < 60; i++) { // Minutenstriche
+      const a = i / 60 * Math.PI * 2 - Math.PI / 2, rr = i % 5 ? r - 2.5 : r - 3.5;
+      px(x, i % 5 ? '#5c4c30' : '#2c2014', cx + Math.round(Math.cos(a) * rr), cy + Math.round(Math.sin(a) * rr), i % 5 ? 1 : 2, i % 5 ? 1 : 2);
+    }
+    NUM.forEach((s, i) => { // römische Ziffern (3x5)
+      const a = i / 12 * Math.PI * 2 - Math.PI / 2, w = [...s].reduce((n, ch) => n + ROMAN[ch][0].length + 1, -1);
+      let nx = Math.round(cx + Math.cos(a) * (r - 8) - w / 2);
+      const ny = Math.round(cy + Math.sin(a) * (r - 8) - 2);
+      for (const ch of s) {
+        ROMAN[ch].forEach((row, ry) => [...row].forEach((v, rx) => { if (v === '1') px(x, '#2c2014', nx + rx, ny + ry); }));
+        nx += ROMAN[ch][0].length + 1;
+      }
+    });
+    for (let y = -6; y <= 6; y++) for (let X = -6; X <= 6; X++) { // Rosette in der Mitte
+      const d = Math.hypot(X, y), a = Math.atan2(y, X);
+      if (d < 6 && d > 3 && Math.cos(a * 8) > 0.2) px(x, '#a89464', cx + X, cy + y);
+    }
+  }
+  // Zeiger, Sekundenzeiger und Pendel – im selben Parallax-Raster wie die Wand (0.5)
+  function drawClockLive(ctx, room, cam, frame) {
+    const off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512;
+    const vt = room.h > 13, oy = vt ? ((Math.floor(cam.y * 0.5) % 208) + 208) % 208 : 0;
+    const { r } = CLOCK, sec = Math.floor(frame / 60), tick = frame % 60 < 4 ? 0.06 * (1 - (frame % 60) / 4) : 0;
+    const hand = (cx, cy, a, len, w, col, tip) => {
+      for (let i = -3; i <= len; i++) {
+        const X = Math.round(cx + Math.cos(a) * i), Y = Math.round(cy + Math.sin(a) * i);
+        ctx.fillStyle = col; ctx.fillRect(X - (w >> 1), Y - (w >> 1), w, w);
+      }
+      if (tip) { const X = Math.round(cx + Math.cos(a) * (len - 2)), Y = Math.round(cy + Math.sin(a) * (len - 2)); ctx.fillStyle = tip; ctx.fillRect(X - 1, Y - 1, 3, 3); }
+    };
+    for (let k = -1; k <= Math.ceil(View.w / 512); k++) for (const ty of oy ? [-oy, 208 - oy] : [0]) {
+      const cx = CLOCK.x - off + k * 512, cy = CLOCK.y + ty;
+      if (cx < -60 || cx > View.w + 60) continue;
+      const mins = frame / 3600 * Math.PI * 2 + 1.9, hrs = mins / 12 + 4.1;
+      hand(cx, cy, hrs - Math.PI / 2, r - 16, 3, '#1c140c', GOLDR[3]);
+      hand(cx, cy, mins - Math.PI / 2, r - 7, 2, '#1c140c', GOLDR[3]);
+      hand(cx, cy, (sec + tick) / 60 * Math.PI * 2 - Math.PI / 2, r - 4, 1, '#c81c1c', null);
+      ctx.fillStyle = GOLDR[3]; ctx.fillRect(cx - 2, cy - 2, 4, 4); ctx.fillStyle = GOLDR[4]; ctx.fillRect(cx - 2, cy - 2, 2, 2);
+      // Pendel im Kasten
+      const py0 = cy + r + 6, pa = Math.sin(frame * Math.PI * 2 / 120) * 0.32;
+      ctx.save(); ctx.beginPath(); ctx.rect(cx - 7, cy + r + 6, 14, 34); ctx.clip();
+      for (let i = 0; i < 24; i++) { ctx.fillStyle = i % 3 ? '#8c6418' : '#c8a040'; ctx.fillRect(Math.round(cx + Math.sin(pa) * i), Math.round(py0 + Math.cos(pa) * i), 1, 1); }
+      const bx = Math.round(cx + Math.sin(pa) * 26), by = Math.round(py0 + Math.cos(pa) * 26);
+      ctx.fillStyle = GOLDR[1]; ctx.fillRect(bx - 4, by - 3, 8, 7); ctx.fillStyle = GOLDR[3]; ctx.fillRect(bx - 3, by - 3, 6, 5); ctx.fillStyle = GOLDR[4]; ctx.fillRect(bx - 2, by - 2, 2, 2);
+      ctx.restore();
+    }
+  }
+
   // ---------------- Hintergründe ----------------
   function buildBg(theme) {
     seed = 7;
@@ -446,15 +526,7 @@ const Tiles = (() => {
       const c = C(512, 208), x = c.getContext('2d');
       wallBricks(x, 512, 208, ['#34343c', '#202028', '#08080c']);
       shade(x, 512, 208, '#000000', 0, 40);
-      const cx = 380, cy = 70, r = 34; // Zifferblatt
-      for (let y = -r - 3; y <= r + 3; y++) for (let X = -r - 3; X <= r + 3; X++) {
-        const d = Math.hypot(X, y);
-        if (d <= r) px(x, d > r - 2 ? '#8c7c4c' : bay(X, y) < 0.5 ? '#c8bc94' : '#b4a880', cx + X, cy + y);
-        else if (d <= r + 3) px(x, '#3c3424', cx + X, cy + y);
-      }
-      for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; px(x, '#2c2418', cx + Math.round(Math.cos(a) * (r - 5)) - 1, cy + Math.round(Math.sin(a) * (r - 5)) - 1, 3, 3); }
-      for (let i = 0; i < 22; i++) px(x, '#1c1408', cx + Math.round(Math.cos(-1.2) * i * 0.9), cy + Math.round(Math.sin(-1.2) * i * 0.9), 2, 2);
-      for (let i = 0; i < 16; i++) px(x, '#1c1408', cx + Math.round(Math.cos(0.4) * i), cy + Math.round(Math.sin(0.4) * i), 2, 2);
+      clockFace(x, CLOCK.x, CLOCK.y, CLOCK.r); // prunkvolles Zifferblatt (Zeiger + Pendel werden live gezeichnet)
       [40, 250, 470].forEach(wx => { px(x, '#000', wx, 40, 6, 30); px(x, '#a80020', wx + 1, 46, 4, 6); lightShaft(x, wx, 70, 6, 60, '#5c0818', 0.4); });
       add('wall', c, 0.5, { vtile: true });
       const frames = [];
@@ -511,6 +583,7 @@ const Tiles = (() => {
   function drawBg(ctx, room, cam, frame = 0, onSky = null) {
     const vt = room.h > 13;
     build(room.theme).bg.forEach(l => { drawLayer(ctx, l, cam, frame, vt); if (onSky && l.name === 'clouds') onSky(ctx); });
+    if (room.theme === 'tower') drawClockLive(ctx, room, cam, frame);
     if (room.theme === 'throne' && W.vortexBg > 0) Mode7.drawTunnel(ctx, View.w, frame, Math.min(1, W.vortexBg / 90)); // Graf Phase 2
   }
 

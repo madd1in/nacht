@@ -294,7 +294,7 @@ const Audio8 = (() => {
     parsed[k] = { bpm: s.bpm, loop: s.loop, echo: s.echo, tracks, steps: lens[0] };
   }
 
-  let song = null, songName = null, pending = null, timer = null;
+  let song = null, songName = null, pending = null, timer = null, tempoMul = 1;
   let cursors = [];
 
   // Sidechain: Melodie/Bass kurz absenken, wenn die Kick kommt
@@ -381,7 +381,7 @@ const Audio8 = (() => {
 
   function schedule() {
     if (!song || !ac) return;
-    const stepDur = 60 / song.bpm / 4;
+    const stepDur = 60 / (song.bpm * tempoMul) / 4;
     const horizon = ac.currentTime + 0.15;
     let allDone = true;
     cursors.forEach((c, i) => {
@@ -430,9 +430,9 @@ const Audio8 = (() => {
       const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
       const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;
       const g = ac.createGain(); g.gain.value = 0;
-      g.gain.setTargetAtTime(0.07, ac.currentTime, 0.8);
+      g.gain.setTargetAtTime(0.024, ac.currentTime, 0.8); // Regen leise unter der Musik
       const lfo = ac.createOscillator(), lg = ac.createGain(); // Windböen
-      lfo.frequency.value = 0.13; lg.gain.value = 0.03; lfo.connect(lg); lg.connect(g.gain); lfo.start();
+      lfo.frequency.value = 0.13; lg.gain.value = 0.01; lfo.connect(lg); lg.connect(g.gain); lfo.start();
       s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master); s.start();
       rainNode = { s, g, lfo };
     } else if (!on && rainNode) {
@@ -450,8 +450,9 @@ const Audio8 = (() => {
   function setMusicVolume(v) { if (musicBus && ac) musicBus.gain.setTargetAtTime(v * (MUSIC_VOL / 0.5) * musicLevel, ac.currentTime, 0.05); }
   function setMusicLevel(l) { musicLevel = l; if (musicBus && ac) musicBus.gain.setTargetAtTime(MUSIC_VOL * l, ac.currentTime, 0.05); }
 
+  function tempo(m) { tempoMul = m; }
   function duck(on) { if (duckBus && ac) duckBus.gain.setTargetAtTime(on ? 0.3 : 1, ac.currentTime, on ? 0.06 : 0.5); }
 
-  return { init, sfx, play, stop, ambience, toggleMute, setMusicVolume, setMusicLevel, ready, duck,
+  return { init, sfx, play, stop, ambience, toggleMute, setMusicVolume, setMusicLevel, ready, duck, tempo,
     context: () => ac, voiceOut: () => voiceBus, get muted() { return muted; }, get current() { return songName; }, _songs: parsed };
 })();

@@ -51,13 +51,14 @@ const Phys = {
   },
 };
 
-const WALK = 1.3, JUMP = -4.3, GRAV = 0.21, MAXFALL = 4.2, ATK_LEN = 22;
-const WHIP_LEN = [0, 26, 26, 42];
-const SWORD_LEN = [0, 20, 22, 30];
-// Peitschen-/Schwertrichtungen: Handposition (relativ zur Figur, nach rechts schauend) und Winkel
+const WALK = 1.45, JUMP = -4.3, GRAV = 0.21, MAXFALL = 4.2, ATK_LEN = 19; // flotter: schneller laufen, kürzere Peitschen-Erholung
+const WHIP_LEN = [0, 23, 23, 38];
+const SWORD_LEN = [0, 17, 19, 27];
+// Peitschen-/Schwertrichtungen: Handposition (relativ zu x-3 / Füße-32, nach rechts schauend) und Winkel.
+// Passt zu den ausgestreckten Armen der 16-Bit-Figur (hero.js, DIR-Ziele minus 9/4).
 const WHIP_DIRS = {
-  fwd: { hx: 15, hy: 9, a: 0 }, upd: { hx: 14, hy: 1, a: -Math.PI / 4 }, up: { hx: 13, hy: 0, a: -Math.PI / 2 },
-  downd: { hx: 15, hy: 10, a: Math.PI / 4 }, down: { hx: 11, hy: 12, a: Math.PI / 2 },
+  fwd: { hx: 19, hy: 10, a: 0 }, upd: { hx: 17, hy: 1, a: -Math.PI / 4 }, up: { hx: 12, hy: -2, a: -Math.PI / 2 },
+  downd: { hx: 18, hy: 15, a: Math.PI / 4 }, down: { hx: 13, hy: 17, a: Math.PI / 2 },
 };
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -137,7 +138,7 @@ class Player {
   spriteTop(spr) { return this.y + this.h - spr.h; }
 
   get dir() { return WHIP_DIRS[this.crouchAtk ? 'fwd' : this.atkDir] || WHIP_DIRS.fwd; }
-  atkTop() { return this.feet - (this.crouchAtk ? 25 : 32); }
+  atkTop() { return this.feet - 32 + (this.crouchAtk ? this.H.crouchDrop : 0); }
   // Hand in Weltkoordinaten
   hand() {
     const D = this.dir, sx = this.x - 3;
@@ -480,7 +481,7 @@ class Player {
     this.dSeg = Array(n).fill(this.dAng); this.dId = ++W.atkId;
   }
   danglePoints() {
-    const hx = this.cx + this.face * 5, hy = this.feet - 22, pts = [];
+    const hx = this.cx + this.face * 11, hy = this.feet - 22, pts = [];
     let x = hx, y = hy;
     for (const a of this.dSeg) { x += Math.cos(a) * (this.sword ? 4.5 : 4); y += Math.sin(a) * (this.sword ? 4.5 : 4); pts.push([x, y]); }
     return pts;
@@ -505,7 +506,7 @@ class Player {
   drawDangle(ctx, cam) {
     const pts = this.danglePoints(), lvl = this.whip;
     if (this.sword) {
-      const [x0, y0] = [this.cx + this.face * 5 - cam.x, this.feet - 22 - cam.y], [x1, y1] = pts[pts.length - 1];
+      const [x0, y0] = [this.cx + this.face * 11 - cam.x, this.feet - 22 - cam.y], [x1, y1] = pts[pts.length - 1];
       for (let k = 0; k <= 20; k++) {
         const t = k / 20, x = Math.round(x0 + (x1 - cam.x - x0) * t), y = Math.round(y0 + (y1 - cam.y - y0) * t);
         ctx.fillStyle = k < 4 ? '#5c3c20' : k === 4 ? '#f8b800' : (k % 2 ? ['', '#c89040', '#a8b0c8', '#fcfcfc'][lvl] : '#fce0a8');
@@ -557,7 +558,7 @@ class Player {
     const H = this.H, p = this.atkPose;
     if (this.state === 'dead') return this.onGround ? H.dead : H.hurt;
     if (this.state === 'hurt') return H.hurt;
-    if (this.state === 'swing') return H.jumpUp;
+    if (this.state === 'swing') return H.swing;
     if (this.slideT > 0) return H.crouch;
     if (this.state === 'stairs') {
       if (this.atkT) return (this.stairUpPose ? H.satkUp : H.satkDown)[p];
@@ -566,7 +567,7 @@ class Player {
     if (this.crashT > 0) return H.atk[2];
     if (this.atkT) {
       if (this.crouchAtk) return H.catk[p];
-      return H.atk[p === 2 && (this.atkDir === 'up' || this.atkDir === 'upd') ? 1 : p];
+      return p === 2 ? (H.atkDir[this.atkDir] || H.atk[2]) : H.atk[p];
     }
     if (this.dangle && this.vx === 0 && this.onGround) return H.atk[2];
     if (this.state === 'toStair') return H.walk[Math.floor(this.walkT / 5) % 8];
@@ -584,7 +585,7 @@ class Player {
     const spr = this.sprite();
     const flash = (this.powerT > 0 || this.chargeT >= 50 || this.crashT > 0) && (W.frame & 4);
     if (spr === this.H.dead) {
-      Sprites.draw(ctx, spr, this.cx - 16 - cam.x, this.feet - spr.h - cam.y, this.face < 0);
+      Sprites.draw(ctx, spr, this.cx - spr.w / 2 - cam.x, this.feet - spr.h - cam.y, this.face < 0);
       return;
     }
     for (const t of this.trail) { // Nachbilder
@@ -595,7 +596,7 @@ class Player {
     ctx.globalAlpha = 1;
     this.drawScarf(ctx, cam);
     if (this.state === 'swing' && this.ring) { // Seil/Peitsche zum Ankerring
-      const hx = this.cx + this.face * 3 - cam.x, hy = this.y + 4 - cam.y, rx = this.ring.cx - cam.x, ry = this.ring.cy - cam.y;
+      const hx = this.cx + this.face * 3 - cam.x, hy = this.feet - 34 - cam.y, rx = this.ring.cx - cam.x, ry = this.ring.cy - cam.y;
       const n = Math.ceil(Math.hypot(rx - hx, ry - hy) / 2);
       for (let k = 0; k <= n; k++) {
         ctx.fillStyle = this.sword ? (k % 2 ? '#8c6440' : '#c8a070') : this.whip === 1 ? (k % 3 ? PAL.b : PAL.B) : (k % 2 ? PAL.g : PAL.W);
@@ -605,14 +606,14 @@ class Player {
     if (this.flipT > 0 && !this.atkT && this.state === 'normal' && !this.onGround) { // Salto beim Doppelsprung
       const c = this.H.crouch, step = Math.floor((20 - this.flipT) / 5) % 4;
       ctx.save();
-      ctx.translate(Math.round(this.cx - cam.x), Math.round(this.feet - 12 - cam.y));
+      ctx.translate(Math.round(this.cx - cam.x), Math.round(this.feet - 14 - cam.y));
       ctx.rotate(step * Math.PI / 2 * this.face);
-      ctx.drawImage(this.face < 0 ? c.f : c.c, -10 - c.pad, -20 - c.pad);
+      ctx.drawImage(this.face < 0 ? c.f : c.c, -17 - c.pad, -22 - c.pad);
       ctx.restore();
       return;
     }
-    const sx = Math.round(this.x - 3 - cam.x), sy = Math.round(this.feet - spr.h - cam.y);
-    Sprites.draw(ctx, spr, sx - (spr.mx || 0), sy, this.face < 0, flash);
+    const sx = Math.round(this.x - 3 - cam.x), sy = Math.round(this.feet - 32 - cam.y); // Bezugspunkt für Waffen
+    Sprites.draw(ctx, spr, sx - (spr.mx || 0), Math.round(this.feet - spr.h - cam.y), this.face < 0, flash);
     if (this.atkT && !this.atkSub) (this.sword ? this.drawSword(ctx, sx, sy) : this.drawWhip(ctx, sx, sy));
     if (this.dangle) this.drawDangle(ctx, cam);
   }
@@ -621,7 +622,7 @@ class Player {
   updateScarf() {
     if (!this.alive) { this.scarf = null; return; }
     const low = this.h === 20 || (this.atkT && this.crouchAtk);
-    const ax = this.cx - this.face * 3, ay = this.feet - (low ? 17 : 25);
+    const ax = this.cx - this.face * 4, ay = this.feet - 32 + (low ? this.H.crouchDrop : 0);
     if (!this.scarf) this.scarf = Array.from({ length: 8 }, (_, i) => ({ x: ax - this.face * i * 2, y: ay + i * 0.4 }));
     const s = this.scarf;
     s[0].x = ax; s[0].y = ay;
@@ -646,6 +647,7 @@ class Player {
   // Breitschwert (Ragnor): Bronze → Stahl → Flammenschwert, mit Hiebbogen-Schweif
   drawSword(ctx, sx, sy) {
     const p = this.atkPose, lvl = this.whip;
+    if (this.crouchAtk) sy += this.H.crouchDrop;
     const blade = ['', '#c89040', '#a8b0c8', '#fcfcfc'][lvl], edge = ['', '#fce0a8', '#fcfcfc', '#fce0a8'][lvl];
     ctx.save();
     if (this.face < 0) { ctx.translate(sx * 2 + 16, 0); ctx.scale(-1, 1); }
@@ -666,10 +668,10 @@ class Player {
         ctx.fillRect(Math.round(fx + nx * 2), Math.round(fy + ny * 2 - (fl ? 1 : 0)), 1, 2);
       }
     };
-    if (p === 0) sword(sx + 2, sy + 4, sx - 8, sy - 9);
-    else if (p === 1) sword(sx + 13, sy + 1, sx + 5, sy - 15);
+    if (p === 0) sword(sx + 1, sy + 3, sx - 9, sy - 10);
+    else if (p === 1) sword(sx + 10, sy - 3, sx + 2, sy - 19);
     else {
-      const D = this.dir, len = SWORD_LEN[lvl], top = sy + (this.crouchAtk ? 7 : 0);
+      const D = this.dir, len = SWORD_LEN[lvl], top = sy;
       const hx = sx + D.hx, hy = top + D.hy;
       sword(hx, hy, hx + Math.cos(D.a) * len, hy + Math.sin(D.a) * len);
       if (this.atkT <= 15) { // Schweif des Hiebs
@@ -684,6 +686,7 @@ class Player {
 
   drawWhip(ctx, sx, sy) {
     const p = this.atkPose, lvl = this.whip;
+    if (this.crouchAtk) sy += this.H.crouchDrop;
     ctx.save();
     if (this.face < 0) { ctx.translate(sx * 2 + 16, 0); ctx.scale(-1, 1); }
     const link = (x, y, i) => {
@@ -699,10 +702,10 @@ class Player {
       for (let i = 0; i < 9; i++) link(sx + 1 - i, sy + 3 + i * 1.2, i);
       if (lvl === 3) ball(sx - 10, sy + 13);
     } else if (p === 1) {
-      for (let i = 0; i < 9; i++) link(sx + 9 - i * 1.4, sy - i * 0.6, i);
-      if (lvl === 3) ball(sx - 6, sy - 7);
+      for (let i = 0; i < 9; i++) link(sx + 10 - i * 1.4, sy - 3 - i * 0.6, i);
+      if (lvl === 3) ball(sx - 5, sy - 10);
     } else { // ausgestreckt im gewählten Winkel
-      const D = this.dir, len = WHIP_LEN[lvl], top = sy + (this.crouchAtk ? 7 : 0);
+      const D = this.dir, len = WHIP_LEN[lvl], top = sy;
       const hx = sx + D.hx, hy = top + D.hy, ca = Math.cos(D.a), sa = Math.sin(D.a);
       for (let i = 0; i < len; i += 2) link(Math.round(hx + ca * i), Math.round(hy + sa * i), i / 2);
       if (lvl === 3) ball(Math.round(hx + ca * (len - 2)) - 1, Math.round(hy + sa * (len - 2)) + 1);

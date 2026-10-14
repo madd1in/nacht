@@ -38,6 +38,7 @@ const W = {
         case 'chest': this.spawn(new Chest(d)); break;
         case 'platform': this.platforms.push(this.spawn(new Platform(d.x, d.x1, d.y))); break;
         case 'chandelier': this.platforms.push(this.spawn(new Chandelier(d))); break;
+        case 'pendulum': this.spawn(new Pendulum(d)); break;
         case 'grand': this.platforms.push(this.spawn(new GrandChandelier(d))); break;
         case 'cog': { const c = new CogWheel(d); this.platforms.push(this.spawn(c)); c.ledges.forEach(l => this.platforms.push(this.spawn(l))); break; }
         case 'elevator': this.platforms.push(this.spawn(new Elevator(d))); break;
@@ -108,8 +109,13 @@ const W = {
       else if (e.kind === 'enemy' || e.kind === 'boss') {
         if (e.kind === 'enemy' && e.rise !== undefined && e.rise < 12) continue;
         if (hits(e.hurtBox ? e.hurtBox() : e) && e.hit(dmg, id)) Input.rumble(0.15, 0.35, 60);
-      } else if (e.kind === 'eproj' && e.type === 'fire' && hits(e)) {
-        e.dead = true; this.spawn(new Spark(e.cx, e.cy)); Audio8.sfx('hit');
+      } else if (e.kind === 'eproj' && !e.reflected && hits(e)) { // Konter: Geschosse zerschlagen bzw. zurückschleudern
+        if (e.type === 'fire') {
+          const p = this.player;
+          e.reflected = true; e.vx = p.face * Math.max(2.6, Math.abs(e.vx) * 1.5); e.vy = -0.3; e.grav = 0;
+          this.popup(e.cx, e.cy - 6, tr('riposte'), '#a4e4fc'); this.addScore(200); this.hitstop = Math.max(this.hitstop || 0, 4);
+        } else { e.dead = true; this.addScore(50); }
+        this.spawn(new Spark(e.cx, e.cy)); Audio8.sfx('hit'); Input.rumble(0.2, 0.4, 80);
       }
     }
     for (const b of boxes) {
@@ -225,7 +231,7 @@ const W = {
         this.cam.x = this.camTarget; this.camTarget = null;
         this.boss = this.spawn(new BOSSES[r.arena.boss](this.arenaX, this.arenaW));
         Audio8.play('boss'); Audio8.sfx('roar'); Input.rumble(0.8, 0.5, 700);
-        this.cinema = 150; this.flash = 8; this.shake = 26;
+        this.cinema = 110; this.flash = 8; this.shake = 26;
         this.spawn(new Shock(this.boss.cx, this.boss.cy, 120, '#d82800', 5));
       }
     } else if (!this.camLock) {

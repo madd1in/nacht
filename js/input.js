@@ -131,7 +131,7 @@ const Input = (() => {
       for (const tc of e.changedTouches) {
         const id = tc.identifier, x = tc.clientX, y = tc.clientY;
         if (e.type === 'touchstart') {
-          if (window.Game && Game.state === 'pause') { latch.start = true; continue; } // Pause: Tippen irgendwo = weiter
+          if (typeof Game !== 'undefined' && Game.state === 'pause') { latch.start = true; continue; } // Pause: Tippen irgendwo = weiter
           const a = hitTest(x, y);
           if (a && (x > window.innerWidth * 0.45 || a === 'start')) { latch[a] = true; active.set(id, a); }
           else if (x < window.innerWidth * 0.5 && stick.id === null) { stick.id = id; stick.ox = x; stick.oy = y; stick.dx = 0; stick.dy = 0; if (hint) hint.style.display = 'none'; }

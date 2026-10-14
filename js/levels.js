@@ -32,6 +32,8 @@ const Levels = (() => {
       // XXL-Kronleuchter (Mode-7-Drehung, schräge Standfläche)
       grand(px, py, len, amp = 0.32, phase = 0) { r.ents.push({ type: 'grand', x: px, y: py, len, amp, phase }); return api; },
       // Zahnrad-Riesenrad: Mittelpunkt (Kacheln), Radius (px), Anzahl Stege, Drehgeschwindigkeit
+      // Pendelbeil: Aufhängung (Kacheln), Stangenlänge (px), Ausschlag (rad), Phase
+      pendulum(px, py, len, amp = 0.55, phase = 0, speed = 0.03) { r.ents.push({ type: 'pendulum', x: px, y: py, len, amp, phase, speed }); return api; },
       cog(cx, cy, rad, n = 4, speed = 0.011) { r.ents.push({ type: 'cog', x: cx, y: cy, r: rad, n, speed }); return api; },
       elevator(x, rowLow, rowHigh) { r.ents.push({ type: 'elevator', x, y: rowLow, y1: rowHigh }); return api; },
       crumble(x, y) { r.ents.push({ type: 'crumble', x, y }); return api; },
@@ -141,6 +143,7 @@ const Levels = (() => {
   const r31 = room(64, 'tower')
     .ground(0, 12).fill(13, 12, 20, 12, '^').ground(21, 63)
     .cog(16.5, 7, 44, 4, 0.011)
+    .pendulum(28, 0, 150, 0.55, 0).pendulum(53, 0, 150, 0.55, Math.PI)
     .statue(24, 10)
     .crumble(34, 8).crumble(37, 8)
     .set(52, 10, 'X')

@@ -253,13 +253,13 @@ class Enemy extends Ent {
 
 class Ghoul extends Enemy {
   constructor(x, groundY, dir) {
-    super(x, groundY - 24, 10, 24, 1, 2, 100);
+    super(x, groundY - 28, 10, 28, 1, 2, 100);
     this.dir = dir; this.face = dir; this.rise = 0; this.groundY = groundY;
     Audio8.sfx('rise');
   }
   update() {
     super.update();
-    if (this.rise < 25) { this.rise += 0.7; if (this.rise > 12) this.touch(); return; }
+    if (this.rise < 33) { this.rise += 0.9; if (this.rise > 14) this.touch(); return; }
     this.vx = this.dir * 0.55;
     if (this.physics()) { this.dir *= -1; this.face = this.dir; }
     this.touch();
@@ -268,8 +268,8 @@ class Ghoul extends Enemy {
   }
   draw(ctx) {
     const s = Sprites.S.ghul[Math.floor(this.t / 12) % 2];
-    if (this.rise < 25) {
-      const sy = Math.round(this.groundY - this.rise - W.cam.y), sx = Math.round(this.cx - 8 - W.cam.x);
+    if (this.rise < 33) {
+      const sy = Math.round(this.groundY - this.rise - W.cam.y), sx = Math.round(this.cx - s.w / 2 - W.cam.x);
       const vis = Math.max(1, Math.floor(this.rise)) + s.pad, cw = s.c.width;
       ctx.drawImage(this.face < 0 ? s.f : s.c, 0, 0, cw, vis, sx - s.pad, sy - s.pad, cw, vis);
       if (this.t % 6 < 3) { ctx.fillStyle = PAL.B; ctx.fillRect(sx + rnd(0, 14), Math.round(this.groundY - W.cam.y) - 2, 2, 2); }
@@ -324,7 +324,7 @@ class Skull extends Enemy {
 
 class Skeleton extends Enemy {
   constructor(tx, ty) {
-    super(tx * T + 3, (ty + 1) * T - 22, 10, 22, 2, 2, 300);
+    super(tx * T + 3, (ty + 1) * T - 28, 10, 28, 2, 2, 300);
     this.throwCD = 90 + rnd(0, 60); this.throwT = 0;
   }
   update() {
@@ -339,7 +339,7 @@ class Skeleton extends Enemy {
     if (this.throwT > 0) {
       if (--this.throwT === 6) {
         const speed = clamp(Math.abs(dx) / 62, 0.8, 2.1);
-        W.spawn(new EProj('bone', this.cx, this.y + 2, this.face * speed, -4.2, 0.16));
+        W.spawn(new EProj('bone', this.cx, this.y - 2, this.face * speed, -4.2, 0.16));
       }
     } else if (--this.throwCD <= 0) { this.throwT = 14; this.throwCD = 110 + rnd(0, 60); }
     this.physics();
@@ -354,7 +354,7 @@ class Skeleton extends Enemy {
 
 class Knight extends Enemy {
   constructor(tx, ty) {
-    super(tx * T + 2, (ty + 1) * T - 24, 12, 24, 5, 2, 500);
+    super(tx * T + 2, (ty + 1) * T - 30, 12, 30, 5, 2, 500);
     this.face = -1;
   }
   hit(dmg, id) {
@@ -377,7 +377,7 @@ class Knight extends Enemy {
 
 class Fishman extends Enemy {
   constructor(x, waterY) {
-    super(x - 5, waterY, 10, 22, 1, 2, 300);
+    super(x - 5, waterY, 10, 28, 1, 2, 300);
     this.vy = -6.6; this.state = 'jump'; this.shootT = 0; this.shootCD = 80;
     W.splash(x, waterY);
   }
@@ -394,7 +394,7 @@ class Fishman extends Enemy {
     } else {
       if (this.shootT > 0) {
         this.vx = 0;
-        if (--this.shootT === 10) { W.spawn(new EProj('fire', this.cx + this.face * 8, this.y + 5, this.face * 1.5, 0, 0)); Audio8.sfx('fire'); }
+        if (--this.shootT === 10) { W.spawn(new EProj('fire', this.cx + this.face * 10, this.y + 4, this.face * 1.5, 0, 0)); Audio8.sfx('fire'); }
       } else {
         this.vx = this.face * 0.5;
         if (--this.shootCD <= 0) { this.shootT = 24; this.shootCD = 140; this.face = Math.sign(p.cx - this.cx) || this.face; }
@@ -449,12 +449,19 @@ class EProj extends Ent {
       }
     } else if (!this.onScreen(24)) this.dead = true;
     if (this.y > W.room.h * T + 16) this.dead = true;
+    if (this.reflected) { // zurückgeschleuderter Feuerball trifft Gegner und Bosse
+      for (const e of W.ents) {
+        if (e.dead || (e.kind !== 'enemy' && e.kind !== 'boss')) continue;
+        if (Phys.overlap(this, e.hurtBox ? e.hurtBox() : e)) { e.hit(3 * Options.dmgMul, ++W.atkId); this.dead = true; W.spawn(new Burst(this.cx, this.cy, true)); break; }
+      }
+      return;
+    }
     const p = W.player;
     if (p.alive && Phys.overlap(this, p)) p.hurt(this.dmg, this.cx);
   }
   draw(ctx) {
     const S = Sprites.S, x = Math.round(this.x - 1 - W.cam.x), y = Math.round(this.y - 1 - W.cam.y);
-    if (this.type === 'fire') Sprites.draw(ctx, S.fire[Math.floor(this.t / 4) % 2], x, y, this.vx < 0);
+    if (this.type === 'fire') Sprites.draw(ctx, S.fire[Math.floor(this.t / 4) % 2], x, y, this.vx < 0, this.reflected && (this.t & 2));
     else if (this.type === 'rock') {
       ctx.fillStyle = PAL.G; ctx.fillRect(x - 1, y - 1, 9, 8);
       ctx.fillStyle = PAL.g; ctx.fillRect(x, y, 6, 5);

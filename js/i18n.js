@@ -120,6 +120,9 @@ const I18N = (() => {
     cont: { de: 'WEITERSPIELEN', en: 'CONTINUE', fr: 'CONTINUER', es: 'CONTINUAR', ja: 'コンティニュー', zh: '继续' },
     toTitle: { de: 'ZUM TITEL', en: 'TITLE SCREEN', fr: 'ÉCRAN TITRE', es: 'MENÚ PRINCIPAL', ja: 'タイトルへ', zh: '返回标题' },
     plusLife: { de: '+LEBEN', en: '+LIFE', fr: '+VIE', es: '+VIDA', ja: '+回復', zh: '+生命' },
+    riposte: { de: 'KONTER!', en: 'PARRY!', fr: 'PARADE !', es: '¡PARADA!', ja: 'はじき返し！', zh: '反击！' },
+    continueQ: { de: 'WEITERSPIELEN?', en: 'CONTINUE?', fr: 'CONTINUER ?', es: '¿CONTINUAR?', ja: 'コンティニュー？', zh: '继续？' },
+    hurry: { de: 'BEEILUNG!', en: 'HURRY UP!', fr: 'VITE !', es: '¡DEPRISA!', ja: '急げ！', zh: '快点！' },
     checkpoint: { de: 'CHECKPOINT', en: 'CHECKPOINT', fr: 'SAUVEGARDE', es: 'GUARDADO', ja: 'チェックポイント', zh: '检查点' },
     pressStart: { de: 'START DRÜCKEN', en: 'PRESS START', fr: 'APPUIE SUR START', es: 'PULSA START', ja: 'スタートを押せ', zh: '按开始键' },
     // ---------------- Abspann ----------------

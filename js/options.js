@@ -5,8 +5,9 @@ const Options = (() => {
   const KEY = 'nachtmahr.opts';
   const nav = ((navigator.languages && navigator.languages[0]) || navigator.language || 'de').slice(0, 2).toLowerCase();
   const o = { easy: false, maxWhip: false, infHearts: false, crt: true, music: 8, character: 'henrik', fullscreen: true,
-    lang: ['de', 'en', 'fr', 'es', 'ja', 'zh'].includes(nav) ? nav : 'en', voice: true };
+    lang: ['de', 'en', 'fr', 'es', 'ja', 'zh'].includes(nav) ? nav : 'en', voice: false };
   try { Object.assign(o, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { /* privat */ }
+  if (o.optVer !== 2) { o.voice = false; o.optVer = 2; } // Sprachausgabe standardmäßig aus (auch für alte Speicherstände)
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) { /* privat */ } };
   return {
     get easy() { return o.easy; }, get maxWhip() { return o.maxWhip; }, get infHearts() { return o.infHearts; },

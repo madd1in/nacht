@@ -256,3 +256,58 @@ const Rays = (() => {
   }
   return { draw };
 })();
+
+// ---------------- Pendelbeil (Mode-7-gedrehte Riesenklinge, Timing-Falle) ----------------
+function bladeSprite() {
+  const W2 = 44, H2 = 20, c = Sprites.canvas(W2, H2), x = c.getContext('2d'), img = x.createImageData(W2, H2), d = img.data;
+  const ST = [[28, 28, 44], [60, 60, 88], [104, 104, 132], [160, 160, 188], [216, 216, 236], [252, 252, 252]];
+  for (let py = 0; py < H2; py++) for (let px = 0; px < W2; px++) {
+    const ox = px + 0.5 - 22, o = Math.hypot(ox, py + 0.5 + 6), inn = Math.hypot(ox, py + 0.5 + 12);
+    if (o > 22 || inn <= 22) continue; // Sichel: außerhalb des inneren, innerhalb des äußeren Kreises
+    const edge = 22 - o; // Abstand zur Schneide
+    let k = edge < 1 ? 5 : edge < 2 ? 4 : Math.round(3 - ox / 22 * 1.2 - py / 20);
+    if (edge >= 2 && (px + py) % 7 === 0) k = Math.max(0, k - 1); // Schmiedespuren
+    k = Math.max(0, Math.min(5, k));
+    const i = (py * W2 + px) * 4; d[i] = ST[k][0]; d[i + 1] = ST[k][1]; d[i + 2] = ST[k][2]; d[i + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  x.fillStyle = GOLD[1]; x.fillRect(19, 0, 6, 5); x.fillStyle = GOLD[4]; x.fillRect(20, 0, 4, 2); x.fillStyle = '#a80020'; x.fillRect(21, 2, 2, 2);
+  return c;
+}
+class Pendulum extends Ent {
+  constructor(d) {
+    super(d.x * T, d.y * T, 0, 0);
+    this.kind = 'fx'; this.L = d.len; this.amp = d.amp; this.phase = d.phase || 0; this.sp = d.speed || 0.03; this.ang = 0;
+    if (!Pendulum.img) Pendulum.img = bladeSprite();
+    // Schneiden-Punkte relativ zur Nabe (für den Treffer-Test)
+    this.edge = [[-19, 4], [-14, 9], [-7, 12], [0, 13], [7, 12], [14, 9], [19, 4]];
+  }
+  tip(a = this.ang) { return [this.x + Math.sin(a) * this.L, this.y + Math.cos(a) * this.L]; }
+  update() {
+    this.t++;
+    const prev = this.ang;
+    this.ang = this.amp * Math.sin(this.t * this.sp + this.phase);
+    if (Math.sign(prev) !== Math.sign(this.ang) && Math.abs(this.x - W.player.cx) < View.w * 0.6) Audio8.sfx('whoosh');
+    const p = W.player;
+    if (!p.alive || p.inv > 0) return;
+    const [tx, ty] = this.tip(), c = Math.cos(this.ang), s = Math.sin(this.ang);
+    for (const [lx, ly] of this.edge) { // lokale Punkte drehen (wie beim Zeichnen: rotate(-ang))
+      const wx = tx + lx * c + ly * s, wy = ty - lx * s + ly * c;
+      if (wx > p.x - 1 && wx < p.x + p.w + 1 && wy > p.y - 1 && wy < p.y + p.h + 1) { p.hurt(3, tx); W.sparks(wx, wy, 6); break; }
+    }
+  }
+  draw(ctx) {
+    const sx = this.x - W.cam.x, sy = this.y - W.cam.y;
+    if (sx < -this.L - 40 || sx > View.w + this.L + 40) return;
+    const [tx, ty] = this.tip();
+    for (let k = 0, n = Math.ceil(this.L / 3); k < n; k++) { // Eisenstange
+      const X = Math.round(sx + (tx - this.x) * k / n), Y = Math.round(sy + (ty - this.y) * k / n);
+      ctx.fillStyle = '#14141c'; ctx.fillRect(X - 1, Y, 3, 3);
+      ctx.fillStyle = k % 4 === 0 ? '#8c8cac' : '#4c4c64'; ctx.fillRect(X, Y, 1, 3);
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.translate(Math.round(tx - W.cam.x), Math.round(ty - W.cam.y)); ctx.rotate(-this.ang);
+    ctx.drawImage(Pendulum.img, -22, -2);
+    ctx.restore();
+  }
+}

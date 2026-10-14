@@ -39,6 +39,7 @@ const Game = {
       this.fsActive = !!document.fullscreenElement;
       settle();
     });
+    document.addEventListener('pointerdown', (e) => { if (this.state === 'pause' && e.pointerType !== 'mouse') this.unpause = true; });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); }
     });
@@ -198,35 +199,36 @@ const Game = {
       }
       case 'intro':
         if ((P.start || P.attack || P.jump) && this.t > 20) { Voice.stop(); this.newGame(0); }
-        else if ((this.t > 60 * 13 && !Voice.busy()) || this.t > 60 * 26) this.newGame(0); // Erzähler ausreden lassen
+        else if ((this.t > 60 * 9 && !Voice.busy()) || this.t > 60 * 24) this.newGame(0); // Erzähler ausreden lassen
         break;
       case 'card':
-        if ((this.t > 150 && !Voice.busy()) || this.t > 330 || ((P.start || P.jump) && this.t > 30)) { this.go('play'); Audio8.play(W.stageDef.music); this.bossName = 0; }
+        if ((this.t > 90 && !Voice.busy()) || this.t > 240 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; }
         break;
       case 'play': this.updatePlay(P); break;
       case 'pause':
-        if (P.start) { this.go('play'); Audio8.setMusicVolume(0.5); Audio8.sfx('pause'); }
+        if (P.start || this.unpause) {
+          this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.sfx('pause'); }
         break;
       case 'fade':
-        if (this.t === 32) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); }
-        if (this.t > 52) this.state = 'play';
+        if (this.t === 18) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); }
+        if (this.t > 30) this.state = 'play';
         break;
       case 'respawn':
-        if (this.t === 50) {
+        if (this.t === 30) {
           if (this.pendingView) this.applyView(this.pendingView);
           W.loadRoom(W.stage, W.roomIdx); W.applyCheckpoint(); W.time = W.stageDef.time;
         }
-        if (this.t > 70) { this.go('play'); Audio8.play(W.stageDef.music); }
+        if (this.t > 44) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.hurryT = 0; }
         break;
       case 'clear': this.updateClear(); break;
-      case 'gameover':
-        if (P.up || P.down) { this.sel = 1 - this.sel; Audio8.sfx('select'); }
-        if ((P.start || P.jump || P.attack) && this.t > 60) {
-          Audio8.sfx('select');
-          if (this.sel === 0) { W.score = 0; W.lives = 3; W.nextLife = 20000; W.player = new Player(); this.startStage(W.stage); }
-          else this.toTitle();
-        }
+      case 'gameover': { // Arcade: CONTINUE? 9 … 0 – Taste drücken = sofort weiter in derselben Stage
+        const left = 9 - Math.floor(this.t / 60);
+        if (left >= 0 && this.t % 60 === 0) Audio8.sfx('tick');
+        if (left >= 0 && (P.start || P.jump || P.attack) && this.t > 30) {
+          Audio8.sfx('bigItem'); W.score = 0; W.lives = 3; W.nextLife = 20000; W.player = new Player(); this.startStage(W.stage);
+        } else if (left < 0 && (this.t > 60 * 10 + 120 || ((P.start || P.jump) && this.t > 60 * 10 + 20))) this.toTitle();
         break;
+      }
       case 'ending':
         if (this.t % 50 === 0 && this.t < 330) { Audio8.sfx('wall'); Input.rumble(0.3, 0.5, 200); }
         if (this.t === 380) Voice.say('ending');
@@ -263,26 +265,28 @@ const Game = {
     if (P.start && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); Audio8.sfx('pause'); return; }
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; } // Zeitlupe
     W.update();
+    if (this.hurryT > 0) this.hurryT--;
     if (W.boss && this.bossName < 150) { if (this.bossName === 0) Voice.say('boss' + (W.stage + 1)); this.bossName++; }
     const p = W.player;
     if (p.alive && p.hp <= p.maxHp / 4 && this.t % 50 === 0) Audio8.sfx('beat');
     if (p.alive && !W.cleared && W.freeze === 0 && ++W.timeSub >= 40) {
       W.timeSub = 0; W.time--;
       if (W.time <= 30 && W.time > 0) Audio8.sfx('tick');
+      if (W.time === 60) { this.hurryT = 150; Audio8.tempo(1.12); Audio8.sfx('bell'); } // Zeit wird knapp: Musik zieht an
       if (W.time <= 0) { W.time = 0; p.die(); }
     }
   },
 
   updateClear() {
     W.update();
-    if (this.tallyPhase === 0 && this.t > 150) this.tallyPhase = 1;
+    if (this.tallyPhase === 0 && this.t > 80) this.tallyPhase = 1;
     if (this.tallyPhase === 1) {
       if (W.time > 0) {
-        const n = Math.min(3, W.time); W.time -= n; W.addScore(n * 10);
+        const n = Math.min(9, W.time); W.time -= n; W.addScore(n * 10);
         if (this.t % 3 === 0) Audio8.sfx('tick');
       } else { this.tallyPhase = 2; this.t2 = this.t; W.addScore(W.player.hearts * 100); Audio8.sfx('money'); }
     }
-    if (this.tallyPhase === 2 && this.t - this.t2 > 120) {
+    if (this.tallyPhase === 2 && this.t - this.t2 > 70) {
       if (W.stage + 1 < Levels.STAGES.length) { W.player.hp = W.player.maxHp; this.startStage(W.stage + 1); }
       else { this.saveHi(); this.go('ending'); Audio8.play('ending'); this.rubble = []; }
     }
@@ -307,8 +311,9 @@ const Game = {
         this.drawCombo(ctx);
         this.drawHud(ctx);
         if (this.state === 'pause') this.panel(ctx, tr('pause'), tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey'));
-        if (this.state === 'fade') this.mosaicFade(ctx, this.t < 32 ? this.t / 30 : 1 - (this.t - 32) / 20);
-        if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 50 ? this.t / 30 : 1 - (this.t - 50) / 20);
+        if (this.state === 'fade') this.mosaicFade(ctx, this.t < 18 ? this.t / 16 : 1 - (this.t - 18) / 12);
+        if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 30 ? this.t / 28 : 1 - (this.t - 30) / 14);
+        if (this.hurryT > 0 && this.state === 'play') this.drawHurry(ctx);
         if (this.state === 'play' && W.boss && this.bossName > 0 && this.bossName < 150) this.drawBossBanner(ctx);
         if (this.state === 'clear') this.drawClear(ctx);
     }
@@ -325,7 +330,7 @@ const Game = {
 
   // Kino-Balken beim Boss-Auftritt
   drawCinema(ctx) {
-    const c = W.cinema, h = Math.round(Math.min(24, (150 - c) * 1.6, c * 1.6));
+    const c = W.cinema, h = Math.round(Math.min(24, (110 - c) * 1.6, c * 1.6));
     ctx.fillStyle = '#000'; ctx.fillRect(0, 32, View.w, h); ctx.fillRect(0, 240 - h, View.w, h);
     ctx.fillStyle = '#a80020'; ctx.fillRect(0, 32 + h, View.w, 1); ctx.fillRect(0, 239 - h, View.w, 1);
   },
@@ -507,12 +512,12 @@ const Game = {
     ctx.fillStyle = '#0a0410';
     for (let i = 0; i < 70; i++) ctx.fillRect(x - 30 + i, y + 32 - Math.round(Math.sin(i / 70 * Math.PI) * 10), 1, 30);
     for (let i = 0; i < 8; i++) {
-      const sx = x + 4 - i * 2, sy = y + 8 + Math.round(Math.sin(this.t * 0.2 + i * 0.9) * (0.5 + i * 0.3));
+      const sx = x + 3 - i * 2, sy = y + 1 + Math.round(Math.sin(this.t * 0.2 + i * 0.9) * (0.5 + i * 0.3));
       const scf = HEROES.get(Options.character).def.scarf;
       ctx.fillStyle = i % 3 === 0 ? scf.b : scf.a; ctx.fillRect(sx, sy, i > 5 ? 1 : scf.w, i > 5 ? 1 : scf.w);
     }
     const H = HEROES.get(Options.character), sc = H.def.scarf;
-    Sprites.draw(ctx, H.idle[Math.floor(this.t / 40) % 2], x - H.stand.mx, y);
+    Sprites.draw(ctx, H.idle[Math.floor(this.t / 40) % 2], x - H.stand.mx, y + 32 - H.stand.h);
   },
 
   controlLines() { return tr(Input.device === 'pad' || Input.padName ? 'pad' : 'keys'); },
@@ -604,17 +609,17 @@ const Game = {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, View.w, 176);
     this.big(ctx, tr('choose'), cx, 40, 2, LOGO, null, '#000');
     HEROES.list.forEach((d, i) => {
-      const on = Options.character === d.id, pw = 134, px = cx + (i === 0 ? -pw - 4 : 4), py = 62, mid = px + pw / 2;
-      ctx.fillStyle = on ? 'rgba(200,144,32,0.22)' : 'rgba(0,0,0,0.6)'; ctx.fillRect(px, py, pw, 136);
+      const on = Options.character === d.id, pw = 134, px = cx + (i === 0 ? -pw - 4 : 4), py = 58, mid = px + pw / 2;
+      ctx.fillStyle = on ? 'rgba(200,144,32,0.22)' : 'rgba(0,0,0,0.6)'; ctx.fillRect(px, py, pw, 148);
       ctx.fillStyle = on ? '#f8b800' : '#4c4c4c';
-      ctx.fillRect(px, py, pw, 1); ctx.fillRect(px, py + 135, pw, 1); ctx.fillRect(px, py, 1, 136); ctx.fillRect(px + pw - 1, py, 1, 136);
+      ctx.fillRect(px, py, pw, 1); ctx.fillRect(px, py + 147, pw, 1); ctx.fillRect(px, py, 1, 148); ctx.fillRect(px + pw - 1, py, 1, 148);
       const H = HEROES.get(d.id), spr = on ? H.walk[Math.floor(this.t / 5) % 8] : H.idle[Math.floor(this.t / 40) % 2];
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(spr.c, mid - spr.c.width, py + 8, spr.c.width * 2, spr.c.height * 2);
-      Font.draw(ctx, d.name, mid, py + 82, on ? '#fcfcfc' : '#8c8c8c', { align: 'center' });
-      Font.draw(ctx, tr(d.id + 'Title'), mid, py + 93, on ? '#f8b800' : '#6c6c6c', { align: 'center' });
-      tr(d.id + 'Desc').forEach((l, k) => Font.draw(ctx, l, mid, py + 108 + k * 11, on ? '#bcbcbc' : '#5c5c5c', { align: 'center' }));
-      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, mid - 4, py + 125);
+      ctx.drawImage(spr.c, mid - spr.c.width, py + 10, spr.c.width * 2, spr.c.height * 2);
+      Font.draw(ctx, d.name, mid, py + 96, on ? '#fcfcfc' : '#8c8c8c', { align: 'center' });
+      Font.draw(ctx, tr(d.id + 'Title'), mid, py + 107, on ? '#f8b800' : '#6c6c6c', { align: 'center' });
+      tr(d.id + 'Desc').forEach((l, k) => Font.draw(ctx, l, mid, py + 120 + k * 11, on ? '#bcbcbc' : '#5c5c5c', { align: 'center' }));
+      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, mid - 4, py + 140);
     });
     Font.draw(ctx, tr(Input.device === 'pad' ? 'selPad' : 'selKey'), cx, 214, '#9c9c9c', { align: 'center' });
   },
@@ -633,7 +638,7 @@ const Game = {
     const H = HEROES.get(Options.character);
     const hx = Math.min(cx - 8, -20 + this.t * 0.5);
     const hs = hx < cx - 8 ? H.walk[Math.floor(this.t / 5) % 8] : H.stand;
-    Sprites.draw(ctx, hs, hx - hs.mx, 172);
+    Sprites.draw(ctx, hs, hx - hs.mx, 204 - hs.h);
     ctx.fillStyle = '#202020'; ctx.fillRect(0, 204, View.w, 4);
     if (this.t > 60 && (this.t >> 5) % 2) Font.draw(ctx, tr('next'), View.w - 6, 228, '#7c7c7c', { align: 'right' });
   },
@@ -642,10 +647,17 @@ const Game = {
     const cx = View.cx;
     this.big(ctx, 'GAME OVER', cx, 80, 3, LOGO, '#200000', '#000');
     Font.draw(ctx, 'SCORE ' + String(W.score).padStart(6, '0'), cx, 120, '#bcbcbc', { align: 'center' });
-    [tr('cont'), tr('toTitle')].forEach((s, i) => {
-      Font.draw(ctx, s, cx - 16, 150 + i * 14, i === this.sel ? '#fcfcfc' : '#7c7c7c');
-      if (i === this.sel) Sprites.draw(ctx, Sprites.S.heartS, cx - 30, 149 + i * 14);
-    });
+    const left = 9 - Math.floor(this.t / 60);
+    if (left >= 0) {
+      Font.draw(ctx, tr('continueQ'), cx, 140, '#fcfcfc', { align: 'center', shadow: '#000' });
+      const pop = (this.t % 60) < 8 ? 1 : 0;
+      this.big(ctx, String(left), cx, 154 - pop * 3, 4 + pop, ['#fcfcfc', '#fce0a8', '#f8b800', '#f8b800', '#f87800', '#d82800', '#881400'], '#200000', '#000');
+      if ((this.t >> 4) % 2) Font.draw(ctx, tr('pressStart'), cx, 200, '#bcbcbc', { align: 'center' });
+    }
+  },
+  drawHurry(ctx) { // blinkendes HURRY UP!
+    if ((this.hurryT >> 3) % 2) return;
+    this.big(ctx, tr('hurry'), View.cx, 96, 3, ['#fcfcfc', '#fcbca0', '#fc7460', '#e83c20', '#d82800', '#a80020', '#580008'], null, '#000');
   },
 
   drawEnding(ctx) {
