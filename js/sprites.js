@@ -100,7 +100,7 @@ const Sprites = (() => {
       x.fillStyle = '#fcfcfc'; x.fillRect(0, 0, c.width, c.height);
       return c;
     };
-    spr.white = { c: mk(spr.c), f: mk(spr.f) };
+    spr.white = { c: mk(spr.c), f: mk(spr.f), pv: spr.pv }; // pv: Drehpunkt (Salto-Nachbilder)
     return spr.white;
   }
 

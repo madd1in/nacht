@@ -49,12 +49,18 @@ const Game = {
     this.debugRoom = q.has('room') ? Math.max(0, parseInt(q.get('room'), 10) - 1) : 0;
     this.toTitle();
     let acc = 0, last = performance.now();
+    const seen = new Set();
     const loop = (now) => {
+      requestAnimationFrame(loop); // zuerst neu anmelden: ein Fehler darf die Schleife nicht beenden
       acc += Math.min(100, now - last); last = now;
       let n = 0;
-      while (acc >= 1000 / 60 && n < 4) { this.step(); acc -= 1000 / 60; n++; }
-      this.render();
-      requestAnimationFrame(loop);
+      try {
+        while (acc >= 1000 / 60 && n < 4) { acc -= 1000 / 60; n++; this.step(); }
+        this.render();
+      } catch (e) { // jeden Fehler nur einmal melden, Spiel läuft weiter statt einzufrieren
+        const key = String(e && e.message);
+        if (!seen.has(key)) { seen.add(key); console.error('[NACHTMAHR]', e); }
+      }
     };
     requestAnimationFrame(loop);
   },
