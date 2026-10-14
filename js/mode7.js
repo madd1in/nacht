@@ -4,6 +4,8 @@
 const Mode7 = (() => {
   const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16);
   const RGB = (r, g, b) => (255 << 24) | (b << 16) | (g << 8) | r;
+  const MOBILE_RENDER = !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  let lastMobileDraw = -Infinity;
 
   // ---------------- Tunnel ----------------
   const TEX = 64;
@@ -30,22 +32,28 @@ const Mode7 = (() => {
       L.b[i] = BAY[(y & 3) * 4 + (X & 3)];
     }
   }
-  // Rotierender, pulsierender Tunnel (halbe Auflösung, auf Spielfeld hochskaliert)
+  // Mobile refreshed tunnel pixels at 30 Hz and quarter resolution; desktop keeps half resolution/full rate.
   function drawTunnel(ctx, w, t, alpha = 1) {
     if (!tex) makeTex();
-    const tw = Math.ceil(w / 2), th = 104;
-    if (!L || L.w !== tw) setup(tw, th);
-    const rot = Math.floor(t * 0.55), mv = Math.floor(t * 1.1), pulse = 0.8 + 0.2 * Math.sin(t * 0.05);
-    const { buf, a, d, s, b } = L;
-    for (let i = 0, n = tw * th; i < n; i++) {
-      const c = tex[((d[i] + mv) & (TEX - 1)) * TEX + ((a[i] + rot) & (TEX - 1))];
-      const k = Math.min(1, Math.floor(s[i] * pulse * 6 + b[i]) / 6); // gestufte, geditherte Tiefe
-      buf[i] = (255 << 24) | ((((c >> 16) & 255) * k) << 16) | ((((c >> 8) & 255) * k) << 8) | ((c & 255) * k);
+    const scale = MOBILE_RENDER ? 4 : 2;
+    const tw = Math.ceil(w / scale), th = 208 / scale;
+    const resized = !L || L.w !== tw || L.h !== th;
+    if (resized) setup(tw, th);
+    const now = MOBILE_RENDER ? performance.now() : 0;
+    if (!MOBILE_RENDER || resized || now - lastMobileDraw >= 1000 / 30) {
+      const rot = Math.floor(t * 0.55), mv = Math.floor(t * 1.1), pulse = 0.8 + 0.2 * Math.sin(t * 0.05);
+      const { buf, a, d, s, b } = L;
+      for (let i = 0, n = tw * th; i < n; i++) {
+        const c = tex[((d[i] + mv) & (TEX - 1)) * TEX + ((a[i] + rot) & (TEX - 1))];
+        const k = Math.min(1, Math.floor(s[i] * pulse * 6 + b[i]) / 6); // gestufte, geditherte Tiefe
+        buf[i] = (255 << 24) | ((((c >> 16) & 255) * k) << 16) | ((((c >> 8) & 255) * k) << 8) | ((c & 255) * k);
+      }
+      L.x.putImageData(L.img, 0, 0);
+      if (MOBILE_RENDER) lastMobileDraw = now;
     }
-    L.x.putImageData(L.img, 0, 0);
     ctx.save();
     ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(L.c, 0, 0, tw, th, 0, 0, tw * 2, 208);
+    ctx.drawImage(L.c, 0, 0, tw, th, 0, 0, w, 208);
     ctx.globalCompositeOperation = 'lighter'; // glühender Kern
     const core = FX.disc(30, [200, 30, 70], [0.55, 0.32, 0.16, 0.06]);
     ctx.globalAlpha = alpha * (0.6 + 0.3 * Math.sin(t * 0.08));
@@ -109,9 +117,11 @@ const Mode7 = (() => {
   function wave(ctx, y0, h, w, amp, t, freq = 0.09) {
     if (amp <= 0.05) return;
     const cv = ctx.canvas;
-    for (let y = 0; y < h; y++) {
-      const off = Math.round(Math.sin(y * freq + t * 0.12) * amp);
-      if (off) ctx.drawImage(cv, 0, y0 + y, w, 1, off, y0 + y, w, 1);
+    const band = MOBILE_RENDER ? 4 : 1;
+    for (let y = 0; y < h; y += band) {
+      const rows = Math.min(band, h - y);
+      const off = Math.round(Math.sin((y + rows / 2) * freq + t * 0.12) * amp);
+      if (off) ctx.drawImage(cv, 0, y0 + y, w, rows, off, y0 + y, w, rows);
     }
   }
   let mc = null;

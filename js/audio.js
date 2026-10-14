@@ -151,17 +151,17 @@ const Audio8 = (() => {
   const gallop = (lo, hi) => `${lo}:2 ${hi}:1 ${hi}:1 ${lo}:2 ${hi}:1 ${hi}:1 ${lo}:2 ${hi}:1 ${hi}:1 ${lo}:1 ${hi}:1 ${lo}:1 ${hi}:1`;
   const drive = (lo, hi) => rep(`${lo}:1 ${lo}:1 ${hi}:1 ${lo}:1`, 4);
   const ROCKX = 'x:1 h:1 h:1 h:1 s:1 h:1 h:1 k:1 k:1 h:1 k:1 h:1 s:1 h:1 o:1 h:1';
-  const FILL = 'k:1 h:1 s:1 h:1 k:1 s:1 s:1 h:1 t:1 t:1 u:1 u:1 s:1 s:1 s:1 s:1';
+  const FILL = 'k:1 h:1 s:1 h:1 k:1 h:1 s:1 h:1 t:1 h:1 u:1 h:1 k:1 t:1 u:1 h:1';
   // Treibender Four-on-the-floor-Beat: Kick auf jedem Viertel, Snare 2+4, offene Hats auf den Offbeats
   const FOUR = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
   const FOURX = 'x:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
-  const FILLS = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 k:1 k:1 s:1 k:1 s:1 q:1 s:1 s:1 s:1';
-  const FILLB = 'k:1 s:1 s:1 k:1 s:1 s:1 t:1 t:1 u:1 u:1 t:1 u:1 q:1 s:1 q:1 s:1';
+  const FILLS = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 h:1 q:1 h:1 t:1 u:1';
+  const FILLB = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 t:1 u:1 q:1 h:1 o:1 h:1';
   const section = () => [FOURX, FOUR, FOUR, FILLS, FOUR, FOUR, FOUR, FILLB].join(' ');
   // B-Teil: galoppierende Kick (kein Dauerfeuer), Tom-Fill und Riser vor dem Loop
   const DK = 'k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1 k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1';
   const DKX = 'x:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1 k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1';
-  const FILLR = 'k:1 s:1 s:1 k:1 t:1 t:1 u:1 u:1 w:8';
+  const FILLR = 'k:1 h:1 o:1 h:1 q:1 h:1 t:1 u:1 w:8';
   const sectionB = () => [DKX, DK, DK, FILLS, DK, DK, DK, FILLR].join(' ');
   // 3er-Arpeggio gegen den 4er-Takt: verschiebt sich ständig und treibt nach vorn
   const arp3 = (a, b, c) => Array.from({ length: 16 }, (_, i) => [a, b, c][i % 3] + ':1').join(' ');
@@ -317,7 +317,7 @@ const Audio8 = (() => {
       noise(0.02, 0.25, 'lowpass', 2500, null, t, musicBus);
     }
     if (n === 'x' || n === 'c') noise(0.7, 0.22, 'highpass', 6000, 2500, t, musicBus);
-    if (n === 's' || n === 'q') { noise(0.14, 0.38, 'bandpass', 1900, 900, t, musicBus); tone2('triangle', 240, 120, 0.06, 0.25, t); }
+    if (n === 's' || n === 'q') { noise(0.14, 0.3, 'bandpass', 1900, 900, t, musicBus); tone2('triangle', 240, 120, 0.06, 0.19, t); }
     else if (n === 'h') noise(0.03, 0.13, 'highpass', 8000, null, t, musicBus);
     else if (n === 'o') noise(0.12, 0.13, 'highpass', 7000, null, t, musicBus);
     else if (n === 't') tone2('triangle', 300, 120, 0.12, 0.45, t);
