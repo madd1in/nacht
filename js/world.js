@@ -21,7 +21,7 @@ const W = {
     this.room = { ...def, grid: def.grid.map(r => r.slice()) };
     this.ents = []; this.platforms = []; this.boss = null;
     this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0;
-    this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0;
+    this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
     this.spawners = def.zones.map(z => new Spawner(z));
     const torch = def.theme === 'courtyard';
     def.ents.forEach(d => {
@@ -69,7 +69,13 @@ const W = {
   },
 
   // Combo: Treffer in schneller Folge erhöhen den Punkte-Multiplikator
-  comboHit() { const c = this.combo; c.n++; c.t = 150; c.best = Math.max(c.best, c.n); c.pop = 8; },
+  comboHit() {
+    const c = this.combo; c.n++; c.t = 150; c.best = Math.max(c.best, c.n); c.pop = 8;
+    if (c.n === 10 || (c.n > 10 && c.n % 15 === 10)) { // Blutrausch: doppelter Schaden für 6 Sekunden
+      const p = this.player; p.rageT = 360;
+      this.popup(p.cx, p.y - 10, tr('rage'), '#fc3c3c'); Audio8.sfx('roar'); Input.rumble(0.6, 0.8, 300); this.shake = 8;
+    }
+  },
   comboMul() { return 1 + Math.min(3, Math.floor(this.combo.n / 5)); },
 
   applyCheckpoint() {
@@ -259,8 +265,11 @@ const W = {
     this.player.updateScarf();
     this.updateCam();
     FX.updateAmbient(this.room.theme, this.cam);
-    this.spawners.forEach(s => s.update());
-    for (const e of this.ents) if (!e.dead && e.kind !== 'platform') e.update();
+    if (this.stopT > 0) this.stopT--;
+    if (this.player.rageT > 0) this.player.rageT--;
+    const stopped = this.stopT > 0;
+    if (!stopped) this.spawners.forEach(s => s.update());
+    for (const e of this.ents) if (!e.dead && e.kind !== 'platform' && !(stopped && (e.kind === 'enemy' || e.kind === 'eproj'))) e.update();
     if (this.crash) this.updateCrash();
     if (this.cinema > 0) this.cinema--;
     if (this.bossEnraged && this.room.theme === 'throne') this.vortexBg++;
@@ -308,6 +317,7 @@ const W = {
     if (storm && FX.stormOn(storm)) { ctx.fillStyle = 'rgba(220,214,255,0.16)'; ctx.fillRect(0, 0, vw, 208); }
     FX.render(ctx, this.collectLights(), theme);
     Rays.draw(ctx, this.room, this.cam, this.frame);
+    if (this.stopT > 0 && (this.stopT > 50 || (this.stopT & 4))) { ctx.fillStyle = 'rgba(120,150,230,0.16)'; ctx.fillRect(0, 0, vw, 208); } // angehaltene Zeit
     const p = this.player;
     if (p.alive && p.hp <= p.maxHp / 4) Drama.drawDanger(ctx, vw, 0.35 + Math.sin(this.frame * 0.14) * 0.2);
     if (this.flash > 0 && (this.flash % 6) < 3) { ctx.fillStyle = 'rgba(252,252,252,0.45)'; ctx.fillRect(-4, -4, vw + 8, 216); }

@@ -80,7 +80,7 @@ class SwarmBat extends Ent {
     this.vx = Math.cos(a) * sp; this.vy = Math.sin(a) * sp - 0.6; this.ph = Math.random() * 6;
   }
   update() { this.t++; this.x += this.vx; this.y += this.vy + Math.sin(this.t * 0.3 + this.ph) * 0.8; if (this.t > 150) this.dead = true; }
-  draw(ctx) { Sprites.draw(ctx, Sprites.S.bat.fly[Math.floor(this.t / 4) % 2], Math.round(this.x - 8 - W.cam.x), Math.round(this.y - W.cam.y), this.vx < 0); }
+  draw(ctx) { const s = Sprites.S.bat.fly[Math.floor(this.t / 3) % 4]; Sprites.draw(ctx, s, Math.round(this.x - s.w / 2 - W.cam.x), Math.round(this.y - 4 - W.cam.y), this.vx < 0); }
 }
 
 class Boss extends Enemy {
@@ -207,7 +207,7 @@ class GiantBat extends Boss {
 
 class GiantSkeleton extends Boss {
   constructor(ax, aw) {
-    super(ax + aw - 60, 176 - 44, 20, 44, 24, 3);
+    super(ax + aw - 60, 176 - 64, 24, 64, 24, 3); // Riese in doppelter Heldengröße
     this.ax = ax; this.aw = aw; this.state = 'rise'; this.face = -1; this.next = 'throw'; this.score = 4000;
   }
   update() {
@@ -268,11 +268,11 @@ class GiantSkeleton extends Boss {
 
 class Count extends Boss {
   constructor(ax, aw) {
-    super(ax + aw - 80, 176 - 40, 16, 40, 24, 3);
+    super(ax + aw - 80, 176 - 36, 16, 36, 24, 3);
     this.ax = ax; this.aw = aw; this.state = 'appear'; this.timer = 0; this.cycle = 0; this.score = 10000;
   }
   vulnerable() { return this.state === 'open'; }
-  hurtBox() { return { x: this.x - 3, y: this.y, w: this.w + 6, h: 28 }; }
+  hurtBox() { return { x: this.x - 3, y: this.y, w: this.w + 6, h: 26 }; }
   update() {
     this.tick();
     if (this.dying) {
@@ -316,11 +316,11 @@ class Count extends Boss {
     const C = Sprites.S.count;
     if ((this.state === 'appear' || this.state === 'vanish') && (this.t & 2)) return;
     const s = this.state === 'open' ? C.open : C.closed;
-    this.ds(ctx, s, Math.round(this.cx - 12 - W.cam.x), Math.round(this.y + this.h - 40 - W.cam.y), false, this.flash);
+    this.spr(ctx, s, W.player.cx < this.cx, 0, 0, this.flash);
     if (this.state === 'open' && this.timer < 10) { // Augenblitz
-      ctx.fillStyle = (this.t & 2) ? PAL.r : PAL.w;
-      ctx.fillRect(Math.round(this.cx - 3 - W.cam.x), Math.round(this.y + 5 - W.cam.y), 1, 1);
-      ctx.fillRect(Math.round(this.cx + 2 - W.cam.x), Math.round(this.y + 5 - W.cam.y), 1, 1);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7;
+      ctx.drawImage(FX.disc(8, [252, 40, 40], [0.7, 0.4, 0.15]), Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - 2 - W.cam.y));
+      ctx.restore();
     }
   }
 }

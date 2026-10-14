@@ -66,7 +66,7 @@ const ITEM_SPR = {
   heartS: () => Sprites.S.heartS, heartB: () => Sprites.S.heartB, bag: () => Sprites.S.bag, bagBig: () => Sprites.S.bagBig,
   whip: () => Sprites.S.whipUp, dagger: () => Sprites.S.dagger, axe: () => Sprites.S.axe, holy: () => Sprites.S.holy,
   cross: () => Sprites.S.cross, rosary: () => Sprites.S.rosary, roast: () => Sprites.S.roast, oneUp: () => Sprites.S.oneUp,
-  orb: () => Sprites.S.orb[Math.floor(W.frame / 8) % 2],
+  orb: () => Sprites.S.orb[Math.floor(W.frame / 8) % 2], watch: () => Sprites.S.watch,
 };
 
 class Item extends Ent {
@@ -114,7 +114,7 @@ class Item extends Ent {
 
 function rollDrop(drop) {
   const p = W.player;
-  const map = { '1': 'dagger', '2': 'axe', '3': 'holy', '4': 'cross', W: 'whip', H: 'heartB', R: 'rosary', $: 'bag', U: 'oneUp' };
+  const map = { '1': 'dagger', '2': 'axe', '3': 'holy', '4': 'cross', '5': 'watch', W: 'whip', H: 'heartB', R: 'rosary', $: 'bag', U: 'oneUp' };
   if (drop === 'W' && p.whip >= 3) return 'heartB';
   if (map[drop]) return map[drop];
   const r = Math.random();
@@ -302,8 +302,8 @@ class Bat extends Enemy {
   }
   draw(ctx) {
     const B = Sprites.S.bat;
-    const s = this.state === 'perch' ? B.perch : B.fly[Math.floor(this.t / 6) % 2];
-    this.ds(ctx, s, Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - W.cam.y - 1), false, this.flash);
+    const s = this.state === 'perch' ? B.perch : B.fly[Math.floor(this.t / 4) % 4];
+    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.y - W.cam.y - 4), this.dir < 0, this.flash);
   }
 }
 

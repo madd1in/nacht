@@ -105,7 +105,8 @@ class Ghost extends Enemy {
   draw(ctx) {
     if (this.alpha <= 0) return;
     ctx.globalAlpha = this.alpha * (this.solidNow ? 0.9 : 0.5);
-    this.ds(ctx, Sprites.S.ghost[Math.floor(this.t / 10) % 2], Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - 2 - W.cam.y), this.face < 0, this.flash);
+    const s = Sprites.S.ghost[Math.floor(this.t / 10) % 2];
+    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.y - 6 - W.cam.y), this.face < 0, this.flash);
     ctx.globalAlpha = 1;
   }
 }

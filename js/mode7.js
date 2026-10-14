@@ -29,33 +29,37 @@ const Mode7 = (() => {
       }
       if (v > 0.5 && v < 0.53) { P('#2c0c3c', bx + 8, by + 6, 10, 1); P('#2c0c3c', bx + 14, by + 7, 6, 1); } // Riss
     }
-    for (let X = 0; X < TW; X += 128) { // goldene Stützrippen quer zur Achse
+    for (let X = 0; X < TW; X += 64) { // goldene Stützrippen quer zur Achse (biegen sich in der Röhre)
       P('#2c1400', X, 0, 12, TH); P('#8c5800', X + 1, 0, 10, TH); P('#e8b030', X + 2, 0, 3, TH); P('#5c3400', X + 9, 0, 2, TH);
       for (let Y = 4; Y < TH; Y += 16) { P('#fcd880', X + 4, Y, 3, 3); P('#5c3400', X + 5, Y + 3, 2, 1); }
     }
     for (let k = 1; k < 4; k++) x.drawImage(tex, 0, 0, TW, TH, k * TW, 0, TW, TH);
   }
-  function makeShade(w) { // Rundung: zu den Rändern hin dunkler (weicher Verlauf + violetter Saum)
+  const FOC = 92; // Brennweite der Röhre: kleiner = stärker gekrümmt
+  function makeShade(w) { // ferne Rückwand (Mitte) im Dunst, nahe Wand oben/unten heller; seitliche Vignette
     shadeW = w; shadeC = Sprites.canvas(w, 208);
-    const x = shadeC.getContext('2d'), R = 104 * 1.12;
+    const x = shadeC.getContext('2d');
     for (let y = 0; y < 208; y++) {
-      const c = Math.cos(Math.asin((y + 0.5 - 104) / R));
-      x.fillStyle = `rgba(6,0,14,${Math.min(0.95, (1 - c) * 1.5)})`; x.fillRect(0, y, w, 1);
-      if (c > 0.97) { x.fillStyle = 'rgba(255,180,255,0.05)'; x.fillRect(0, y, w, 1); } // Glanz vorne
+      const c = Math.cos(Math.atan((y + 0.5 - 104) / FOC));
+      x.fillStyle = `rgba(14,0,30,${(0.62 * Math.pow(c, 3)).toFixed(3)})`; x.fillRect(0, y, w, 1);
     }
+    const g = x.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(0.18, 'rgba(0,0,0,0)'); g.addColorStop(0.82, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
+    x.fillStyle = g; x.fillRect(0, 0, w, 208);
   }
   function drawTunnel(ctx, w, t, alpha = 1) {
     if (!tex) makeTex();
     if (!shadeC || shadeW !== w) makeShade(w);
     const camX = (typeof W !== 'undefined' && W.cam) ? W.cam.x : 0;
-    const R = 104 * 1.12, rot = t * 0.9, step = MOBILE_RENDER ? 2 : 1;
-    const sx = ((Math.floor(camX * 0.35) % TW) + TW) % TW;
+    const rot = t * 0.9, step = MOBILE_RENDER ? 2 : 1;
+    const mid = (((camX * 0.35) % TW) + TW) % TW + 384; // Bildmitte in der (4x breiten) Textur
     ctx.save();
     ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false;
     for (let y = 0; y < 208; y += step) {
-      const th = Math.asin((y + step / 2 - 104) / R); // Winkel auf dem Zylinder
-      const v = ((Math.floor(th * TH * 0.55 + rot) % TH) + TH) % TH;
-      ctx.drawImage(tex, sx, v, w, 1, 0, y, w, step);
+      const yy = y + step / 2 - 104, phi = Math.atan(yy / FOC); // Blickwinkel auf die Röhreninnenseite
+      const v = ((Math.floor(phi * TH * 0.62 + rot) % TH) + TH) % TH;
+      const sw = w / Math.sqrt(1 + (yy / FOC) ** 2); // nahe Wand → größer: senkrechte Rippen biegen sich
+      ctx.drawImage(tex, mid - sw / 2, v, sw, 1, 0, y, w, step);
     }
     ctx.drawImage(shadeC, 0, 0);
     ctx.restore();

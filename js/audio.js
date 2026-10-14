@@ -17,6 +17,18 @@ const Audio8 = (() => {
     comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.15;
     comp.connect(ac.destination);
     master = ac.createGain(); master.gain.value = muted ? 0 : 0.7; master.connect(comp);
+    // SNES-artiger Hall: erzeugte Impulsantwort (dunkel, ~2 s), leise beigemischt
+    const rev = ac.createConvolver(), len = Math.floor(ac.sampleRate * 2.1), ir = ac.createBuffer(2, len, ac.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch); let lp = 0;
+      let e = 0;
+      for (let i = 0; i < len; i++) { lp += ((Math.random() * 2 - 1) - lp) * 0.18; d[i] = lp * Math.pow(1 - i / len, 2.6) * (i < 400 ? i / 400 : 1); e += d[i] * d[i]; }
+      const k = 1 / Math.sqrt(e || 1); // auf Energie 1 normieren
+      for (let i = 0; i < len; i++) d[i] *= k;
+    }
+    rev.buffer = ir;
+    const wet = ac.createGain(); wet.gain.value = 0.32;
+    master.connect(rev); rev.connect(wet); wet.connect(comp);
     duckBus = ac.createGain(); duckBus.connect(master); // wird während der Sprachausgabe abgesenkt
     voiceBus = ac.createGain(); voiceBus.gain.value = 1.3; voiceBus.connect(master);
     musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(duckBus);
@@ -126,6 +138,8 @@ const Audio8 = (() => {
       });
     },
     boom: () => { noise(2.2, 0.6, 'lowpass', 500, 35); tone('triangle', 70, 28, 1.8, 0.5); tone('pulse', 55, 30, 0.9, 0.12, 0.5); },
+    crack: () => { noise(0.05, 0.42, 'highpass', 3500); tone('square', 2600, 900, 0.025, 0.07); },
+    watch: () => { arp(['c6', 'g5', 'c6', 'g5', 'c6'], 0.08, 'pulse', 0.12, 0.125); tone('triangle', 1760, 1720, 0.9, 0.1); },
     creak: () => { tone('sawtooth', 74, 56, 0.55, 0.05); noise(0.45, 0.05, 'bandpass', 420, 240); },
     cog: () => { noise(0.03, 0.1, 'highpass', 3200); tone('pulse', 1900, 1750, 0.025, 0.045, 0.125); },
     latch: () => { tone('pulse', 1800, 2600, 0.06, 0.12, 0.125); noise(0.08, 0.2, 'highpass', 5000); },
@@ -173,6 +187,7 @@ const Audio8 = (() => {
   const chordArps = (list, m) => list.map(c => arp3(...m[c])).join(' ');
   const arp3f = (a, b, c) => Array.from({ length: 32 }, (_, i) => [a, b, c][i % 3] + ':0.5').join(' '); // 32tel
   const chordArps2 = (list, m) => list.map(c => arp3(...m[c])).join(' ') + ' ' + list.map(c => arp3f(...m[c])).join(' ');
+  const chordPad = (list, m) => rep(list.map(c => m[c].join('+') + ':16').join(' '), 2); // Streicher-Fläche
   const chordBass = (list, m, fn) => rep(list.map(c => fn(...m[c])).join(' '), 2);
 
   // Stage 1 – Burgsturm (d-Moll, 168 BPM)
@@ -211,7 +226,7 @@ const Audio8 = (() => {
         'f5:2 a#5:2 d6:2 f6:4 d6:2 a#5:2 f5:2', 'e5:2 g5:2 c6:2 e6:4 d6:2 c6:2 a#5:2',
         'a5:2 c#6:2 e6:2 a6:4 g6:2 f6:2 e6:2', 'c#6:2 a5:2 e5:2 c#5:2 a4:4 -:4',
       ]),
-      p2: chordArps2(S1C, S1), tri: chordBass(S1C, S1B, drive), dr: section() + ' ' + sectionB(),
+      p2: chordArps2(S1C, S1), tri: chordBass(S1C, S1B, drive), pad: chordPad(S1C, S1), dr: section() + ' ' + sectionB(),
     },
     stage2: {
       bpm: 166, loop: true, echo: { delay: 3, vol: 0.35 },
@@ -225,7 +240,7 @@ const Audio8 = (() => {
         'c6:3 b5:1 a5:2 f5:2 a5:2 c6:2 f6:4', 'd6:3 c6:1 b5:2 g5:2 b5:2 d6:2 g6:4',
         'e6:2 d6:2 b5:2 g#5:2 b5:2 g#5:2 e5:2 d5:2', 'b4:2 e5:2 g#5:2 b5:2 e6:8',
       ]),
-      p2: chordArps2(S2C, S2), tri: chordBass(S2C, S2B, drive), dr: section() + ' ' + sectionB(),
+      p2: chordArps2(S2C, S2), tri: chordBass(S2C, S2B, drive), pad: chordPad(S2C, S2), dr: section() + ' ' + sectionB(),
     },
     stage3: {
       bpm: 184, loop: true, echo: { delay: 3, vol: 0.3 },
@@ -239,7 +254,7 @@ const Audio8 = (() => {
         'e6:2 c6:2 g5:2 c6:2 e6:2 g6:2 e6:2 c6:2', 'f#6:2 d6:2 a5:2 d6:2 f#6:2 a6:2 f#6:2 d6:2',
         'd#6:2 f#6:2 b6:4 a6:2 f#6:2 d#6:2 b5:2', 'b5:4 a5:2 g5:2 f#5:4 d#5:4',
       ]),
-      p2: chordArps2(S3C, S3), tri: chordBass(S3C, S3B, drive), dr: section() + ' ' + sectionB(),
+      p2: chordArps2(S3C, S3), tri: chordBass(S3C, S3B, drive), pad: chordPad(S3C, S3), dr: section() + ' ' + sectionB(),
     },
     boss: {
       bpm: 192, loop: true, echo: { delay: 2, vol: 0.28 },
@@ -251,6 +266,7 @@ const Audio8 = (() => {
       ].join(' '),
       p2: [rep('d4:1 d5:1', 16), rep('d#4:1 d#5:1', 16), rep('d4:1 d5:1', 16), rep('c#4:1 c#5:1', 16)].join(' '),
       tri: [drive('d2', 'd3'), drive('d2', 'd3'), drive('d#2', 'd#3'), drive('d#2', 'd#3'), drive('d2', 'd3'), drive('d2', 'd3'), drive('c#2', 'c#3'), drive('c#2', 'c#3')].join(' '),
+      pad: 'd3+f3+a3:32 d#3+g3+a#3:32 d3+f3+a3:32 c#3+e3+g#3:32',
       dr: [FOURX, DK, FOUR, FILLS, DK, DK, DK, FILLR].join(' '),
     },
     clear: {
