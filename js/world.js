@@ -4,7 +4,7 @@
 const W = {
   room: null, stage: 0, roomIdx: 0, ents: [], platforms: [], stairs: [], spawners: [],
   player: null, cam: { x: 0, y: 0 }, camYf: 0, frame: 0, atkId: 0,
-  score: 0, lives: 3, time: 300, timeSub: 0, nextLife: 20000, bloodT: 0, stageFrames: 0,
+  score: 0, lives: 3, time: 300, timeSub: 0, nextLife: 20000, bloodT: 0, stageFrames: 0, stats: { hits: 0, deaths: 0, combo: 0 }, sway: { a: 0, v: 0 }, zoomFx: null, bellCd: 0,
   camLock: false, camTarget: null, boss: null, arenaOn: false, arenaX: 0, arenaW: 0,
   freeze: 0, hitstop: 0, shake: 0, flash: 0, cleared: false, lightning: 0, lightningCD: 300,
   checkpoint: null, crash: null, exiting: false, storm: { cd: 100, flash: 0, bolt: null },
@@ -23,6 +23,7 @@ const W = {
     this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0;
     this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
     if (this.bloodT > 0) { this.bloodT = 0; Audio8.tempo(1); }
+    this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200;
     this.spawners = def.zones.map(z => new Spawner(z));
     const torch = def.theme === 'courtyard';
     def.ents.forEach(d => {
@@ -72,12 +73,36 @@ const W = {
   // Combo: Treffer in schneller Folge erhöhen den Punkte-Multiplikator
   comboHit() {
     const c = this.combo; c.n++; c.t = 150; c.best = Math.max(c.best, c.n); c.pop = 8;
+    this.stats.combo = Math.max(this.stats.combo, c.n);
+    const hype = [5, 15, 25, 40, 60].indexOf(c.n); // Arcade-Ansager bei Combo-Meilensteinen
+    if (hype >= 0) Game.announce(hype);
     if (c.n === 10 || (c.n > 10 && c.n % 15 === 10)) { // Blutrausch: doppelter Schaden für 6 Sekunden
       const p = this.player; p.rageT = 360;
       this.popup(p.cx, p.y - 10, tr('rage'), '#fc3c3c'); Audio8.sfx('roar'); Input.rumble(0.6, 0.8, 300); this.shake = 8;
     }
   },
   comboMul() { return (1 + Math.min(3, Math.floor(this.combo.n / 5))) * (this.bloodT > 0 ? 2 : 1); }, // Blutmond: doppelte Punkte
+
+  // Turmglocke schlägt: Turm schwankt, Staub rieselt von der Decke
+  tollBell() {
+    this.bellCd = 480 + Math.floor(rnd(0, 240));
+    Audio8.sfx('bell'); Input.rumble(0.45, 0.3, 600); this.shake = Math.max(this.shake, 6);
+    this.sway.v += (Math.random() < 0.5 ? -1 : 1) * 0.0045;
+    for (let i = 0; i < 14; i++) this.spawn(new Particle(this.cam.x + rnd(0, View.w), this.cam.y + rnd(0, 24), rnd(-0.2, 0.2), rnd(0, 0.6), i % 2 ? '#7c7c7c' : '#bcbcbc', 90, 1, 0.05));
+  },
+
+  // SNES-Kamera: Drehung (Schwanken) und Zoom (Boss-Auftritt) des ganzen Spielfelds
+  applyCamFx(ctx, vw) {
+    const rot = this.sway.a, zf = this.zoomFx;
+    let z = 1, px = vw / 2, py = 104;
+    if (zf) {
+      z = 1 + zf.amp * Math.sin(Math.min(1, zf.t / zf.len) * Math.PI);
+      if (zf.b) { px = clamp(zf.b.cx - this.cam.x, 40, vw - 40); py = clamp(zf.b.cy - this.cam.y, 40, 168); }
+    }
+    if (!rot && z === 1) return;
+    const cover = 1 + Math.abs(rot) * (vw / 208 + 0.3); // leicht vergrößern, damit keine Ecken frei werden
+    ctx.translate(px, py); ctx.rotate(rot); ctx.scale(z * cover, z * cover); ctx.translate(-px, -py);
+  },
 
   // Blutmond (rote Kerze): 12 s doppelte Punkte, mehr Herzen, rote Nacht, Musik zieht an
   bloodMoon(x, y) {
@@ -246,6 +271,7 @@ const W = {
         this.cam.x = this.camTarget; this.camTarget = null;
         this.boss = this.spawn(new BOSSES[r.arena.boss](this.arenaX, this.arenaW));
         Audio8.play('boss'); Audio8.sfx('roar'); Input.rumble(0.8, 0.5, 700);
+        this.zoomFx = { t: 0, len: 84, amp: 0.16, b: this.boss }; // Kamera fährt auf den Boss zu
         this.cinema = 110; this.flash = 8; this.shake = 26;
         this.spawn(new Shock(this.boss.cx, this.boss.cy, 120, '#d82800', 5));
       }
@@ -276,6 +302,10 @@ const W = {
     FX.updateAmbient(this.room.theme, this.cam);
     if (this.stopT > 0) this.stopT--;
     if (this.bloodT > 0 && --this.bloodT === 0) Audio8.tempo(this.time <= 60 ? 1.12 : 1);
+    if (this.room.bell && --this.bellCd <= 0) this.tollBell();
+    const sw = this.sway; // gedämpfte Pendelbewegung des Bildes
+    if (sw.a || sw.v) { sw.v = (sw.v - sw.a * 0.012) * 0.985; sw.a += sw.v; if (Math.abs(sw.a) < 0.0004 && Math.abs(sw.v) < 0.0001) { sw.a = 0; sw.v = 0; } }
+    if (this.zoomFx && ++this.zoomFx.t > this.zoomFx.len) this.zoomFx = null;
     if (this.player.rageT > 0) this.player.rageT--;
     const stopped = this.stopT > 0;
     if (!stopped) this.spawners.forEach(s => s.update());
@@ -288,6 +318,7 @@ const W = {
     const b = this.boss;
     if (b && !b.dying && !this.bossEnraged && b.hp <= b.maxHp / 2) { // Phase 2: Musik eskaliert
       this.bossEnraged = true; Audio8.stop(); Audio8.play('boss2'); Audio8.sfx('roar');
+      this.zoomFx = { t: 0, len: 46, amp: 0.1, b };
       if (this.room.theme === 'throne') Voice.say('taunt'); // der Graf spottet
       this.flash = 8; this.shake = 18; this.spawn(new Shock(b.cx, b.cy, 110, '#a80020', 5)); Input.rumble(0.7, 0.4, 500);
     }
@@ -314,6 +345,7 @@ const W = {
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 32, vw, 208); ctx.clip();
     ctx.translate(sx, 32 + sy);
+    this.applyCamFx(ctx, vw);
     const storm = theme === 'courtyard' ? this.storm : null;
     Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); FX.drawFlock(c); } : null);
     this.drawDoor(ctx);

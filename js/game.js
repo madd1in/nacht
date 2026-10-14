@@ -140,6 +140,7 @@ const Game = {
 
   startStage(s, room = 0) {
     W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0;
+    W.stats = { hits: 0, deaths: 0, combo: 0 };
     if (this.pendingView) this.applyView(this.pendingView);
     W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1));
     Audio8.stop();
@@ -154,14 +155,29 @@ const Game = {
   },
 
   onPlayerDeath() {
-    W.lives--;
+    W.lives--; W.stats.deaths++;
     if (W.lives < 0) { this.saveHi(); this.sel = 0; this.go('gameover'); Audio8.play('over'); Voice.say('gameover'); return; }
     const p = W.player;
     p.hp = p.maxHp; p.hearts = Options.infHearts ? 99 : Math.max(5, p.hearts); p.whip = Options.maxWhip ? 3 : Math.max(1, p.whip - 1);
     this.go('respawn');
   },
 
-  startClear() { this.go('clear'); this.tallyPhase = 0; Audio8.play('clear'); Voice.say('clear'); this.recordTime(); },
+  startClear() { this.go('clear'); this.tallyPhase = 0; this.annT = 0; Audio8.play('clear'); Voice.say('clear'); this.recordTime(); this.rateStage(); },
+
+  // Arcade-Wertung S–D aus Restzeit, kassierten Treffern, bester Combo und Toden (vor der Zeitbonus-Zählung)
+  rateStage() {
+    const left = W.time / Levels.STAGES[W.stage].time, s = W.stats;
+    const pts = (left >= 0.6 ? 3 : left >= 0.45 ? 2 : left >= 0.3 ? 1 : 0)
+      + (s.hits === 0 ? 3 : s.hits <= 3 ? 2 : s.hits <= 6 ? 1 : 0)
+      + (s.combo >= 20 ? 3 : s.combo >= 12 ? 2 : s.combo >= 6 ? 1 : 0)
+      - s.deaths * 2;
+    this.rank = pts >= 8 ? 'S' : pts >= 6 ? 'A' : pts >= 4 ? 'B' : pts >= 2 ? 'C' : 'D';
+    this.rankBonus = { S: 20000, A: 10000, B: 5000, C: 2000, D: 0 }[this.rank];
+    this.rankT = 0;
+  },
+
+  // Combo-Ansager (Index in tr('hype'))
+  announce(i) { this.annT = 72; this.annIdx = i; Audio8.sfx('announce'); },
 
   // Bestzeit pro Stage (getrennt für den Leicht-Modus), dauerhaft im Browser gespeichert
   recordTime() {
@@ -178,6 +194,9 @@ const Game = {
     Input.update();
     const P = Input.pressed;
     this.t++;
+    // Arcade-Zählwerk: angezeigter Score rollt zum echten hoch
+    if (this.dispScore === undefined || W.score < this.dispScore) this.dispScore = W.score;
+    else if (this.dispScore < W.score) this.dispScore += Math.max(1, Math.ceil((W.score - this.dispScore) / 6));
     if (this.state === 'title' && !this.revealed && (this.t >= 60 || P.start || P.jump || P.attack)) { // Blitz + Logo-Einschlag
       this.revealed = true; this.revealT = 0; if (this.t < 60) Input.clear();
       this.tStorm.cd = 1; Audio8.sfx('boom'); Audio8.sfx('bell'); Input.rumble(0.9, 0.6, 700);
@@ -218,7 +237,7 @@ const Game = {
         else if ((this.t > 60 * 9 && !Voice.busy()) || this.t > 60 * 24) this.newGame(0); // Erzähler ausreden lassen
         break;
       case 'card':
-        if ((this.t > 90 && !Voice.busy()) || this.t > 240 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; }
+        if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
         break;
       case 'play': this.updatePlay(P); break;
       case 'pause':
@@ -234,7 +253,7 @@ const Game = {
           if (this.pendingView) this.applyView(this.pendingView);
           W.loadRoom(W.stage, W.roomIdx); W.applyCheckpoint(); W.time = W.stageDef.time;
         }
-        if (this.t > 44) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.hurryT = 0; }
+        if (this.t > 44) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.hurryT = 0; this.readyT = 1; }
         break;
       case 'clear': this.updateClear(); break;
       case 'gameover': { // Arcade: CONTINUE? 9 … 0 – Taste drücken = sofort weiter in derselben Stage
@@ -279,6 +298,13 @@ const Game = {
 
   updatePlay(P) {
     if (P.start && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); Audio8.sfx('pause'); return; }
+    if (this.readyT > 0) { // READY? … GO! (das Spiel läuft dabei schon)
+      this.readyT++;
+      if (this.readyT === 3) Audio8.sfx('ready');
+      if (this.readyT === 42) Audio8.sfx('go');
+      if (this.readyT > 80) this.readyT = 0;
+    }
+    if (this.annT > 0) this.annT--;
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; } // Zeitlupe
     W.update();
     if (!W.cleared) W.stageFrames++;
@@ -301,9 +327,10 @@ const Game = {
       if (W.time > 0) {
         const n = Math.min(9, W.time); W.time -= n; W.addScore(n * 10);
         if (this.t % 3 === 0) Audio8.sfx('tick');
-      } else { this.tallyPhase = 2; this.t2 = this.t; W.addScore(W.player.hearts * 100); Audio8.sfx('money'); }
+      } else { this.tallyPhase = 2; this.t2 = this.t; W.addScore(W.player.hearts * 100 + this.rankBonus); Audio8.sfx('money'); }
     }
-    if (this.tallyPhase === 2 && this.t - this.t2 > 70) {
+    if (this.tallyPhase === 2 && ++this.rankT === 25) { Audio8.sfx('stamp'); W.shake = 10; Input.rumble(0.5, 0.5, 250); } // Rang-Stempel
+    if (this.tallyPhase === 2 && this.t - this.t2 > 150) {
       if (W.stage + 1 < Levels.STAGES.length) { W.player.hp = W.player.maxHp; this.startStage(W.stage + 1); }
       else { this.saveHi(); this.go('ending'); Audio8.play('ending'); this.rubble = []; }
     }
@@ -332,6 +359,8 @@ const Game = {
         if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 30 ? this.t / 28 : 1 - (this.t - 30) / 14);
         if (this.hurryT > 0 && this.state === 'play') this.drawHurry(ctx);
         if (this.state === 'play' && W.boss && this.bossName > 0 && this.bossName < 150) this.drawBossBanner(ctx);
+        if (this.state === 'play' && this.readyT > 0) this.drawReady(ctx);
+        if (this.state === 'play' && this.annT > 0) this.drawAnnounce(ctx);
         if (this.state === 'clear') this.drawClear(ctx);
     }
     this.drawToast(ctx);
@@ -358,7 +387,29 @@ const Game = {
     ctx.globalAlpha = c.t < 30 ? c.t / 30 : 1;
     const s = c.pop > 0 ? 3 : 2, mul = W.comboMul();
     this.big(ctx, c.n + ' COMBO', 8 + Font.width(c.n + ' COMBO') * s / 2, 38 - (s - 2) * 2, s, ['#fcfcfc', '#fce0a8', '#f8b800', '#f8b800', '#f87800', '#d82800', '#881400'], null, '#000');
-    if (mul > 1) Font.draw(ctx, tr('scoreX', mul), 10, 58, '#fce0a8', { shadow: '#000' });
+    // Combo-Zeitbalken: läuft ab, wenn kein Treffer nachkommt
+    ctx.fillStyle = '#000'; ctx.fillRect(9, 53, 44, 4);
+    ctx.fillStyle = c.t < 45 && (W.frame & 4) ? '#fc7460' : '#f8b800'; ctx.fillRect(10, 54, Math.round(42 * c.t / 150), 2);
+    if (mul > 1) Font.draw(ctx, tr('scoreX', mul), 10, 59, '#fce0a8', { shadow: '#000' });
+    ctx.globalAlpha = 1;
+  },
+
+  drawReady(ctx) {
+    const k = this.readyT, cx = View.cx;
+    if (k < 40) {
+      if (k < 8 || (k >> 3) % 2 === 0) this.big(ctx, tr('ready'), cx, 92, 3, ['#fcfcfc', '#e4e4fc', '#a4e4fc', '#3cbcfc', '#0078f8', '#0058f8', '#00288c'], null, '#000');
+      return;
+    }
+    const sc = k < 48 ? Math.round(4 + (48 - k) * 0.6) : 4; // GO! fliegt groß rein
+    ctx.globalAlpha = k > 70 ? (80 - k) / 10 : 1;
+    this.big(ctx, tr('go'), cx, 90 - (sc - 4) * 3, sc, ['#fcfcfc', '#fce0a8', '#f8b800', '#f8b800', '#f87800', '#d82800', '#881400'], '#200000', '#000');
+    ctx.globalAlpha = 1;
+  },
+
+  drawAnnounce(ctx) {
+    const k = 72 - this.annT, sc = k < 6 ? 6 - Math.floor(k / 2) : 3;
+    ctx.globalAlpha = this.annT < 15 ? this.annT / 15 : 1;
+    this.big(ctx, tr('hype')[this.annIdx], View.cx, 70 - (sc - 3) * 3, sc, ['#fcfcfc', '#fce0a8', '#f8b800', '#fc7460', '#e83c20', '#a80020', '#580008'], null, '#000');
     ctx.globalAlpha = 1;
   },
 
@@ -424,7 +475,7 @@ const Game = {
     const p = W.player, pad = (n, l) => String(Math.max(0, n)).padStart(l, '0');
     const label = '#b0a080', val = '#fcfcfc';
     const right = Wd - 98, boxCx = Math.round((116 + right) / 2);
-    Font.draw(ctx, tr('hudScore'), 36, 3, label, { align: 'right' }); Font.draw(ctx, pad(W.score, 6), 40, 3, val, { shadow: '#000' });
+    Font.draw(ctx, tr('hudScore'), 36, 3, label, { align: 'right' }); Font.draw(ctx, pad(this.dispScore || 0, 6), 40, 3, this.dispScore < W.score ? '#fce0a8' : val, { shadow: '#000' });
     if (Options.easy) Font.draw(ctx, tr('tagEasy'), 82, 3, '#58f898');
     Font.draw(ctx, tr('hudTime'), boxCx - 13, 3, label, { align: 'right' });
     Font.draw(ctx, pad(W.time, 4), boxCx - 9, 3, W.time <= 30 && (W.frame & 16) ? '#fc7460' : val, { shadow: '#000' });
@@ -494,18 +545,31 @@ const Game = {
 
   drawClear(ctx) {
     if (this.tallyPhase === 0) return;
-    const cx = View.cx;
-    ctx.fillStyle = '#000'; ctx.fillRect(cx - 80, 70, 160, 96);
-    ctx.strokeStyle = '#f8b800'; ctx.strokeRect(cx - 79.5, 70.5, 159, 95);
-    Font.draw(ctx, tr('clear'), cx, 80, '#f8b800', { align: 'center' });
-    Font.draw(ctx, tr('timeBonus'), cx - 68, 98); Font.draw(ctx, String(W.time * 10), cx + 68, 98, '#fcfcfc', { align: 'right' });
+    const cx = View.cx, R = (a, b) => Font.draw(ctx, b, cx + 68, a, '#fcfcfc', { align: 'right' });
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - 80, 66, 160, 112);
+    ctx.strokeStyle = '#f8b800'; ctx.strokeRect(cx - 79.5, 66.5, 159, 111);
+    Font.draw(ctx, tr('clear'), cx, 74, '#f8b800', { align: 'center' });
+    Font.draw(ctx, tr('timeBonus'), cx - 68, 90); R(90, String(W.time * 10));
     if (this.tallyPhase === 2) {
-      Font.draw(ctx, tr('heartBonus'), cx - 68, 112); Font.draw(ctx, String(W.player.hearts * 100), cx + 68, 112, '#fcfcfc', { align: 'right' });
+      Font.draw(ctx, tr('heartBonus'), cx - 68, 102); R(102, String(W.player.hearts * 100));
+      Font.draw(ctx, tr('rankBonus'), cx - 68, 114, '#fce0a8'); R(114, String(this.rankBonus));
     }
-    if (this.clearTime) { // Stage-Zeit + Bestzeit
-      Font.draw(ctx, tr('stageTime'), cx - 68, 132, '#a4e4fc'); Font.draw(ctx, this.fmtTime(this.clearTime), cx + 68, 132, '#fcfcfc', { align: 'right' });
-      if (this.newBest) { if (this.t & 16) Font.draw(ctx, tr('newBest'), cx, 148, '#f8b800', { align: 'center' }); }
-      else { Font.draw(ctx, tr('bestTime'), cx - 68, 148, '#7c7c7c'); Font.draw(ctx, this.fmtTime(this.bestTime), cx + 68, 148, '#bcbcbc', { align: 'right' }); }
+    if (this.clearTime) { // Stage-Zeit + Bestzeit (links), Rang (rechts)
+      Font.draw(ctx, tr('stageTime'), cx - 68, 134, '#a4e4fc'); Font.draw(ctx, this.fmtTime(this.clearTime), cx + 22, 134, '#fcfcfc', { align: 'right' });
+      if (this.newBest) { if (this.t & 16) Font.draw(ctx, tr('newBest'), cx - 68, 150, '#f8b800'); }
+      else { Font.draw(ctx, tr('bestTime'), cx - 68, 150, '#7c7c7c'); Font.draw(ctx, this.fmtTime(this.bestTime), cx + 22, 150, '#bcbcbc', { align: 'right' }); }
+    }
+    if (this.tallyPhase === 2 && this.rankT >= 17) { // Rang-Buchstabe wird aufgestempelt
+      const sc = Math.max(4, 12 - (this.rankT - 17));
+      const PAL_R = {
+        S: ['#fcfcfc', '#fce0a8', '#f8b800', '#f8b800', '#f87800', '#d82800', '#881400'],
+        A: ['#fcfcfc', '#fcbca0', '#fc7460', '#e83c20', '#d82800', '#a80020', '#580008'],
+        B: ['#fcfcfc', '#a4e4fc', '#3cbcfc', '#0078f8', '#0058f8', '#0000bc', '#000080'],
+        C: ['#fcfcfc', '#b8f8b8', '#58d854', '#00a800', '#008800', '#005800', '#003000'],
+        D: ['#fcfcfc', '#bcbcbc', '#a0a0a0', '#7c7c7c', '#585858', '#383838', '#202020'],
+      };
+      Font.draw(ctx, tr('rank'), cx + 50, 126, '#7c7c7c', { align: 'center' });
+      this.big(ctx, this.rank, cx + 50, 138 - (sc - 4) * 3, sc, PAL_R[this.rank], '#200000', '#000');
     }
   },
 
@@ -702,7 +766,10 @@ const Game = {
       [tr('finalScore', String(W.score).padStart(6, '0')), '#f8b800'], ['', ''], [tr('thanks'), '#fcfcfc'],
     ];
     if (t > 380) {
-      const y0 = Math.max(70, 240 - (t - 380) * 0.4);
+      // weiterscrollen, bis die letzte Zeile ganz im Bild steht (vorher blieb der Abspann bei y=70 stehen
+      // und alles ab „ERSTELLT MIT CLAUDE CODE" lag unter dem sichtbaren Bereich)
+      const yEnd = 194 - (lines.length - 1) * 12;
+      const y0 = Math.max(yEnd, 240 - (t - 380) * 0.4);
       ctx.save(); ctx.beginPath(); ctx.rect(0, 32, w, 176); ctx.clip();
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(cx - 112, 32, 224, 176);
       lines.forEach(([s, c], i) => { if (s) Font.draw(ctx, s, cx, y0 + i * 12, c, { align: 'center', shadow: '#000' }); });

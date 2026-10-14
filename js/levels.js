@@ -40,6 +40,8 @@ const Levels = (() => {
       crumble(x, y) { r.ents.push({ type: 'crumble', x, y }); return api; },
       statue(x, y) { r.ents.push({ type: 'statue', x, y }); return api; },
       ring(x, y) { r.ents.push({ type: 'ring', x, y }); return api; },
+      // Turmglocke: schlägt regelmäßig, der ganze Turm schwankt (Mode-7-Drehung des Bildes)
+      bell() { r.bell = true; return api; },
       chest(x, y, loot = 'rnd') { r.ents.push({ type: 'chest', x, y, loot }); return api; },
       start(x, y) { r.start = { x, y }; return api; },
       exit(x) { r.exit = { x0: x, y0: 0, x1: w - 1, y1: h - 1 }; r.door = { x }; return api; },
@@ -63,7 +65,7 @@ const Levels = (() => {
     .fill(44, 10, 45, 10, '=')
     .candle(5, 9).candle(11, 9, 'W').candle(17, 9).candle(23, 9, 'H').candle(29, 7)
     .candle(35, 9, '1').candle(41, 9).candle(47, 9, 'W').candle(53, 9, '$').candle(59, 9).candle(64, 9, 'H')
-    .enemy('raven', 29, 8).enemy('raven', 45, 9).ring(37, 4)
+    .enemy('raven', 29, 8).enemy('raven', 45, 9)
     .chest(62, 10)
     .zone('ghoul', 14, 60, { interval: 110, max: 3 })
     .start(2, 10).exit(70).done();
@@ -81,6 +83,7 @@ const Levels = (() => {
     .candle(12, 21, 'H').candle(21, 19).candle(12, 14).candle(15, 14, '3').candle(10, 7, 'W').candle(26, 4, 'H')
     .enemy('bat', 20, 12).enemy('bat', 6, 4)
     .zone('ghoul', 0, 27, { interval: 170, max: 1 })
+    .bell()
     .start(2, 27).exitAt(25, 0, 27, 5).done();
 
   const r12 = room(104, 'hall')
@@ -105,7 +108,7 @@ const Levels = (() => {
     .statue(43, 9)
     .candle(5, 9).candle(12, 9, 'H').candle(23, 7).candle(35, 6, 'H').candle(46, 8).candle(51, 7, '4')
     .candle(62, 7).candle(68, 7, '$').candle(84, 9).candle(90, 9, 'H')
-    .enemy('skel', 46, 9).ring(26, 4).ring(48, 4).ring(66, 4)
+    .enemy('skel', 46, 9)
     .zone('fish', 20, 78, { interval: 170, max: 2 })
     .zone('skull', 50, 78, { interval: 280, max: 1 })
     .start(2, 10).exit(94).done();

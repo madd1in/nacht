@@ -152,6 +152,9 @@ const Audio8 = (() => {
     chest: () => { tone('triangle', 140, 90, 0.2, 0.3); arp(['c6', 'e6', 'g6', 'c7'], 0.05, 'pulse', 0.13, 0.25); },
     crumble: () => noise(0.25, 0.25, 'lowpass', 1200, 200),
     raven: () => { tone('pulse', 900, 500, 0.12, 0.08, 0.125); noise(0.1, 0.1, 'bandpass', 2000, 900); },
+    go: () => { arp(['g5', 'c6', 'e6', 'g6', 'c7'], 0.035, 'pulse', 0.16, 0.25); noise(0.35, 0.22, 'highpass', 6000, 2500); tone('triangle', 130, 260, 0.3, 0.35); },
+    announce: () => { if (!ac) return; const t = ac.currentTime; ['c5', 'e5', 'g5', 'c6'].forEach(n => tone('pulse', freq(n), freq(n), 0.32, 0.07, 0.25, t)); tone('pulse', freq('c6'), freq('c6') * 1.01, 0.4, 0.09, 0.125, t + 0.09); noise(0.2, 0.18, 'highpass', 5000, 2000); },
+    stamp: () => { tone('triangle', 110, 40, 0.35, 0.55); noise(0.3, 0.45, 'lowpass', 2200, 120); arp(['c6', 'g6', 'c7'], 0.05, 'pulse', 0.13, 0.125); },
     step: () => { noise(0.045, 0.07, 'lowpass', 1100, 250); tone('triangle', 120, 70, 0.04, 0.05); },
     stepWet: () => { noise(0.07, 0.06, 'bandpass', 2600, 900); noise(0.04, 0.05, 'lowpass', 900, 250); },
   };

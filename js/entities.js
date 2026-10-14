@@ -109,10 +109,10 @@ class Player {
     if (!this.atkSub && this.state === 'normal' && !this.crouchAtk) {
       if (I.up) this.atkDir = horiz ? 'upd' : 'up';
       else if (I.down && !this.onGround) this.atkDir = horiz ? 'downd' : 'down';
-      else this.ringAssist();
+      else if (Input.device === 'touch' && !this.onGround) this.ringAssist(); // Ziel-Hilfe nur für Touch in der Luft
     }
   }
-  // Ziel-Hilfe: Ring in Reichweite über dem Spieler → automatisch dorthin peitschen (vor allem für Touch)
+  // Ziel-Hilfe (nur Touch, in der Luft): Ring in Reichweite über dem Spieler → automatisch dorthin peitschen
   ringAssist() {
     if (!W.rings || !W.rings.length) return;
     const reach = (this.sword ? SWORD_LEN : WHIP_LEN)[this.whip] + 52;
@@ -173,7 +173,7 @@ class Player {
 
   hurt(dmg, srcX) {
     if (this.inv > 0 || !this.alive || W.cleared) return;
-    this.dangle = false; W.combo.n = 0; W.combo.t = 0;
+    this.dangle = false; W.combo.n = 0; W.combo.t = 0; W.stats.hits++;
     if (this.state === 'swing') { this.state = 'normal'; this.ring = null; }
     this.hp -= dmg;
     Audio8.sfx('hurt'); Input.rumble(0.45, 0.7, 200);
@@ -435,7 +435,8 @@ class Player {
 
   // ---------- Ankerringe: Peitsche einhaken und pendeln ----------
   tryLatch() {
-    if (this.state !== 'normal' || !W.rings || !W.rings.length) return false;
+    // nur bei bewusst nach oben gerichteten Hieben einhaken – Vorwärts-/Duck-/Abwärtshiebe treffen immer die Gegner
+    if (this.state !== 'normal' || !W.rings || !W.rings.length || (this.atkDir !== 'up' && this.atkDir !== 'upd')) return false;
     const D = this.dir, h = this.hand(), reach = (this.sword ? SWORD_LEN : WHIP_LEN)[this.whip] + 48;
     const wa = Math.atan2(Math.sin(D.a), Math.cos(D.a) * this.face);
     for (const r of W.rings) { // großzügig wie bei Super Castlevania IV

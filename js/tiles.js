@@ -202,6 +202,35 @@ const Tiles = (() => {
       for (let X = 0; X < w; X++) if (bay(X, y) < t * 0.75) px(x, col, X, y);
     }
   }
+  // Rosette im Thronsaal: Lage in der Wandebene (512 px breit, Parallaxe 0.5) + Buntglas mit Bleiruten
+  const ROSE = { x: 128, y: 66, r: 30 };
+  function roseGlass(x, rx, ry, rr) {
+    for (let y = -rr; y <= rr; y++) for (let X = -rr; X <= rr; X++) {
+      const d = Math.hypot(X, y);
+      if (d > rr) continue;
+      const a = (Math.atan2(y, X) + Math.PI) / (Math.PI * 2), seg = Math.floor(a * 12), ring = Math.floor(d / rr * 3);
+      const glass = [['#f8b800', '#a80020', '#0058f8'], ['#0058f8', '#d82800', '#00a800'], ['#a80020', '#6844fc', '#f8b800']][ring % 3][seg % 3];
+      const lead = Math.abs(a * 12 - Math.round(a * 12)) < 0.06 || Math.abs(d / rr * 3 - Math.round(d / rr * 3)) < 0.08;
+      px(x, lead ? '#140810' : glass, rx + X, ry + y);
+    }
+    px(x, '#f8b800', rx - 3, ry - 3, 6, 6);
+  }
+  // Mode-7: das Glas der Rosette dreht sich (in der Wutphase des Grafen schneller)
+  let roseC = null, roseAng = 0, roseF = 0;
+  function drawRose(ctx, cam, frame) {
+    if (!roseC) { const R = ROSE.r; roseC = C(R * 2 + 2, R * 2 + 2); roseGlass(roseC.getContext('2d'), R + 1, R + 1, R); }
+    const df = frame - roseF; roseF = frame; // an Spiel-Frames gekoppelt, nicht an die Bildwiederholrate
+    if (df > 0 && df < 10) roseAng += df * (W.bossEnraged ? 0.03 : 0.004);
+    const off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512, h = roseC.width / 2;
+    for (let X = -off; X < View.w + 64; X += 512) {
+      const cx = X + ROSE.x;
+      if (cx < -40 || cx > View.w + 40) continue;
+      ctx.save(); ctx.imageSmoothingEnabled = false;
+      ctx.translate(cx, ROSE.y); ctx.rotate(roseAng); ctx.drawImage(roseC, -h, -h);
+      ctx.restore();
+    }
+  }
+
   function archWindow(x, wx, wy, ww, wh, inner) {
     const r = ww / 2;
     px(x, '#3c3c3c', wx - 4, wy - 1, ww + 8, wh + 5);
@@ -451,17 +480,12 @@ const Tiles = (() => {
         banner(x, 200, 20, 22, 70, '#a80020', '#f8b800', '#fce0a8');
         banner(x, 456, 20, 22, 70, '#a80020', '#f8b800', '#fce0a8');
       } else {
-        const rx = 128, ry = 66, rr = 30; // Rosette
+        const { x: rx, y: ry, r: rr } = ROSE; // Rosette: Steinrahmen hier, das Glas dreht sich als eigene Ebene (drawRose)
         for (let y = -rr - 4; y <= rr + 4; y++) for (let X = -rr - 4; X <= rr + 4; X++) {
           const d = Math.hypot(X, y);
-          if (d > rr + 4) continue;
-          if (d > rr) { px(x, '#7c7c7c', rx + X, ry + y); continue; }
-          const a = (Math.atan2(y, X) + Math.PI) / (Math.PI * 2), seg = Math.floor(a * 12), ring = Math.floor(d / rr * 3);
-          const glass = [['#f8b800', '#a80020', '#0058f8'], ['#0058f8', '#d82800', '#00a800'], ['#a80020', '#6844fc', '#f8b800']][ring % 3][seg % 3];
-          const lead = Math.abs(a * 12 - Math.round(a * 12)) < 0.06 || Math.abs(d / rr * 3 - Math.round(d / rr * 3)) < 0.08;
-          px(x, lead ? '#140810' : glass, rx + X, ry + y);
+          if (d > rr && d <= rr + 4) px(x, '#7c7c7c', rx + X, ry + y);
         }
-        px(x, '#f8b800', rx - 3, ry - 3, 6, 6);
+        roseGlass(x, rx, ry, rr);
         [[40, '#2c0838'], [392, '#2c0838']].forEach(([wx]) => archWindow(x, wx, 50, 24, 80, (X0, Y0, w, h, inside) => {
           for (let y = Y0; y < Y0 + h; y++) for (let X = X0; X < X0 + w; X++) if (inside(X, y)) px(x, ['#a80020', '#0058f8', '#f8b800', '#00a800'][(Math.floor((X - X0) / 6) + Math.floor((y - Y0) / 12)) % 4], X, y);
         }));
@@ -582,7 +606,11 @@ const Tiles = (() => {
   // onSky: wird nach den Himmelsebenen aufgerufen (Blitze hinter Burg & Bäumen)
   function drawBg(ctx, room, cam, frame = 0, onSky = null) {
     const vt = room.h > 13;
-    build(room.theme).bg.forEach(l => { drawLayer(ctx, l, cam, frame, vt); if (onSky && l.name === 'clouds') onSky(ctx); });
+    build(room.theme).bg.forEach(l => {
+      drawLayer(ctx, l, cam, frame, vt);
+      if (onSky && l.name === 'clouds') onSky(ctx);
+      if (l.name === 'wall' && room.theme === 'throne') drawRose(ctx, cam, frame);
+    });
     if (room.theme === 'tower') drawClockLive(ctx, room, cam, frame);
     if (room.theme === 'throne' && W.vortexBg > 0) Mode7.drawTunnel(ctx, View.w, frame, Math.min(1, W.vortexBg / 90)); // Graf Phase 2
   }
