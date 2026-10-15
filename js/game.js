@@ -747,10 +747,10 @@ const Game = {
   drawCard(ctx) {
     const cx = View.cx;
     Mode7.drawMap(ctx, View.w, this.t, W.stage); // Mode-7-Weltkarte im Hintergrund
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 78, View.w, 124);
+    ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.fillRect(0, 78, View.w, 124); // leichter, damit Karte und Burgen durchscheinen
     ctx.fillStyle = '#c89020'; ctx.fillRect(0, 78, View.w, 1); ctx.fillRect(0, 201, View.w, 1);
     const st = W.stageDef;
-    Font.draw(ctx, tr('stageNo', W.stage + 1), cx, 86, '#b0a080', { align: 'center' });
+    Font.draw(ctx, tr('stageNo', W.stage + 1), cx, 86, '#d0c0a0', { align: 'center', shadow: '#000' });
     const nm = tr('stage' + (W.stage + 1));
     this.big(ctx, nm, cx, 102, Font.width(nm) * 3 > View.w - 16 ? 2 : 3, LOGO, '#300000', '#000');
     const n = Levels.STAGES.length;
@@ -760,8 +760,8 @@ const Game = {
       ctx.fillRect(x, 150, 8, 8);
       if (i < n - 1) { ctx.fillStyle = '#3c3c3c'; ctx.fillRect(x + 12, 153, 32, 2); }
     }
-    Font.draw(ctx, tr('lives', Math.max(0, W.lives)), cx, 176, '#bcbcbc', { align: 'center' });
-    Font.draw(ctx, tr('bossIs', tr('boss' + (W.stage + 1))), cx, 190, '#7c7c7c', { align: 'center' });
+    Font.draw(ctx, tr('lives', Math.max(0, W.lives)), cx, 176, '#e0e0e0', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('bossIs', tr('boss' + (W.stage + 1))), cx, 190, '#b0b0b0', { align: 'center', shadow: '#000' });
   },
 
   drawClear(ctx) {
@@ -799,9 +799,11 @@ const Game = {
     ctx.save(); ctx.translate(0, 32);
     Tiles.drawLayer(ctx, L('sky'), cam0, this.t);
     Tiles.drawLayer(ctx, L('moon'), cam0, this.t);
+    Tiles.drawCloud7(ctx, this.t); // Mode-7-Wolkendecke, halb durchsichtig
     Tiles.drawLayer(ctx, L('storm'), cam0, this.t);
     Tiles.drawLayer(ctx, L('clouds'), cam0, this.t);
     FX.drawStormSky(ctx, this.tStorm, View.w);
+    Tiles.drawLayer(ctx, L('peaks'), { x: 1500, y: 0 }, this.t);
     Tiles.drawLayer(ctx, L('mountains'), { x: 1500, y: 0 }, this.t);
     ctx.drawImage(L('castle').c, Math.round(View.w * 0.5 - 408) + (shake ? Math.round(rnd(-2, 2)) : 0), sink);
     FX.drawFog(ctx, 'courtyard', cam0, this.t);

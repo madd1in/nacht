@@ -168,6 +168,8 @@ const Audio8 = (() => {
     flap: () => { noise(0.07, 0.14, 'bandpass', 1300, 700); noise(0.05, 0.1, 'bandpass', 1700, 900, ac.currentTime + 0.08); }, // Buchdeckel schlagen
     page: () => noise(0.16, 0.09, 'highpass', 2600, 6000), // Papier raschelt
     tome: () => { tone('sine', 196, 98, 0.5, 0.14); tone('triangle', 392, 370, 0.4, 0.06); arp(['e6', 'g6', 'a#6', 'e7'], 0.05, 'pulse', 0.04, 0.125); }, // Zauberbuch schlägt auf
+    slime: () => { noise(0.4, 0.18, 'lowpass', 600, 150); tone('sine', 140, 60, 0.4, 0.12); }, // Schleimkokon gluckert
+    splat: () => { noise(0.3, 0.35, 'bandpass', 900, 200); tone('sine', 220, 50, 0.25, 0.18); }, // Kokon platzt
     tink: () => { tone('square', 2600, 2100, 0.05, 0.07); tone('pulse', 3400, 3000, 0.07, 0.05, 0.125); noise(0.05, 0.12, 'highpass', 6000); }, // abgeprallt
     stepWet: () => { noise(0.07, 0.06, 'bandpass', 2600, 900); noise(0.04, 0.05, 'lowpass', 900, 250); },
   };

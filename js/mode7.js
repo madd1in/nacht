@@ -66,29 +66,53 @@ const Mode7 = (() => {
     ctx.restore();
   }
   // ---------------- Mode-7-Weltkarte ----------------
+  // Höhenfeld (nahtloses Wertrauschen) mit Relief-Schattierung im Mondlicht: Meer und Fluss mit Glanz, Wiesen, dunkle Wälder,
+  // Fels, Schneegipfel, ein Pfad mit Holzbrücke. Darauf stehen Burgen und Tannen als Mode-7-Sprites, die mit der Entfernung
+  // schrumpfen (wie in Mario Kart); am Horizont dreht sich ein Bergpanorama mit, darüber Mond und Sterne.
   const MS = 256;
-  let map = null;
+  let map = null, mapH = null, trees = null, pano = null;
   const POINTS = [[60, 200], [128, 128], [196, 58]];
   function makeMap() {
-    map = new Int32Array(MS * MS);
-    let seed = 5;
-    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    map = new Int32Array(MS * MS); mapH = new Float32Array(MS * MS);
+    const hh = (x, y, s) => { let n = Math.imul(x * 374761393 + y * 668265263 + s * 1442695041, 1274126177); n ^= n >>> 13; n = Math.imul(n, 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+    const vn = (x, y, s, sd) => { const n = MS / s, gx = x / s, gy = y / s, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+      const a = hh(x0 % n, y0 % n, sd), b = hh((x0 + 1) % n, y0 % n, sd), c = hh(x0 % n, (y0 + 1) % n, sd), d = hh((x0 + 1) % n, (y0 + 1) % n, sd);
+      return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy; };
     for (let y = 0; y < MS; y++) for (let x = 0; x < MS; x++) {
-      const n = Math.sin(x * 0.07) * Math.cos(y * 0.06) + Math.sin((x + y) * 0.13) * 0.5;
-      map[y * MS + x] = n > 0.75 ? RGB(92, 92, 108) : n > 0.45 ? RGB(28, 56, 30) : ((x ^ y) & 4) ? RGB(34, 70, 36) : RGB(40, 80, 40);
+      let h = vn(x, y, 64, 1) * 0.5 + vn(x, y, 32, 2) * 0.25 + vn(x, y, 16, 3) * 0.15 + vn(x, y, 8, 4) * 0.1;
+      const rx = 30 + Math.sin(y * 2 * Math.PI / MS * 3) * 18, dr = Math.min(Math.abs(x - rx), MS - Math.abs(x - rx)); // Flussbett
+      if (dr < 7) h = Math.min(h, 0.24 + dr * 0.012);
+      for (const [cx, cy] of POINTS) { const d = Math.hypot(x - cx, y - cy); if (d < 16) h = h * (d / 16) + 0.46 * (1 - d / 16); } // Burgplätze eingeebnet
+      mapH[y * MS + x] = h;
     }
-    for (let i = 0; i < 700; i++) { const x = Math.floor(rnd() * MS), y = Math.floor(rnd() * MS); for (let k = 0; k < 4; k++) map[((y + (k >> 1)) & 255) * MS + ((x + (k & 1)) & 255)] = RGB(14, 36, 18); }
-    for (let y = 0; y < MS; y++) { const rx = Math.floor(30 + Math.sin(y * 0.05) * 18); for (let k = 0; k < 6; k++) map[y * MS + ((rx + k) & 255)] = k === 0 || k === 5 ? RGB(40, 90, 160) : RGB(30, 70, 190); }
-    const line = ([x0, y0], [x1, y1]) => { for (let t = 0; t <= 1; t += 0.002) { const x = Math.round(x0 + (x1 - x0) * t), y = Math.round(y0 + (y1 - y0) * t + Math.sin(t * 9) * 6); for (let k = -2; k <= 2; k++) map[((y + k) & 255) * MS + (x & 255)] = RGB(176, 140, 90); } };
+    const H = (x, y) => mapH[(y & 255) * MS + (x & 255)];
+    for (let y = 0; y < MS; y++) for (let x = 0; x < MS; x++) {
+      const h = H(x, y), sh = Math.max(0.45, Math.min(1.45, 0.85 + (H(x - 1, y - 1) - H(x + 1, y + 1)) * 16)), dt = hh(x, y, 9);
+      let c = h < 0.27 ? [22, 44, 110] : h < 0.3 ? [40, 76, 150] : h < 0.32 ? [96, 88, 70] : h < 0.5 ? (dt > 0.85 ? [70, 110, 50] : [48, 92, 44]) : h < 0.64 ? (dt > 0.7 ? [36, 84, 40] : dt > 0.35 ? [20, 58, 30] : [14, 44, 24]) : h < 0.76 ? [96, 88, 92] : [204, 200, 226];
+      if (h < 0.3 && dt > 0.93) c = [150, 160, 220]; // Mondglitzern auf dem Wasser
+      const k = h < 0.3 ? 1 : sh;
+      map[y * MS + x] = RGB(Math.min(255, c[0] * k * 0.78) | 0, Math.min(255, c[1] * k * 0.8) | 0, Math.min(255, c[2] * k * 1.05) | 0); // Mondlicht: etwas bläulich
+    }
+    const line = ([x0, y0], [x1, y1]) => { for (let t = 0; t <= 1; t += 0.002) { const x = Math.round(x0 + (x1 - x0) * t), y = Math.round(y0 + (y1 - y0) * t + Math.sin(t * 9) * 6); for (let k = -2; k <= 2; k++) { const i = ((y + k) & 255) * MS + (x & 255), water = mapH[i] < 0.3; map[i] = water ? RGB(110, 70, 40) : Math.abs(k) === 2 ? RGB(80, 64, 44) : RGB(150, 124, 84); } } }; // Pfad, über Wasser als Holzbrücke
     line(POINTS[0], POINTS[1]); line(POINTS[1], POINTS[2]);
-    POINTS.forEach(([cx, cy], i) => {
-      const s = 7 + i * 2;
-      for (let y = -s; y <= s; y++) for (let x = -s; x <= s; x++) {
-        const edge = Math.abs(x) === s || Math.abs(y) === s;
-        map[((cy + y) & 255) * MS + ((cx + x) & 255)] = edge ? RGB(30, 26, 34) : (y < -s / 3 ? RGB(168, 0, 32) : RGB(110, 110, 124));
-      }
-    });
+    POINTS.forEach(([cx, cy]) => { for (let y = -9; y <= 9; y++) for (let x = -9; x <= 9; x++) { const d = Math.hypot(x, y); if (d <= 9) map[((cy + y) & 255) * MS + ((cx + x) & 255)] = d > 8 ? RGB(40, 36, 44) : ((x + y) & 1) ? RGB(88, 84, 96) : RGB(104, 100, 112); } }); // gepflasterte Burgplätze
+    trees = []; let s = 77; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    for (let i = 0; i < 400 && trees.length < 90; i++) { const x = rnd() * MS, y = rnd() * MS, h = H(x | 0, y | 0); if (h > 0.5 && h < 0.66 && POINTS.every(([px, py]) => Math.hypot(px - x, py - y) > 20)) trees.push([x, y, 0.8 + rnd() * 0.5]); }
+    pano = new Int16Array(256); for (let i = 0; i < 256; i++) pano[i] = Math.round(6 + Math.abs(Math.sin(i / 256 * Math.PI * 6)) * 8 + Math.sin(i / 256 * Math.PI * 22) * 2 + hh(i >> 2, 1, 5) * 3); // Bergpanorama am Horizont
   }
+  // Mode-7-Sprites: Burgen (je Stage eigene Silhouette mit Fackelfenstern und Fahne) und Tannen
+  const BILL = (() => {
+    const mk = (w, h, f) => { const c = Sprites.canvas(w, h), x = c.getContext('2d'); f((col, a, b, ww = 1, hh = 1) => { x.fillStyle = col; x.fillRect(a, b, ww, hh); }); return c; };
+    const castle = (kind) => mk(40, 44, (R) => {
+      const S = '#5c5468', L = '#8c8498', D = '#2c2834', RF = '#a80020';
+      const tower = (x, y, w, h, roof) => { R(D, x, y, w, h); R(S, x + 1, y, w - 2, h); R(L, x + 1, y, 1, h); if (roof) { for (let i = 0; i <= w / 2 + 1; i++) R(RF, x - 1 + i, y - 1 - i * 2, Math.max(1, w + 2 - i * 2), 2); R('#f8b800', x + w / 2, y - w - 6, 1, 4); R(RF, x + w / 2 + 1, y - w - 6, 3, 2); } else for (let i = 0; i < w; i += 2) R(S, x + i, y - 2, 1, 2); R('#f8b800', x + w / 2 - 1, y + 4, 2, 2); };
+      if (kind === 0) { R(D, 4, 30, 32, 14); R(S, 5, 30, 30, 14); for (let i = 4; i < 36; i += 3) R(S, i, 28, 2, 2); tower(2, 22, 8, 22, true); tower(30, 22, 8, 22, true); tower(15, 14, 10, 30, true); R('#140c08', 17, 36, 6, 8); R('#3c2810', 17, 36, 6, 1); } // Burghof mit Tor
+      else if (kind === 1) { R(D, 6, 26, 28, 18); R(S, 7, 26, 26, 18); for (let i = 0; i < 16; i++) R(S, 20 - i, 26 - Math.floor(i * 0.7), i * 2, 1); R('#140c08', 16, 34, 8, 10); R('#58f898', 19, 36, 2, 2); for (const gx of [1, 35]) { R(S, gx, 36, 4, 8); R(L, gx + 1, 34, 2, 2); R(L, gx, 37, 4, 1); } } // Gruft mit Grabsteinen
+      else { tower(13, 6, 14, 38, true); tower(3, 26, 8, 18, false); tower(29, 26, 8, 18, false); R('#fcd040', 19, 14, 2, 3); R('#fcd040', 19, 22, 2, 3); } // Bergfried
+    });
+    const tree = mk(12, 20, (R) => { for (let r = 0; r < 17; r++) { const w = Math.max(1, Math.round(r / 17 * 11) - (r % 4 === 3 ? 2 : 0)); R(r % 4 === 0 ? '#1c4c28' : '#0c2c18', 6 - (w >> 1), r, w, 1); if (w > 2) R('#2c6c38', 6 - (w >> 1), r, 1, 1); } R('#2c1c10', 5, 17, 2, 3); });
+    return { castles: [castle(0), castle(1), castle(2)], tree };
+  })();
   let M = null;
   function drawMap(ctx, w, t, stage) {
     if (!map) makeMap();
@@ -96,24 +120,53 @@ const Mode7 = (() => {
     if (!M || M.w !== tw) { const c = Sprites.canvas(tw, th), x = c.getContext('2d'), img = x.createImageData(tw, th); M = { w: tw, c, x, img, buf: new Int32Array(img.data.buffer) }; }
     const [px, py] = POINTS[clamp(stage, 0, 2)], ang = t * 0.006 + stage * 1.3;
     const fx = Math.sin(ang), fy = -Math.cos(ang), rx = Math.cos(ang), ry = Math.sin(ang);
-    const camX = px - fx * 70, camY = py - fy * 70, buf = M.buf;
+    const camX = px - fx * 70, camY = py - fy * 70, buf = M.buf, FOG = [70, 40, 96];
+    const po = Math.floor(ang / (Math.PI * 2) * 512);
     for (let y = 0; y < th; y++) {
-      if (y <= hor) { // Himmel mit Farbverlauf
-        const k = y / hor, col = RGB(20 + k * 60, 4 + k * 10, 30 + k * 40);
-        for (let x = 0; x < tw; x++) buf[y * tw + x] = ((x * 7 + y * 13) % 97 === 0 && k < 0.6) ? RGB(200, 200, 230) : col;
+      if (y <= hor) { // Himmel: Verlauf, Sterne, Mond, Bergpanorama, das sich mit dem Blick dreht
+        const k = y / hor;
+        for (let x = 0; x < tw; x++) {
+          let col = RGB(14 + k * 56, 4 + k * 30, 30 + k * 66);
+          if (((x * 7 + y * 13 + po * 3) % 97 === 0) && k < 0.7) col = RGB(210, 210, 240);
+          const mx = ((x * 2 + po) % 512 + 512) % 512 - 300, md = Math.hypot(mx / 2, y - 10); // Blutmond
+          if (md < 6) col = md < 5 ? RGB(216, 60 + (y - 10) * 4, 40) : RGB(120, 20, 30);
+          const ph = pano[(((x + (po >> 1)) % 256) + 256) % 256];
+          if (y > hor - ph) col = y > hor - ph + 1 ? RGB(14, 8, 24) : RGB(150, 100, 170); // Bergsilhouette mit Mondlicht-Kante
+          buf[y * tw + x] = col;
+        }
         continue;
       }
-      const z = 1800 / (y - hor), fog = Math.max(0.25, Math.min(1, 1.6 - z / 260));
+      const z = 1800 / (y - hor), fog = Math.max(0, Math.min(1, (z - 140) / 380));
       for (let x = 0; x < tw; x++) {
         const sx = (x - tw / 2) * z / 140;
         const u = Math.floor(camX + rx * sx + fx * z) & 255, v = Math.floor(camY + ry * sx + fy * z) & 255;
-        const c = map[v * MS + u], k = Math.min(1, Math.floor(fog * 5 + BAY[(y & 3) * 4 + (x & 3)]) / 5);
-        buf[y * tw + x] = (255 << 24) | ((((c >> 16) & 255) * k) << 16) | ((((c >> 8) & 255) * k) << 8) | ((c & 255) * k);
+        const c = map[v * MS + u], f = Math.min(1, Math.floor(fog * 6 + BAY[(y & 3) * 4 + (x & 3)]) / 6); // Dunst zum Horizont hin, gedithert
+        buf[y * tw + x] = (255 << 24) | ((((c >> 16) & 255) * (1 - f) + FOG[2] * f) << 16) | ((((c >> 8) & 255) * (1 - f) + FOG[1] * f) << 8) | ((c & 255) * (1 - f) + FOG[0] * f);
       }
     }
     M.x.putImageData(M.img, 0, 0);
     ctx.save(); ctx.imageSmoothingEnabled = false;
     ctx.drawImage(M.c, 0, 0, tw, th, 0, 32, tw * 2, 208);
+    // Mode-7-Sprites: von hinten nach vorn, mit der Entfernung skaliert (nächste Wiederholung der nahtlosen Karte)
+    const objs = [];
+    const add = (wx, wy, img, size, glow) => {
+      const dx = ((wx - camX + 128) % 256 + 256) % 256 - 128, dy = ((wy - camY + 128) % 256 + 256) % 256 - 128;
+      const z = dx * fx + dy * fy, lat = dx * rx + dy * ry;
+      if (z < 12 || z > 700) return;
+      const sx = tw / 2 + lat * 140 / z, sy = hor + 1800 / z, sc = 140 / z * size;
+      if (sx < -40 || sx > tw + 40) return;
+      objs.push({ z, sx, sy, sc, img, glow });
+    };
+    trees.forEach(([x, y, s]) => add(x, y, BILL.tree, 0.25 * s));
+    POINTS.forEach(([x, y], i) => add(x, y, BILL.castles[i], 0.45, i === clamp(stage, 0, 2)));
+    objs.sort((a, b) => b.z - a.z);
+    for (const o of objs) {
+      const wd = o.img.width * o.sc * 2, ht = o.img.height * o.sc * 2, X = o.sx * 2 - wd / 2, Y = 32 + o.sy * 2 - ht;
+      ctx.globalAlpha = Math.max(0.15, Math.min(1, 1.3 - o.z / 520));
+      if (o.glow) { const r = 18 + Math.sin(t * 0.15) * 4; ctx.fillStyle = 'rgba(232,40,40,0.25)'; ctx.beginPath(); ctx.ellipse(o.sx * 2, 32 + o.sy * 2, r * o.sc * 3, r * o.sc, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.drawImage(o.img, Math.round(X), Math.round(Y), Math.max(1, Math.round(wd)), Math.max(1, Math.round(ht)));
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 

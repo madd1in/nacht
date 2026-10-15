@@ -727,34 +727,27 @@ class FallingChandelier extends Ent {
 
 // ---------------- Ritterrüstung: Deko auf einem Sockel – manche erwachen zum Leben ----------------
 class ArmorSuit extends Ent {
-  constructor(d) { super(d.x * T + 2, (d.y + 1) * T - 38, 14, 38); this.kind = 'prop'; this.live = !!d.live; this.state = 'still'; this.wt = 0; this.flip = !!d.flip; this.d = d; }
+  constructor(d) { super(d.x * T, (d.y + 1) * T - 56, 16, 56); this.kind = 'prop'; this.live = !!d.live; this.state = 'still'; this.wt = 0; this.flip = !!d.flip; this.d = d; }
   update() {
     this.t++;
     if (!this.live || this.state === 'empty') return;
     const p = W.player;
-    if (this.state === 'still' && p.alive && Math.abs(p.cx - this.cx) < 64 && Math.abs(p.feet - (this.y + this.h)) < 40) { this.state = 'wake'; this.wt = 0; Audio8.sfx('clank', this.cx); }
-    if (this.state === 'wake' && ++this.wt > 36) { // steigt vom Sockel: wird zum Ritter
+    if (this.state === 'still' && p.alive && Math.abs(p.cx - this.cx) < 64 && Math.abs(p.feet - (this.y + this.h)) < 48) { this.state = 'wake'; this.wt = 0; Audio8.sfx('clank', this.cx); }
+    if (this.state === 'wake' && ++this.wt > 36) { // steigt vom Sockel und marschiert los
       this.state = 'empty';
-      const k = W.spawn(new Knight(this.d.x, this.d.y));
+      const k = W.spawn(new LivingArmor(this.d.x, this.d.y));
       k.face = Math.sign(p.cx - this.cx) || 1; k.y = this.y + this.h - 4 - k.h;
       W.dust(this.cx, this.y + this.h - 4, 5); Audio8.sfx('clank', this.cx); W.shake = Math.max(W.shake, 3);
     }
   }
   draw(ctx) {
     const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
-    R('#2c2834', -3, 34, 20, 4); R('#5c5468', -3, 34, 20, 1); R('#1c1824', -2, 37, 18, 1); // Sockel
+    R('#2c2834', -5, 52, 26, 4); R('#6c6478', -5, 52, 26, 1); R('#1c1824', -4, 55, 24, 1); R('#3c3448', -3, 53, 22, 1); // Sockel
     if (this.state === 'empty') return;
-    const sh = this.state === 'wake' ? Math.round(Math.sin(this.wt * 2.1)) : 0, X = sh;
-    const S = '#8c8898', L = '#c8c4d0', D = '#4c4858', K = '#1c1824';
-    R(D, X + 3, 22, 3, 12); R(D, X + 8, 22, 3, 12); R(S, X + 3, 22, 2, 11); R(S, X + 8, 22, 2, 11); R(K, X + 2, 32, 4, 2); R(K, X + 8, 32, 4, 2); // Beine
-    R(D, X + 1, 10, 12, 13); R(S, X + 2, 10, 10, 12); R(L, X + 3, 11, 3, 8); R(D, X + 2, 16, 10, 1); R(D, X + 2, 20, 10, 2); // Brustharnisch
-    R(D, X - 1, 10, 3, 5); R(D, X + 12, 10, 3, 5); R(L, X - 1, 10, 3, 1); R(L, X + 12, 10, 3, 1); // Schulterstücke
-    R(S, X - 1, 15, 2, 7); R(S, X + 13, 15, 2, 7);
-    R(D, X + 3, 1, 8, 9); R(S, X + 4, 1, 6, 8); R(L, X + 4, 1, 2, 5); R(K, X + 4, 5, 6, 1); R('#a80020', X + 6, -3, 2, 4); // Helm mit Federbusch
+    const sh = this.state === 'wake' ? Math.round(Math.sin(this.wt * 2.1)) : 0, X = x + (this.flip ? -8 : -7) + sh, Y = y - 3;
+    Sprites.draw(ctx, ARMOR_SPR.still, X, Y, this.flip);
     const eyes = this.state === 'wake' ? ((this.wt >> 2) % 2 ? '#fc3c3c' : '#fcd040') : this.live && (this.t % 240) < 4 ? '#6c1010' : null; // erwachende Rüstung: Augen glühen
-    if (eyes) { R(eyes, X + 5, 5, 1, 1); R(eyes, X + 8, 5, 1, 1); }
-    const fx = this.flip ? -6 : 16; // Hellebarde
-    R('#3c2410', X + fx, -6, 2, 40); R('#c8c4d0', X + fx - 2, -8, 6, 3); R('#8c8898', X + fx + (this.flip ? -2 : 2), -5, 3, 4);
+    if (eyes) { ctx.fillStyle = eyes; for (const ex of this.flip ? [17, 14] : [12, 15]) ctx.fillRect(X + ex, Y + 9, 1, 1); }
   }
 }
 
@@ -936,5 +929,213 @@ class Candelabra extends Ent {
       R('#c89020', cx0 - 1, top + 1, 4, 1); R('#e8e0c8', cx0, top - 4, 2, 5);
       R(((this.t >> 2) + k) % 3 ? '#fcd040' : '#f87800', cx0, top - 7, 2, 3);
     });
+  }
+}
+
+// ---------------- Riesige Ahnenbilder: die Augen folgen dem Helden ----------------
+// Vorgerendert: prunkvoller Goldrahmen mit Eckrosetten und Namensschild, dunkler Firnis-Hintergrund mit Vignette,
+// Brustbild (Ahnherr, Gräfin, der Graf selbst). Nur Augäpfel und Pupillen werden live gezeichnet.
+const PORTRAITS = (() => {
+  const FW = 64, FH = 84;
+  const mk = (v) => {
+    const c = Sprites.canvas(FW, FH), x = c.getContext('2d'), R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(Math.round(a), Math.round(b), w, h); };
+    const ell = (cx, cy, rx, ry, f) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let X = Math.floor(cx - rx); X <= cx + rx; X++) { const q = ((X + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2; if (q <= 1) f(X, y, q); } };
+    // Firnis-Hintergrund mit Vignette und Craquelé
+    for (let y = 6; y < FH - 6; y++) for (let X = 6; X < FW - 6; X++) {
+      const d = Math.hypot((X - FW / 2) / 26, (y - 34) / 34), base = v === 2 ? [40, 8, 14] : v === 1 ? [16, 24, 30] : [26, 20, 12], k = Math.max(0.25, 1.15 - d * 0.75);
+      const cr = ((X * 7 + y * 3) % 23 === 0) ? 0.7 : 1;
+      R(`rgb(${base.map(b => Math.round(b * k * cr)).join(',')})`, X, y);
+    }
+    const SK = v === 2 ? ['#9c8c94', '#c8b8bc', '#e8dce0'] : ['#a07860', '#d0a888', '#ecc8a8']; // Haut: der Graf leichenblass
+    const cx = 32;
+    // Kleidung / Schultern
+    if (v === 1) { ell(cx, 74, 22, 16, (X, y, q) => R(q > 0.85 ? '#1c0410' : ((X + y) % 4 ? '#5c0c24' : '#7c1434'), X, y)); for (let k = -6; k <= 6; k += 3) R('#e8e0d0', cx + k, 58 + Math.abs(k) / 3, 2, 2); } // Gräfin: Samtkleid, Perlenkette
+    else { ell(cx, 76, 24, 18, (X, y, q) => R(q > 0.85 ? '#060408' : X < cx ? '#141018' : '#1c1820', X, y)); R(v === 2 ? '#a80020' : '#c89020', cx - 22, 60, 6, 20); R(v === 2 ? '#a80020' : '#c89020', cx + 16, 60, 6, 20); // Umhang mit Futter
+      R('#e8e4dc', cx - 4, 56, 8, 8); R('#c8c4bc', cx - 1, 56, 2, 8); if (v === 0) R('#c89020', cx - 2, 64, 4, 4); else R('#a80020', cx - 2, 62, 4, 3); } // Halstuch, Brosche
+    R(SK[0], cx - 4, 48, 8, 9); R(SK[1], cx - 3, 48, 6, 8); // Hals
+    // Gesicht: Oval mit Licht von links
+    ell(cx, 36, 11, 14, (X, y, q) => { const l = -(X - cx) / 11 * 0.6 - (y - 36) / 14 * 0.3 + (1 - q) * 0.7; R(l > 0.75 ? SK[2] : l > 0.25 ? SK[1] : SK[0], X, y); });
+    // Haare
+    if (v === 1) { ell(cx, 25, 13, 9, (X, y, q) => { if (y < 30 || Math.abs(X - cx) > 9) R((X + y) % 3 ? '#1c0c08' : '#3c2010', X, y); }); ell(cx, 16, 7, 6, (X, y) => R((X * y) % 5 ? '#2c140c' : '#4c2814', X, y)); R('#e8e0d0', cx - 1, 11, 2, 2); } // Hochsteckfrisur mit Perle
+    else ell(cx, 27, 12.5, 9, (X, y, q) => { if (y < 30 || Math.abs(X - cx) > 10) R(v === 2 ? ((X + y) % 4 ? '#08060c' : '#1c1828') : ((X + y) % 3 ? '#3c3434' : '#5c5450'), X, y); }); // Haar (Graf: Witwenspitze)
+    if (v === 2) { R('#08060c', cx - 1, 26, 2, 4); }
+    // Augenbrauen, Nase, Mund
+    R(v === 2 ? '#08060c' : '#3c2418', cx - 8, 31, 5, 1); R(v === 2 ? '#08060c' : '#3c2418', cx + 3, 31, 5, 1);
+    if (v === 2) { R('#08060c', cx - 8, 30, 2, 1); R('#08060c', cx + 6, 30, 2, 1); } // böse geschwungene Brauen
+    R(SK[0], cx, 36, 1, 5); R(SK[2], cx - 1, 37, 1, 3); R(SK[0], cx - 1, 41, 3, 1);
+    R(v === 1 ? '#a01c34' : v === 2 ? '#5c0818' : '#7c4038', cx - 3, 45, 6, 1); if (v === 2) { R('#fcfcfc', cx - 2, 46, 1, 1); R('#fcfcfc', cx + 1, 46, 1, 1); } // Mund (Graf: Fangzähne)
+    if (v === 0) { R('#4c3c34', cx - 5, 47, 10, 3); R('#3c2c24', cx - 3, 49, 6, 2); } // Bart des Ahnherrn
+    // Augenhöhlen (Augäpfel werden live gezeichnet)
+    R(SK[0], cx - 8, 33, 6, 4); R(SK[0], cx + 2, 33, 6, 4);
+    // Goldrahmen mit Profil, Eckrosetten und Namensschild
+    for (let k = 0; k < 6; k++) { const col = ['#3c2804', '#8c6414', '#f8d878', '#c89020', '#8c6414', '#2c1c04'][k]; x.fillStyle = col; x.fillRect(k, k, FW - k * 2, 1); x.fillRect(k, FH - 1 - k, FW - k * 2, 1); x.fillRect(k, k, 1, FH - k * 2); x.fillRect(FW - 1 - k, k, 1, FH - k * 2); }
+    for (let X = 8; X < FW - 8; X += 4) { R('#f8d878', X, 2, 2, 1); R('#f8d878', X, FH - 3, 2, 1); }
+    for (let y = 8; y < FH - 8; y += 4) { R('#f8d878', 2, y, 1, 2); R('#f8d878', FW - 3, y, 1, 2); }
+    [[3, 3], [FW - 9, 3], [3, FH - 9], [FW - 9, FH - 9]].forEach(([a, b]) => { ell(a + 3, b + 3, 4, 4, (X, y, q) => R(q < 0.3 ? '#fce0a8' : q < 0.65 ? '#c89020' : '#5c4010', X, y)); });
+    R('#5c4010', cx - 10, FH - 12, 20, 5); R('#c89020', cx - 9, FH - 11, 18, 3); for (let k = -7; k <= 6; k += 2) R('#5c4010', cx + k, FH - 10, 1, 1); // Namensschild
+    if (v === 0) { for (let y = 0; y < 30; y++) R('#08040a', 14 + y * 0.6, 52 + y * 0.5, 1, 1); } // Riss in der Leinwand
+    return c;
+  };
+  return { FW, FH, art: [mk(0), mk(1), mk(2)], eyes: [[24, 33], [34, 33]] };
+})();
+class Portrait extends Ent {
+  // d: wx, wy = Lage in der Wandebene (Parallaxe 0.5, wiederholt sich alle 512 px wie Fenster und Vorhänge), v = erstes Motiv;
+  // jede Wiederholung zeigt den nächsten Ahnen. Die Pupillen folgen dem Helden, steht er direkt davor, glühen die Augen rot.
+  constructor(d) { super(0, 0, 1, 1); this.kind = 'prop'; this.wx = d.wx; this.wy = d.wy; this.v = d.v || 0; this.glow = 0; this.rects = []; }
+  place() {
+    const L = Tiles.layer(W.room.theme, 'wall'), cam = W.cam, out = [];
+    if (!L) return out;
+    const Hc = L.c.height, off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512, base = Math.floor(Math.floor(cam.x * 0.5) / 512);
+    const oy = L.vtile && W.room.h > 13 ? ((Math.floor(cam.y * 0.5) % Hc) + Hc) % Hc : 0;
+    for (let k = -1; k <= Math.ceil(View.w / 512) + 1; k++) for (const ty of oy ? [-oy, Hc - oy] : [0]) {
+      const X = this.wx - off + k * 512, Y = this.wy + ty;
+      if (X > View.w || X + 64 < 0 || Y > 208 || Y + 84 < 0) continue;
+      out.push([X, Y, (((this.v + base + k) % 3) + 3) % 3]);
+    }
+    return out;
+  }
+  update() {
+    this.t++; this.rects = this.place();
+    const px = W.player.cx - W.cam.x, near = this.rects.some(([X]) => Math.abs(px - (X + 32)) < 30);
+    this.glow = near ? Math.min(30, this.glow + 1) : Math.max(0, this.glow - 1);
+  }
+  lights(L) { // die Augen schimmern im Dunkeln
+    for (const [X, Y, v] of this.rects) { const red = v === 2 || this.glow > 20; for (const [ex, ey] of PORTRAITS.eyes) L.push({ x: X + ex + 3, y: Y + ey + 1, r: red ? 12 : 9, c: red ? [232, 30, 30] : [210, 200, 180], a: red ? 0.45 : 0.3 }); }
+  }
+  draw() {}
+  drawBack(ctx) {
+    const px = W.player.cx - W.cam.x, py = W.player.cy - 8 - W.cam.y;
+    for (const [X, Y, v] of this.rects) {
+      ctx.drawImage(PORTRAITS.art[v], X, Y);
+      for (const [ex, ey] of PORTRAITS.eyes) { // Augäpfel mit Pupillen, die dem Helden folgen
+        const dx = px - (X + ex + 3), dy = py - (Y + ey + 2), l = Math.hypot(dx, dy) || 1, ox = Math.round(dx / l * 1.6), oy = Math.round(dy / l * 0.9);
+        ctx.fillStyle = v === 2 ? '#e8d0d0' : '#ece8dc'; ctx.fillRect(X + ex + 1, Y + ey, 4, 3); ctx.fillRect(X + ex, Y + ey + 1, 6, 1);
+        const red = v === 2 || this.glow > 20;
+        ctx.fillStyle = red ? '#d81c1c' : '#2c1c14'; ctx.fillRect(X + ex + 2 + ox, Y + ey + oy + (oy < 0 ? 1 : 0), 2, 2);
+        ctx.fillStyle = red ? '#fc8c8c' : '#000'; ctx.fillRect(X + ex + 2 + ox + (ox > 0 ? 1 : 0), Y + ey + 1 + Math.max(0, oy), 1, 1);
+      }
+    }
+  }
+}
+
+// ---------------- Ritterrüstung (größer, detailreicher): Topfhelm mit Federbusch, Schulterlamellen, Harnisch mit Grat ----------------
+// Deko-Rüstungen stützen die Hände auf einen Bidenhänder; erwachte Rüstungen marschieren mit Hellebarde los.
+const ARMOR_SPR = (() => {
+  const M = ['#14141c', '#2c2c38', '#4c4c5c', '#70707e', '#9696a4', '#bcbcc8', '#e4e4ee'];
+  const mk = (walk, weapon) => {
+    const c = Sprites.canvas(30, 58), x = c.getContext('2d'), O = 3, Y0 = 4;
+    const R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(O + a, Y0 + b, w, h); };
+    const cyl = (x0, y0, w, h, lo = 1, hi = 6) => { for (let i = 0; i < w; i++) { const t = w > 1 ? i / (w - 1) : 0.5, k = Math.round(lo + (hi - lo) * Math.max(0, 1 - Math.abs(t - 0.35) * 2.1)); R(M[k], x0 + i, y0, 1, h); } };
+    if (weapon === 'halberd') { R('#3c2410', 22, -4, 2, 56); R('#5c3818', 22, -4, 1, 56); R(M[5], 20, -4, 6, 6); R(M[6], 20, -4, 6, 1); R(M[3], 25, -2, 2, 3); R(M[6], 22, -8, 2, 4); } // Hellebarde
+    R('#7c0818', 9, -4, 3, 2); R('#a81020', 8, -3, 4, 3); R('#d82838', 10, -4, 2, 1); R('#7c0818', 6, -2, 3, 3); R('#a81020', 5, 0, 3, 3); R('#5c0410', 4, 2, 2, 2); // Federbusch
+    cyl(7, 0, 9, 11, 1, 6); R(M[1], 7, 0, 9, 1); R(M[0], 7, 5, 9, 1); R(M[6], 9, 1, 2, 3); // Topfhelm mit Sehschlitz
+    R(M[0], 12, 7, 1, 1); R(M[0], 13, 8, 1, 1); R(M[0], 12, 9, 1, 1); R(M[0], 14, 7, 1, 1); R(M[0], 14, 9, 1, 1); // Atemlöcher
+    cyl(8, 11, 7, 2, 1, 4); // Halsberge
+    for (let k = 0; k < 3; k++) { cyl(0 + k, 12 + k * 2, 8 - k, 2, 1, 5); R(M[0], k, 13 + k * 2, 8 - k, 1); cyl(15, 12 + k * 2, 8 - k, 2, 1, 5); R(M[0], 15, 13 + k * 2, 8 - k, 1); } // Schulterlamellen
+    R(M[6], 2, 12, 2, 1); R(M[6], 17, 12, 2, 1);
+    cyl(6, 12, 11, 13, 1, 6); R(M[6], 11, 14, 1, 9); R(M[5], 8, 13, 7, 1); R(M[1], 6, 22, 11, 1); R(M[2], 6, 24, 11, 1); // Brustharnisch mit Grat
+    for (let k = 0; k < 4; k++) { cyl(5, 25 + k * 2, 13, 2, 1, 5); R(M[0], 5, 26 + k * 2, 13, 1); } // Bauchreifen, Beintaschen
+    for (const [ax, d] of [[1, 1], [19, -1]]) { // Arme
+      cyl(ax, 18, 3, 6, 1, 5); R(M[5], ax, 24, 3, 2); R(M[6], ax + 1, 24, 1, 1);
+      for (let k = 0; k < 4; k++) cyl(ax + d * (k + 1), 26 + k, 3, 1, 1, 5);
+    }
+    cyl(7, 29, 9, 3, 2, 6); R(M[0], 7, 31, 9, 1); // Panzerhandschuhe
+    const legs = walk === 0 ? [[6, 0], [13, 0]] : walk === 1 ? [[5, 2], [14, 0]] : [[7, 0], [12, 2]];
+    legs.forEach(([lx, lift]) => { cyl(lx, 33, 4, 7, 1, 5); R(M[6], lx + 1, 40, 2, 2); R(M[3], lx, 42, 4, 1); cyl(lx, 43 - lift, 4, 6, 1, 5); R(M[2], lx - 1, 49 - lift, 6, 2); R(M[4], lx - 1, 49 - lift, 6, 1); R(M[0], lx + 4, 50 - lift, 1, 1); });
+    if (weapon === 'sword') { R('#c89020', 10, 26, 3, 3); R('#5c3414', 11, 28, 1, 2); R('#c89020', 5, 32, 13, 2); R('#fce0a8', 5, 32, 13, 1); R('#d8d8e4', 10, 34, 3, 16); R('#9c9cac', 12, 34, 1, 16); R('#d8d8e4', 11, 50, 1, 2); } // Bidenhänder
+    return Sprites.fromCanvas(c, false);
+  };
+  return { still: mk(0, 'sword'), walk: [mk(1, 'halberd'), mk(0, 'halberd'), mk(2, 'halberd'), mk(0, 'halberd')] };
+})();
+
+// Erwachte Rüstung: marschiert mit Hellebarde, glühende Augen im Sehschlitz
+class LivingArmor extends Knight {
+  constructor(tx, ty) { super(tx, ty); this.w = 16; this.h = 50; this.x = tx * T; this.y = (ty + 1) * T - this.h; this.hp = 6; this.score = 600; }
+  draw(ctx) {
+    const s = ARMOR_SPR.walk[Math.floor(this.t / 10) % 4], fl = this.face < 0;
+    const X = Math.round(this.cx - 15 - W.cam.x), Y = Math.round(this.y + this.h - 54 - W.cam.y);
+    this.ds(ctx, s, X, Y, fl, this.flash);
+    ctx.fillStyle = (this.t >> 3) % 2 ? '#fc3c3c' : '#fc8c3c'; // Augen im Sehschlitz
+    for (const ex of fl ? [17, 14] : [12, 15]) ctx.fillRect(X + ex, Y + 9, 1, 1);
+  }
+}
+
+// ---------------- Schleimkokon (Seelenstrudel): darin ein Skelett – es bricht aus, sobald der Held näher kommt ----------------
+class Cocoon extends Enemy {
+  constructor(tx, ty, inner = 'skel') { super(tx * T - 2, (ty + 1) * T - 30, 20, 30, 3, 1, 200); this.inner = inner; this.state = 'still'; this.wt = 0; this.tx = tx; this.ty = ty; }
+  update() {
+    super.update();
+    const p = W.player;
+    if (this.state === 'still') {
+      if (this.t % 50 === 0 && Math.random() < 0.5) W.spawn(new Particle(this.cx + rnd(-6, 6), this.y + this.h - 2, 0, 0.3, '#58d860', 40, 1, 0.05)); // tropft
+      if (p.alive && Math.abs(p.cx - this.cx) < 76 && Math.abs(p.cy - this.cy) < 70) { this.state = 'crack'; this.wt = 0; Audio8.sfx('slime', this.cx); }
+    } else if (this.state === 'crack' && ++this.wt > 34) this.burst(true);
+    this.touch();
+  }
+  burst(release) {
+    this.dead = true;
+    Audio8.sfx('splat', this.cx); W.shake = Math.max(W.shake, 3);
+    for (let i = 0; i < 18; i++) W.spawn(new Particle(this.cx + rnd(-8, 8), this.cy + rnd(-10, 10), rnd(-2.4, 2.4), rnd(-3.2, -0.6), i % 3 ? '#58d860' : '#a8fc98', 46, 2, 0.18)); // Schleimspritzer
+    if (!release) return;
+    if (this.inner === 'bat') { for (const s of [-1, 1]) { const b = W.spawn(new Bat(this.tx + s * 0.4, this.ty - 1)); b.state = 'fly'; b.dir = s; b.face = s; b.baseY = b.y; } }
+    else { const k = W.spawn(new Skeleton(this.tx, this.ty)); k.throwCD = 50; }
+  }
+  kill(silent) { super.kill(silent); this.burst(false); } // vorher zerschlagen: das Skelett darin zerfällt mit
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), sh = this.state === 'crack' ? Math.round(Math.sin(this.wt * 1.9) * (1 + this.wt / 18)) : 0;
+    const pulse = Math.sin(this.t * 0.06) * 1.2, cx = x + 10 + sh, cy = y + 16;
+    ctx.fillStyle = 'rgba(40,120,50,0.5)'; ctx.fillRect(x - 3, y + 28, 26, 2); ctx.fillRect(x, y + 27, 20, 1); // Schleimpfütze
+    for (let yy = 0; yy < 30; yy++) { // Kokon: zähe, durchscheinende Masse
+      const t = yy / 29, w = Math.round((Math.sin(t * Math.PI) * 9 + 2 + (yy > 22 ? 2 : 0)) * (1 + pulse * 0.04));
+      ctx.fillStyle = yy < 3 ? 'rgba(120,230,110,0.55)' : 'rgba(70,190,80,0.5)'; ctx.fillRect(cx - w, y + yy, w * 2, 1);
+      ctx.fillStyle = 'rgba(20,80,30,0.5)'; ctx.fillRect(cx - w, y + yy, 1, 1); ctx.fillRect(cx + w - 1, y + yy, 1, 1);
+    }
+    ctx.fillStyle = 'rgba(20,40,20,0.75)'; // Schatten des Gefangenen: Schädel, Rippen, Arme
+    if (this.inner === 'bat') { ctx.fillRect(cx - 7, cy - 4, 14, 3); ctx.fillRect(cx - 2, cy - 6, 4, 8); }
+    else { ctx.fillRect(cx - 3, y + 5, 6, 5); ctx.fillRect(cx - 1, y + 10, 2, 12); for (let k = 0; k < 3; k++) ctx.fillRect(cx - 4, y + 12 + k * 3, 8, 1); ctx.fillRect(cx - 6, y + 12, 2, 8); ctx.fillRect(cx + 4, y + 12, 2, 8); ctx.fillRect(cx - 3, y + 22, 2, 6); ctx.fillRect(cx + 1, y + 22, 2, 6); }
+    ctx.fillStyle = this.state === 'crack' && (this.wt & 4) ? '#fc3c3c' : 'rgba(250,60,60,0.7)'; ctx.fillRect(cx - 2, y + 7, 1, 1); ctx.fillRect(cx + 1, y + 7, 1, 1); // Augen
+    ctx.fillStyle = 'rgba(230,255,220,0.8)'; ctx.fillRect(cx - 5, y + 6, 1, 3); ctx.fillRect(cx - 6, y + 10, 1, 2); ctx.fillRect(cx + 3, y + 4, 2, 1); // Glanz
+    if (this.state === 'crack') { ctx.fillStyle = '#a8fc98'; for (let k = 0; k < Math.min(6, this.wt / 5); k++) ctx.fillRect(cx - 6 + ((k * 5) % 12), y + 4 + k * 4, 2, 1); } // Risse
+    if (this.flash) { ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(x, y, 20, 30); }
+  }
+}
+
+// ---------------- Grotte: großer Wasserfall – halbtransparenter, strömender Wasservorhang (SNES-Farbmathematik, der Fels
+// scheint durch), die Strähnen wellen sich; am Fuß transparente Gischtwolken, die auch vor dem Helden aufsteigen ----------------
+class Waterfall extends Ent {
+  constructor(d) { super(d.x * T - d.w / 2, d.y0 * T, d.w, (d.y1 - d.y0) * T); this.kind = 'prop'; }
+  update() {
+    this.t++;
+    if (this.t % 2 === 0 && this.onScreen(30)) W.spawn(new Particle(this.x + rnd(0, this.w), this.y + this.h - 3, rnd(-1.4, 1.4), -rnd(0.8, 2.4), Math.random() < 0.5 ? '#c8e8fc' : '#7cb4e8', 30, 1, 0.12)); // Spritzer
+    if (this.t % 40 === 0 && this.onScreen(0)) Audio8.drip(this.cx, 0.5);
+  }
+  lights(L, cx, cy) { L.push({ x: this.cx - cx, y: this.y + this.h - 12 - cy, r: 56, c: [100, 160, 230], a: 0.35 }); L.push({ x: this.cx - cx, y: this.y + this.h * 0.4 - cy, r: 40, c: [90, 140, 220], a: 0.2 }); }
+  draw() {}
+  drawBack(ctx) {
+    const X = Math.round(this.x - W.cam.x), Y = Math.round(this.y - W.cam.y), w = this.w, h = this.h;
+    if (X > View.w || X + w < 0) return;
+    const y0 = Math.max(0, Y), y1 = Math.min(208, Y + h);
+    if (y1 <= y0) return;
+    ctx.fillStyle = 'rgba(50,110,190,0.34)'; ctx.fillRect(X, y0, w, y1 - y0); // Grundschleier
+    for (let i = 0; i < w; i++) { // Strähnen strömen abwärts, jede Spalte mit eigenem Tempo, seitlich leicht gewellt
+      const sp = 2.2 + (i % 5) * 0.4, wob = Math.round(Math.sin(this.t * 0.05 + i * 0.4) * 0.6);
+      for (let k = 0; k < 4; k++) {
+        const len = 10 + ((i * 7 + k * 13) % 20), yy = ((i * 31 + k * 57 + this.t * sp) % (h + len)) - len, sy = Y + yy;
+        if (sy + len < y0 || sy > y1) continue;
+        ctx.fillStyle = (i + k) % 3 === 0 ? 'rgba(236,250,255,0.55)' : 'rgba(170,214,248,0.38)';
+        ctx.fillRect(X + i + wob, Math.round(sy), 1, len);
+      }
+    }
+    ctx.fillStyle = 'rgba(230,248,255,0.55)'; ctx.fillRect(X, y0, 1, y1 - y0); ctx.fillRect(X + w - 1, y0, 1, y1 - y0); // Ränder
+    const B = Y + h; ctx.fillStyle = 'rgba(220,240,255,0.5)'; for (let i = -6; i < w + 6; i += 2) ctx.fillRect(X + i, B - 2 - ((i * 7 + this.t) % 5), 2, 3); // Schaum am Wasserspiegel
+  }
+  drawFront(ctx) {
+    const X = this.x - W.cam.x, B = this.y + this.h - W.cam.y;
+    if (X > View.w + 40 || X + this.w < -40 || B < -40 || B > 280) return;
+    for (let k = 0; k < 10; k++) {
+      const ph = (this.t * 0.55 + k * 23) % 64, r = 6 + ph * 0.35, cx = X + this.w / 2 + Math.sin(k * 2.1 + this.t * 0.01) * (this.w * 0.5 + ph * 0.5), cy = B - 4 - ph * 0.8;
+      ctx.fillStyle = `rgba(200,226,250,${(0.2 * (1 - ph / 64)).toFixed(3)})`;
+      ctx.beginPath(); ctx.ellipse(cx, cy, r * 1.5, r, 0, 0, Math.PI * 2); ctx.fill();
+    }
   }
 }

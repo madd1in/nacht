@@ -4,7 +4,7 @@
 // Gewitter über dem ganzen Schloss: [Dunkelheit zwischen den Blitzen, Restdunkel im Blitz] (Hof und Schiff: Freiluft, ohne Abdunklung)
 const STORMY = { courtyard: null, ship: null, glass: [0.44, 0.12], foyer: [0.88, 0.02], library: [0.52, 0.08], hall: [0.5, 0.1], tower: [0.5, 0.1], throne: [0.46, 0.1] };
 // Fenster in der Wandebene (x, Oberkante, Breite, Höhe): werfen im Blitz Lichtbahnen in den Raum
-const STORM_WINS = { foyer: [[44, 20, 56, 216], [300, 20, 56, 216]], library: [[296, 24, 48, 98]], hall: [[64, 40, 32, 88], [320, 40, 32, 88]], throne: [[40, 38, 24, 92], [392, 38, 24, 92]] };
+const STORM_WINS = { foyer: [[44, 20, 56, 216], [300, 20, 56, 216]], library: [[296, 24, 48, 98]], hall: [[64, 40, 32, 88], [320, 40, 32, 88]], throne: [[59, 24, 32, 108], [315, 24, 32, 108]] };
 const W = {
   room: null, stage: 0, roomIdx: 0, ents: [], platforms: [], stairs: [], spawners: [],
   player: null, cam: { x: 0, y: 0 }, camYf: 0, frame: 0, atkId: 0,
@@ -42,6 +42,9 @@ const W = {
         case 'fgear': this.platforms.push(this.spawn(new FlatGear(d))); break;
         case 'wgear': this.platforms.push(this.spawn(new WheelGear(d))); break;
         case 'throne': this.spawn(new Throne(d)); break;
+        case 'portrait': this.spawn(new Portrait(d)); break;
+        case 'waterfall': this.spawn(new Waterfall(d)); break;
+        case 'cocoon': this.spawn(new Cocoon(d.x, d.y, d.inner)); break;
         case 'brazier': this.spawn(new Brazier(d)); break;
         case 'candelabra': this.spawn(new Candelabra(d)); break;
         case 'book': this.spawn(new FlyBook(d.x * T + 8, (d.y + 1) * T - 5, { rest: true })); break;
@@ -599,7 +602,7 @@ const W = {
       else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
       else if (e instanceof Gatehouse) e.lights(L, this.cam.x, this.cam.y, flick);
       else if (e instanceof FallingChandelier) e.lights(L, this.cam.x, this.cam.y, flick);
-      else if (e instanceof Lectern || e instanceof Brazier || e instanceof Candelabra) e.lights(L, cx, cy, flick);
+      else if (e instanceof Lectern || e instanceof Brazier || e instanceof Candelabra || e instanceof Waterfall) e.lights(L, cx, cy, flick);
       else if (e instanceof Tome && e.open) L.push({ x, y, r: 34, c: [232, 40, 80], a: 0.5 });
       else if (e instanceof Chandelier) L.push({ x, y: e.y - cy - 6, r: 42 + flick(e.px), c: [248, 160, 60], a: 0.55 });
       else if (e instanceof Statue && e.active) L.push({ x, y: y - 8, r: 30, c: [60, 188, 252], a: 0.45 });
@@ -618,6 +621,7 @@ const W = {
     if (this.room.theme === 'foyer' || this.room.theme === 'library') for (const [wx, wy, ww, wh] of this.stormWindows()) { // Fenster schimmern im Mondlicht, auch zwischen den Blitzen
       for (let k = 0; k < 3; k++) L.push({ x: wx + ww / 2, y: wy + wh * (0.2 + k * 0.3), r: 50, c: [90, 100, 170], a: this.room.theme === 'foyer' ? 0.06 : 0.16 }); // Eingangshalle: fast nur der Blitz erhellt den Saal
     }
+    for (const e of this.ents) if (e instanceof Portrait) e.lights(L); // Ahnenbilder hängen in der Wandebene
     if (this.room.theme === 'ship') Tiles.shipLights(L, this.cam);
     this.doorLights(L);
     if ((this.room.theme === 'courtyard' || this.room.theme === 'ship') && FX.stormOn(this.storm)) L.push({ x: View.w / 2, y: 40, r: 420 });

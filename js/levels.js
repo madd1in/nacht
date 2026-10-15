@@ -139,6 +139,7 @@ const Levels = (() => {
     .enemy('bat', 24, 2).enemy('bat', 52, 3).enemy('bat', 79, 2)
     .candle(3, 15).candle(9, 15, 'H').candle(23, 9).candle(33, 9, 'W').candle(42, 9).candle(48, 15, '$').candle(56, 15, 'H').candle(66, 10).candle(78, 15, '2')
     .statue(48, 17)
+    .prop('portrait', { wx: 168, wy: 40, v: 0 }).prop('portrait', { wx: 424, wy: 40, v: 1 }) // Ahnenbilder zwischen den Fenstern, ihre Augen folgen
     .zone('ghoul', 4, 80, { interval: 170, max: 2 })
     .start(2, 17).exit(82).done();
 
@@ -169,6 +170,7 @@ const Levels = (() => {
     .candle(50, 9, '$').candle(53, 3, 'H').candle(61, 3).candle(67, 9).candle(73, 9, 'H').candle(80, 9, '2').candle(86, 9)
     .enemy('bat', 14, 3).enemy('bat', 40, 2).enemy('bat', 70, 3)
     .zone('ghoul', 18, 50, { interval: 140, max: 2 })
+    .prop('portrait', { wx: 118, wy: 34, v: 0 }).prop('portrait', { wx: 373, wy: 34, v: 2 })
     .start(2, 10).arena('gbat').done();
 
   // ======================= STAGE 2: Die Katakomben =======================
@@ -181,6 +183,7 @@ const Levels = (() => {
     .candle(5, 9).candle(12, 9, 'H').candle(23, 7).candle(35, 6, 'H').candle(46, 8).candle(51, 7, '4')
     .candle(62, 7).candle(68, 7, '$').candle(84, 9).candle(90, 9, 'H')
     .enemy('skel', 46, 9)
+    .prop('waterfall', { x: 59.5, y0: 0, y1: 11, w: 40 })                // großer Wasserfall in den Höhlensee
     .zone('fish', 20, 78, { interval: 170, max: 2 })
     .zone('skull', 50, 78, { interval: 280, max: 1 })
     .start(2, 10).exit(94).done();
@@ -200,6 +203,7 @@ const Levels = (() => {
     .chest(25, 4, 'life')
     .enemy('skel', 15, 16).enemy('bat', 20, 10).enemy('bat', 3, 7).enemy('ghost', 20, 14)
     .zone('fish', 7, 27, { interval: 220, max: 1 })
+    .prop('waterfall', { x: 17, y0: 0, y1: 28, w: 32 })
     .start(2, 27).exitAt(24, 0, 27, 4).done();
 
   const r22 = room(96, 'crypt')
@@ -294,6 +298,7 @@ const Levels = (() => {
     .statue(4, 10)
     .candle(12, 7, 'H').candle(27, 7).candle(37, 6, 'H').candle(54, 7, '$').candle(60, 9, 'H').candle(32, 2, '1').candle(50, 2, 'W')
     .zone('skull', 10, 56, { interval: 640, max: 1 })
+    .prop('cocoon', { x: 27, y: 8 }).prop('cocoon', { x: 37, y: 7 }).prop('cocoon', { x: 54, y: 8 }).prop('cocoon', { x: 60, y: 10, inner: 'bat' }) // in Schleim eingeschlossene Gegner
     .start(2, 10).exit(62).done();
 
   // Glasturm: senkrechter Aufstieg zum Thronsaal zwischen riesigen Buntglasfenstern (Treppen im Zickzack, zwei Aufzüge)
@@ -323,6 +328,7 @@ const Levels = (() => {
     .enemy('knight', 38, 10).enemy('pillar', 46, 10).enemy('bat', 16, 4).enemy('bat', 40, 3).enemy('ghost', 33, 5)
     .zone('skull', 30, 50, { interval: 420, max: 1 })
     // imposanter Thronsaal: der Thron des Grafen unter dem Baldachin, Feuerschalen, goldene Standleuchter, Rüstungen als Ehrenwache
+    .prop('portrait', { wx: 171, wy: 34, v: 1 })
     .prop('throne', { x: 80, y: 10 }).prop('brazier', { x: 75.3, y: 10 }).prop('brazier', { x: 84.7, y: 10 })
     .prop('candelabra', { x: 3, y: 10 }).prop('candelabra', { x: 13, y: 10 }).prop('candelabra', { x: 28, y: 10 }).prop('candelabra', { x: 37, y: 10 }).prop('candelabra', { x: 51, y: 10 }).prop('candelabra', { x: 57, y: 10 })
     .prop('armor', { x: 8, y: 10 }).prop('armor', { x: 32, y: 10, flip: true }).prop('armor', { x: 55, y: 10 }).prop('armor', { x: 60, y: 10, flip: true })

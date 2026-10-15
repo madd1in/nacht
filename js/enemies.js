@@ -354,8 +354,8 @@ class Bat extends Enemy {
   }
   draw(ctx) {
     const B = Sprites.S.bat;
-    const s = this.state === 'perch' ? B.perch : B.fly[Math.floor(this.t / 4) % 4];
-    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.y - W.cam.y - 4), this.dir < 0, this.flash);
+    const s = this.state === 'perch' ? B.perch : B.fly[Math.floor(this.t / 3) % B.fly.length];
+    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.y - W.cam.y - (this.state === 'perch' ? 2 : 7)), this.dir < 0, this.flash);
   }
 }
 
@@ -406,7 +406,8 @@ class Skull extends Enemy {
     if (this.t > 900) this.dead = true;
   }
   draw(ctx) {
-    this.ds(ctx, Sprites.S.skull[Math.floor(this.t / 5) % 2], Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - 4 - W.cam.y), this.dir > 0, this.flash);
+    const s = Sprites.S.skull[Math.floor(this.t / 4) % Sprites.S.skull.length];
+    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.y - 4 - W.cam.y), this.dir > 0, this.flash);
   }
 }
 
@@ -496,7 +497,7 @@ class Fishman extends Enemy {
   }
   draw(ctx) {
     const S = Sprites.S;
-    const s = this.shootT > 0 ? S.fishShoot : S.fish[this.state === 'jump' ? 0 : Math.floor(this.t / 12) % 2];
+    const s = this.shootT > 0 ? S.fishShoot : S.fish[this.state === 'jump' ? 2 : Math.floor(this.t / 12) % 2];
     this.spr(ctx, s, this.face < 0, 0, 0, this.flash);
   }
 }
