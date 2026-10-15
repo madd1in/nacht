@@ -1541,11 +1541,20 @@ const Tiles = (() => {
         px(x3, '#3c3848', gx, 176 - gh, 10, gh); px(x3, '#3c3848', gx + 1, 175 - gh, 8, 1); px(x3, '#5c5868', gx, 176 - gh, 1, gh); px(x3, '#5c5868', gx + 1, 175 - gh, 7, 1);
         px(x3, '#24202c', gx + 4, 179 - gh, 2, 8); px(x3, '#24202c', gx + 2, 181 - gh, 6, 2);
       });
+      L.push({ name: 'fog7', custom: drawFog7, par: 0, c: C(1, 1) }); // Mode-7-Bodennebel zwischen Burg und Bäumen
       add('near', nr, 0.6);
     } else if (theme === 'hall' || theme === 'throne') {
       const c = C(512, 208), x = c.getContext('2d');
       if (theme === 'hall') wallBricks(x, 512, 208, ['#5c2414', '#3c1008', '#140000']);
-      else wallBricks(x, 512, 208, ['#4c1430', '#300818', '#0c0008'], 24, 12);
+      else { // Thronsaal: polierter schwarzroter Marmor in großen Quadern mit Adern, unten geschnitzte Vertäfelung mit Goldleiste
+        for (let Y = 0; Y < 208; Y++) for (let X = 0; X < 512; X++) {
+          const row = Math.floor(Y / 26), bx = (X + (row % 2) * 24) % 48, by = Y % 26, n = hn(X >> 1, Y >> 1, 41);
+          let c = Math.abs(Math.sin(X * 0.09 + Y * 0.21 + hn(X >> 4, Y >> 4, 7) * 6)) < 0.05 ? '#4c1c2c' : n > 0.72 ? '#2c0814' : '#22060f';
+          if (bx === 0 || by === 0) c = '#0c0206'; else if (bx === 1 || by === 1) c = '#3c1020';
+          px(x, c, X, Y);
+        }
+        for (let Y = 152; Y < 208; Y++) for (let X = 0; X < 512; X++) px(x, Y < 154 ? '#c89020' : (X % 64 < 3 || Y % 28 === 0) ? '#1c0a04' : (X % 64 < 5 || Y % 28 === 1) ? '#6c3c18' : '#2c1408', X, Y);
+      }
       const vtile = theme === 'hall';
       shade(x, 512, 208, '#000000', 0, 50);
       if (theme === 'hall') {
@@ -1581,6 +1590,11 @@ const Tiles = (() => {
         lightShaft(x, 110, 100, 36, 70, '#a8287c', 0.22);
         banner(x, 200, 10, 26, 96, '#4428bc', '#f8b800', '#a80020');
         banner(x, 300, 10, 26, 96, '#4428bc', '#f8b800', '#a80020');
+        [[22, 236], [258, 488]].forEach(([a, b]) => { for (let X = a; X < b; X++) { // schwere Samt-Draperie zwischen den Pfeilern
+          const t = (X - a) / (b - a), sag = Math.round(10 + Math.sin(t * Math.PI) * 18);
+          for (let Y = 0; Y < sag; Y++) px(x, (Y + Math.round(Math.sin(t * Math.PI * 6) * 2)) % 7 < 2 ? '#8c1020' : '#5c0814', X, Y);
+          px(x, '#c89020', X, sag, 1, 1); if (X % 2 === 0) px(x, '#f8b800', X, sag + 1, 1, 2);
+        } });
       }
       [0, 236, 488].forEach(cx => pillar(x, cx, 22, 208));
       add('wall', c, 0.5, { vtile });
@@ -1713,6 +1727,39 @@ const Tiles = (() => {
       const Y = ((((i * 61) % 150 + 24 - oy) % 260) + 260) % 260 - 30 + Math.sin(frame * 0.02 + i * 1.7) * 14;
       ctx.drawImage(flockBooks[i % 4][(Math.floor(frame / 5) + i) % 4], Math.round(X), Math.round(Y));
     }
+  }
+
+  // Burghof: Mode-7-Bodennebel – eine perspektivische Nebelebene, die zum Horizont hin flach wird und langsam heranrollt
+  // (halbe Auflösung, jede Bildzeile in die Ebene zurückgerechnet; nahtloses Rauschen in drei Oktaven)
+  let fogTex = null, fogBuf = null;
+  function drawFog7(ctx, cam, frame) {
+    if (!fogTex) {
+      fogTex = new Uint8Array(128 * 128);
+      for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+        let v = 0;
+        for (const [s, w] of [[32, 0.6], [16, 0.28], [8, 0.12]]) {
+          const n = 128 / s, gx = x / s, gy = y / s, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+          const a = hn(x0 % n, y0 % n, 31), b = hn((x0 + 1) % n, y0 % n, 31), c = hn(x0 % n, (y0 + 1) % n, 31), d = hn((x0 + 1) % n, (y0 + 1) % n, 31);
+          v += w * (a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy);
+        }
+        fogTex[y * 128 + x] = Math.max(0, Math.min(255, (v - 0.3) * 2.4 * 255));
+      }
+    }
+    const HZ = 112, w = Math.ceil(View.w / 2), h = (208 - HZ) >> 1;
+    if (!fogBuf || fogBuf.w !== w) { const c = C(w, h), x = c.getContext('2d'), img = x.createImageData(w, h); fogBuf = { w, c, x, img, d: new Int32Array(img.data.buffer) }; }
+    const d = fogBuf.d, cx = cam.x * 0.45, step = View.lite ? 2 : 1; // Sparmodus: nur jede zweite Zeile
+    if (step > 1) d.fill(0);
+    for (let j = 0; j < h; j += step) {
+      const yy = j * 2 + 1, dist = 900 / (yy + 5), sc = dist / 210, fade = Math.min(1, yy / 26) * (0.5 + 0.5 * Math.min(1, (h * 2 - yy) / 50)) * 0.62;
+      const v = ((dist + frame * 0.35) & 127) * 128, du = 2 * sc, row = j * w;
+      let u = (-View.w / 2) * sc + cx * sc * 0.2 + frame * 0.12 + cx + 4096;
+      for (let i = 0; i < w; i++, u += du) {
+        const a = (fogTex[v + ((u | 0) & 127)] * fade) | 0;
+        d[row + i] = a ? (a << 24) | (214 << 16) | (160 << 8) | 176 : 0;
+      }
+    }
+    fogBuf.x.putImageData(fogBuf.img, 0, 0);
+    ctx.drawImage(fogBuf.c, 0, 0, w, h, 0, HZ, w * 2, h * 2);
   }
 
   // ---------------- Glasturm als Röhre (Mode 7): senkrechte Achse, Blick von innen auf die Wand ----------------

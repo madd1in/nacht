@@ -270,6 +270,21 @@ const Levels = (() => {
     .enemy('bat', 18, 11).enemy('bat', 9, 1).enemy('ghost', 14, 12)
     .start(6, 29).exitAt(3, 0, 6, 3).done();
 
+  // Zahnradwerk im Uhrturm: riesige Zahnräder als Mode-7-Drehscheiben. Erst zwei liegende Räder – man läuft vorn über die
+  // Scheibe gegen die Drehung an –, dann zwei stehende Räder, deren Zähne oben entgegenrollen. Darunter Stacheln.
+  const gw = room(104, 'tower')
+    .ground(0, 9).fill(10, 12, 31, 12, '^').ground(32, 43).fill(44, 12, 61, 12, '^').ground(62, 103)
+    .stair(38, 10, 3, 1).fill(41, 8, 43, 12, '#').fill(62, 8, 64, 12, '#').stair(67, 10, 3, -1) // Steinpodeste vor und hinter den stehenden Rädern
+    .prop('fgear', { x: 15.47, row: 11, r: 88, v: -0.75 })
+    .prop('fgear', { x: 27.43, row: 11, r: 80, v: -0.9, phase: 0.4 })
+    .prop('wgear', { x: 47.625, top: 120, r: 80, v: -0.8 })
+    .prop('wgear', { x: 57.375, top: 128, r: 64, v: -1.0 })
+    .statue(37, 10)
+    .candle(3, 9).candle(7, 9, 'H').candle(15, 5).candle(21, 5, 'W').candle(28, 5, '$').candle(35, 9, 'H').candle(40, 9)
+    .candle(48, 4, 'H').candle(58, 4).candle(66, 9, '3').candle(74, 9, 'H').candle(84, 9).candle(94, 9, '$').candle(99, 9)
+    .enemy('bat', 38, 4).enemy('bat', 70, 3).enemy('knight', 80, 10).enemy('pillar', 92, 10)
+    .start(2, 10).exit(102).done();
+
   // Seelenstrudel: schwebende Steine über dem Nichts, Ankerringe, rotierender Mode-7-Tunnel
   const vx = room(64, 'vortex')
     .ground(0, 7).ground(57, 63)
@@ -303,16 +318,20 @@ const Levels = (() => {
     .ground(0, 15).ground(26, 87)
     .grand(21, 0, 134, 0.3, 0.8)
     .statue(30, 10)
-    .fill(75, 7, 77, 7, '=').fill(82, 7, 84, 7, '=')
+    .fill(69, 7, 71, 7, '=').fill(86, 7, 87, 7, '=')                     // Plattformen links und rechts neben dem Thron
     .candle(5, 9, 'H').candle(10, 9).candle(18, 2, 'H').candle(34, 9, '1').candle(40, 9).candle(44, 9, 'U').candle(48, 9, 'R')
     .enemy('knight', 38, 10).enemy('pillar', 46, 10).enemy('bat', 16, 4).enemy('bat', 40, 3).enemy('ghost', 33, 5)
     .zone('skull', 30, 50, { interval: 420, max: 1 })
+    // imposanter Thronsaal: der Thron des Grafen unter dem Baldachin, Feuerschalen, goldene Standleuchter, Rüstungen als Ehrenwache
+    .prop('throne', { x: 80, y: 10 }).prop('brazier', { x: 75.3, y: 10 }).prop('brazier', { x: 84.7, y: 10 })
+    .prop('candelabra', { x: 3, y: 10 }).prop('candelabra', { x: 13, y: 10 }).prop('candelabra', { x: 28, y: 10 }).prop('candelabra', { x: 37, y: 10 }).prop('candelabra', { x: 51, y: 10 }).prop('candelabra', { x: 57, y: 10 })
+    .prop('armor', { x: 8, y: 10 }).prop('armor', { x: 32, y: 10, flip: true }).prop('armor', { x: 55, y: 10 }).prop('armor', { x: 60, y: 10, flip: true })
     .start(2, 10).arena('count').done();
 
   const STAGES = [
     { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
-    { name: 'DER BERGFRIED', music: 'stage3', time: 960, rooms: [r31, lb, v3, vx, vg, r32], boss: 'GRAF NACHTMAHR' },
+    { name: 'DER BERGFRIED', music: 'stage3', time: 1080, rooms: [r31, lb, v3, gw, vx, vg, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
   return { STAGES };

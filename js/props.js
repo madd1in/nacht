@@ -829,3 +829,112 @@ class Globe extends Ent {
     R('#fce0a8', 11, 0, 2, 1); R('#8c6414', 11, 26, 2, 1); // Achse
   }
 }
+
+// ---------------- Thronsaal: der Thron des Grafen auf einem Podest unter einem Baldachin ----------------
+// Hinter den Kulissen gezeichnet (vor den Kacheln): Lambrequin mit Goldfransen, schwere gerafften Samtvorhänge,
+// Damast-Rückwand mit Fledermauswappen, dreistufiges Podest aus schwarzem Marmor mit rotem Läufer, gotischer Thron
+// mit Fialen, Rückenlehne aus gestepptem Samt, Schädeln auf den Armlehnen und Löwenfüßen.
+const THRONE_ART = (() => {
+  const W0 = 176, H0 = 176, c = Sprites.canvas(W0, H0), x = c.getContext('2d'), cx = 88;
+  const R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(Math.round(a), Math.round(b), Math.round(w), Math.round(h)); };
+  for (let y = 12; y < 150; y++) for (let X = 30; X < 146; X++) { // Damast-Rückwand
+    const u = (X % 16) - 8, v = (y % 22) - 11, fl = Math.abs(u) < 6 - Math.abs(v) * 0.5;
+    R(fl ? '#4c0818' : (X + y) % 5 === 0 ? '#2a020a' : '#34040e', X, y);
+  }
+  // Wappen über dem Thron: Fledermaus vor goldener Scheibe
+  for (let y = -12; y <= 12; y++) for (let X = -12; X <= 12; X++) { const d = Math.hypot(X, y); if (d <= 12) R(d > 10.5 ? '#f8b800' : d > 9.5 ? '#8c6414' : '#5c0814', cx + X, 24 + y); }
+  for (let k = 0; k < 9; k++) { R('#0c0408', cx - 2 - k, 22 - Math.round(Math.sin(k / 8 * Math.PI) * 4), 1, 4 + (k % 3 === 2 ? 2 : 0)); R('#0c0408', cx + 2 + k, 22 - Math.round(Math.sin(k / 8 * Math.PI) * 4), 1, 4 + (k % 3 === 2 ? 2 : 0)); }
+  R('#0c0408', cx - 2, 20, 5, 7); R('#0c0408', cx - 2, 18, 1, 2); R('#0c0408', cx + 2, 18, 1, 2); R('#fc3c3c', cx - 1, 22, 1, 1); R('#fc3c3c', cx + 1, 22, 1, 1);
+  // gerafften Vorhänge links und rechts
+  for (const side of [-1, 1]) {
+    for (let y = 10; y < 176; y++) {
+      const tie = 100, g = y < tie ? 0.95 - (y - 10) / (tie - 10) * 0.5 : 0.45 + (y - tie) / 76 * 0.6, w = Math.round(42 * g), x0 = side < 0 ? 2 : W0 - 2 - w;
+      for (let X = 0; X < w; X++) { const f = Math.sin((X / Math.max(1, w)) * Math.PI * 4 + y * 0.02) * 0.5 + 0.5; R(f > 0.8 ? '#c02838' : f > 0.45 ? '#8c1020' : f > 0.15 ? '#5c0814' : '#30040a', x0 + X, y); }
+      if (y > tie - 2 && y < tie + 2) R('#c89020', x0 - 1, y, w + 2, 1);
+    }
+    const tx = side < 0 ? 22 : W0 - 26; // Quaste
+    R('#f8b800', tx, 102, 4, 5); for (let k = 0; k < 11; k++) R(k % 2 ? '#c89020' : '#fce0a8', tx - 1 + (k % 6), 107 + (k >> 1), 1, 4);
+  }
+  // Lambrequin mit Bogenkanten und Goldfransen
+  for (let X = 0; X < W0; X++) { const sc = X % 22, h = 12 + Math.round(Math.sin(sc / 22 * Math.PI) * 6); R('#6c0814', X, 0, 1, h); R(sc % 4 === 0 ? '#8c1020' : '#6c0814', X, 2, 1, h - 4); R('#c89020', X, h - 2, 1, 1); if (X % 2 === 0) R('#f8b800', X, h - 1, 1, 3); }
+  R('#f8b800', 0, 0, W0, 2); R('#fce0a8', 0, 0, W0, 1);
+  // Podest: drei Stufen aus schwarzem Marmor mit Goldkante, roter Läufer
+  [[6, 160, 164, 16], [22, 148, 132, 12], [38, 138, 100, 10]].forEach(([sx, sy, sw, sh]) => {
+    for (let y = 0; y < sh; y++) for (let X = 0; X < sw; X++) R(Math.abs(Math.sin((sx + X) * 0.2 + (sy + y) * 0.5)) < 0.06 ? '#3c2c44' : '#1c1420', sx + X, sy + y);
+    R('#6c5c74', sx, sy, sw, 1); R('#c89020', sx, sy + 1, sw, 1); R('#0c080e', sx, sy + sh - 1, sw, 1);
+  });
+  R('#a80020', cx - 15, 138, 30, 38); R('#d82838', cx - 15, 138, 30, 1); R('#f8b800', cx - 15, 138, 2, 38); R('#f8b800', cx + 13, 138, 2, 38);
+  for (const y of [148, 160]) R('#c89020', cx - 15, y, 30, 1); // Teppichstangen auf den Stufen
+  // Thron: Seitenpfosten mit Goldbändern und Fialen
+  for (const s of [-1, 1]) {
+    const px0 = cx + s * 30 - (s < 0 ? 0 : 5);
+    R('#140a0c', px0, 36, 5, 100); R('#3c2028', px0, 36, 1, 100);
+    for (const y of [44, 70, 96, 120]) R('#c89020', px0, y, 5, 2);
+    for (let k = 0; k < 14; k++) { const w = 1 + Math.floor(k / 5); R('#140a0c', px0 + 2 - Math.floor(w / 2), 22 + k, w, 1); } // Fiale
+    R('#f8b800', px0 + 1, 19, 3, 3);
+  }
+  // Rückenlehne: Spitzbogen, Goldrahmen, gesteppter Samt
+  for (let y = 26; y < 112; y++) {
+    const half = y > 52 ? 24 : Math.round(24 * Math.sqrt(Math.max(0, 1 - ((52 - y) / 26) ** 2 * 0.9)));
+    for (let X = -half; X < half; X++) {
+      const edge = Math.abs(X) > half - 3 || y < 29, gold = Math.abs(X) > half - 5 && Math.abs(X) <= half - 3, tuft = (X + 64 + (y % 12 < 6 ? 0 : 4)) % 8 === 0 && y % 6 === 0;
+      R(edge ? '#140a0c' : gold ? '#c89020' : tuft ? '#5c0814' : ((X + y) & 3) === 0 ? '#a01828' : '#8c1020', cx + X, y);
+    }
+  }
+  for (let k = 0; k < 20; k++) R(k < 4 ? '#fce0a8' : '#140a0c', cx - Math.floor(k / 7), 6 + k, 1 + Math.floor(k / 7) * 2, 1); // Mittelfiale
+  R('#f8b800', cx - 1, 4, 3, 3);
+  // Sitz, Armlehnen mit Schädeln, Löwenfüße
+  R('#5c0814', cx - 30, 112, 60, 14); R('#c02838', cx - 30, 112, 60, 3); R('#f8b800', cx - 30, 115, 60, 1); R('#c89020', cx - 30, 125, 60, 1);
+  for (const s of [-1, 1]) {
+    const ax = s < 0 ? cx - 38 : cx + 26;
+    R('#140a0c', ax, 100, 12, 14); R('#3c2028', ax, 100, 12, 1); R('#c89020', ax, 104, 12, 1);
+    const sk = s < 0 ? ax - 2 : ax + 8; R('#d8d4c4', sk, 94, 7, 6); R('#f0ecdc', sk, 94, 7, 1); R('#140c08', sk + 1, 96, 2, 2); R('#140c08', sk + 4, 96, 2, 2); R('#a8a494', sk + 2, 99, 3, 2); // Schädel
+    R('#c89020', s < 0 ? cx - 30 : cx + 24, 126, 6, 10); R('#f8b800', s < 0 ? cx - 31 : cx + 23, 134, 8, 3); // Löwenfuß
+  }
+  return c;
+})();
+class Throne extends Ent {
+  constructor(d) { super(d.x * T - 88, (d.y + 1) * T - 176, 176, 176); this.kind = 'prop'; }
+  draw() {}
+  drawBack(ctx) {
+    const X = Math.round(this.x - W.cam.x), Y = Math.round(this.y - W.cam.y);
+    if (X < View.w && X + 176 > 0) ctx.drawImage(THRONE_ART, X, Y);
+  }
+}
+
+// Feuerschale auf eisernem Dreifuß: lodernde Flammen, Funkenflug, warmes Licht
+class Brazier extends Ent {
+  constructor(d) { super(d.x * T - 8, (d.y + 1) * T - 52, 16, 52); this.kind = 'prop'; this.t = d.x * 7; }
+  update() {
+    this.t++;
+    if (this.t % 5 === 0 && this.onScreen(16)) W.spawn(new Particle(this.cx + rnd(-6, 6), this.y - 4, rnd(-0.25, 0.25), -rnd(0.7, 1.3), Math.random() < 0.5 ? '#f87800' : '#fcd040', 28, 1, -0.015));
+  }
+  lights(L, cx, cy, flick) { L.push({ x: this.cx - cx, y: this.y - 6 - cy, r: 66 + flick(this.x) * 2, c: [248, 120, 30], a: 0.72 }); }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#1c1418', 7, 14, 2, 34); R('#4c4458', 7, 14, 1, 34); R('#1c1418', 2, 44, 12, 2); R('#1c1418', 0, 46, 3, 6); R('#1c1418', 13, 46, 3, 6); R('#c89020', 6, 28, 4, 2); // Dreifuß
+    R('#2c2430', -5, 8, 26, 6); R('#6c6478', -5, 8, 26, 1); R('#c89020', -5, 10, 26, 1); R('#1c1418', -3, 14, 22, 2); // Schale
+    R('#a82800', -3, 6, 22, 3); R('#fc7c00', -1, 6, 18, 1); // Glut
+    for (let k = 0; k < 5; k++) { // züngelnde Flammen
+      const ph = this.t * 0.23 + k * 1.7, h = 11 + Math.round(Math.sin(ph) * 4 + Math.sin(ph * 2.3) * 2), fx = -2 + k * 4;
+      R('#d82800', fx, 6 - h, 4, h); R('#f87800', fx + 1, 6 - Math.round(h * 0.75), 2, Math.round(h * 0.75)); R('#fcd040', fx + 1, 6 - Math.round(h * 0.4), 2, Math.round(h * 0.4));
+    }
+  }
+}
+
+// Goldener Standleuchter mit fünf Kerzen
+class Candelabra extends Ent {
+  constructor(d) { super(d.x * T - 12, (d.y + 1) * T - 48, 24, 48); this.kind = 'prop'; this.t = d.x * 5; }
+  update() { this.t++; }
+  lights(L, cx, cy, flick) { L.push({ x: this.cx - cx, y: this.y + 2 - cy, r: 40 + flick(this.x), c: [248, 160, 60], a: 0.5 }); }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#5c4010', 4, 44, 16, 4); R('#c89020', 4, 44, 16, 1); R('#8c6414', 7, 40, 10, 4); // Fuß
+    R('#8c6414', 11, 12, 2, 30); R('#e8c070', 11, 12, 1, 30); R('#c89020', 9, 24, 6, 2); R('#c89020', 9, 33, 6, 2); // Schaft mit Knäufen
+    R('#c89020', 1, 12, 22, 2); R('#fce0a8', 1, 12, 22, 1); R('#c89020', 1, 6, 2, 6); R('#c89020', 21, 6, 2, 6); R('#c89020', 6, 8, 2, 4); R('#c89020', 16, 8, 2, 4); // Arme
+    [[1, 5], [6, 7], [11, 3], [16, 7], [21, 5]].forEach(([cx0, top], k) => {
+      R('#c89020', cx0 - 1, top + 1, 4, 1); R('#e8e0c8', cx0, top - 4, 2, 5);
+      R(((this.t >> 2) + k) % 3 ? '#fcd040' : '#f87800', cx0, top - 7, 2, 3);
+    });
+  }
+}

@@ -311,3 +311,140 @@ class Pendulum extends Ent {
     ctx.restore();
   }
 }
+
+// ---------------- Zahnradwerk im Uhrturm (Mode 7) ----------------
+// Draufsicht eines Messingzahnrads (256×256): Zahnkranz, Riefen, Nieten, gravierte Ringe und römische Ziffern wie auf
+// einem Zifferblatt, Speichen, Nabe. Vier Helligkeitsstufen, damit die Scheibe hinten im Dunst liegt.
+const GEAR_TEX = (() => {
+  const S = 256, N = 24, R0 = 110, R1 = 124, base = new Array(S * S).fill(null);
+  for (let y = 0; y < S; y++) for (let X = 0; X < S; X++) {
+    const dx = X - 127.5, dy = y - 127.5, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    const tooth = Math.cos(a * N) > -0.15;
+    if (r > R1 || (r > R0 && !tooth)) continue;
+    let c;
+    if (r > R0) c = r > R1 - 2 ? [252, 228, 160] : Math.cos(a * N) > 0.7 ? [222, 172, 76] : [176, 126, 44]; // Zähne
+    else if (r > R0 - 3) c = [96, 64, 20];
+    else if (r > R0 - 14) c = (Math.floor(a / (Math.PI / 48)) & 1) ? [170, 122, 44] : [190, 140, 56]; // geriffelter Kranz
+    else if (r > R0 - 16) c = [90, 60, 20];
+    else if (r < 24) c = r < 9 ? [40, 26, 10] : r > 21 ? [96, 64, 20] : [214, 166, 76]; // Nabe
+    else {
+      const spoke = Math.abs(Math.sin(a * 3)) < 0.1 + 7 / r;
+      c = spoke ? [184, 136, 54] : (Math.abs(r - 70) < 1 || Math.abs(r - 44) < 1) ? [120, 84, 28] : [140, 100, 36]; // Speichen, gravierte Ringe auf der Scheibe
+      if (!spoke && r > 74 && r < 90) { // Ziffernring: zwölf Marken, jede dritte breiter (wie III, VI, IX, XII)
+        const m = (a / (Math.PI / 6) % 1 + 1) % 1, wide = Math.round(((a + Math.PI) / (Math.PI / 6))) % 3 === 0;
+        if (m < (wide ? 0.09 : 0.04) || m > (wide ? 0.91 : 0.96)) c = [70, 46, 14];
+      }
+    }
+    if (Math.abs(r - (R0 - 8)) < 2.2 && Math.abs(Math.sin(a * 12)) < 0.12) c = [252, 236, 190]; // Nieten
+    base[y * S + X] = c;
+  }
+  const levels = [0.55, 0.72, 0.88, 1.12].map(k => {
+    const d = new Int32Array(S * S);
+    base.forEach((c, i) => { if (c) d[i] = (255 << 24) | (Math.min(255, c[2] * k) << 16) | (Math.min(255, c[1] * k) << 8) | Math.min(255, c[0] * k); });
+    return d;
+  });
+  return { S, N, R0, R1, levels };
+})();
+
+// Liegendes Riesenzahnrad: perspektivische Drehscheibe. Jede Bildzeile/-spalte wird in die Scheibe zurückgerechnet und
+// gedreht (Mode 7). Der Held läuft auf einer Sehne vor der Achse – dort zieht die Oberfläche überall gleich schnell
+// seitwärts wie ein Laufband (vx = -ω·z).
+class FlatGear extends Ent {
+  // d: x (Achse, Kachel), row (Laufhöhe = Oberkante der Reihe), r (px), v (px/Frame an der Lauflinie, negativ = nach links)
+  constructor(d) {
+    const R = d.r, sq = 0.3, zc = 0.45, half = Math.sqrt(1.06 * 1.06 - zc * zc) * R;
+    super(d.x * T - half, d.row * T, half * 2, 4);
+    this.kind = 'platform'; this.R = R; this.sq = sq; this.zc = zc; this.v = d.v; this.om = -d.v / (zc * R);
+    this.ax = d.x * T; this.ay = d.row * T - R * zc * sq; this.rot = d.phase || 0; this.dx = 0; this.dy = 0; this.buf = null;
+  }
+  carryAt() { return [this.v, 0]; }
+  update() { this.t++; this.rot += this.om; if (this.t % 26 === 0 && Math.abs(this.ax - W.player.cx) < View.w * 0.7) Audio8.sfx('cog', this.ax); }
+  draw(ctx) {
+    const R = this.R, sq = this.sq, RR = R * 1.08, W2 = Math.ceil(RR), H2 = Math.ceil(RR * sq), TH = 10;
+    const sx = Math.round(this.ax - W.cam.x), sy = Math.round(this.ay - W.cam.y);
+    if (sx + W2 < -8 || sx - W2 > View.w + 8) return;
+    // Achse unten (in die Grube) und Lagerbock
+    ctx.fillStyle = '#16120e'; ctx.fillRect(sx - 7, sy + H2, 14, 200);
+    ctx.fillStyle = '#3c3024'; ctx.fillRect(sx - 7, sy + H2, 2, 200);
+    const bw = W2 * 2 + 1, bh = H2 * 2 + TH + 2;
+    if (!this.buf) { const c = Sprites.canvas(bw, bh), x = c.getContext('2d'), img = x.createImageData(bw, bh); this.buf = { c, x, img, d: new Int32Array(img.data.buffer) }; }
+    const B = this.buf, d = B.d, G = GEAR_TEX, S = G.S, k = G.R1 / RR, cs = Math.cos(this.rot), sn = Math.sin(this.rot);
+    d.fill(0);
+    for (let j = 0; j <= H2 * 2; j++) {
+      const z = (j - H2) / sq, zz = z * z;
+      if (zz > RR * RR) continue;
+      const half = Math.floor(Math.sqrt(RR * RR - zz)), lv = j < H2 * 0.5 ? 0 : j < H2 ? 1 : 2, row = j * bw + W2;
+      const zs = z * sn, zc = z * cs;
+      for (let i = -half; i <= half; i++) {
+        const u = (i * cs + zs) * k + 127.5, v = (zc - i * sn) * k + 127.5;
+        const sheen = i > -half * 0.45 && i < -half * 0.2 && j > H2 * 0.6; // feststehender Glanzstreifen
+        const p = G.levels[sheen ? 3 : lv][(v | 0) * S + (u | 0)];
+        if (p) d[row + i] = p;
+      }
+    }
+    // Kranz von der Seite: die Zähne laufen vorne vorbei
+    for (let i = -W2; i <= W2; i++) {
+      if (Math.abs(i) >= RR) continue;
+      const zf = Math.sqrt(RR * RR - i * i), ys = Math.round(H2 + zf * sq), ph = Math.atan2(zf, i) - this.rot, tooth = Math.cos(ph * G.N) > -0.15;
+      const side = Math.abs(i) / RR, col = tooth ? (side > 0.8 ? 0xff1c4c7c : side > 0.5 ? 0xff2c6ca4 : 0xff3c8cc8) : 0xff0c2440; // ABGR: Messing
+      for (let k2 = 1; k2 <= TH; k2++) d[(ys + k2) * bw + i + W2] = k2 === TH ? 0xff081830 : k2 === 1 && tooth ? 0xff70c4f0 : col;
+    }
+    B.x.putImageData(B.img, 0, 0);
+    ctx.drawImage(B.c, sx - W2, sy - H2);
+    // Achse nach oben (hinter der Lauflinie) mit Nabenkappe
+    for (let k3 = 0; k3 < 12; k3++) { ctx.fillStyle = ['#2c2418', '#5c4a2c', '#8c7044', '#b08c54', '#c8a060', '#b08c54', '#8c7044', '#6c5434', '#4c3c24', '#3c3020', '#2c2418', '#1c160e'][k3]; ctx.fillRect(sx - 6 + k3, 0, 1, sy + 2); }
+    ctx.fillStyle = '#5c4a2c'; ctx.fillRect(sx - 10, sy - 2, 20, 5); ctx.fillStyle = '#e8c070'; ctx.fillRect(sx - 9, sy - 2, 18, 1);
+  }
+}
+
+// Stehendes Riesenzahnrad (Mode-7-Drehung des Sprites): oben rollen die Zähne – die Noppen – dem Helden entgegen.
+// Der Held läuft auf dem Kranz, wippt über jeden Zahn und wird zurückgetragen, wenn er stehen bleibt.
+const WHEEL_IMGS = {};
+function wheelImg(R) {
+  if (WHEEL_IMGS[R]) return WHEEL_IMGS[R];
+  const RT = R + 9, S = RT * 2 + 2, c = Sprites.canvas(S, S), x = c.getContext('2d'), img = x.createImageData(S, S), d = img.data, N = Math.round(2 * Math.PI * R / 21);
+  for (let y = 0; y < S; y++) for (let X = 0; X < S; X++) {
+    const dx = X - S / 2 + 0.5, dy = y - S / 2 + 0.5, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx), tc = Math.cos(a * N);
+    if (r > RT || (r > R && tc < -0.1)) continue;
+    let col;
+    if (r > R) col = r > RT - 2 ? [250, 222, 150] : tc > 0.75 ? [214, 164, 70] : [168, 118, 40]; // Zähne (Noppen)
+    else if (r > R - 12) col = (Math.floor(a / (Math.PI / 40)) & 1) ? [160, 112, 40] : [182, 132, 50];
+    else if (r > R - 15) col = [82, 54, 18];
+    else if (r < 20) col = r < 7 ? [36, 24, 10] : r > 17 ? [90, 60, 20] : [210, 160, 70];
+    else { const sp = Math.abs(Math.sin(a * 3)) < 0.09 + 7 / r; if (!sp && r < R - 15) continue; col = [176, 128, 48]; } // Speichen, dazwischen offen
+    if (Math.abs(r - (R - 6)) < 2 && Math.abs(Math.sin(a * 10)) < 0.12) col = [252, 236, 190]; // Nieten
+    const lit = 1 + (-dx - dy) / (RT * 3); // Licht von links oben (dreht sich mit – wie auf dem SNES)
+    const i = (y * S + X) * 4; d[i] = Math.min(255, col[0] * lit); d[i + 1] = Math.min(255, col[1] * lit); d[i + 2] = Math.min(255, col[2] * lit); d[i + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  return (WHEEL_IMGS[R] = { c, S, N });
+}
+class WheelGear extends Ent {
+  // d: x (Achse, Kachel), top (Weltpixel-y des Scheitels), r (Zahngrund, px), v (px/Frame am Scheitel, negativ = nach links)
+  constructor(d) {
+    super(d.x * T - d.r, d.top, d.r * 2, 4);
+    this.kind = 'platform'; this.R = d.r; this.v = d.v; this.om = d.v / (d.r + 5); this.rot = 0;
+    this.ax = d.x * T; this.ay = d.top + d.r + 5; this.img = wheelImg(d.r); this.dx = 0; this.dy = 0;
+  }
+  surfR(x) { // Lauffläche: Zahnspitzen heben den Helden an, in den Lücken sinkt er ein wenig ein
+    const dx = x - this.ax, a = Math.atan2(-Math.sqrt(Math.max(0, (this.R + 5) ** 2 - dx * dx)), dx) - this.rot;
+    return this.R + 5 + 3 * Math.max(0, Math.cos(a * this.img.N));
+  }
+  surfaceAt(x) {
+    const dx = x - this.ax;
+    if (Math.abs(dx) > this.R * 0.8) return null;
+    const Rs = this.surfR(x);
+    return this.ay - Math.sqrt(Math.max(0, Rs * Rs - dx * dx));
+  }
+  carryAt(x) { const c = Math.sqrt(Math.max(0, 1 - ((x - this.ax) / (this.R + 5)) ** 2)); return [this.v * c, 0]; }
+  update() { this.t++; this.rot += this.om; if (this.t % 22 === 0 && Math.abs(this.ax - W.player.cx) < View.w * 0.7) Audio8.sfx('cog', this.ax); }
+  draw(ctx) {
+    const sx = Math.round(this.ax - W.cam.x), sy = Math.round(this.ay - W.cam.y), h = this.img.S / 2;
+    if (sx + h < 0 || sx - h > View.w) return;
+    ctx.fillStyle = '#120e0a'; ctx.fillRect(sx - 9, sy, 18, 220); ctx.fillStyle = '#2c241a'; ctx.fillRect(sx - 9, sy, 2, 220); // Lagerbock
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.translate(sx, sy); ctx.rotate(this.rot); ctx.drawImage(this.img.c, -h, -h);
+    ctx.restore();
+    ctx.fillStyle = '#3c3020'; ctx.fillRect(sx - 6, sy - 6, 12, 12); ctx.fillStyle = '#c8a060'; ctx.fillRect(sx - 5, sy - 5, 10, 2); ctx.fillStyle = '#e8c070'; ctx.fillRect(sx - 2, sy - 2, 4, 4); // feststehende Achskappe
+  }
+}

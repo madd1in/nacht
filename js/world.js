@@ -39,6 +39,11 @@ const W = {
         case 'skel': this.spawn(new Skeleton(d.x, d.y)); break;
         case 'knight': this.spawn(new Knight(d.x, d.y)); break;
         case 'panther': this.spawn(new Panther(d.x, d.y)); break;
+        case 'fgear': this.platforms.push(this.spawn(new FlatGear(d))); break;
+        case 'wgear': this.platforms.push(this.spawn(new WheelGear(d))); break;
+        case 'throne': this.spawn(new Throne(d)); break;
+        case 'brazier': this.spawn(new Brazier(d)); break;
+        case 'candelabra': this.spawn(new Candelabra(d)); break;
         case 'book': this.spawn(new FlyBook(d.x * T + 8, (d.y + 1) * T - 5, { rest: true })); break;
         case 'tome': this.spawn(new Tome(d.x, d.y)); break;
         case 'lectern': this.spawn(new Lectern(d)); break;
@@ -465,6 +470,7 @@ const W = {
     this.applyCamFx(ctx, vw);
     const storm = theme in STORMY ? this.storm : null; // Gewitter über dem ganzen Schloss: Blitze lassen Fenster und Räume aufleuchten
     Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); if (theme === 'courtyard') FX.drawFlock(c); } : null);
+    for (const e of this.ents) if (e.drawBack && !e.dead) e.drawBack(ctx); // Kulissen vor den Kacheln (Thron mit Baldachin)
     const flashOn = storm && FX.stormOn(storm), dark = STORMY[theme];
     if (flashOn && dark && theme !== 'glass') this.drawCastShadows(ctx); // Blitz in dunklen Sälen: alles wirft harte Schlagschatten an die Wand
     this.drawDoor(ctx);
@@ -593,7 +599,7 @@ const W = {
       else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
       else if (e instanceof Gatehouse) e.lights(L, this.cam.x, this.cam.y, flick);
       else if (e instanceof FallingChandelier) e.lights(L, this.cam.x, this.cam.y, flick);
-      else if (e instanceof Lectern) e.lights(L, cx, cy, flick);
+      else if (e instanceof Lectern || e instanceof Brazier || e instanceof Candelabra) e.lights(L, cx, cy, flick);
       else if (e instanceof Tome && e.open) L.push({ x, y, r: 34, c: [232, 40, 80], a: 0.5 });
       else if (e instanceof Chandelier) L.push({ x, y: e.y - cy - 6, r: 42 + flick(e.px), c: [248, 160, 60], a: 0.55 });
       else if (e instanceof Statue && e.active) L.push({ x, y: y - 8, r: 30, c: [60, 188, 252], a: 0.45 });
