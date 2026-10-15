@@ -98,16 +98,15 @@ const Levels = (() => {
     .candle(16, 22).candle(25, 22, 'H').candle(17, 17).candle(21, 12, 'W')
     .candle(36, 16, 'H').candle(43, 16).candle(35, 11).candle(40, 6, 'R').candle(42, 6, 'H')
     .candle(64, 21).candle(70, 21, '1').candle(63, 27).candle(70, 27, 'H').candle(86, 27).candle(91, 27, 'W')
-    .enemy('skel', 40, 31).enemy('skel', 69, 28).enemy('bat', 28, 10).enemy('bat', 50, 6).enemy('bat', 30, 22)
-    .enemy('raven', 17, 18).enemy('raven', 66, 22).enemy('ghost', 52, 14)
+    .enemy('skel', 40, 31).enemy('bat', 50, 6).enemy('raven', 66, 22) // wenige Gegner: das Schiff soll Spaß machen, nicht zermürben
     .cargo(51, 31) // Frachtkiste „UPEL“ – Gruß an Infernax
     // Grüße an Monkey Island: Schiffsname, Grogfass, Gummihuhn mit Rolle in der Mitte, dreiköpfiger Affe
     .sign(1, 30, 6, 'SEA MONKEY')
     .prop('grog', { x: 29, y: 31 })
     .prop('chicken', { x: 41, y: 7 })
     .prop('monkey', { x0: 20, x1: 23, row: 14 })
-    .zone('sea', 14, 56, { interval: 150, max: 2 })
-    .zone('eagle', 6, 72, { interval: 300, max: 1 })
+    .zone('sea', 14, 56, { interval: 320, max: 1 })
+    .zone('eagle', 6, 72, { interval: 640, max: 1 })
     .statue(45, 31).mini('tentacle', 53, 69, 55, 22) // Kontrollpunkt, dann der lila Tentakel vor dem Anlegen
     .dock(62, 74, 80, 29).music('sea')
     .start(3, 28).exit(94).noDoor().done();

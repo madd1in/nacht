@@ -124,8 +124,8 @@ const Mode7 = (() => {
   // Licht: der Mond steht hinter dem Meer – Wellenkanten glänzen, dünne Kämme leuchten türkis durch,
   // Schaumspitzen treiben mit, von hohen Kämmen weht Gischt, auf dem Mondpfad funkelt es.
   const OC_H = 84, OC_HOR = 41, OC_F = 60, OC_CAM = 30, OC_Z0 = 22, OC_Z1 = 420;
-  const OC_DEEP = [8, 14, 40], OC_MID = [22, 36, 86], OC_HI = [70, 92, 170], OC_FOAM = [196, 212, 252], OC_FOG = [42, 40, 88], OC_MOON = [236, 170, 170];
-  const OC_TEAL = [36, 104, 136], OC_RIM = [130, 150, 220];
+  const OC_DEEP = [8, 14, 40], OC_MID = [22, 36, 86], OC_HI = [70, 92, 170], OC_FOAM = [196, 212, 252], OC_FOG = [42, 40, 88], OC_MOON = [226, 200, 222];
+  const OC_TEAL = [36, 104, 136], OC_RIM = [130, 150, 220], OC_MID2 = [42, 60, 126]; // MID2: Zwischenstufe für eine weichere Rampe
   let OC = null, ocZ = null, ocZB = null;
   const spray = new Int32Array(3 * 1200);
   const mixC = (a, b, k, l) => (255 << 24) | (Math.min(255, (a[2] + (b[2] - a[2]) * k) * l) << 16) | (Math.min(255, (a[1] + (b[1] - a[1]) * k) * l) << 8) | Math.min(255, (a[0] + (b[0] - a[0]) * k) * l);
@@ -137,7 +137,8 @@ const Mode7 = (() => {
   const T_O = [16, 4, 26], T_D = [44, 12, 60], T_M = [90, 32, 112], T_L = [140, 66, 168], T_S = [228, 180, 244], T_K = [244, 186, 220], T_KC = [120, 40, 90];
   const LX = 0.6, LY = -0.8, KTOP = 96; // KTOP: Spielpixel über dem Meerespuffer, damit hohe Arme nicht abgeschnitten werden
   let KB = null;
-  function drawTentacles(ozb, tw, sx, k, light, CAM, t) {
+  function drawTentacles(ozb, tw, sx, k, light, CAM, t, vq = 1) {
+    const sh = vq === 2 ? 0 : 1; // Spielpixel → Zeile im Meerespuffer
     const KW = tw * sx, KH = KTOP + OC_H * 2;
     if (!KB || KB.w !== KW) { const c = Sprites.canvas(KW, KH), x = c.getContext('2d'), img = x.createImageData(KW, KH); KB = { w: KW, c, x, img, buf: new Int32Array(img.data.buffer), zb: new Float32Array(KW * KH) }; }
     if (!KB.col || KB.col.sx !== sx) { KB.col = new Int32Array(KW); for (let x = 0; x < KW; x++) KB.col[x] = (x / sx) | 0; KB.col.sx = sx; }
@@ -149,14 +150,14 @@ const Mode7 = (() => {
     const a = k.t > 330 ? Math.min(1, (k.t - 330) / 34) : 0, ang = a * a * 1.45, sink = k.t > 370 ? (k.t - 370) / 50 : 0;
     const N = 52, P = [];
     // Meerestiefe unter einem Spielpixel des Armpuffers (oberhalb des Meeres: nichts davor)
-    const water = (x, y) => { const by = (y - KTOP) >> 1; return by < 0 ? 1e9 : ozb[by * tw + colIx[x]]; };
+    const water = (x, y) => { const by = (y - KTOP) >> sh; return by < 0 ? 1e9 : ozb[by * tw + colIx[x]]; };
     const disc = (p, R, zt, nx, ny, C5, sk, i) => {
       const x0 = Math.max(0, Math.floor(p.x - R)), x1 = Math.min(KW - 1, Math.ceil(p.x + R)), y0 = Math.max(0, Math.floor(p.y - R)), y1 = Math.min(KH - 1, Math.ceil(p.y + R));
       const skx = p.x - nx * p.R * 0.56, sky = p.y - ny * p.R * 0.56, skr = p.R * 0.28, skr2 = skr * skr;
       for (let y = y0; y <= y1; y++) {
         const ddy = y + 0.5 - p.y, q = R * R - ddy * ddy;
         if (q < 0) continue;
-        const hw = Math.sqrt(q), xa = Math.max(x0, Math.round(p.x - hw)), xb = Math.min(x1, Math.round(p.x + hw) - 1), row = y * KW, by = (y & 3) * 4, wy = (y - KTOP) >> 1, wrow = wy < 0 ? -1 : wy * tw;
+        const hw = Math.sqrt(q), xa = Math.max(x0, Math.round(p.x - hw)), xb = Math.min(x1, Math.round(p.x + hw) - 1), row = y * KW, by = (y & 3) * 4, wy = (y - KTOP) >> sh, wrow = wy < 0 ? -1 : wy * tw;
         if (xb < xa) continue;
         if (xa < box.x0) box.x0 = xa; if (xb > box.x1) box.x1 = xb; if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y;
         for (let x = xa; x <= xb; x++) {
@@ -222,59 +223,80 @@ const Mode7 = (() => {
     if (box.x1 < box.x0) { KB.box = null; return false; }
     return any;
   }
+  // Volle Auflösung (1×1-Pixel, feinere Tiefenschritte); im Sparmodus grob (3×2-Pixel). Farben je Tiefe einmal pro Bild.
+  let ocCol = null, ocHalf = false, ocPerf = 0, ocSlow = 0;
+  const SINT = new Float32Array(4096); for (let i = 0; i < 4096; i++) SINT[i] = Math.sin(i / 4096 * Math.PI * 2);
+  const sn = (a) => SINT[((a * 651.8986) | 0) & 4095]; // Sinus aus der Tabelle (Wellen brauchen keine volle Genauigkeit)
   function drawOcean(ctx, w, t, o = {}) {
-    const lo = MOBILE_RENDER || View.lite, sx = lo ? 3 : 2, tw = Math.ceil(w / sx);
-    if (!OC || OC.w !== tw) { const c = Sprites.canvas(tw, OC_H), x = c.getContext('2d'), img = x.createImageData(tw, OC_H); OC = { w: tw, c, x, img, buf: new Int32Array(img.data.buffer) }; ocZB = new Float32Array(tw * OC_H); }
-    if (!ocZ || ocZ.lo !== lo) { ocZ = []; for (let z = OC_Z0; z < OC_Z1; z = z * (lo ? 1.035 : 1.022) + 0.6) ocZ.push(z); ocZ.lo = lo; }
+    const t0p = performance.now(), lo = MOBILE_RENDER || View.lite, sx = lo ? 3 : ocHalf ? 2 : 1, vq = lo ? 1 : 2, tw = Math.ceil(w / sx); // ocHalf: Zwischenstufe, wenn das Meer allein zu teuer wird
+    const H = OC_H * vq, HOR = OC_HOR * vq, F = OC_F * vq;
+    if (!OC || OC.w !== tw || OC.h !== H) { const c = Sprites.canvas(tw, H), x = c.getContext('2d'), img = x.createImageData(tw, H); OC = { w: tw, h: H, c, x, img, buf: new Int32Array(img.data.buffer) }; ocZB = new Float32Array(tw * H); }
+    if (!ocZ || ocZ.lo !== lo) { ocZ = []; for (let z = OC_Z0; z < OC_Z1; z = lo ? z * 1.035 + 0.6 : z * 1.016 + 0.4) ocZ.push(z); ocZ.lo = lo; }
     const buf = OC.buf, zb = ocZB; buf.fill(0); zb.fill(1e9);
     const calm = o.calm === undefined ? 1 : o.calm, A = 30 * (0.3 + 0.7 * calm), light = o.flash ? 1.7 : 1;
     const CAM = OC_CAM + (o.lift || 0), HY = o.horizon || 122; // höherer Standpunkt → flacherer Blick aufs Meer
     const rv = o.rogue || 0, AR = rv ? 80 * Math.sqrt(Math.max(0, 1 - rv / 430)) : 0;
     const u0 = (o.camX || 0) * 0.06 + (o.sail || 0) * 0.8, moonX = (w - 92) / sx, tq = Math.floor(t / 5), tg = Math.floor(t / 3);
     const fogFill = mixC(OC_FOG, OC_FOG, 0, light), horizon = mixC(OC_FOG, OC_MOON, 0.3, light);
+    const NZ = ocZ.length;
+    if (!ocCol || ocCol.n !== NZ || ocCol.light !== light || ocCol.z !== ocZ) { // Farbtafeln je Tiefe (Dunst nimmt nach hinten zu)
+      const mk = () => new Int32Array(NZ);
+      ocCol = { n: NZ, light, z: ocZ, fog: new Float32Array(NZ), d: mk(), m: mk(), m2: mk(), h: mk(), f: mk(), mo: mk(), te: mk(), ri: mk() };
+      for (let i = 0; i < NZ; i++) {
+        const fog = Math.min(1, (ocZ[i] - OC_Z0) / (OC_Z1 - OC_Z0) * 1.25); ocCol.fog[i] = fog;
+        ocCol.d[i] = mixC(OC_DEEP, OC_FOG, fog, light); ocCol.m[i] = mixC(OC_MID, OC_FOG, fog, light); ocCol.m2[i] = mixC(OC_MID2, OC_FOG, fog, light);
+        ocCol.h[i] = mixC(OC_HI, OC_FOG, fog * 0.9, light); ocCol.f[i] = mixC(OC_FOAM, OC_FOG, Math.min(1, fog * 1.1), light);
+        ocCol.mo[i] = mixC(OC_MOON, OC_FOG, fog * 0.5, light); ocCol.te[i] = mixC(OC_TEAL, OC_FOG, fog, light); ocCol.ri[i] = mixC(OC_RIM, OC_FOG, fog * 0.7, light);
+      }
+    }
+    const CL = ocCol, pw = 2 / sx, maxH = A + 4.5 + AR; // höchste mögliche Welle: dahinter kann nichts mehr über den Rand ragen
     let ns = 0;
     for (let x = 0; x < tw; x++) {
-      const dx = (x + 0.5 - tw / 2) / (tw / 2) * 0.95, mx = Math.abs(x - moonX);
-      let ymin = OC_H;
-      for (let i = 0; i < ocZ.length && ymin > 0; i++) {
+      const dx = (x + 0.5 - tw / 2) / (tw / 2) * 0.95, mx = Math.abs(x - moonX), bx = x & 3;
+      let ymin = H;
+      for (let i = 0; i < NZ && ymin > 0; i++) {
         const z = ocZ[i], u = u0 + dx * z;
-        const s = (Math.sin(z * 0.045 + t * 0.035 + Math.sin(u * 0.012 + z * 0.004) * 1.2) + 1) * 0.5, s3 = s * s * s;
-        let h = s3 * A + Math.sin(u * 0.06 + z * 0.03 - t * 0.05) * 3 + Math.sin(u * 0.11 - z * 0.07 + t * 0.08) * 1.5, rog = 0;
+        if (ymin <= HOR + (CAM - maxH) * F / z) break; // früher Abbruch
+        const s = (sn(z * 0.045 + t * 0.035 + sn(u * 0.012 + z * 0.004) * 1.2) + 1) * 0.5, s3 = s * s * s;
+        let h = s3 * A + sn(u * 0.06 + z * 0.03 - t * 0.05) * 3 + sn(u * 0.11 - z * 0.07 + t * 0.08) * 1.5, rog = 0;
         if (AR) { const d = z - rv, q = d / (d < 0 ? 8 : 22); rog = Math.exp(-q * q) * (0.8 + 0.2 * Math.cos(u * 0.02 + t * 0.01)); h += rog * AR; } // steile Front, langer Rücken
-        const sy = Math.floor(OC_HOR + (CAM - h) * OC_F / z);
+        const sy = Math.floor(HOR + (CAM - h) * F / z);
         if (sy >= ymin) continue;
-        const fog = Math.min(1, (z - OC_Z0) / (OC_Z1 - OC_Z0) * 1.25), crest = Math.max(s3 * (1 - rog * 0.5), Math.pow(rog, 3) * 0.97); // Monsterwelle: unten dunkel, oben heller, weiße Krone
-        const cs = [mixC(OC_DEEP, OC_FOG, fog, light), mixC(OC_MID, OC_FOG, fog, light), mixC(OC_HI, OC_FOG, fog * 0.9, light), mixC(OC_FOAM, OC_FOG, Math.min(1, fog * 1.1), light)];
-        const moon = mixC(OC_MOON, OC_FOG, fog * 0.5, light), teal = mixC(OC_TEAL, OC_FOG, fog, light), rim = mixC(OC_RIM, OC_FOG, fog * 0.7, light);
-        const lace = Math.sin(u * 0.23 + t * 0.021) * Math.sin(z * 0.19 - t * 0.034 + u * 0.05) + 0.6 * Math.sin(u * 0.071 - z * 0.13 + t * 0.012); // treibende Schaumstreifen
-        const path = 1.5 + Math.max(0, sy - OC_HOR) * 0.18, span = ymin - Math.max(0, sy), edge = span >= 3 && fog < 0.55, laceOk = span >= 2 && fog < 0.7;
-        for (let y = Math.max(0, sy); y < ymin; y++) {
-          const b = BAY[(y & 3) * 4 + (x & 3)], dd = y - sy, c = crest - dd * 0.07 + b * 0.18; // Wellenflanke unter dem Kamm dunkler
-          let col = c > 0.94 && dd < 2 ? cs[3] : c > 0.66 ? (dd < 3 && crest > 0.45 ? teal : cs[2]) : c > 0.3 ? cs[1] : cs[0]; // Schaum nur ganz oben auf echten Kämmen
-          if (dd === 0 && edge && crest > 0.28) col = c > 0.88 ? cs[3] : rim;           // Mondlicht auf der Wellenkante (nur echte Silhouetten)
-          else if (laceOk && lace > 1.1 + b * 0.3 && c > 0.22 && dd < 5) col = cs[3];    // Schaumspitzen
-          if (mx < path && c > 0.3 && hsh(x, y, tq) < 0.22 + crest * 0.3) col = moon;     // funkelnder Mondpfad
-          buf[y * tw + x] = col; zb[y * tw + x] = z;
+        const fog = CL.fog[i], crest = Math.max(s3 * (1 - rog * 0.5), rog * rog * rog * 0.97); // Monsterwelle: unten dunkel, oben heller, weiße Krone
+        const lace = sn(u * 0.23 + t * 0.021) * sn(z * 0.19 - t * 0.034 + u * 0.05) + 0.6 * sn(u * 0.071 - z * 0.13 + t * 0.012); // treibende Schaumstreifen
+        const path = (1.5 + Math.max(0, sy - HOR) / vq * 0.18) * pw, span = ymin - Math.max(0, sy), edge = span >= 3 * vq && fog < 0.55, laceOk = span >= 2 * vq && fog < 0.7;
+        const c0 = CL.d[i], c1 = CL.m[i], c15 = CL.m2[i], c2 = CL.h[i], c3 = CL.f[i], cmo = CL.mo[i], cte = CL.te[i], cri = CL.ri[i];
+        for (let y = Math.max(0, sy), o2 = y * tw + x; y < ymin; y++, o2 += tw) {
+          const b = BAY[(y & 3) * 4 + bx], dd = y - sy, dn = dd / vq, c = crest - dn * 0.07 + b * 0.18; // Wellenflanke unter dem Kamm dunkler
+          let col = c > 0.95 && dn < 2 ? c3 : c > 0.76 ? (dn < 3 && crest > 0.5 ? cte : c2) : c > 0.57 ? c15 : c > 0.36 ? c1 : c0; // weiche Rampe, tiefes Blau überwiegt, Schaum nur ganz oben
+          if (dd === 0 && edge && crest > 0.5) col = c > 0.88 ? c3 : cri;               // Mondlicht nur auf echten Wellenkämmen (keine Höhenlinien)
+          else if (laceOk && lace > 1.22 + b * 0.4 && c > 0.22 && dn < 2.5 && hsh(x, y, 7) < 0.65) col = c3; // feine, zerrissene Schaumstreifen
+          if (mx < path && c > 0.32 && hsh(x, y, tq) < 0.12 + crest * 0.26) col = cmo;    // funkelnder Mondpfad
+          buf[o2] = col; zb[o2] = z;
         }
-        if (crest > 0.93 && sy > 2 && ns < 1196 && hsh(x, i, tg) < 0.4) { // Gischt weht von hohen Kämmen
-          const k2 = hsh(i, x, tg) < 0.5 ? 1 : 2;
-          spray[ns++] = x - k2 + 1; spray[ns++] = sy - k2; spray[ns++] = cs[3];
+        if (crest > 0.93 && sy > 2 * vq && ns < 1196 && hsh(x, i, tg) < 0.4 / pw) { // Gischt weht von hohen Kämmen
+          const k2 = (hsh(i, x, tg) < 0.5 ? 1 : 2) * vq;
+          spray[ns++] = x - (k2 >> 1); spray[ns++] = sy - k2; spray[ns++] = c3;
         }
         ymin = Math.max(0, sy);
       }
-      for (let y = OC_HOR; y < ymin; y++) { buf[y * tw + x] = y === OC_HOR ? horizon : fogFill; zb[y * tw + x] = OC_Z1; } // Meer bis zum Horizont im Dunst, heller Saum
+      for (let y = HOR; y < ymin; y++) { buf[y * tw + x] = y < HOR + vq ? horizon : fogFill; zb[y * tw + x] = OC_Z1; } // Meer bis zum Horizont im Dunst, heller Saum
     }
     for (let k2 = 0; k2 < ns; k2 += 3) { const X = spray[k2], Y = spray[k2 + 1]; if (X >= 0 && X < tw && Y >= 0) buf[Y * tw + X] = spray[k2 + 2]; }
-    const kr = o.kraken && o.kraken.t >= 0 && drawTentacles(zb, tw, sx, o.kraken, light, CAM, t);
+    const kr = o.kraken && o.kraken.t >= 0 && drawTentacles(zb, tw, sx, o.kraken, light, CAM, t, vq);
     OC.x.putImageData(OC.img, 0, 0);
     ctx.save(); ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(OC.c, 0, 0, tw, OC_H, 0, HY - OC_HOR * 2, tw * sx, OC_H * 2);
+    ctx.drawImage(OC.c, 0, 0, tw, H, 0, HY - OC_HOR * 2, tw * sx, OC_H * 2);
     if (kr) { // Krakenarme in voller Auflösung darüber (nur der benutzte Ausschnitt)
       const b = KB.box, bw = b.x1 - b.x0 + 1, bh = b.y1 - b.y0 + 1;
       KB.x.putImageData(KB.img, 0, 0, b.x0, b.y0, bw, bh);
       ctx.drawImage(KB.c, b.x0, b.y0, bw, bh, b.x0, HY - OC_HOR * 2 - KTOP + b.y0, bw, bh);
     }
     ctx.restore();
+    if (!lo && !ocHalf) { // braucht das Meer dauerhaft zu lange, rechnet es mit halber Breite weiter (statt gleich in den Spar-Modus)
+      ocPerf = ocPerf * 0.95 + (performance.now() - t0p) * 0.05;
+      if (ocPerf > 6) { if (++ocSlow > 90) { ocHalf = true; console.info('[NACHTMAHR] Meer: halbe Breite'); } } else ocSlow = 0;
+    }
   }
 
   // ---------------- HDMA-Welle & Mosaik ----------------
