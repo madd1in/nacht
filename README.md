@@ -23,11 +23,12 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 
 - **2 Helden**: Henrik (Peitsche) und Ragnor, Barbar aus dem Norden (Breitschwert + Wurfseil)
 - **3 Stages, 12 Räume** inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
-- **Glasturm** vor dem Thronsaal: senkrechter Aufstieg zwischen riesigen gotischen Buntglasfenstern mit Figuren – König, Königin, Ritter, Schlachtross und der Drachentöter gegen den Drachen; farbige Lichtbahnen, Blitze lassen das Glas aufleuchten, ferner Chor. Die drehenden Rosetten (Mode 7) sitzen im Thronsaal
+- **Glasturm** vor dem Thronsaal: senkrechter Aufstieg zwischen riesigen gotischen Buntglasfenstern und Bündelpfeilern – König, Königin, Ritter, Schlachtross, Engel und der Drachentöter gegen den Drachen, jede Figur unter einem Baldachin mit Maßwerkrosette, Schwarzlot-Malerei und lateinischem Inschriftband; das Glas leuchtet auf und ab, wenn Wolken am Mond vorbeiziehen, Blitze lassen es aufflammen, ferner Chor. Die drehenden Rosetten (Mode 7) sitzen im Thronsaal
 - **Grüße an Monkey Island** auf dem Schiff – wer genau hinsieht, findet sie
+- **Miniboss: der lila Tentakel** – kurz vor dem Anlegen steigen Fangarme vor dem Rumpf aus der See, schlagen aufs Deck, fegen darüber, spucken Tinte und brechen durch die Planken; Kontrollpunkt davor
 - **Ankunft per Schiff** (wie in Bloodstained): hohe Galeone im Sturm – über Strickleitern hinauf in die Takelage bis in den Mastkorb, mit **Seilrutschen** von Mast zu Mast; Fischmenschen entern von See aus, **Seeadler** stoßen im Sturzflug herab; eigenes Seemannslied im 6/8-Takt – am Bug „Land in Sicht!“, das Schiff kracht an die Mole und die Laufplanke fällt
 - **Mode-7-Seegang**: das ganze Bild rollt und stampft mit dem Schiff (Drehpunkt an der Wasserlinie – oben im Mast schwankt es stärker), riesige Segel blähen sich zeilenweise im Wind (HDMA) samt Blutmond-Wappen
-- **Mode-7-Ozean**: perspektivisches Meer mit Höhenfeld – Dünungsberge rollen heran, eine Monsterwelle türmt sich über den Horizont, ein Riesenkrake reckt seine Fangarme aus dem Wasser
+- **Mode-7-Ozean**: perspektivisches Meer mit Höhenfeld – Dünungsberge rollen heran, eine Monsterwelle türmt sich über den Horizont, ein Riesenkrake reckt seine Fangarme aus dem Wasser; Mondlicht auf den Wellenkanten, türkis durchscheinende Kämme, Schaum und Gischt
 - **3 Bosse** mit Kino-Auftritt, Musik-Eskalation in Phase 2 und Zeitlupen-Finale; der Graf verwandelt den Thronsaal in einen Strudel
 - **6 Sprachen**: Deutsch, Englisch, Französisch, Spanisch, Japanisch, Chinesisch (Optionen → Sprache)
 - **Sprachausgabe**: Erzähler, Stage-Ansagen, Boss-Auftritte und Spott des Grafen – Studioaufnahmen (ElevenLabs) für EN/FR/ES/JA/ZH, Deutsch über die Browser-Stimme

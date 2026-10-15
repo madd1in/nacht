@@ -510,7 +510,7 @@ class EProj extends Ent {
     if (this.reflected) { // zurückgeschleuderter Feuerball trifft Gegner und Bosse
       for (const e of W.ents) {
         if (e.dead || (e.kind !== 'enemy' && e.kind !== 'boss')) continue;
-        if (Phys.overlap(this, e.hurtBox ? e.hurtBox() : e)) { e.hit(3 * Options.dmgMul, ++W.atkId); this.dead = true; W.spawn(new Burst(this.cx, this.cy, true)); break; }
+        if (Phys.hitsEnt(this, e)) { e.hit(3 * Options.dmgMul, ++W.atkId); this.dead = true; W.spawn(new Burst(this.cx, this.cy, true)); break; }
       }
       return;
     }

@@ -633,6 +633,35 @@ const Tiles = (() => {
     });
   }
 
+  // Glasturm: zwei Säulen ganz vorn an den Turmwänden – dunkel im Gegenlicht, mit farbigem Saum; ziehen schneller vorbei (Tiefe)
+  let glassCol = null;
+  function buildGlassColumn() {
+    const w = 24, h = 208, c = C(w, h), x = c.getContext('2d'), img = x.createImageData(w, h), d = img.data;
+    for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) {
+      const n = (X + 0.5 - w / 2) / (w / 2), cap = Y < 16, ring = Y >= 120 && Y < 125;
+      const half = cap ? w / 2 : ring ? w / 2 - 1 : w / 2 - 3;
+      if (Math.abs(X + 0.5 - w / 2) > half) continue;
+      let b = 0.08 + 0.2 * Math.sqrt(Math.max(0, 1 - n * n)) - 0.06 * n + (bay(X, Y) - 0.5) * 0.05;
+      if (cap) b += Y < 3 ? 0.12 : ((X + (Y > 8 ? 3 : 0)) % 6 < 3 ? 0.07 : 0);  // Kapitell mit Blattwerk
+      if (ring) b += Y === 120 ? 0.12 : 0.04;
+      let r = 40 * b + 6, g = 32 * b + 3, bl = 56 * b + 10;
+      const rim = Math.abs(n) * half / (w / 2);
+      if (rim > 0.72 && !cap) { const k = (rim - 0.72) * 2.4, t = n < 0 ? [190, 90, 255] : [90, 150, 255]; r += t[0] * k * 0.5; g += t[1] * k * 0.5; bl += t[2] * k * 0.5; } // Saum aus Fensterlicht
+      const i = (Y * w + X) * 4; d[i] = Math.min(255, r); d[i + 1] = Math.min(255, g); d[i + 2] = Math.min(255, bl); d[i + 3] = 255;
+    }
+    x.putImageData(img, 0, 0);
+    return c;
+  }
+  function drawGlassFront(ctx, room, cam) {
+    const c = glassCol || (glassCol = buildGlassColumn()), par = 1.25, rw = room.w * T;
+    const mid = (rw - View.w) / 2, oy = ((Math.floor(cam.y * par) % 208) + 208) % 208;
+    for (const rx of [-12, rw - 12]) {
+      const sx = Math.round(rx - cam.x - (cam.x - mid) * (par - 1));
+      if (sx > View.w || sx + 24 < 0) continue;
+      for (let y = -oy; y < 208; y += 208) ctx.drawImage(c, sx, y);
+    }
+  }
+
   // ---------------- Glasfiguren: mit Pfaden gezeichnet, auf die Glaspalette quantisiert ----------------
   // Jede Farbfläche bekommt beim Einsetzen ins Fenster automatisch Bleiruten an ihren Grenzen.
   const FIG_W = 70, FIG_H = 130;
@@ -643,7 +672,6 @@ const Tiles = (() => {
     king(g) {
       g.circ(GOLD, 35, 34, 17); g.poly(RUBY, [[14, 54], [56, 54], [64, 126], [6, 126]]); g.rect(BLUE, 31, 58, 8, 62);
       g.rect(WHITE, 6, 118, 58, 8); g.ell(WHITE, 35, 54, 22, 7); g.circ(SKIN, 35, 36, 10); g.poly(WHITE, [[26, 40], [44, 40], [35, 57]]);
-      g.rect(DARK, 30, 33, 3, 2); g.rect(DARK, 37, 33, 3, 2);
       g.poly(GOLD, [[24, 30], [24, 19], [29, 25], [35, 15], [41, 25], [46, 19], [46, 30]]); g.rect(RUBY, 33, 22, 4, 4);
       g.line(GOLD, 56, 50, 56, 114, 3); g.circ(GOLD, 56, 46, 5); g.rect(GOLD, 55, 35, 3, 7); g.rect(GOLD, 52, 37, 9, 2); g.circ(SKIN, 56, 74, 4);
       g.rect(GREEN, 0, 124, 70, 6);
@@ -674,7 +702,7 @@ const Tiles = (() => {
       g.rect(WHITE, 50, 88, 6, 34); g.rect(WHITE, 58, 88, 5, 32);
       g.poly(BLUE, [[20, 70], [62, 70], [66, 96], [16, 96]]); g.rect(GOLD, 16, 94, 50, 3); g.rect(GOLD, 20, 70, 42, 2);
       g.rect(GOLD, 38, 76, 3, 14); g.rect(GOLD, 33, 81, 13, 3);
-      g.rect(DARK, 50, 120, 6, 3); g.rect(DARK, 58, 118, 5, 3); g.circ(DARK, 13, 37, 1.6);
+      g.rect(DARK, 50, 120, 6, 3); g.rect(DARK, 58, 118, 5, 3);
       g.rect(GREEN, 0, 124, 70, 6);
     },
     knight(g) { // Ritter mit erhobenem Schwert und Wappenschild
@@ -689,18 +717,87 @@ const Tiles = (() => {
     queen(g) {
       g.circ(GOLD, 35, 32, 16); g.poly(BROWN, [[25, 30], [45, 30], [49, 60], [21, 60]]);
       g.poly(BLUE, [[18, 50], [52, 50], [66, 126], [4, 126]]); g.poly(PURPLE, [[26, 52], [44, 52], [40, 126], [30, 126]]); g.rect(GOLD, 4, 120, 62, 6);
-      g.circ(SKIN, 35, 36, 9); g.rect(DARK, 31, 35, 2, 2); g.rect(DARK, 37, 35, 2, 2);
+      g.circ(SKIN, 35, 36, 9);
       g.poly(GOLD, [[26, 28], [26, 20], [31, 25], [35, 17], [39, 25], [44, 20], [44, 28]]);
       g.line(GREEN, 53, 60, 53, 100, 2); g.poly(WHITE, [[53, 58], [46, 50], [53, 45], [60, 50]]); g.circ(SKIN, 50, 80, 4);
       g.rect(GREEN, 0, 124, 70, 6);
     },
+    angel(g) { // Engel mit ausgebreiteten Flügeln und Posaune
+      g.poly(WHITE, [[30, 50], [10, 10], [2, 22], [2, 46], [10, 70], [26, 80]]); g.poly(WHITE, [[40, 50], [60, 10], [68, 22], [68, 46], [60, 70], [44, 80]]);
+      g.poly(YELLOW, [[30, 52], [12, 22], [8, 34], [12, 58], [26, 70]]); g.poly(YELLOW, [[40, 52], [58, 22], [62, 34], [58, 58], [44, 70]]);
+      g.circ(GOLD, 35, 30, 13);
+      g.poly(BLUE, [[22, 48], [48, 48], [58, 124], [12, 124]]); g.poly(WHITE, [[29, 50], [41, 50], [45, 124], [25, 124]]);
+      g.circ(YELLOW, 35, 31, 9); g.circ(SKIN, 35, 34, 7);
+      g.poly(GOLD, [[40, 60], [62, 38], [65, 41], [43, 63]]); g.poly(GOLD, [[60, 34], [70, 26], [70, 44], [64, 44]]); g.circ(SKIN, 42, 62, 3);
+      g.rect(SKIN, 28, 120, 5, 4); g.rect(SKIN, 37, 120, 5, 4);
+      g.rect(GREEN, 0, 124, 70, 6);
+    },
+  };
+  // Schwarzlot: Malerei auf dem Glas (Gesichter, Falten, Schuppen, Federn) – nur Abdunklung, keine Bleiruten
+  const PAINT = {
+    king(p) {
+      p.rays(35, 34, 12, 16, 20); p.circ(35, 34, 16);
+      p.dot(31, 34); p.dot(32, 34); p.dot(38, 34); p.dot(39, 34); p.line(29, 31, 33, 31); p.line(37, 31, 41, 31); p.line(35, 35, 35, 38); p.line(34, 39, 36, 39);
+      p.line(31, 43, 33, 52); p.line(35, 43, 35, 54); p.line(39, 43, 37, 52); p.line(28, 41, 31, 47); p.line(42, 41, 39, 47);
+      [20, 27, 35, 43, 50].forEach(x => p.dot(x, 54)); [24, 31, 39, 46].forEach(x => p.dot(x, 57));
+      p.line(20, 62, 13, 116); p.line(26, 64, 24, 116); p.line(45, 64, 47, 116); p.line(51, 62, 58, 116); p.line(33, 62, 33, 116); p.line(37, 62, 37, 116);
+      p.line(25, 27, 45, 27); p.dot(28, 23); p.dot(42, 23); p.circ(56, 46, 3);
+      p.line(8, 121, 62, 121); [12, 22, 32, 42, 52].forEach(x => p.dot(x, 123));
+    },
+    queen(p) {
+      p.rays(35, 32, 11, 15, 20); p.circ(35, 32, 15);
+      p.dot(31, 35); p.dot(32, 35); p.dot(38, 35); p.dot(39, 35); p.line(30, 32, 33, 32); p.line(37, 32, 40, 32); p.line(35, 36, 35, 38); p.line(33, 41, 37, 41);
+      p.line(25, 40, 23, 58); p.line(27, 44, 26, 58); p.line(45, 40, 47, 58); p.line(43, 44, 44, 58);
+      p.line(15, 70, 8, 118); p.line(21, 66, 17, 118); p.line(49, 66, 53, 118); p.line(55, 70, 62, 118); p.line(35, 56, 35, 118);
+      p.line(53, 50, 53, 56); p.line(48, 50, 58, 50); p.line(27, 26, 43, 26); p.dot(35, 21);
+      p.line(6, 123, 64, 123);
+    },
+    slayer(p) {
+      p.rays(28, 28, 10, 14, 18); p.circ(28, 28, 14);
+      p.line(24, 27, 34, 27); p.dot(26, 34); p.dot(32, 34); p.line(29, 22, 29, 25);
+      for (let y = 84; y < 120; y += 3) for (let x = 20; x < 39; x += 3) if (x < 27 || x > 30) p.dot(x + (y % 2), y);
+      for (let y = 44; y < 80; y += 4) { p.dot(19, y); p.dot(40, y); }
+      p.line(23, 48, 23, 78); p.line(37, 48, 37, 78);
+      p.line(8, 54, 8, 74); p.line(14, 54, 14, 74); p.line(12, 104, 10, 118); p.line(20, 100, 22, 118);
+    },
+    dragon(p) {
+      for (let y = 78; y < 102; y += 4) for (let x = 32; x < 62; x += 5) { const ox = x + ((y / 4) % 2) * 2; p.dot(ox, y); p.dot(ox + 1, y + 1); p.dot(ox + 2, y); }
+      [88, 92, 96].forEach(y => p.line(36, y, 52, y));
+      p.line(46, 72, 64, 28); p.line(48, 72, 67, 60); p.line(47, 72, 60, 62); p.line(52, 52, 66, 44);
+      p.circ(24, 46, 3); p.dot(14, 50); p.line(18, 54, 30, 50); p.line(30, 50, 36, 62); p.line(33, 52, 42, 70);
+      for (let y = 100; y < 124; y += 5) p.line(60, y, 66, y + 3);
+      p.line(38, 100, 38, 114); p.line(54, 100, 54, 114);
+    },
+    horse(p) {
+      p.circ(13, 37, 1.5); p.dot(9, 41); p.line(10, 44, 16, 47); p.line(16, 34, 24, 42); p.line(12, 39, 22, 44);
+      p.line(26, 44, 28, 66); p.line(29, 42, 31, 66); p.line(32, 50, 33, 66);
+      p.line(28, 72, 26, 94); p.line(42, 72, 42, 94); p.line(56, 72, 60, 94); p.line(20, 84, 64, 84);
+      p.line(52, 92, 52, 118); p.line(60, 92, 60, 116); p.line(14, 74, 18, 88); p.line(22, 78, 26, 90);
+      p.line(62, 80, 68, 94); p.line(63, 90, 66, 104);
+    },
+    knight(p) {
+      p.line(30, 27, 40, 27); p.dot(31, 36); p.dot(39, 36); p.line(35, 36, 35, 41);
+      p.line(35, 46, 35, 82); p.line(22, 60, 48, 60); p.line(21, 72, 49, 72);
+      p.line(23, 96, 32, 96); p.line(38, 96, 47, 96); p.line(23, 106, 32, 106); p.line(38, 106, 47, 106); p.circ(27, 101, 2); p.circ(42, 101, 2);
+      p.line(56, 10, 56, 54); p.line(13, 56, 13, 84); p.line(5, 64, 21, 64);
+      p.line(39, 14, 46, 22); p.line(42, 12, 48, 18);
+    },
+    angel(p) {
+      p.rays(35, 30, 10, 12, 16); p.circ(35, 30, 12);
+      for (let k = 0; k < 6; k++) { p.line(30, 52, 6 + k * 2, 14 + k * 11); p.line(40, 52, 64 - k * 2, 14 + k * 11); }
+      for (let y = 26; y < 70; y += 6) { p.dot(10 + (y % 12) / 3, y); p.dot(60 - (y % 12) / 3, y); }
+      p.dot(32, 33); p.dot(38, 33); p.line(34, 37, 36, 37); p.line(29, 26, 33, 24); p.line(37, 24, 41, 26); p.circ(28, 32, 2); p.circ(42, 32, 2);
+      p.line(35, 54, 35, 118); p.line(31, 60, 28, 118); p.line(39, 60, 42, 118); p.line(20, 70, 15, 118); p.line(50, 70, 55, 118);
+      p.line(44, 59, 61, 42); p.line(64, 34, 64, 44);
+    },
   };
   const figCache = {};
-  function glassFigure(name) { // 'name!' = gespiegelt; liefert Palettenindex+1 je Pixel (0 = kein Glas der Figur)
+  // 'name!' = gespiegelt; liefert { col: Palettenindex+1 je Pixel (0 = kein Glas der Figur), paint: 1 = Schwarzlot }
+  function glassFigure(name) {
     if (figCache[name]) return figCache[name];
     const mirror = name.endsWith('!'), base = name.replace('!', '');
-    const c = C(FIG_W, FIG_H), x = c.getContext('2d');
-    if (mirror) { x.translate(FIG_W, 0); x.scale(-1, 1); }
+    const c = C(FIG_W, FIG_H), x = c.getContext('2d'), pc = C(FIG_W, FIG_H), q = pc.getContext('2d');
+    if (mirror) { x.translate(FIG_W, 0); x.scale(-1, 1); q.translate(FIG_W, 0); q.scale(-1, 1); }
     const g = {
       poly(col, pts) { x.fillStyle = col; x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.closePath(); x.fill(); },
       circ(col, cx, cy, r) { x.fillStyle = col; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill(); },
@@ -708,15 +805,24 @@ const Tiles = (() => {
       rect(col, a, b, w, h) { x.fillStyle = col; x.fillRect(a, b, w, h); },
       line(col, x0, y0, x1, y1, w) { x.strokeStyle = col; x.lineWidth = w; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); },
     };
-    FIGS[base](g);
-    const src = x.getImageData(0, 0, FIG_W, FIG_H).data, out = new Uint8Array(FIG_W * FIG_H);
-    for (let i = 0; i < out.length; i++) {
+    q.strokeStyle = q.fillStyle = '#000'; q.lineWidth = 1;
+    const p = {
+      dot(a, b) { q.fillRect(Math.floor(a), Math.floor(b), 1, 1); },
+      line(x0, y0, x1, y1) { q.beginPath(); q.moveTo(x0 + 0.5, y0 + 0.5); q.lineTo(x1 + 0.5, y1 + 0.5); q.stroke(); },
+      circ(cx, cy, r) { q.beginPath(); q.arc(cx + 0.5, cy + 0.5, r, 0, Math.PI * 2); q.stroke(); },
+      rays(cx, cy, r0, r1, n) { for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2; this.line(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); } }, // Strahlen im Heiligenschein
+    };
+    FIGS[base](g); PAINT[base](p);
+    const src = x.getImageData(0, 0, FIG_W, FIG_H).data, ps = q.getImageData(0, 0, FIG_W, FIG_H).data;
+    const col = new Uint8Array(FIG_W * FIG_H), paint = new Uint8Array(FIG_W * FIG_H);
+    for (let i = 0; i < col.length; i++) {
       if (src[i * 4 + 3] < 128) continue;
       let best = 0, bd = 1e9;
-      FIG_PAL.forEach((p, k) => { const dd = (p[0] - src[i * 4]) ** 2 + (p[1] - src[i * 4 + 1]) ** 2 + (p[2] - src[i * 4 + 2]) ** 2; if (dd < bd) { bd = dd; best = k; } });
-      out[i] = best + 1;
+      FIG_PAL.forEach((pp, k) => { const dd = (pp[0] - src[i * 4]) ** 2 + (pp[1] - src[i * 4 + 1]) ** 2 + (pp[2] - src[i * 4 + 2]) ** 2; if (dd < bd) { bd = dd; best = k; } });
+      col[i] = best + 1;
+      paint[i] = ps[i * 4 + 3] > 90 ? 1 : 0;
     }
-    return (figCache[name] = out);
+    return (figCache[name] = { col, paint });
   }
 
   // ---------------- Hintergründe ----------------
@@ -726,48 +832,166 @@ const Tiles = (() => {
     const add = (name, c, par, extra = {}) => L.push({ name, c, par, wrap: c.width >= 512, ...extra });
     if (theme === 'vortex') {
       L.push({ name: 'tunnel', tunnel: true, par: 0, c: C(1, 1) });
-    } else if (theme === 'glass') { // Glasturm: riesige Buntglasfenster mit Figuren – König, Drachentöter gegen Drachen, Schlachtross, Ritter, Königin
+    } else if (theme === 'glass') { // Glasturm: riesige Buntglasfenster zwischen Bündelpfeilern – Figuren unter Baldachinen, Maßwerkrosette, Juwelenbordüre, Rautengrund
       const c = C(512, 416), x = c.getContext('2d'), img = x.createImageData(512, 416), d = img.data;
+      const gc = C(512, 416), gx = gc.getContext('2d'), gimg = gx.createImageData(512, 416), gd = gimg.data; // Leuchtebene: nur das Glas
       const put = (X, Y, col) => { const i = (Y * 512 + X) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255; };
-      for (let Y = 0; Y < 416; Y++) for (let X = 0; X < 512; X++) put(X, Y, [12, 6, 18]);
-      const SETS = [ // Grund, Randband, Rundfenster, Akzent
-        [[24, 48, 160], [160, 24, 40], [200, 144, 24], [164, 200, 248]],
-        [[150, 20, 40], [24, 48, 160], [200, 144, 24], [252, 200, 120]],
-        [[92, 40, 160], [200, 144, 24], [24, 128, 76], [200, 160, 248]],
-        [[24, 110, 70], [92, 40, 160], [160, 24, 40], [180, 248, 200]],
-        [[24, 48, 160], [200, 144, 24], [150, 20, 40], [164, 200, 248]],
+      const glowPut = (X, Y, col) => { const i = (Y * 512 + X) * 4; gd[i] = col[0]; gd[i + 1] = col[1]; gd[i + 2] = col[2]; gd[i + 3] = 255; };
+      for (let Y = 0; Y < 416; Y++) { // Quadermauerwerk, sehr dunkel, damit das Glas leuchtet
+        const row = Math.floor(Y / 9), off = (row % 2) * 11;
+        for (let X = 0; X < 512; X++) {
+          const j = (X + off) % 22, blk = Math.floor((X + off) / 22);
+          if (Y % 9 === 0 || j === 0) { put(X, Y, [7, 3, 11]); continue; }
+          const n = ((row * 7 + blk * 13) % 5) + (Y % 9 === 1 || j === 1 ? 3 : 0) + bay(X, Y) * 2;
+          put(X, Y, [15 + n, 9 + n, 21 + n]);
+        }
+      }
+      const SETS = [ // Grund, Bordüre, Rosette, Akzent
+        [[26, 52, 168], [168, 26, 44], [216, 160, 32], [120, 200, 240]],
+        [[152, 22, 44], [26, 52, 168], [216, 160, 32], [252, 200, 120]],
+        [[22, 108, 70], [152, 22, 44], [216, 160, 32], [180, 248, 200]],
+        [[96, 40, 168], [216, 160, 32], [168, 26, 44], [220, 170, 252]],
       ];
-      const MOTIFS = [['king', 'slayer', 'dragon', 'horse', 'knight'], ['queen', 'horse!', 'knight', 'king!', 'slayer']];
-      const LEAD = [10, 6, 16], STONE = [70, 60, 84];
-      MOTIFS.forEach((row, band) => [6, 108, 210, 312, 414].forEach((wx, wi) => {
-        const w = 88, wy = band * 208 + 4, h = 200, a = Math.round(w * 0.866), S = SETS[(wi + band * 2) % 5];
-        const fig = glassFigure(row[wi]), fx0 = wx + 9, fy0 = wy + 62;
-        const inside = (X, Y) => Y >= wy && Y < wy + h && X >= wx && X < wx + w && (Y >= wy + a || ((X - wx - w) ** 2 + (Y - wy - a) ** 2 <= w * w && (X - wx) ** 2 + (Y - wy - a) ** 2 <= w * w)); // Spitzbogen
-        const figAt = (X, Y) => { const u = X - fx0, v = Y - fy0; return u >= 0 && u < FIG_W && v >= 0 && v < FIG_H ? fig[v * FIG_W + u] : 0; };
-        for (let Y = wy; Y < wy + h; Y++) for (let X = wx; X < wx + w; X++) {
-          if (!inside(X, Y)) continue;
-          const lx = X - wx, ly = Y - wy, row2 = Math.floor(ly / 12), gc = Math.floor((lx + (row2 % 2) * 4) / 8);
-          const tr = Math.hypot(X - (wx + w / 2), Y - (wy + a * 0.62)), f = figAt(X, Y);
-          const inner = inside(X - 9, Y) && inside(X + 9, Y) && inside(X, Y - 9) && inside(X, Y + 9);
-          let col;
-          if (!inside(X - 2, Y) || !inside(X + 2, Y) || !inside(X, Y - 2) || !inside(X, Y + 2)) col = STONE;            // Steinrahmen
-          else if (!inner) col = ly % 10 === 0 ? LEAD : S[1];                                                           // Randband
-          else if (f) col = (figAt(X - 1, Y) !== f || figAt(X + 1, Y) !== f || figAt(X, Y - 1) !== f || figAt(X, Y + 1) !== f) ? LEAD : FIG_PAL[f - 1]; // Figur, Blei an jeder Farbgrenze
-          else if (Math.abs(tr - 9) < 1.2) col = LEAD;
-          else if (tr < 9) col = S[2];                                                                                  // Rundfenster im Bogen
-          else if (ly % 12 === 0 || (lx + (row2 % 2) * 4) % 8 === 0) col = LEAD;                                        // Bleiruten
-          else { const hs = (row2 * 31 + gc * 17 + wi * 7 + band * 5) % 11; col = hs < 2 ? S[3] : hs < 4 ? S[1] : S[0]; } // Hintergrundscheiben
-          if (col !== LEAD && col !== STONE) { // Mondlicht von hinten: Mitte hell, Ränder dunkler
-            const k = 0.62 + 0.38 * Math.sin(Math.PI * lx / w) * (0.75 + 0.25 * Math.sin(Math.PI * ly / h)) + (bay(X, Y) - 0.5) * 0.16;
-            col = [Math.min(255, col[0] * k), Math.min(255, col[1] * k), Math.min(255, col[2] * k)];
+      const MOTIFS = [['king', 'slayer', 'dragon', 'horse'], ['queen', 'knight', 'angel', 'king!']];
+      const SET_OF = [[0, 2, 1, 3], [2, 3, 1, 0]]; // Grundfarbe je Fenster: jede Figur hebt sich ab (grüner Drache auf rotem Grund)
+      const NAMES = { king: 'REX', slayer: 'GEORGIVS', dragon: 'DRACO', horse: 'EQVVS', knight: 'MILES', queen: 'REGINA', angel: 'ANGELVS' };
+      const LEAD = [12, 6, 18], ST = [[50, 42, 62], [78, 68, 92], [112, 100, 128], [26, 20, 34]];
+      const WHITE_G = FIG_PAL[3], YEL = FIG_PAL[11], GOLD_G = FIG_PAL[2];
+      const hash = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n ^ (n >>> 12), 0x297a2d39); return ((n ^ (n >>> 15)) >>> 0) / 4294967296; };
+      const label = (t) => { // Inschriftband: Pixelschrift als Schwarzlot-Maske
+        const tc = C(FIG_W, 10), tx = tc.getContext('2d');
+        Font.draw(tx, t, FIG_W / 2, 2, '#000', { align: 'center' });
+        const a = tx.getImageData(0, 0, FIG_W, 10).data, m = new Uint8Array(FIG_W * 10);
+        for (let i = 0; i < m.length; i++) m[i] = a[i * 4 + 3] > 100 ? 1 : 0;
+        return m;
+      };
+      const W0 = 84, H0 = 196, A0 = Math.round(W0 * 0.866), FX = 7, FY = 56, RC = { x: W0 / 2, y: 27 }, RR = 14;
+      const insideW = (lx, ly) => ly >= 0 && ly < H0 && lx >= 0 && lx < W0 && (ly >= A0 || ((lx - W0) ** 2 + (ly - A0) ** 2 <= W0 * W0 && lx ** 2 + (ly - A0) ** 2 <= W0 * W0)); // Spitzbogen
+      const edgeW = (lx, ly, r) => !insideW(lx - r, ly) || !insideW(lx + r, ly) || !insideW(lx, ly - r) || !insideW(lx, ly + r);
+      // Zonen sind für alle Fenster gleich: 0 außen, 1 Steinlaibung, 2 Juwelenbordüre, 3 Perlenschnur, 4 Innenfeld
+      const zone = new Uint8Array(W0 * H0);
+      for (let ly = 0; ly < H0; ly++) for (let lx = 0; lx < W0; lx++) zone[ly * W0 + lx] = !insideW(lx, ly) ? 0 : edgeW(lx, ly, 2) ? 1 : edgeW(lx, ly, 6) ? 2 : edgeW(lx, ly, 8) ? 3 : 4;
+      const canopy = (lx, ly) => { // gotischer Baldachin aus Weiß- und Silbergelbglas über der Figur
+        const cx = W0 / 2, ax = Math.abs(lx + 0.5 - cx);
+        if (ly >= 56 && ly < 61 && lx >= 11 && lx < W0 - 11) return { id: 5000, col: WHITE_G, p: lx % 5 === 0 || ly === 60 ? 1 : 0 };      // Gesims mit Bogenfries
+        if (ly >= 40 && ly < 56 && ax <= ly - 38) {                                                                                       // Wimperg mit Dreipass und Krabben
+          const ring = Math.abs(Math.hypot(lx + 0.5 - cx, ly - 52) - 5) < 0.6 && ly < 53, crab = Math.abs(ax - (ly - 38)) < 0.8 && ly % 3 === 0;
+          return { id: 5001, col: YEL, p: ring || crab ? 1 : 0 };
+        }
+        for (const pc of [15, W0 - 15]) {
+          const dx = Math.abs(lx + 0.5 - pc), s = pc > cx ? 1 : 0;
+          if (ly >= 40 && ly < 56 && dx <= 3) return { id: 5002 + s, col: WHITE_G, p: dx < 0.6 && ly >= 44 && ly <= 51 ? 1 : 0 };            // Fiale mit Fensterchen
+          if (ly >= 32 && ly < 40 && dx <= (ly - 32) * 0.45) return { id: 5004 + s, col: YEL, p: 0 };                                    // Fialenspitze
+        }
+        return null;
+      };
+      const glow = [];
+      MOTIFS.forEach((row, band) => row.forEach((name, wi) => {
+        const wx = 22 + wi * 128, wy = band * 208 + 6, S = SETS[SET_OF[band][wi]], key = band * 4 + wi;
+        const F = glassFigure(name), txt = label(NAMES[name.replace('!', '')]);
+        glow[key] = S[0];
+        const pid = new Int32Array(W0 * H0).fill(-1), base = new Array(W0 * H0), paint = new Uint8Array(W0 * H0);
+        for (let ly = 0; ly < H0; ly++) for (let lx = 0; lx < W0; lx++) {
+          const i = ly * W0 + lx, z = zone[i];
+          if (z < 2) continue;
+          let id, col, pt = 0, cz;
+          const u = lx - FX, v = ly - FY, f = u >= 0 && u < FIG_W && v >= 0 && v < 120 ? F.col[v * FIG_W + u] : 0;
+          const dr = Math.hypot(lx + 0.5 - RC.x, ly + 0.5 - RC.y);
+          if (z === 2) { const k = Math.floor((ly + Math.abs(lx + 0.5 - W0 / 2) * 0.7) / 8); id = 1000 + k; col = k % 3 === 0 ? S[2] : S[1]; } // Juwelen
+          else if (z === 3) { const k = Math.floor((ly + Math.abs(lx + 0.5 - W0 / 2)) / 3); id = 2000 + k; col = k % 2 ? WHITE_G : S[3]; }   // Perlen
+          else if (dr < RR + 1.6) { // Maßwerkrosette: Steinring, Vierpass, Mittelbuckel
+            const lobes = [[6, 0], [-6, 0], [0, 6], [0, -6]].map(([ox, oy]) => Math.hypot(lx + 0.5 - RC.x - ox, ly + 0.5 - RC.y - oy) - 6);
+            const md = Math.min(...lobes), li = lobes.indexOf(md);
+            if (dr > RR - 1.4 || Math.abs(md) < 0.9 || Math.abs(dr - 3) < 0.8) { pid[i] = -2; base[i] = ly + 0.5 < RC.y ? ST[2] : ST[0]; continue; }
+            if (dr < 3) { id = 3000; col = GOLD_G; }
+            else if (md < 0) { id = 3001 + li; col = li < 2 ? S[2] : S[3]; pt = Math.abs(md + 3) < 0.5 ? 1 : 0; }
+            else { id = 3010 + (lx < RC.x ? 0 : 1) + (ly < RC.y ? 0 : 2); col = S[1]; }
           }
-          put(X, Y, col);
+          else if ((cz = canopy(lx, ly))) { id = cz.id; col = cz.col; pt = cz.p; }
+          else if (v >= 120 && v < 130 && u >= 0 && u < FIG_W) { // Inschriftband mit eingerollten Enden
+            if (u < 3 || u > 66) { id = 6001 + (u < 3 ? 0 : 1); col = S[1]; } else { id = 6000; col = WHITE_G; pt = txt[(v - 120) * FIG_W + u]; }
+          }
+          else if (f) { id = 7000 + f; col = FIG_PAL[f - 1]; pt = F.paint[v * FIG_W + u]; }
+          else { // Rautengrund, jede Raute mit kleiner gemalter Rosette
+            const U = lx + ly, V = lx - ly + 400, cu = Math.floor(U / 10), cv = Math.floor(V / 10), du = U - cu * 10 - 5, dv = V - cv * 10 - 5;
+            id = 10000 + cu * 100 + cv; col = S[0]; pt = Math.abs(du) + Math.abs(dv) <= 1 && (du + dv) % 2 === 0 ? 1 : 0;
+          }
+          pid[i] = id; base[i] = col; paint[i] = pt;
+        }
+        for (let ly = 0; ly < H0; ly++) for (let lx = 0; lx < W0; lx++) {
+          const i = ly * W0 + lx, z = zone[i], X = wx + lx, Y = wy + ly;
+          if (!z) continue;
+          if (z === 1) { put(X, Y, edgeW(lx, ly, 1) ? ST[3] : ly < A0 ? ST[2] : ST[1]); continue; } // Laibung mit Fase
+          if (pid[i] === -2) { put(X, Y, base[i]); continue; }                                      // Maßwerk
+          const l = lx > 0 ? pid[i - 1] : -1, t = ly > 0 ? pid[i - W0] : -1;
+          if ((l >= 0 && l !== pid[i]) || (t >= 0 && t !== pid[i])) { put(X, Y, LEAD); continue; } // Bleirute
+          const col = base[i], h = hash(pid[i] * 7919 + key * 104729);
+          let k = 0.58 + 0.42 * Math.sin(Math.PI * (lx + 0.5) / W0) * (0.8 + 0.2 * (1 - ly / H0)); // Mondlicht von hinten: Mitte hell
+          k *= 0.9 + 0.2 * h;                                                                       // jede Scheibe etwas anders getönt
+          k *= 1 + 0.07 * Math.sin(lx * (0.45 + h) + ly * (1.2 - h) * 0.6 + h * 40);              // Schlieren im mundgeblasenen Glas
+          k += (bay(X, Y) - 0.5) * 0.12;
+          if (hash(i * 31 + key * 977) < 0.005) k *= 1.4;                                           // Bläschen
+          let r = col[0] * k, g = col[1] * k, b = col[2] * k;
+          if (paint[i]) { r = r * 0.28 + 10; g = g * 0.24 + 5; b = b * 0.22 + 4; }                   // Schwarzlot
+          const out = [Math.min(255, r), Math.min(255, g), Math.min(255, b)];
+          put(X, Y, out); glowPut(X, Y, out);
+        }
+        for (let ly = -12; ly < H0 + 12; ly++) for (let lx = -12; lx < W0 + 12; lx++) { // farbiger Lichtschein auf dem Mauerwerk rund ums Fenster
+          if (insideW(lx, ly)) continue;
+          const X = wx + lx, Y = wy + ly;
+          if (X < 0 || X >= 512 || Y < 0 || Y >= 416) continue;
+          let dist;
+          if (ly >= A0) { const ex = lx < 0 ? -lx : lx >= W0 ? lx - W0 + 1 : 0, ey = ly >= H0 ? ly - H0 + 1 : 0; dist = Math.hypot(ex, ey); }
+          else dist = Math.max(Math.hypot(lx - W0, ly - A0), Math.hypot(lx, ly - A0)) - W0;
+          if (dist >= 12 || dist < 0) continue;
+          const k = (1 - dist / 12) ** 2 * 0.5, j = (Y * 512 + X) * 4;
+          d[j] = Math.min(255, d[j] + S[0][0] * k); d[j + 1] = Math.min(255, d[j + 1] + S[0][1] * k); d[j + 2] = Math.min(255, d[j + 2] + S[0][2] * k);
         }
       }));
-      x.putImageData(img, 0, 0);
-      [0, 100, 202, 304, 406, 508].forEach(cx => { px(x, '#1c1424', cx - 4, 0, 12, 416); px(x, '#3c3048', cx - 2, 0, 2, 416); px(x, '#080410', cx + 6, 0, 2, 416); }); // Pfeiler
-      [204, 412].forEach(gy => { px(x, '#2c2438', 0, gy, 512, 4); px(x, '#4c4058', 0, gy, 512, 1); }); // Gesimse zwischen den Fensterreihen
+      // Bündelpfeiler: Rundpfeiler mit vier Diensten, farbiges Streiflicht der Nachbarfenster an den Kanten,
+      // Blattkapitell am Bogenansatz, Schaftring, Basis auf dem Gesims
+      const STN = [[16, 11, 24], [32, 25, 44], [52, 44, 66], [78, 68, 94], [110, 99, 128], [148, 138, 166]];
+      const stone = (b, X, Y) => { const v = Math.max(0, Math.min(4.999, b * 5 + (bay(X, Y) - 0.5) * 0.7)), k = Math.floor(v); return STN[k]; };
+      const tint = (col, g, a) => [col[0] * (1 - a) + Math.min(255, g[0] * 1.25) * a, col[1] * (1 - a) + Math.min(255, g[1] * 1.25) * a, col[2] * (1 - a) + Math.min(255, g[2] * 1.25) * a];
+      const cyl = (n) => 0.25 + 0.55 * Math.sqrt(Math.max(0, 1 - n * n)) - 0.18 * n; // Licht leicht von links
+      for (let band = 0; band < 2; band++) for (let k = 0; k <= 4; k++) {
+        const cx = k * 128, y0 = band * 208, gl = glow[band * 4 + (k + 3) % 4], gr = glow[band * 4 + k % 4];
+        for (let ly = 0; ly < 204; ly++) for (let dx = -21; dx <= 21; dx++) {
+          const X = cx + dx, Y = y0 + ly;
+          if (X < 0 || X >= 512) continue;
+          const ax = Math.abs(dx);
+          let col = null;
+          if (ly >= 70 && ly < 73) col = ax <= 21 ? (ly === 70 ? STN[5] : STN[3]) : null;                      // Deckplatte des Kapitells
+          else if (ly >= 73 && ly < 81) { // Kelch mit Blattwerk
+            if (ax <= 20 - (ly - 73) * 0.4) {
+              const leaf = ((dx + 42 + (ly < 77 ? 0 : 3)) % 6), curl = ly === 73 || ly === 74;
+              col = curl && leaf < 2 ? STN[5] : leaf < 3 ? STN[4 - (ly > 77 ? 1 : 0)] : STN[2];
+            }
+          } else if (ly >= 81 && ly < 83) col = ax <= 18 ? (ly === 81 ? STN[4] : STN[1]) : null;               // Halsring
+          else if (ly >= 140 && ly < 143) col = ax <= 19 ? (ly === 140 ? STN[4] : STN[2]) : null;              // Schaftring
+          else if (ly >= 190 && ly < 194) col = ax <= 21 ? stone(cyl(dx / 22) * (ly === 190 ? 1.15 : 0.9), X, Y) : null; // Wulst der Basis
+          else if (ly >= 194) col = ax <= 21 ? (ly === 194 ? STN[4] : ly > 201 ? STN[0] : STN[2]) : null;    // Sockel
+          if (!col) { // Schäfte
+            const sides = [[0, 8], [-14, 4], [14, 4]];
+            for (const [sx, r] of sides) {
+              const n = (dx - sx) / (r + 0.5);
+              if (Math.abs(n) > 1) continue;
+              col = stone(cyl(n), X, Y);
+              if (n < -0.6 && dx < 0) col = tint(col, gl, Math.min(0.85, (-n - 0.6) * 2.1)); // Streiflicht vom linken Fenster
+              else if (n > 0.6 && dx > 0) col = tint(col, gr, Math.min(0.85, (n - 0.6) * 2.1)); // … und vom rechten
+              break;
+            }
+            if (!col) col = ax <= 21 ? (ax >= 19 ? STN[1] : STN[0]) : null;         // Kehlen zwischen den Diensten
+          }
+          if (col) put(X, Y, col);
+        }
+      }
+      for (const gy of [204, 412]) for (let X = 0; X < 512; X++) { // Gesims mit Zahnschnitt zwischen den Fensterreihen
+        put(X, gy, [100, 90, 118]); put(X, gy + 1, [66, 56, 80]); put(X, gy + 2, X % 4 === 0 ? [14, 9, 20] : [54, 46, 68]); put(X, gy + 3, [14, 9, 20]);
+      }
+      x.putImageData(img, 0, 0); gx.putImageData(gimg, 0, 0);
       add('wall', c, 0.5, { vtile: true });
+      add('glassGlow', gc, 0.5, { vtile: true, glow: true });
     } else if (theme === 'ship') { // nachts auf See: Sturmhimmel, Blutmond, Burg auf der Klippe, Meer, Takelage
       const sky = C(640, 208), x = sky.getContext('2d');
       smooth(x, 640, 208, ['#000000', '#02020c', '#060818', '#0c0e26', '#141436', '#1e1a44', '#2a1e4c', '#3a2250', '#4a2450']);
@@ -1026,9 +1250,21 @@ const Tiles = (() => {
     if (!l.wrap) { ctx.drawImage(img, 0, 0); return; }
     const off = ((Math.floor(cam.x * l.par + (l.drift ? frame * l.drift : 0) + (l.sail ? (W.sailX || 0) * l.sail : 0)) % img.width) + img.width) % img.width;
     const oy = vt && l.vtile ? ((Math.floor(cam.y * l.par) % img.height) + img.height) % img.height : 0;
-    for (const yy of oy ? [-oy, img.height - oy] : [0]) {
-      for (let x = -off; x < View.w; x += img.width) ctx.drawImage(img, x, yy);
+    const tile = () => { for (const yy of oy ? [-oy, img.height - oy] : [0]) for (let x = -off; x < View.w; x += img.width) ctx.drawImage(img, x, yy); };
+    if (!l.glow) { tile(); return; }
+    // Glasturm: die Fenster leuchten auf und ab, wenn Wolken am Mond vorbeiziehen; ab und zu wandert ein Glanzstreifen
+    // übers Glas, und bei Blitzen flammen alle Fenster auf
+    const cloud = 0.5 + 0.3 * Math.sin(frame * 0.011) + 0.2 * Math.sin(frame * 0.0037 + 1.3);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = FX.stormOn(W.storm) ? 0.7 : 0.05 + 0.2 * Math.max(0, cloud);
+    tile();
+    const ph = (frame % 600) / 600;
+    if (ph < 0.4) {
+      const sx = -90 + ph / 0.4 * (View.w + 180);
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx + 30, 0); ctx.lineTo(sx - 34, 208); ctx.lineTo(sx - 64, 208); ctx.closePath(); ctx.clip();
+      ctx.globalAlpha = 0.3; tile();
     }
+    ctx.restore();
   }
 
   // onSky: wird nach den Himmelsebenen aufgerufen (Blitze hinter Burg & Bäumen)
@@ -1068,6 +1304,7 @@ const Tiles = (() => {
   }
   function drawFront(ctx, room, cam) {
     if (room.theme === 'ship') { drawShipFront(ctx, room, cam, W.frame); return; }
+    if (room.theme === 'glass') { drawGlassFront(ctx, room, cam); return; }
     const c = fronts[room.theme] || (fronts[room.theme] = buildFront(room.theme));
     const off = ((Math.floor(cam.x * 1.3) % 640) + 640) % 640;
     for (let x = -off; x < View.w; x += 640) ctx.drawImage(c, x, 0);

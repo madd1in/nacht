@@ -5,7 +5,7 @@ const W = {
   room: null, stage: 0, roomIdx: 0, ents: [], platforms: [], stairs: [], spawners: [],
   player: null, cam: { x: 0, y: 0 }, camYf: 0, frame: 0, atkId: 0,
   score: 0, lives: 3, time: 300, timeSub: 0, nextLife: 20000, lifeT: 0, bloodT: 0, stageFrames: 0, stats: { hits: 0, deaths: 0, combo: 0 }, sway: { a: 0, v: 0 }, zoomFx: null, bellCd: 0,
-  camLock: false, camTarget: null, boss: null, arenaOn: false, arenaX: 0, arenaW: 0,
+  camLock: false, camTarget: null, boss: null, arenaOn: false, arenaX: 0, arenaW: 0, arenaBoss: null, camEase: 0, miniDone: {},
   freeze: 0, hitstop: 0, shake: 0, flash: 0, cleared: false, lightning: 0, lightningCD: 300,
   checkpoint: null, crash: null, exiting: false, storm: { cd: 100, flash: 0, bolt: null },
   sail: 0, sailX: 0, roll: 0, rollAmp: 0, heave: 0, docked: 0, dockT: 0, rogue: null, kraken: null, gust: 0,
@@ -21,7 +21,7 @@ const W = {
     const def = Levels.STAGES[stage].rooms[roomIdx];
     this.room = { ...def, grid: def.grid.map(r => r.slice()) };
     this.ents = []; this.platforms = []; this.boss = null;
-    this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0;
+    this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0; this.arenaBoss = null; this.camEase = 0;
     this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
     if (this.bloodT > 0) { this.bloodT = 0; Audio8.tempo(1); }
     this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200;
@@ -128,7 +128,7 @@ const W = {
     this.rollAmp = 0.03 * k;
     this.roll = Math.sin(this.frame * 0.0166) * this.rollAmp + Math.sin(this.frame * 0.041 + 1) * this.rollAmp * 0.2;
     this.heave = Math.sin(this.frame * 0.0332 + 0.6) * 3.5 * k; // Stampfen: das Bild hebt und senkt sich
-    if (d && !this.docked && p.alive && p.cx > d.x * T) { this.docked = 1; this.dockT = 0; Game.shout('landHo'); Audio8.sfx('bell'); }
+    if (d && !this.docked && p.alive && p.cx > d.x * T && !this.miniPending()) { this.docked = 1; this.dockT = 0; Game.shout('landHo'); Audio8.sfx('bell'); }
     if (this.docked) {
       this.dockT++;
       this.sail = Math.max(0, 1 - this.dockT / 80);
@@ -151,10 +151,13 @@ const W = {
     if (this.sail > 0.5 && Math.random() < 0.0028) { this.gust = 1; Audio8.sfx('whoosh'); }
     // Monsterwelle: baut sich am Horizont auf, rollt heran und bricht über die Reling
     // Riesenkrake: drei Fangarme tauchen hinter dem Schiff auf, peitschen und schlagen aufs Wasser
-    const K = this.kraken || (this.kraken = { t: -1, cd: 300, arms: [] });
+    const K = this.kraken || (this.kraken = { t: -1, cd: 300, arms: [], sw: 0 });
+    const fight = !!(this.boss && this.boss.sea && !this.boss.dying); // Miniboss: der Krake selbst taucht hinter dem Schiff auf
+    K.sw++;
+    if (fight && (K.t < 0 || K.t > 330)) { K.t = 0; K.arms = [-1, 0, 1].map(k => ({ u: k * 30 + rnd(-6, 6), z: 52 + Math.random() * 22, len: 95 + Math.random() * 25, ph: Math.random() * 6 })); }
     if (K.t >= 0) {
-      K.t++;
-      if (K.t === 1) { Audio8.sfx('roar'); Input.rumble(0.4, 0.3, 400); Game.shout('kraken'); }
+      if (!(fight && K.t >= 200)) K.t++;
+      if (K.t === 1) { Audio8.sfx('roar'); Input.rumble(0.4, 0.3, 400); if (!fight) Game.shout('kraken'); }
       if (K.t === 362) { this.shake = Math.max(this.shake, 10); Audio8.sfx('boom'); Audio8.sfx('splash'); this.sway.v += 0.003; }
       if (K.t > 430) { K.t = -1; K.cd = 1500 + Math.random() * 900; }
     } else if (this.sail > 0.6 && p.alive && !(this.rogue && this.rogue.v > 0) && --K.cd <= 0) {
@@ -167,6 +170,7 @@ const W = {
       if (R.v <= 24) { R.v = 0; R.cd = 1000 + Math.random() * 700; this.rogueHit(); }
     } else if (this.sail > 0.6 && p.alive && K.t < 0 && --R.cd <= 0) { R.v = 430; R.warned = false; }
   },
+  miniPending() { const M = this.room.mini; return !!M && !this.miniDone[this.stage + ':' + this.roomIdx]; },
   rogueHit() { // Schiff krängt, Gischt fegt übers Deck
     this.shake = 16; this.sway.v += (Math.random() < 0.5 ? -1 : 1) * 0.006; Input.rumble(0.9, 0.7, 600);
     Audio8.sfx('boom'); Audio8.sfx('splash');
@@ -219,7 +223,7 @@ const W = {
       if (e.kind === 'candle') { if (hits(e)) e.hit(); }
       else if (e.kind === 'enemy' || e.kind === 'boss') {
         if (e.kind === 'enemy' && e.rise !== undefined && e.rise < 12) continue;
-        if (hits(e.hurtBox ? e.hurtBox() : e) && e.hit(dmg, id)) Input.rumble(0.15, 0.35, 60);
+        if ((e.hurtBoxes ? e.hurtBoxes().some(hits) : hits(e.hurtBox ? e.hurtBox() : e)) && e.hit(dmg, id)) Input.rumble(0.15, 0.35, 60);
       } else if (e.kind === 'eproj' && !e.reflected && hits(e)) { // Konter: Geschosse zerschlagen bzw. zurückschleudern
         if (e.type === 'fire') {
           const p = this.player;
@@ -244,7 +248,7 @@ const W = {
       if (e.kind === 'candle') { if (Phys.overlap(sub, e)) e.hit(); continue; }
       if (e.kind !== 'enemy' && e.kind !== 'boss') continue;
       if (e.rise !== undefined && e.rise < 12) continue;
-      if (!Phys.overlap(sub, e.hurtBox ? e.hurtBox() : e)) continue;
+      if (!Phys.hitsEnt(sub, e)) continue;
       const last = sub.hits.get(e);
       if (last !== undefined && this.frame - last < sub.cd) continue;
       sub.hits.set(e, this.frame);
@@ -323,6 +327,14 @@ const W = {
     this.boss = null;
     Input.rumble(1, 1, 700);
     this.ents.forEach(e => { if (e.kind === 'enemy' || e.kind === 'eproj') e.dead = true; });
+    if (b.mini) { // Miniboss: Kamera wieder frei, Beute statt Orb, weiter mit der Musik des Raums
+      this.miniDone[this.stage + ':' + this.roomIdx] = true;
+      this.camLock = false; this.arenaOn = false; this.arenaW = 0; this.camEase = 1; Game.bossName = 0;
+      const x = this.arenaX + 40;
+      ['roast', 'bagBig', 'heartB'].forEach((t, i) => this.spawn(new Item(t, x + i * 22, Tent.floorAt(x + i * 22) - 40)));
+      Audio8.tempo(1); Audio8.play(this.songName()); Game.note(b.nameKey + 'Note');
+      return;
+    }
     this.spawn(new Item('orb', clamp(b.cx, this.cam.x + 24, this.cam.x + View.w - 24), Math.min(b.cy, 140)));
   },
 
@@ -331,8 +343,17 @@ const W = {
 
   updateCam() {
     const p = this.player, r = this.room, vw = View.w;
+    const M = r.mini; // Miniboss mitten im Raum: ein Abschnitt wird zur Arena (Kontrollpunkt davor wird sicher gesetzt)
+    if (M && !this.arenaOn && p.alive && p.cx > M.x * T && p.feet > M.minRow * T && !this.miniDone[this.stage + ':' + this.roomIdx]) {
+      this.arenaOn = true; this.camLock = true; this.arenaBoss = M.boss;
+      this.arenaX = M.x0 * T; this.arenaW = (M.x1 - M.x0) * T;
+      this.camTarget = clamp(Math.round(this.arenaX + this.arenaW / 2 - vw / 2), 0, r.w * T - vw);
+      this.ents.forEach(e => { if (e.kind === 'enemy') e.dead = true; });
+      for (const e of this.ents) if (e instanceof Statue && !e.active && e.cx < this.arenaX) e.activate(true);
+      Audio8.stop();
+    }
     if (r.arena && !this.arenaOn && p.alive && p.cx > r.w * T - vw + 40) {
-      this.arenaOn = true; this.camLock = true; this.arenaX = r.w * T - vw; this.arenaW = vw; this.camTarget = this.arenaX;
+      this.arenaOn = true; this.camLock = true; this.arenaX = r.w * T - vw; this.arenaW = vw; this.camTarget = this.arenaX; this.arenaBoss = r.arena.boss;
       this.ents.forEach(e => { if (e.kind === 'enemy') e.dead = true; });
       Audio8.stop();
     }
@@ -341,7 +362,7 @@ const W = {
       this.cam.x += clamp(d, -2, 2);
       if (Math.abs(d) < 0.5) {
         this.cam.x = this.camTarget; this.camTarget = null;
-        this.boss = this.spawn(new BOSSES[r.arena.boss](this.arenaX, this.arenaW));
+        this.boss = this.spawn(new BOSSES[this.arenaBoss](this.arenaX, this.arenaW));
         Audio8.play('boss'); Audio8.sfx('roar'); Input.rumble(0.8, 0.5, 700);
         this.zoomFx = { t: 0, len: 84, amp: 0.16, b: this.boss }; // Kamera fährt auf den Boss zu
         this.cinema = 110; this.flash = 8; this.shake = 26;
@@ -350,11 +371,13 @@ const W = {
     } else if (!this.camLock) {
       const want = Math.abs(p.vx) > 0.1 ? p.face * 28 : p.face * 10;
       this.look += (want - this.look) * 0.035;
-      this.cam.x = this.camXFor(p);
+      const cx = this.camXFor(p);
+      if (this.camEase) { const d = cx - this.cam.x; this.cam.x += clamp(d, -3, 3); if (Math.abs(d) <= 3) this.camEase = 0; } // nach dem Miniboss weich zurück zum Helden
+      else this.cam.x = cx;
     }
     const maxY = Math.max(0, r.h * T - View.fh);
     if (maxY > 0) {
-      const ty = clamp(p.feet - 136, 0, maxY), d = ty - this.camYf;
+      const ty = this.arenaOn && r.mini ? maxY : clamp(p.feet - 136, 0, maxY), d = ty - this.camYf; // Miniboss: Deck bleibt im Bild
       this.camYf += Math.abs(d) > 70 ? d * 0.25 : d * 0.12;
       this.cam.y = Math.round(this.camYf);
     } else { this.camYf = 0; this.cam.y = 0; }

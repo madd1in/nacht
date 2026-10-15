@@ -50,6 +50,8 @@ const Levels = (() => {
       exit(x) { r.exit = { x0: x, y0: 0, x1: w - 1, y1: h - 1 }; r.door = { x }; return api; },
       exitAt(x0, y0, x1, y1) { r.exit = { x0, y0, x1, y1 }; r.door = { x: x0 + 1 }; return api; },
       arena(boss) { r.arena = { boss }; return api; },
+      // Miniboss mitten im Raum: Arena x0..x1 (Kacheln), startet, sobald der Held x überschreitet (Füße unterhalb Reihe minRow)
+      mini(boss, x0, x1, x, minRow = 0) { r.mini = { boss, x0, x1, x, minRow }; return api; },
       // Schiff: Masten (Kachel-x), Steuerrad, Anlegen (ab Spieler-x legt das Schiff an, Laufplanke x0..x1 in Reihe row)
       // Mast: x (Kachel, Mitte), Mastkopf-Reihe, Rah-Reihen von oben nach unten, Segel-Index mit Wappen
       mast(x, top, yards, emblem = -1) { (r.masts || (r.masts = [])).push({ x, top, yards, emblem }); return api; },
@@ -92,11 +94,11 @@ const Levels = (() => {
     .zip(42, 8, 62, 23)
     .fill(61, 23, 72, 23, '=')                                         // Fock-Rah
     .mast(20.5, 6, [14, 19, 24]).mast(38.5, 1, [8, 13, 18, 26], 2).mast(66.5, 10, [16, 23, 27]).wheel(6, 29)
-    .candle(4, 27).candle(8, 27, 'W').candle(15, 30, 'H').candle(23, 30).candle(41, 30).candle(45, 30, '$').candle(53, 30, 'H')
+    .candle(4, 27).candle(8, 27, 'W').candle(15, 30, 'H').candle(23, 30).candle(41, 30).candle(49, 30, '$').candle(53, 30, 'H')
     .candle(16, 22).candle(25, 22, 'H').candle(17, 17).candle(21, 12, 'W')
     .candle(36, 16, 'H').candle(43, 16).candle(35, 11).candle(40, 6, 'R').candle(42, 6, 'H')
     .candle(64, 21).candle(70, 21, '1').candle(63, 27).candle(70, 27, 'H').candle(86, 27).candle(91, 27, 'W')
-    .enemy('skel', 44, 31).enemy('skel', 69, 28).enemy('bat', 28, 10).enemy('bat', 50, 6).enemy('bat', 30, 22)
+    .enemy('skel', 40, 31).enemy('skel', 69, 28).enemy('bat', 28, 10).enemy('bat', 50, 6).enemy('bat', 30, 22)
     .enemy('raven', 17, 18).enemy('raven', 66, 22).enemy('ghost', 52, 14)
     .cargo(51, 31) // Frachtkiste „UPEL“ – Gruß an Infernax
     // Grüße an Monkey Island: Schiffsname, Grogfass, Gummihuhn mit Rolle in der Mitte, dreiköpfiger Affe
@@ -106,6 +108,7 @@ const Levels = (() => {
     .prop('monkey', { x0: 20, x1: 23, row: 14 })
     .zone('sea', 14, 56, { interval: 150, max: 2 })
     .zone('eagle', 6, 72, { interval: 300, max: 1 })
+    .statue(45, 31).mini('tentacle', 53, 69, 55, 22) // Kontrollpunkt, dann der lila Tentakel vor dem Anlegen
     .dock(62, 74, 80, 29).music('sea')
     .start(3, 28).exit(94).noDoor().done();
 

@@ -47,7 +47,7 @@ const Voice = (() => {
     if (!key) { busyUntil = 0; Audio8.duck(false); return; }
     const lang = Options.lang;
     busyUntil = performance.now() + 4000; // Ladezeit überbrücken
-    if (!REC.includes(lang)) { speak(key, lang, my); return; }
+    if (!REC.includes(lang) || !KEYS.includes(key)) { speak(key, lang, my); return; } // ohne Studioaufnahme: Browser-Stimme
     load(lang, key).then(buf => {
       if (my !== token) return;
       if (!buf) { speak(key, lang, my); return; }

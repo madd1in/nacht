@@ -145,7 +145,7 @@ const Game = {
   },
 
   startStage(s, room = 0) {
-    W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0;
+    W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0; W.miniDone = {};
     W.stats = { hits: 0, deaths: 0, combo: 0 };
     if (this.pendingView) this.applyView(this.pendingView);
     W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1)); this.shoutT = 0; this.noteT = 0;
@@ -229,7 +229,7 @@ const Game = {
     W.score = 0; W.lives = 3; W.nextLife = 20000;
     const p = W.player = new Player();
     if (hero !== Options.character) { p.H = HEROES.get(hero); p.def = p.H.def; p.sword = p.def.weapon === 'sword'; } // ohne die Einstellung zu speichern
-    W.stage = 0; W.time = Levels.STAGES[0].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0;
+    W.stage = 0; W.time = Levels.STAGES[0].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0; W.miniDone = {};
     W.stats = { hits: 0, deaths: 0, combo: 0 };
     W.loadRoom(0, Math.max(0, Levels.STAGES[0].rooms.findIndex(r => r.theme === 'courtyard'))); // Demo spielt im Burghof
     this.demo = { t: 0, lastX: p.x, stuck: 0 };
@@ -451,7 +451,7 @@ const Game = {
     W.update(); this.updateBars();
     if (!W.cleared) W.stageFrames++;
     if (this.hurryT > 0) this.hurryT--;
-    if (W.boss && this.bossName < 150) { if (this.bossName === 0) Voice.say('boss' + (W.stage + 1)); this.bossName++; }
+    if (W.boss && this.bossName < 150) { if (this.bossName === 0) Voice.say(W.boss.voice || 'boss' + (W.stage + 1)); this.bossName++; }
     const p = W.player;
     if (p.alive && p.hp <= p.maxHp / 4 && this.t % 50 === 0) Audio8.sfx('beat');
     if (p.alive && !W.cleared && W.freeze === 0 && ++W.timeSub >= 40) {
@@ -741,7 +741,7 @@ const Game = {
     const slide = t < 20 ? (20 - t) * 12 : t > 130 ? (t - 130) * -12 : 0;
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 40, View.w, 22);
     ctx.fillStyle = '#c89020'; ctx.fillRect(0, 40, View.w, 1); ctx.fillRect(0, 61, View.w, 1);
-    this.big(ctx, tr('boss' + (W.stage + 1)), cx + slide, 44, 2, ['#fce0a8', '#fce0a8', '#f8b800', '#f8b800', '#c89020', '#9c6400', '#6c4000'], null, '#000');
+    this.big(ctx, tr((W.boss && W.boss.nameKey) || 'boss' + (W.stage + 1)), cx + slide, 44, 2, ['#fce0a8', '#fce0a8', '#f8b800', '#f8b800', '#c89020', '#9c6400', '#6c4000'], null, '#000');
   },
 
   drawCard(ctx) {

@@ -46,6 +46,11 @@ const Phys = {
     }
     return 0;
   },
+  // Trifft Rechteck b das Ziel e? Bosse aus mehreren Teilen (Fangarme) liefern eine Liste von Trefferzonen.
+  hitsEnt(b, e) {
+    if (e.hurtBoxes) return e.hurtBoxes().some(r => Phys.overlap(b, r));
+    return Phys.overlap(b, e.hurtBox ? e.hurtBox() : e);
+  },
   overlap(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   },

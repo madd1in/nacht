@@ -1,4 +1,4 @@
-// Bosse: Riesenfledermaus, Knochenriese, Graf Nachtmahr.
+// Bosse: Riesenfledermaus, Knochenriese, Graf Nachtmahr – und der lila Tentakel als Miniboss auf dem Schiff.
 'use strict';
 
 // ---------------- Riesenfledermaus: prozedurale Pixel-Art (72x44, symmetrisch) ----------------
@@ -325,4 +325,421 @@ class Count extends Boss {
   }
 }
 
-const BOSSES = { gbat: GiantBat, giant: GiantSkeleton, count: Count };
+// ---------------- Lila Tentakel: Miniboss auf dem Schiff (Gruß an Vepar aus Bloodstained) ----------------
+// Zwei Fangarme steigen vor dem Rumpf aus der See, schlagen aufs Deck und fegen darüber; in Phase 2 bleiben
+// beide oben, spucken Tinte und ein dritter Arm bricht durch die Planken. Jeder Arm ist eine Gliederkette
+// (FABRIK, mit Ellbogenziel für die Hakenform) und wird pro Bild als schattierter, geditherter Schlauch in
+// einen Pixelpuffer gestempelt – ein einziges drawImage statt hunderter kleiner Bilder.
+const Tent = (() => {
+  const rgb = (h) => { const n = parseInt(h.slice(1), 16); return (0xff000000 | (n & 255) << 16 | (n >> 8 & 255) << 8 | n >> 16) | 0; }; // ABGR als int32
+  const pal = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, rgb(v)]));
+  const PAL = {
+    base: pal({ o: '#16041e', dd: '#300a40', d: '#4e1666', m: '#7c2c98', l: '#ac58c8', s: '#ecc0fc', k: '#f0bcd8', kc: '#7c2c5c' }),
+    rage: pal({ o: '#1c0418', dd: '#3c0a38', d: '#5e145c', m: '#90287c', l: '#c454a8', s: '#fcc8ec', k: '#fc6c9c', kc: '#a8104c' }), // Phase 2: glühende Saugnäpfe
+    flash: pal({ o: '#3c3c5c', dd: '#a8a8c8', d: '#c8c8e8', m: '#e8e8fc', l: '#fcfcfc', s: '#fcfcfc', k: '#fcfcfc', kc: '#c8c8e8' }),
+  };
+  const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16 - 0.5);
+  const M = 32; // Rand um das Spielfeld: beim Schaukeln (Bilddrehung) ragen die Arme sonst abgeschnitten ins Bild
+  const B = { c: null, x: null, img: null, d: null, w: 0, h: 0, box: null };
+  function buffer(w, h) {
+    if (!B.c || B.w !== w || B.h !== h) {
+      B.c = Sprites.canvas(w, h); B.x = B.c.getContext('2d'); B.img = B.x.createImageData(w, h);
+      B.d = new Int32Array(B.img.data.buffer); // Int32: negative Farbwerte ohne Umwandlung speichern B.w = w; B.h = h; B.box = null;
+    }
+    if (B.box) { const b = B.box; for (let y = b.y0; y <= b.y1; y++) B.d.fill(0, y * w + b.x0, y * w + b.x1 + 1); } // nur den zuletzt benutzten Bereich leeren
+    B.box = { x0: w, y0: h, x1: -1, y1: -1 };
+    return B;
+  }
+  const grow = (x0, y0, x1, y1) => { const b = B.box; if (x0 < b.x0) b.x0 = x0; if (y0 < b.y0) b.y0 = y0; if (x1 > b.x1) b.x1 = x1; if (y1 > b.y1) b.y1 = y1; };
+  // Scheibe mit fester Farbe (Umriss, Saugnäpfe)
+  function flat(cx, cy, R, col) {
+    const w = B.w, d = B.d, y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(B.h - 1, Math.ceil(cy + R));
+    for (let y = y0; y <= y1; y++) {
+      const dy = y + 0.5 - cy, q = R * R - dy * dy;
+      if (q < 0) continue;
+      const hw = Math.sqrt(q), x0 = Math.max(0, Math.round(cx - hw)), x1 = Math.min(w - 1, Math.round(cx + hw) - 1);
+      if (x1 < x0) continue;
+      d.fill(col, y * w + x0, y * w + x1 + 1); grow(x0, y, x1, y);
+    }
+  }
+  // Scheibe mit Rundung: Licht von oben entlang der Normalen (nx, ny), Bänder mit Bayer-Dither
+  function shade(cx, cy, R, nx, ny, P) {
+    const w = B.w, d = B.d, iR = 1 / R, y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(B.h - 1, Math.ceil(cy + R));
+    for (let y = y0; y <= y1; y++) {
+      const dy = y + 0.5 - cy, q = R * R - dy * dy;
+      if (q < 0) continue;
+      const hw = Math.sqrt(q), x0 = Math.max(0, Math.round(cx - hw)), x1 = Math.min(w - 1, Math.round(cx + hw) - 1), row = y * w, by = (y & 3) * 4;
+      for (let x = x0; x <= x1; x++) {
+        const v = ((x + 0.5 - cx) * nx + dy * ny) * iR + BAY[by + (x & 3)] * 0.22;
+        d[row + x] = v > 0.84 ? P.s : v > 0.5 ? P.l : v > 0.02 ? P.m : v > -0.52 ? P.d : P.dd;
+      }
+    }
+  }
+  function blit(ctx) { // Puffer → Spielfeld (einmal pro Bild, nur der benutzte Ausschnitt)
+    const b = B.box;
+    if (!b || b.x1 < b.x0) return;
+    const bw = b.x1 - b.x0 + 1, bh = b.y1 - b.y0 + 1;
+    B.x.putImageData(B.img, 0, 0, b.x0, b.y0, bw, bh);
+    ctx.drawImage(B.c, b.x0, b.y0, bw, bh, b.x0 - M, b.y0 - M, bw, bh);
+  }
+  // kleine Scheibe direkt aufs Spielfeld (Tinte, Glühen)
+  function fdisc(ctx, cx, cy, R, col) {
+    ctx.fillStyle = col;
+    for (let dy = -R; dy <= R; dy++) { const hw = Math.floor(Math.sqrt(Math.max(0, R * R + R * 0.8 - dy * dy))); ctx.fillRect(Math.round(cx) - hw, Math.round(cy) + dy, 2 * hw + 1, 1); }
+  }
+  // Boden unter x (Deck oder Back); Plattformen hoch oben in der Takelage zählen nicht
+  function floorAt(x) {
+    const c = Math.floor(x / T), g = W.room.grid;
+    for (let r = W.room.h - 10; r < W.room.h; r++) { const ch = g[r] && g[r][c]; if (ch === '#' || ch === '=') return r * T; }
+    return W.room.h * T;
+  }
+  const pull = (a, b, L) => { const dx = a.x - b.x, dy = a.y - b.y, d = Math.hypot(dx, dy) || 1; a.x = b.x + dx / d * L; a.y = b.y + dy / d * L; };
+  return { M, PAL, buffer, flat, shade, blit, fdisc, floorAt, pull };
+})();
+
+class TentArm {
+  // side: -1 = links vor dem Rumpf, 1 = rechts, 0 = bricht durch die Planken
+  constructor(boss, side, n, len, r0) {
+    this.b = boss; this.side = side; this.n = n; this.L = len; this.r0 = r0; this.m = Math.round(n * 0.5);
+    this.inward = side ? -side : 0;
+    this.state = 'hidden'; this.t = 0; this.depth = 1; this.amp = 4; this.ease = 0.1; this.ph = Math.random() * 6; this.hole = 0;
+    this.bx = side < 0 ? boss.ax - 18 : side > 0 ? boss.ax + boss.aw + 18 : boss.ax + boss.aw / 2;
+    this.place();
+    this.pts = Array.from({ length: n }, (_, i) => ({ x: this.bx, y: this.by + i * 2 }));
+    this.q = this.pts.map(() => ({ x: 0, y: 0, nx: 0, ny: -1, up: false }));
+    this.tipX = this.bx; this.tipY = this.by; this.tx = this.bx; this.ty = this.by; this.harm = n; this.lockX = this.bx;
+    this.ex = null; this.elX = 0; this.elY = 0; this.hasEl = false;
+    this.radii = this.pts.map((_, i) => Math.max(2, 2 + (r0 - 2) * Math.pow(1 - i / (n - 1), 0.75)));
+    this.shape();
+  }
+  place() { // Wurzel: unter Wasser vor dem Rumpf (bzw. unter dem Loch im Deck)
+    this.by = this.side ? W.room.h * T + 22 + this.depth * 300 : Tent.floorAt(this.bx) + 44 + this.depth * 150;
+  }
+  go(state) { this.state = state; this.t = 0; }
+  visible() { return this.state !== 'hidden'; }
+  // Ruhehaltung: steigt am Rand auf, wölbt sich über die Reling, die Spitze hängt als Haken über dem Deck
+  idlePose() {
+    const b = this.b, s = Math.sin(b.t * 0.03 + this.ph), c = Math.cos(b.t * 0.047 + this.ph), H = b.deckY;
+    this.ex = this.bx + this.inward * (10 + s * 6); this.ey = H - 132 + c * 8;
+    this.tx = this.bx + this.inward * (66 + s * 16); this.ty = H - 70 + c * 14;
+  }
+  update(p) {
+    const t = ++this.t, b = this.b, ph2 = b.ph2, H = b.deckY, top = W.cam.y + 12;
+    let depthGoal = 0, buoy = true;
+    this.harm = this.n; this.ex = null; this.amp += ((ph2 ? 5 : 4) - this.amp) * 0.1;
+    switch (this.state) {
+      case 'hidden': depthGoal = 1; this.tx = this.bx; this.ty = this.by; this.ease = 0.1; break;
+      case 'rise': // taucht vor dem Rumpf auf
+        if (t === 1) { W.splash(this.bx, W.room.h * T - 8); W.shake = Math.max(W.shake, 6); }
+        this.idlePose(); this.ease = 0.06;
+        if (t > 52) this.go('idle');
+        break;
+      case 'idle': this.idlePose(); this.ease = 0.05; this.harm = this.n - 7; break;
+      case 'aim': { // bäumt sich hoch über dem Helden auf; die letzten Frames steht das Ziel fest
+        const lock = ph2 ? 24 : 32, end = ph2 ? 42 : 54;
+        if (t < lock) this.lockX = clamp(p.cx, b.ax + 14, b.ax + b.aw - 14);
+        this.ex = this.bx + this.inward * 16; this.ey = H - 150;
+        this.tx = this.bx + (this.lockX - this.bx) * 0.55; this.ty = Math.max(top, H - 184); this.ease = 0.09; this.harm = this.n - 6;
+        if (t === 1) Audio8.sfx('whoosh', this.bx);
+        if (t === lock) { Audio8.sfx('creak', this.lockX); Input.rumble(0.2, 0.2, 120); }
+        if (t > end) this.go('slam');
+        break;
+      }
+      case 'slam':
+        this.tx = this.lockX + this.inward * 18; this.ty = Tent.floorAt(this.lockX) - 4; this.ease = 0.42; this.amp = 1.5; this.harm = 0; buoy = false;
+        if (t === 7) this.impact();
+        if (t > 9) this.go('stuck');
+        break;
+      case 'stuck': // liegt betäubt auf den Planken: harmlos und verwundbar
+        this.amp = 1; buoy = false;
+        if (t % 9 === 0) { const q = this.q[this.n - 2 - (t % 7)]; W.dust(q.x, Tent.floorAt(q.x), 2); }
+        if (t > (ph2 ? 56 : 76)) this.go('lift');
+        break;
+      case 'lift': this.idlePose(); this.ease = 0.07; if (t > 26) b.done(this); break;
+      case 'coil': // rollt sich am eigenen Rand ein, dann fegt er knapp über die Planken
+        this.ex = this.bx + this.inward * 6; this.ey = H - 60;
+        this.tx = this.bx + this.inward * 30; this.ty = H - 34; this.ease = 0.12; this.amp = 7; this.harm = this.n - 5;
+        if (t === 1) Audio8.sfx('creak', this.bx);
+        if (t > (ph2 ? 24 : 34)) { this.go('sweep'); Audio8.sfx('whoosh', this.bx); }
+        break;
+      case 'sweep': case 'sweepBack': {
+        const len = this.state === 'sweep' ? (ph2 ? 40 : 50) : (ph2 ? 34 : 42), k = Math.min(1, t / len);
+        const x0 = this.bx + this.inward * 30, x1 = this.side < 0 ? b.ax + b.aw - 8 : b.ax + 8;
+        const x = this.state === 'sweep' ? x0 + (x1 - x0) * k : x1 + (x0 - x1) * k;
+        this.tx = x; this.ty = Tent.floorAt(x) - 9; this.ease = 0.5; this.harm = this.n - 5; buoy = false;
+        if (t % 4 === 0) { const q = this.q[this.n - 1]; W.dust(q.x, Tent.floorAt(q.x), 2); }
+        if (k >= 1) { if (this.state === 'sweep') { this.go('sweepBack'); Audio8.sfx('whoosh', x); } else this.go('lift'); }
+        break;
+      }
+      case 'spit': // bäumt sich auf und spuckt Tinte in hohen Bögen
+        this.ex = this.bx + this.inward * 14; this.ey = H - 140;
+        this.tx = this.bx + this.inward * 44; this.ty = Math.max(top, H - 168); this.ease = 0.08; this.harm = this.n - 5;
+        if (t === 24 || t === 32 || (ph2 && t === 40)) this.spit(p, (t - 32) / 8);
+        if (t > 54) this.go('idle');
+        break;
+      case 'retract': depthGoal = 1; this.tx = this.bx + this.inward * 8; this.ty = this.by - 40; this.ease = 0.07; buoy = false; if (t > 50) this.go('hidden'); break;
+      case 'thrash': // Todeskampf
+        this.amp = 10; this.ex = this.bx + this.inward * (12 + Math.sin(t * 0.13) * 10); this.ey = H - 120 + Math.cos(t * 0.19) * 24;
+        this.tx = this.bx + this.inward * (50 + Math.sin(t * 0.21 + this.ph) * 40); this.ty = Math.max(top, H - 100 + Math.cos(t * 0.17 + this.ph) * 50); this.ease = 0.16;
+        break;
+      // ---- dritter Arm: durch die Planken ----
+      case 'warn': // Planken knarren und heben sich, lila Licht dringt durch die Fugen
+        depthGoal = 1;
+        if (t % 4 === 0) W.dust(this.bx + rnd(-10, 10), Tent.floorAt(this.bx), 2);
+        if (t === 1 || t === 22) Audio8.sfx('creak', this.bx);
+        if (t > (ph2 ? 40 : 50)) this.go('burst');
+        break;
+      case 'burst':
+        if (t === 1) {
+          this.depth = 0.3; this.hole = 1; W.shake = Math.max(W.shake, 12); Input.rumble(0.7, 0.5, 300);
+          Audio8.sfx('boom', this.bx); Audio8.sfx('crack', this.bx);
+          W.debris(this.bx, Tent.floorAt(this.bx) - 2, '#8c5c34', 14);
+        }
+        this.tx = this.bx + Math.sin(t * 0.4) * 6; this.ty = Tent.floorAt(this.bx) - 104; this.ease = 0.35; this.harm = 0; buoy = false;
+        if (t > 14) this.go('sway');
+        break;
+      case 'sway':
+        this.tx = this.bx + Math.sin(b.t * 0.08 + this.ph) * 24; this.ty = Tent.floorAt(this.bx) - 96 + Math.cos(b.t * 0.11) * 8; this.ease = 0.08;
+        this.harm = this.n >> 1;
+        if (t > (ph2 ? 60 : 70)) this.go('retract');
+        break;
+    }
+    if (this.hole > 0 && this.state === 'hidden') this.hole = Math.max(0, this.hole - 0.02);
+    this.depth += (depthGoal - this.depth) * (this.state === 'burst' ? 0.3 : 0.06);
+    this.place();
+    this.tipX += (this.tx - this.tipX) * this.ease; this.tipY += (this.ty - this.tipY) * this.ease;
+    if (this.ex !== null) {
+      if (!this.hasEl) { this.elX = this.pts[this.m].x; this.elY = this.pts[this.m].y; this.hasEl = true; }
+      this.elX += (this.ex - this.elX) * this.ease; this.elY += (this.ey - this.elY) * this.ease;
+    } else this.hasEl = false;
+    if (!Number.isFinite(this.tipX + this.tipY + this.elX + this.elY)) { this.tipX = this.elX = this.bx; this.tipY = this.elY = this.by; }
+    // Glätten + Auftrieb: der lockere Arm wölbt sich nach oben und zur Arena hin, statt einzuknicken
+    const P = this.pts;
+    for (let i = 1; i < this.n - 1; i++) {
+      const p0 = P[i - 1], p2 = P[i + 1], q = P[i];
+      q.x += ((p0.x + p2.x) / 2 - q.x) * 0.2; q.y += ((p0.y + p2.y) / 2 - q.y) * 0.2;
+      if (buoy) { q.y -= 0.8; q.x += this.inward * 0.4; }
+    }
+    this.solve(); this.shape();
+    if (this.side && (this.state === 'rise' || this.state === 'retract') && t % 6 === 0) W.splash(this.bx + rnd(-8, 8), W.room.h * T - 8);
+  }
+  fab(i0, i1, rx, ry, tx, ty) {
+    const P = this.pts, L = this.L;
+    for (let it = 0; it < 2; it++) {
+      P[i1].x = tx; P[i1].y = ty;
+      for (let i = i1 - 1; i >= i0; i--) Tent.pull(P[i], P[i + 1], L);
+      P[i0].x = rx; P[i0].y = ry;
+      for (let i = i0 + 1; i <= i1; i++) Tent.pull(P[i], P[i - 1], L);
+    }
+  }
+  solve() {
+    const P = this.pts, n = this.n;
+    if (this.hasEl) { this.fab(0, this.m, this.bx, this.by, this.elX, this.elY); this.fab(this.m, n - 1, P[this.m].x, P[this.m].y, this.tipX, this.tipY); }
+    else this.fab(0, n - 1, this.bx, this.by, this.tipX, this.tipY);
+    // einmal über dem Deck, bleibt der Arm darauf liegen, statt durch die Planken zu tauchen
+    let above = false;
+    for (let i = 1; i < n; i++) {
+      const q = P[i], fy = Tent.floorAt(q.x) - this.radii[i] + 1;
+      if (q.y < fy - 2) above = true;
+      else if (above && q.y > fy) q.y = fy;
+    }
+  }
+  shape() { // gezeichnete Lage: Schlängeln quer zur Kette, an Wurzel und Spitze null
+    const P = this.pts, n = this.n, t = this.b.t;
+    for (let i = 0; i < n; i++) {
+      const a = P[Math.max(0, i - 1)], c = P[Math.min(n - 1, i + 1)];
+      let dx = c.x - a.x, dy = c.y - a.y;
+      const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+      const s = i / (n - 1), w = Math.sin(s * Math.PI) * this.amp * Math.sin(s * 7 - t * 0.17 + this.ph);
+      const q = this.q[i];
+      q.x = P[i].x - dy * w; q.y = P[i].y + dx * w;
+      q.nx = -dy; q.ny = dx;
+      if (q.ny > 0 || (q.ny === 0 && q.nx * this.inward < 0)) { q.nx = -q.nx; q.ny = -q.ny; } // Normale nach oben: Licht von oben, Saugnäpfe unten
+      q.up = q.y < Tent.floorAt(q.x) + 3;
+    }
+  }
+  impact() {
+    W.shake = Math.max(W.shake, 14); Input.rumble(0.9, 0.6, 350);
+    Audio8.sfx('boom', this.lockX); Audio8.sfx('wall', this.lockX);
+    for (let i = 4; i < this.n; i += 3) { const q = this.q[i]; if (q.up) W.dust(q.x, Tent.floorAt(q.x), 3); }
+    W.debris(this.q[this.n - 1].x, Tent.floorAt(this.q[this.n - 1].x) - 2, '#8c5c34', 6);
+  }
+  spit(p, k) {
+    const q = this.q[this.n - 1], tf = 44, g = 0.14;
+    const vx = (p.cx - q.x) / tf + k * 0.7, vy = (p.cy - q.y) / tf - g * tf / 2;
+    W.spawn(new InkBlob(q.x, q.y, vx, vy));
+    Audio8.sfx('throw', q.x);
+  }
+  hitBoxes(out) {
+    if (!this.visible()) return;
+    const pad = this.state === 'stuck' ? 10 : 2; // der liegende Arm ist auch mit der waagrechten Peitsche zu treffen
+    for (let i = 1; i < this.n; i += 2) {
+      const q = this.q[i], r = this.radii[i];
+      if (q.up) out.push({ x: q.x - r - 2, y: q.y - r - pad, w: 2 * r + 4, h: 2 * r + pad + 2 });
+    }
+  }
+  touches(p) {
+    if (!this.visible()) return null;
+    for (let i = this.harm; i < this.n; i++) {
+      const q = this.q[i], r = this.radii[i] * 0.8;
+      if (q.up && q.x + r > p.x && q.x - r < p.x + p.w && q.y + r > p.y && q.y - r < p.y + p.h) return q;
+    }
+    return null;
+  }
+  drawWarn(ctx) { // Vorwarnungen: Schatten über der Aufschlagzone, Risse in den Planken, glühende Spitze
+    const b = this.b, cx = W.cam.x, cy = W.cam.y, pulse = 0.35 + 0.25 * Math.sin(b.t * 0.5);
+    if (this.state === 'aim') {
+      const xa = this.side < 0 ? b.ax : this.lockX - 22, xb = this.side < 0 ? this.lockX + 22 : b.ax + b.aw;
+      ctx.fillStyle = `rgba(150,30,110,${pulse.toFixed(2)})`;
+      for (let x = Math.floor(xa / 4) * 4; x < xb; x += 4) ctx.fillRect(Math.round(x - cx), Tent.floorAt(x) - 3 - cy, 4, 3);
+      ctx.fillStyle = `rgba(252,60,100,${(pulse + 0.2).toFixed(2)})`;
+      ctx.fillRect(Math.round(this.lockX - 3 - cx), Tent.floorAt(this.lockX) - 4 - cy, 6, 4);
+    }
+    if (this.state === 'aim' || this.state === 'coil') {
+      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(this.t * 0.6);
+      for (let i = this.n - 5; i < this.n; i += 2) Tent.fdisc(ctx, this.q[i].x - cx, this.q[i].y - cy, Math.round(this.radii[i] + 5), '#fc3c64');
+      ctx.globalAlpha = 1;
+    }
+    if (this.side === 0 && (this.state === 'warn' || this.hole > 0)) {
+      const fy = Tent.floorAt(this.bx) - cy, x = Math.round(this.bx - cx);
+      if (this.state === 'warn') {
+        const j = this.t & 2 ? 1 : 0;
+        ctx.fillStyle = `rgba(200,80,240,${pulse.toFixed(2)})`;
+        ctx.fillRect(x - 12, fy + 4, 24, 1); ctx.fillRect(x - 8 + j, fy + 9, 16, 1);
+        ctx.fillStyle = '#5c3418'; ctx.fillRect(x - 10, fy - 1 - j, 8, 2); ctx.fillRect(x + 3, fy - j, 7, 2);
+      } else {
+        ctx.globalAlpha = Math.min(1, this.hole * 2);
+        ctx.fillStyle = '#0c0410'; ctx.fillRect(x - 12, fy, 24, 8);
+        ctx.fillStyle = '#3c1c0c'; ctx.fillRect(x - 14, fy - 3, 3, 4); ctx.fillRect(x + 11, fy - 4, 3, 5); ctx.fillRect(x - 7, fy - 2, 2, 3); ctx.fillRect(x + 6, fy - 2, 2, 3);
+        ctx.fillStyle = '#a4743c'; ctx.fillRect(x - 14, fy - 3, 1, 2); ctx.fillRect(x + 11, fy - 4, 1, 2);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+  stamp(P) { // in den Puffer: Umriss, runder Schlauch, Saugnäpfe an der Unterseite
+    if (!this.visible()) return;
+    const cx = W.cam.x - Tent.M, cy = W.cam.y - Tent.M, n = this.n, Q = this.q, R = this.radii, S = [];
+    for (let i = 0; i < n - 1; i++) { // Stützpunkte dicht genug für glatte Ränder: dicke Glieder brauchen weniger (Bogenhöhe < 0,4 px)
+      const a = Q[i], c = Q[i + 1], k = Math.max(1, Math.ceil(Math.hypot(c.x - a.x, c.y - a.y) / Math.max(2, R[i] * 0.5)));
+      for (let j = 0; j < k; j++) {
+        const f = j / k, nx = a.nx + (c.nx - a.nx) * f, ny = a.ny + (c.ny - a.ny) * f, nl = Math.hypot(nx, ny) || 1;
+        S.push({ x: a.x + (c.x - a.x) * f - cx, y: a.y + (c.y - a.y) * f - cy, r: R[i] + (R[i + 1] - R[i]) * f, nx: nx / nl, ny: ny / nl, i });
+      }
+    }
+    const e = Q[n - 1]; S.push({ x: e.x - cx, y: e.y - cy, r: R[n - 1], nx: e.nx, ny: e.ny, i: n - 1 });
+    for (const s of S) Tent.flat(s.x, s.y, s.r + 1, P.o);
+    for (const s of S) Tent.shade(s.x, s.y, s.r, s.nx, s.ny, P);
+    for (let i = 1; i < n - 1; i++) { // Saugnäpfe
+      const q = Q[i], r = R[i];
+      if (r < 3.5) continue;
+      const sx = q.x - cx - q.nx * r * 0.6, sy = q.y - cy - q.ny * r * 0.6, sr = Math.max(1.2, r * 0.3);
+      Tent.flat(sx, sy, sr + 0.6, P.dd); Tent.flat(sx, sy, sr, P.k);
+      if (r >= 7) Tent.flat(sx, sy, sr * 0.45, P.kc);
+    }
+  }
+}
+
+// Tintenkugel: fliegt im Bogen, zerplatzt auf den Planken; die Peitsche schlägt sie weg
+class InkBlob extends EProj {
+  constructor(x, y, vx, vy) { super('ink', x, y, vx, vy, 0.14, 2); }
+  update() {
+    super.update();
+    if (this.dead) return;
+    if (this.t % 3 === 0) W.spawn(new Particle(this.cx + rnd(-1, 1), this.cy, 0, 0.1, this.t % 6 ? '#2c0c3c' : '#5c1c6c', 16, 2, 0));
+    if (this.vy > 0 && Phys.solidTile(Math.floor(this.cx / T), Math.floor((this.y + this.h) / T))) {
+      this.dead = true; Audio8.sfx('splash', this.cx);
+      for (let i = 0; i < 9; i++) W.spawn(new Particle(this.cx, this.y + this.h - 1, rnd(-1.8, 1.8), rnd(-2.2, -0.4), i % 2 ? '#2c0c3c' : '#7c2c98', 30, 2, 0.16));
+    }
+  }
+  draw(ctx) {
+    const x = Math.round(this.cx - W.cam.x), y = Math.round(this.cy - W.cam.y);
+    ctx.globalAlpha = 0.4 + 0.2 * Math.sin(this.t * 0.5); Tent.fdisc(ctx, x, y, 6, '#c050e0'); ctx.globalAlpha = 1; // lila Schimmer: vor dem Nachthimmel sichtbar
+    Tent.fdisc(ctx, x, y, 4, '#e8a0fc'); Tent.fdisc(ctx, x, y, 3, '#16041e'); Tent.fdisc(ctx, x + 1, y + 1, 1, '#4c1464');
+    ctx.fillStyle = '#e8a0fc'; ctx.fillRect(x - 2, y - 2, 2, 1); ctx.fillRect(x - 2, y - 1, 1, 1);
+  }
+}
+
+class TentacleBoss extends Boss {
+  constructor(ax, aw) {
+    super(ax + aw / 2 - 20, W.room.h * T - 90, 40, 40, 18, 2);
+    this.ax = ax; this.aw = aw; this.mini = true; this.sea = true; this.score = 5000;
+    this.nameKey = 'bossTentacle'; this.voice = 'tentacle';
+    this.deckY = (W.room.h - 2) * T; // Hauptdeck: Bezug für Höhen, damit die Arme auch über der erhöhten Back im Bild bleiben
+    this.arms = [new TentArm(this, -1, 28, 11, 14), new TentArm(this, 1, 28, 11, 14)];
+    this.burst = new TentArm(this, 0, 15, 9, 9);
+    this.turn = W.player.cx < ax + aw / 2 ? 1 : 0; // der Arm auf der anderen Seite taucht zuerst auf
+    this.gap = 0; this.inkCd = 110; this.burstCd = 150; this.ph2 = false;
+  }
+  all() { return [this.arms[0], this.arms[1], this.burst]; }
+  vulnerable() { return this.all().some(a => a.visible() && a.q.some(q => q.up)); }
+  hurtBoxes() { const out = []; for (const a of this.all()) a.hitBoxes(out); return out; }
+  hit(dmg, id) { // Funken am getroffenen Glied (dem Peitschenende am nächsten)
+    const p = W.player, hx = p.cx + p.face * 26, hy = p.cy - 4;
+    let best = null, bd = Infinity;
+    for (const b of this.hurtBoxes()) { const d = Math.hypot(b.x + b.w / 2 - hx, b.y + b.h / 2 - hy); if (d < bd) { bd = d; best = b; } }
+    if (best) { this.x = best.x + best.w / 2 - 20; this.y = best.y + best.h / 2 - 20; }
+    return super.hit(dmg, id);
+  }
+  done(arm) { // Angriff vorbei → der andere Arm ist dran
+    arm.go(this.ph2 ? 'idle' : 'retract');
+    this.turn = 1 - this.arms.indexOf(arm); this.gap = this.ph2 ? 30 : 40;
+  }
+  update() {
+    this.tick();
+    if (this.dying) return this.updateDeath();
+    const p = W.player;
+    if (!this.ph2 && this.hp <= this.maxHp / 2) { // Phase 2: beide Arme bleiben oben, Tinte, Durchbruch durch die Planken
+      this.ph2 = true; W.flash = 8; W.shake = Math.max(W.shake, 14); Audio8.sfx('roar'); Audio8.tempo(1.1); Input.rumble(0.6, 0.5, 400);
+      for (const a of this.arms) if (a.state === 'hidden' || a.state === 'retract') a.go('rise');
+    }
+    const A = this.arms[this.turn], B = this.arms[1 - this.turn];
+    if (this.state === 'intro') { if (this.timer >= 30) { A.go('rise'); this.state = 'fight'; } }
+    else {
+      if (A.state === 'hidden' && --this.gap <= 0) A.go('rise');
+      if (A.state === 'idle' && A.t > (this.ph2 ? 24 : 36) && --this.gap <= 0) A.go(Math.random() < 0.55 ? 'aim' : 'coil');
+      if (this.ph2) {
+        if (B.state === 'hidden') B.go('rise');
+        if (B.state === 'idle' && B.t > 30 && --this.inkCd <= 0) { B.go('spit'); this.inkCd = 140 + rnd(0, 60); }
+        if (this.burst.state === 'hidden' && this.burst.hole === 0 && --this.burstCd <= 0 && p.alive && p.onGround) {
+          this.burst.bx = clamp(p.cx, this.ax + 20, this.ax + this.aw - 20); this.burst.go('warn'); this.burstCd = 240 + rnd(0, 80);
+        }
+      }
+    }
+    for (const a of this.all()) a.update(p);
+    if (p.alive) for (const a of this.all()) { const q = a.touches(p); if (q) { p.hurt(this.dmg, q.x); break; } }
+    this.track();
+  }
+  track() { // Mittelpunkt (Zoom, Lebensbalken, Abspann) folgt dem sichtbaren Teil des aktiven Arms
+    const a = [this.arms[this.turn], ...this.all()].find(a => a.visible() && a.q.some(q => q.up));
+    if (!a) return;
+    let sx = 0, sy = 0, k = 0;
+    for (const q of a.q) if (q.up) { sx += q.x; sy += q.y; k++; }
+    this.x = sx / k - 20; this.y = sy / k - 20;
+  }
+  updateDeath() {
+    const d = this.dying++;
+    if (d === 1) {
+      W.slowmo = 50; W.flash = 14; W.shake = 26; Input.rumble(1, 1, 900); Audio8.sfx('roar');
+      for (const a of this.all()) if (a.visible() && a.side) a.go('thrash'); else if (a.visible()) a.go('retract');
+      if (W.kraken && W.kraken.t >= 0) W.kraken.t = Math.max(W.kraken.t, 300); // der Krake im Hintergrund schlägt ein letztes Mal und versinkt
+    }
+    if (d % 7 === 0 && d < 70) {
+      const hb = this.hurtBoxes();
+      if (hb.length) { const b = hb[Math.floor(Math.random() * hb.length)]; W.spawn(new Burst(b.x + b.w / 2, b.y + b.h / 2)); Audio8.sfx('explode', b.x); }
+    }
+    if (d === 70) for (const a of this.all()) if (a.visible()) a.go('retract');
+    if (d === 84 || d === 100) for (const a of this.arms) { W.splash(a.bx, W.room.h * T - 8); W.splash(a.bx + a.inward * 20, W.room.h * T - 8); }
+    for (const a of this.all()) a.update(W.player);
+    if (d >= 130) { this.dead = true; W.bossDefeated(this); }
+  }
+  draw(ctx) {
+    const fl = this.flash || (this.dying > 0 && this.dying < 70 && (this.dying & 4) > 0);
+    const P = fl ? Tent.PAL.flash : this.ph2 ? Tent.PAL.rage : Tent.PAL.base;
+    for (const a of this.all()) a.drawWarn(ctx);
+    Tent.buffer(View.w + 2 * Tent.M, 208 + 2 * Tent.M);
+    this.burst.stamp(P); this.arms[1 - this.turn].stamp(P); this.arms[this.turn].stamp(P); // der angreifende Arm liegt vorn
+    Tent.blit(ctx);
+  }
+}
+
+const BOSSES = { gbat: GiantBat, giant: GiantSkeleton, count: Count, tentacle: TentacleBoss };
