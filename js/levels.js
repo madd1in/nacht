@@ -228,6 +228,24 @@ const Levels = (() => {
     .zone('skull', 10, 56, { interval: 640, max: 1 })
     .start(2, 10).exit(62).done();
 
+  // Glasturm: senkrechter Aufstieg zum Thronsaal zwischen riesigen Buntglasfenstern (Treppen im Zickzack, zwei Aufzüge)
+  const vg = room(28, 'glass', 44)
+    .ground(0, 27)
+    .stair(6, 41, 5, 1).fill(11, 37, 18, 37, '=')
+    .stair(14, 36, 5, 1).fill(19, 32, 26, 32, '=')
+    .stair(24, 31, 5, -1).fill(10, 27, 19, 27, '=')
+    .elevator(8, 27, 19).fill(10, 19, 15, 19, '=')
+    .stair(12, 18, 5, 1).fill(17, 14, 25, 14, '=')
+    .stair(24, 13, 5, -1).fill(10, 9, 19, 9, '=')
+    .elevator(8, 9, 3).fill(10, 3, 16, 3, '=')
+    .statue(16, 26)
+    .candle(12, 35).candle(17, 35, 'H').candle(21, 30).candle(25, 30, '$').candle(11, 25, 'H').candle(18, 25)
+    .candle(11, 17, 'H').candle(19, 12, 'W').candle(24, 12).candle(12, 7, 'H').candle(17, 7).candle(13, 1, 'R')
+    .chest(22, 31, 'big')
+    .enemy('knight', 14, 26).enemy('ghost', 16, 34).enemy('ghost', 20, 6).enemy('bat', 22, 24).enemy('bat', 6, 15)
+    .zone('skull', 0, 27, { interval: 420, max: 1 })
+    .start(2, 41).exitAt(11, 0, 15, 2).done();
+
   const r32 = room(88, 'throne')
     .ground(0, 15).ground(26, 87)
     .grand(21, 0, 134, 0.3, 0.8)
@@ -241,7 +259,7 @@ const Levels = (() => {
   const STAGES = [
     { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
-    { name: 'DER BERGFRIED', music: 'stage3', time: 640, rooms: [r31, v3, vx, r32], boss: 'GRAF NACHTMAHR' },
+    { name: 'DER BERGFRIED', music: 'stage3', time: 780, rooms: [r31, v3, vx, vg, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
   return { STAGES };

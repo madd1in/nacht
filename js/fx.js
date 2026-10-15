@@ -30,8 +30,8 @@ const FX = (() => {
     return c;
   }
 
-  const AMB = { ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
-  const TINT = { ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
+  const AMB = { glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
+  const TINT = { glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
   const lc = Sprites.canvas(256, 208), lx = lc.getContext('2d');
   let vignette = null;
 
@@ -178,6 +178,7 @@ const FX = (() => {
   // ---------------- Umgebungspartikel ----------------
   let amb = [];
   const CFG = {
+    glass: { max: 26, rate: 0.25, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 208, vx: 0.05, vy: -0.08, life: 320, col: ['#fc7460', '#a4e4fc', '#fce0a8', '#c8a0fc'][Math.floor(Math.random() * 4)], kind: 'mote' }) }, // bunter Staub im Glaslicht
     ship: { max: 16, rate: 0.18, make: (c) => ({ x: c.x + View.w + 4, y: c.y + 96 + Math.random() * 100, vx: -1.5 - Math.random(), vy: -0.15, life: 260, col: '#c8e4fc', kind: 'spray' }) }, // Gischt im Wind
     courtyard: { max: 14, rate: 0.12, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + 110 + Math.random() * 60, vx: 0, vy: 0, life: 240, col: '#c8f818', kind: 'firefly' }) },
     hall: { max: 26, rate: 0.25, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 176, vx: 0.08, vy: 0.04, life: 300, col: '#fce0a8', kind: 'dust' }) },

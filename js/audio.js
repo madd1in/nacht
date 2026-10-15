@@ -519,6 +519,10 @@ const Audio8 = (() => {
       ambDrone(nodes, out, 'triangle', 73.4, 0.5); ambDrone(nodes, out, 'triangle', 110, 0.35); ambDrone(nodes, out, 'sine', 146.8, 0.2);
       ambLfo(nodes, out.gain, 0.05, 0.01);
       level = 0.022;
+    } else if (theme === 'glass') { // Glasturm: ferner Chor (A-Dur-Klang), schwebend
+      ambDrone(nodes, out, 'sine', 220, 0.5); ambDrone(nodes, out, 'sine', 277.2, 0.35); ambDrone(nodes, out, 'sine', 329.6, 0.3); ambDrone(nodes, out, 'triangle', 110, 0.3);
+      ambLfo(nodes, out.gain, 0.07, 0.008);
+      level = 0.018;
     } else if (theme === 'ship') { // Brandung: anschwellendes Wellenrauschen + Wind in der Takelage
       const lp = ambNoise(nodes, out, 'lowpass', 600);
       ambLfo(nodes, lp.frequency, 0.08, 380); ambLfo(nodes, out.gain, 0.08, 0.014);
@@ -549,6 +553,8 @@ const Audio8 = (() => {
     } else if (theme === 'cave' && Math.random() < 0.006) drip(null, 0.6);
     else if (theme === 'crypt' && Math.random() < 0.0025) { // ferne Ketten
       for (let i = 0; i < 5; i++) noise(0.05, 0.035, 'bandpass', 3000 + Math.random() * 2000, 0, t + i * 0.07 + Math.random() * 0.03);
+    } else if (theme === 'glass' && Math.random() < 0.003) { // Glas klingt
+      tone('sine', 1800 + Math.random() * 1600, 0, 0.5, 0.02, 0, t);
     } else if (theme === 'ship' && Math.random() < 0.004) { // Schiffsrumpf ächzt
       tone('sawtooth', 60 + Math.random() * 25, 45, 0.7, 0.03, 0, t);
     } else if (theme === 'hall' && Math.random() < 0.0015) { // Gebälk knarzt

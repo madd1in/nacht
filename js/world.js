@@ -403,7 +403,7 @@ const W = {
     }
 
     if (this.room.theme === 'courtyard') FX.updateFlock(View.w);
-    if (this.room.theme === 'courtyard' || this.room.theme === 'ship') FX.updateStorm(this.storm, View.w, () => {
+    if (this.room.theme === 'courtyard' || this.room.theme === 'ship' || this.room.theme === 'glass') FX.updateStorm(this.storm, View.w, () => {
       setTimeout(() => Audio8.sfx('thunder'), 150 + Math.random() * 700);
       Input.rumble(0.35, 0.15, 450); this.shake = Math.max(this.shake, 4);
     });
@@ -416,7 +416,7 @@ const W = {
     ctx.beginPath(); ctx.rect(0, 32, vw, 208); ctx.clip();
     ctx.translate(sx, 32 + sy);
     this.applyCamFx(ctx, vw);
-    const storm = theme === 'courtyard' || theme === 'ship' ? this.storm : null;
+    const storm = theme === 'courtyard' || theme === 'ship' || theme === 'glass' ? this.storm : null; // Glasturm: Blitze lassen die Fenster aufleuchten
     Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); if (theme === 'courtyard') FX.drawFlock(c); } : null);
     this.drawDoor(ctx);
     Tiles.drawTiles(ctx, this.room, this.cam, this.frame);

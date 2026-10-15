@@ -19,6 +19,7 @@ const Tiles = (() => {
     tower: { a: ['#c8c8c8', '#9a9a9a', '#6e6e6e', '#464646', '#141414'], b: ['#a4e4fc', '#3cbcfc', '#0078f8', '#0040a8', '#001038'] },
     throne: { a: ['#fce0a8', '#f8b800', '#a80020', '#680010', '#1c0008'], b: ['#e0d0fc', '#a088f8', '#6844fc', '#4428bc', '#120628'] },
     vortex: { a: ['#e8b8fc', '#a868d8', '#6c2c9c', '#401060', '#14041c'], b: ['#fca0cc', '#d84080', '#9c1c50', '#5c0c2c', '#1c0410'] },
+    glass: { a: ['#d0c8e0', '#a098b8', '#706888', '#484060', '#16101e'], b: ['#fce0a8', '#d8a838', '#a87000', '#684000', '#1c0c00'] },
     ship: { a: ['#e8b070', '#b87c44', '#8a5428', '#5a3214', '#1e0c04'], b: ['#dcb47c', '#a8783c', '#7a4c20', '#4a2a0c', '#160802'] },
   };
 
@@ -269,6 +270,26 @@ const Tiles = (() => {
       ctx.save(); ctx.imageSmoothingEnabled = false;
       ctx.translate(cx, ROSE.y); ctx.rotate(roseAng); ctx.drawImage(roseC, -h, -h);
       ctx.restore();
+    }
+  }
+
+  // Glasturm: Rosetten in den Spitzbögen drehen sich (Mode-7-Rotation), im selben Parallax-Raster wie die Fenster
+  let groseC = null, groseA = 0, groseF = 0;
+  function drawGlassRoses(ctx, cam, frame) {
+    const R = 32;
+    if (!groseC) { groseC = C(R * 2 + 2, R * 2 + 2); roseGlass(groseC.getContext('2d'), R + 1, R + 1, R); }
+    const df = frame - groseF; groseF = frame;
+    if (df > 0 && df < 10) groseA += df * 0.006;
+    const offX = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512, offY = ((Math.floor(cam.y * 0.5) % 208) + 208) % 208, h = groseC.width / 2;
+    for (let X = -offX; X < View.w + 512; X += 512) for (const ty of [-offY, 208 - offY]) {
+      [[254, 42, 1], [50, 150, -1]].forEach(([rx, ry, dir]) => {
+        const cx = X + rx, cy = ty + ry;
+        if (cx < -60 || cx > View.w + 60 || cy < -60 || cy > 270) return;
+        ctx.save(); ctx.imageSmoothingEnabled = false;
+        ctx.fillStyle = '#463c54'; ctx.beginPath(); ctx.arc(cx, cy, R + 3, 0, Math.PI * 2); ctx.fill();
+        ctx.translate(cx, cy); ctx.rotate(groseA * dir); ctx.drawImage(groseC, -h, -h);
+        ctx.restore();
+      });
     }
   }
 
@@ -601,6 +622,45 @@ const Tiles = (() => {
     const add = (name, c, par, extra = {}) => L.push({ name, c, par, wrap: c.width >= 512, ...extra });
     if (theme === 'vortex') {
       L.push({ name: 'tunnel', tunnel: true, par: 0, c: C(1, 1) });
+    } else if (theme === 'glass') { // Glasturm: fast nur riesige Buntglasfenster zwischen schlanken Maßwerk-Pfeilern
+      const c = C(512, 208), x = c.getContext('2d'), img = x.createImageData(512, 208), d = img.data;
+      const put = (X, Y, col) => { const i = (Y * 512 + X) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255; };
+      for (let Y = 0; Y < 208; Y++) for (let X = 0; X < 512; X++) put(X, Y, [12, 6, 18]);
+      const SETS = [ // Grund, Randband, Medaillon-Stern, Akzent
+        [[24, 48, 160], [160, 24, 40], [200, 144, 24], [164, 200, 248]],
+        [[150, 20, 40], [24, 48, 160], [200, 144, 24], [252, 200, 120]],
+        [[92, 40, 160], [200, 144, 24], [24, 128, 76], [200, 160, 248]],
+        [[24, 110, 70], [92, 40, 160], [160, 24, 40], [180, 248, 200]],
+        [[24, 48, 160], [200, 144, 24], [150, 20, 40], [164, 200, 248]],
+      ];
+      const LEAD = [10, 6, 16], STONE = [70, 60, 84];
+      [6, 108, 210, 312, 414].forEach((wx, wi) => {
+        const w = 88, wy = 4, h = 200, a = Math.round(w * 0.866), S = SETS[wi], mcx = wx + w / 2, mcy = wy + h * 0.56, mr = w * 0.34;
+        const inside = (X, Y) => Y >= wy && Y < wy + h && X >= wx && X < wx + w && (Y >= wy + a || ((X - wx - w) ** 2 + (Y - wy - a) ** 2 <= w * w && (X - wx) ** 2 + (Y - wy - a) ** 2 <= w * w)); // Spitzbogen
+        for (let Y = wy; Y < wy + h; Y++) for (let X = wx; X < wx + w; X++) {
+          if (!inside(X, Y)) continue;
+          const lx = X - wx, ly = Y - wy, row = Math.floor(ly / 12), gc = Math.floor((lx + (row % 2) * 4) / 8);
+          const md = Math.hypot(X - mcx, Y - mcy), tr = Math.hypot(X - mcx, Y - (wy + a * 0.62));
+          let col;
+          if (!inside(X - 2, Y) || !inside(X + 2, Y) || !inside(X, Y - 2) || !inside(X, Y + 2)) col = STONE;            // Steinrahmen
+          else if (!(inside(X - 9, Y) && inside(X + 9, Y) && inside(X, Y - 9) && inside(X, Y + 9))) col = ly % 10 === 0 ? LEAD : S[1]; // Randband
+          else if (Math.abs(md - mr) < 1.2 || Math.abs(tr - 9) < 1.2) col = LEAD;                                        // Bleiringe
+          else if (md < mr) { const an = Math.atan2(Y - mcy, X - mcx); col = md < 5 ? S[3] : Math.cos(an * 8) > 0.55 - (md / mr) * 0.4 ? S[2] : S[1]; } // Medaillon mit Stern
+          else if (tr < 9) col = S[2];                                                                                  // Rundfenster im Bogen
+          else if (ly % 12 === 0 || (lx + (row % 2) * 4) % 8 === 0) col = LEAD;                                         // Bleiruten
+          else { const hs = (row * 31 + gc * 17 + wi * 7) % 11; col = hs < 2 ? S[3] : hs < 4 ? S[1] : S[0]; }            // Scheiben
+          if (col !== LEAD && col !== STONE) { // Mondlicht von hinten: Mitte hell, Ränder dunkler
+            const k = 0.62 + 0.38 * Math.sin(Math.PI * lx / w) * (0.75 + 0.25 * Math.sin(Math.PI * ly / h)) + (bay(X, Y) - 0.5) * 0.16;
+            col = [Math.min(255, col[0] * k), Math.min(255, col[1] * k), Math.min(255, col[2] * k)];
+          }
+          put(X, Y, col);
+        }
+      });
+      x.putImageData(img, 0, 0);
+      [0, 100, 202, 304, 406, 508].forEach(cx => { px(x, '#1c1424', cx - 4, 0, 12, 208); px(x, '#3c3048', cx - 2, 0, 2, 208); px(x, '#080410', cx + 6, 0, 2, 208); }); // Pfeiler
+      px(x, '#2c2438', 0, 204, 512, 4); px(x, '#4c4058', 0, 204, 512, 1); // Gesims zwischen den Fensterreihen
+      add('wall', c, 0.5, { vtile: true });
+      L.push({ name: 'roses', custom: drawGlassRoses, par: 0.5, c: C(1, 1) });
     } else if (theme === 'ship') { // nachts auf See: Sturmhimmel, Blutmond, Burg auf der Klippe, Meer, Takelage
       const sky = C(640, 208), x = sky.getContext('2d');
       smooth(x, 640, 208, ['#000000', '#02020c', '#060818', '#0c0e26', '#141436', '#1e1a44', '#2a1e4c', '#3a2250', '#4a2450']);
@@ -829,7 +889,7 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), ship: () => planks(p.a, { hull: true }) }[theme];
+    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => stone(p.a, o), ship: () => planks(p.a, { hull: true }) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
       : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true })) : ground;

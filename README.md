@@ -22,7 +22,8 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 ## Inhalt
 
 - **2 Helden**: Henrik (Peitsche) und Ragnor, Barbar aus dem Norden (Breitschwert + Wurfseil)
-- **3 Stages, 11 Räume** inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
+- **3 Stages, 12 Räume** inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
+- **Glasturm** vor dem Thronsaal: senkrechter Aufstieg zwischen riesigen gotischen Buntglasfenstern – drehende Rosetten (Mode 7), farbige Lichtbahnen, Blitze lassen das Glas aufleuchten, ferner Chor
 - **Ankunft per Schiff** (wie in Bloodstained): hohe Galeone im Sturm – über Strickleitern hinauf in die Takelage bis in den Mastkorb, mit **Seilrutschen** von Mast zu Mast; Fischmenschen entern von See aus, **Seeadler** stoßen im Sturzflug herab; eigenes Seemannslied im 6/8-Takt – am Bug „Land in Sicht!“, das Schiff kracht an die Mole und die Laufplanke fällt
 - **Mode-7-Seegang**: das ganze Bild rollt und stampft mit dem Schiff (Drehpunkt an der Wasserlinie – oben im Mast schwankt es stärker), riesige Segel blähen sich zeilenweise im Wind (HDMA) samt Blutmond-Wappen
 - **Mode-7-Ozean**: perspektivisches Meer mit Höhenfeld – Dünungsberge rollen heran, eine Monsterwelle türmt sich über den Horizont, ein Riesenkrake reckt seine Fangarme aus dem Wasser
