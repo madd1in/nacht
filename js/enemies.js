@@ -329,6 +329,42 @@ class Bat extends Enemy {
   }
 }
 
+// ---------------- Seeadler (Schiff): gleitet heran, stößt im Sturzflug herab, steigt wieder auf ----------------
+class SeaEagle extends Enemy {
+  constructor(x, y, dir) { super(x, y, 18, 10, 2, 2, 300); this.dir = dir; this.face = dir; this.state = 'glide'; this.vx = dir * 1.5; this.vy = 0; this.t = 0; }
+  update() {
+    super.update();
+    const p = W.player;
+    if (this.state === 'glide') {
+      this.x += this.vx; this.y += Math.sin(this.t * 0.06) * 0.4;
+      const dx = p.cx - this.cx;
+      if (this.t > 30 && p.alive && Math.sign(dx) === this.dir && Math.abs(dx) < 96 && p.cy > this.cy + 18) { // Ziel erfasst: Sturzflug
+        this.state = 'dive'; this.t = 0;
+        const a = Math.atan2(p.cy - 4 - this.cy, dx);
+        this.vx = Math.cos(a) * 3.3; this.vy = Math.sin(a) * 3.3;
+        Audio8.sfx('eagle', this.cx);
+      }
+    } else if (this.state === 'dive') {
+      this.vy += 0.03; this.x += this.vx; this.y += this.vy;
+      if (this.t > 55 || this.cy > p.cy + 8) { this.state = 'climb'; this.t = 0; }
+    } else { // abdrehen und wieder steigen
+      this.vx = clamp(this.vx + this.dir * 0.07, -2.6, 2.6); this.vy = Math.max(this.vy - 0.18, -2.4);
+      this.x += this.vx; this.y += this.vy;
+    }
+    if (this.vx) this.face = Math.sign(this.vx);
+    this.touch();
+    if (this.t > 60 && !this.onScreen(60)) this.dead = true;
+  }
+  kill(silent) {
+    super.kill(silent);
+    if (!silent) for (let i = 0; i < 10; i++) W.spawn(new Particle(this.cx + rnd(-6, 6), this.cy + rnd(-4, 4), rnd(-1.2, 1.2), rnd(-1.6, -0.2), i % 3 ? '#b0602c' : '#fcfcfc', 70, 2, 0.03)); // Federn
+  }
+  draw(ctx) {
+    const E = Sprites.S.eagle, s = this.state === 'dive' ? E[0] : E[[0, 1, 2, 1][Math.floor(this.t / 6) % 4]];
+    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.cy - s.h / 2 - W.cam.y), this.face > 0, this.flash);
+  }
+}
+
 class Skull extends Enemy {
   constructor(x, y, dir) { super(x, y, 12, 12, 1, 3, 300); this.dir = dir; this.face = dir; this.baseY = y; }
   update() {
@@ -544,6 +580,10 @@ class Spawner {
     const side = Math.random() < 0.5 ? 1 : -1;
     const x = side > 0 ? c.x + View.w + 2 : c.x - 14;
     return new Skull(x, clamp(p.y + rnd(-14, 10), c.y + 24, c.y + 170), -side);
+  }
+  spawn_eagle(p, c) { // Seeadler kommt hoch oben vom Bildrand
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    return new SeaEagle(dir > 0 ? c.x - 24 : c.x + View.w + 6, c.y + rnd(14, 46), dir);
   }
   spawn_sea(p, c) { // Schiff: Fischmenschen springen aus dem Meer über die Reling an Deck
     const deck = W.room.h - 2;

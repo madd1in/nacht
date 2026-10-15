@@ -165,6 +165,50 @@ class Chest extends Ent {
   draw(ctx) { Sprites.draw(ctx, Sprites.S.chest[this.opened ? 1 : 0], Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y)); }
 }
 
+// ---------------- Seilrutsche (Schiff): im Sprung ans Seil greifen oder am Start „hoch“ drücken ----------------
+class Zipline extends Ent {
+  constructor(d) {
+    super(Math.min(d.x0, d.x1) * T, Math.min(d.y0, d.y1) * T - 40, Math.abs(d.x1 - d.x0) * T + 16, Math.abs(d.y1 - d.y0) * T + 40);
+    this.kind = 'prop'; this.t = 0; this.cool = 0;
+    this.x0 = d.x0 * T + 8; this.y0 = d.y0 * T - 34; this.x1 = d.x1 * T + 8; this.y1 = d.y1 * T - 34; // Seil auf Handhöhe
+    this.dir = Math.sign(this.x1 - this.x0) || 1;
+    this.len = Math.hypot(this.x1 - this.x0, this.y1 - this.y0);
+    this.slope = (this.y1 - this.y0) / this.len;
+    this.sag = Math.min(14, this.len * 0.05);
+  }
+  at(s) { return [this.x0 + (this.x1 - this.x0) * s, this.y0 + (this.y1 - this.y0) * s + Math.sin(s * Math.PI) * this.sag]; }
+  update() {
+    this.t++;
+    if (this.cool > 0) { this.cool--; return; }
+    const p = W.player;
+    if (!p.alive || p.state !== 'normal') return;
+    const s = (p.cx - this.x0) / (this.x1 - this.x0);
+    if (s < -0.12 || s > 0.94) return; // am Start etwas Spielraum vor der Rolle
+    const ry = this.at(Math.max(0, s))[1], hy = p.feet - 34;
+    this.near = p.onGround && s < 0.12 && Math.abs(hy - ry) < 10;
+    if ((!p.onGround && p.vy > -0.6 && Math.abs(hy - ry) < 7) || (this.near && Input.pressed.up)) {
+      p.state = 'zip'; p.zip = { line: this, s: Math.max(0, s), v: 1.2 }; p.atkT = 0; p.dangle = false; p.setCrouch(false);
+      p.onGround = false; p.vx = 0; p.vy = 0; this.near = false;
+      Audio8.sfx('latch'); Input.rumble(0.25, 0.2, 100);
+    }
+  }
+  draw(ctx) {
+    const cx = W.cam.x, cy = W.cam.y, n = Math.ceil(this.len / 2);
+    for (let k = 0; k <= n; k++) {
+      const [x, y] = this.at(k / n);
+      ctx.fillStyle = k % 3 ? '#8c7450' : '#c8b088'; ctx.fillRect(Math.round(x - cx), Math.round(y - cy), 2, 1);
+    }
+    [[this.x0, this.y0], [this.x1, this.y1]].forEach(([x, y]) => { // Rollen
+      ctx.fillStyle = '#2c1808'; ctx.fillRect(Math.round(x - cx) - 3, Math.round(y - cy) - 3, 6, 6);
+      ctx.fillStyle = '#c8a040'; ctx.fillRect(Math.round(x - cx) - 1, Math.round(y - cy) - 1, 2, 2);
+    });
+    if (this.near && (this.t & 16)) { // Hinweis: „hoch“ drücken
+      const X = Math.round(this.x0 - cx), Y = Math.round(this.y0 - cy) - 12;
+      ctx.fillStyle = '#fce0a8'; for (let i = 0; i < 4; i++) ctx.fillRect(X - i, Y + i, 1 + i * 2, 1);
+    }
+  }
+}
+
 // ---------------- Frachtkiste „UPEL“ – Gruß an Infernax (Alcedors Heimat) ----------------
 class Cargo extends Ent {
   constructor(d) { super(d.x * T - 6, (d.y + 1) * T - 22, 28, 22); this.kind = 'candle'; }

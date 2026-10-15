@@ -127,7 +127,7 @@ const Mode7 = (() => {
   // Riesenkrake: Fangarme als Kette perspektivischer Scheiben, mit Tiefenpuffer gegen die Wellen verdeckt.
   // k = { t, arms: [{ u (relativ zur Blickmitte), z, len, ph }] }; t: 0–90 auftauchen, 330–364 zuschlagen, ab 370 versinken
   const SKIN = [92, 28, 68], SKIN_HI = [160, 72, 120], SUCK = [232, 180, 200];
-  function drawTentacles(buf, zb, tw, u0, k, light) {
+  function drawTentacles(buf, zb, tw, u0, k, light, CAM) {
     const r = Math.min(1, k.t / 90), rise = r * r * (3 - 2 * r);
     const a = k.t > 330 ? Math.min(1, (k.t - 330) / 34) : 0, ang = a * a * 1.45, sink = k.t > 370 ? (k.t - 370) / 50 : 0;
     for (const arm of k.arms) {
@@ -138,7 +138,7 @@ const Mode7 = (() => {
         const dz = Math.cos(s * 2 + k.t * 0.03 + arm.ph) * 6 * s;
         const h2 = h * Math.cos(ang) - sink * arm.len, z2 = arm.z + dz - h * Math.sin(ang);
         if (z2 < OC_Z0) continue;
-        const cx = tw / 2 + ((arm.u + du) / z2) / 0.95 * (tw / 2) - 0.5, cy = OC_HOR + (OC_CAM - h2) * OC_F / z2;
+        const cx = tw / 2 + ((arm.u + du) / z2) / 0.95 * (tw / 2) - 0.5, cy = OC_HOR + (CAM - h2) * OC_F / z2;
         const R = ((1 - s * 0.85) * 6 + 1) * OC_F / z2, fog = Math.min(1, (z2 - OC_Z0) / (OC_Z1 - OC_Z0) * 1.25);
         const cSkin = mixC(SKIN, OC_FOG, fog, light), cHi = mixC(SKIN_HI, OC_FOG, fog, light), cSuck = mixC(SUCK, OC_FOG, fog, light);
         const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(tw - 1, Math.ceil(cx + R)), y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(OC_H - 1, Math.ceil(cy + R));
@@ -159,6 +159,7 @@ const Mode7 = (() => {
     if (!ocZ || ocZ.lo !== lo) { ocZ = []; for (let z = OC_Z0; z < OC_Z1; z = z * (lo ? 1.035 : 1.022) + 0.6) ocZ.push(z); ocZ.lo = lo; }
     const buf = OC.buf, zb = ocZB; buf.fill(0); zb.fill(1e9);
     const calm = o.calm === undefined ? 1 : o.calm, A = 30 * (0.3 + 0.7 * calm), light = o.flash ? 1.7 : 1;
+    const CAM = OC_CAM + (o.lift || 0), HY = o.horizon || 122; // höherer Standpunkt → flacherer Blick aufs Meer
     const rv = o.rogue || 0, AR = rv ? 80 * Math.sqrt(Math.max(0, 1 - rv / 430)) : 0;
     const u0 = (o.camX || 0) * 0.06 + (o.sail || 0) * 0.8, moonX = (w - 92) / sx;
     const fogFill = mixC(OC_FOG, OC_FOG, 0, light);
@@ -170,7 +171,7 @@ const Mode7 = (() => {
         const s = (Math.sin(z * 0.045 + t * 0.035 + Math.sin(u * 0.012 + z * 0.004) * 1.2) + 1) * 0.5, s3 = s * s * s;
         let h = s3 * A + Math.sin(u * 0.06 + z * 0.03 - t * 0.05) * 3 + Math.sin(u * 0.11 - z * 0.07 + t * 0.08) * 1.5, rog = 0;
         if (AR) { const d = z - rv, q = d / (d < 0 ? 8 : 22); rog = Math.exp(-q * q) * (0.8 + 0.2 * Math.cos(u * 0.02 + t * 0.01)); h += rog * AR; } // steile Front, langer Rücken
-        const sy = Math.floor(OC_HOR + (OC_CAM - h) * OC_F / z);
+        const sy = Math.floor(OC_HOR + (CAM - h) * OC_F / z);
         if (sy >= ymin) continue;
         const fog = Math.min(1, (z - OC_Z0) / (OC_Z1 - OC_Z0) * 1.25), crest = Math.max(s3 * (1 - rog * 0.5), Math.pow(rog, 3) * 0.97); // Monsterwelle: unten dunkel, oben heller, weiße Krone
         const cs = [mixC(OC_DEEP, OC_FOG, fog, light), mixC(OC_MID, OC_FOG, fog, light), mixC(OC_HI, OC_FOG, fog * 0.8, light), mixC(OC_FOAM, OC_FOG, fog * 0.6, light)];
@@ -185,10 +186,10 @@ const Mode7 = (() => {
       }
       for (let y = OC_HOR; y < ymin; y++) { buf[y * tw + x] = fogFill; zb[y * tw + x] = OC_Z1; } // Meer bis zum Horizont im Dunst
     }
-    if (o.kraken && o.kraken.t >= 0) drawTentacles(buf, zb, tw, u0, o.kraken, light);
+    if (o.kraken && o.kraken.t >= 0) drawTentacles(buf, zb, tw, u0, o.kraken, light, CAM);
     OC.x.putImageData(OC.img, 0, 0);
     ctx.save(); ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(OC.c, 0, 0, tw, OC_H, 0, 122 - OC_HOR * 2, tw * sx, OC_H * 2);
+    ctx.drawImage(OC.c, 0, 0, tw, OC_H, 0, HY - OC_HOR * 2, tw * sx, OC_H * 2);
     ctx.restore();
   }
 

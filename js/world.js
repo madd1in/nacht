@@ -8,7 +8,7 @@ const W = {
   camLock: false, camTarget: null, boss: null, arenaOn: false, arenaX: 0, arenaW: 0,
   freeze: 0, hitstop: 0, shake: 0, flash: 0, cleared: false, lightning: 0, lightningCD: 300,
   checkpoint: null, crash: null, exiting: false, storm: { cd: 100, flash: 0, bolt: null },
-  sail: 0, sailX: 0, roll: 0, docked: 0, dockT: 0, rogue: null, kraken: null,
+  sail: 0, sailX: 0, roll: 0, rollAmp: 0, heave: 0, docked: 0, dockT: 0, rogue: null, kraken: null, gust: 0,
   combo: { n: 0, t: 0, best: 0 }, look: 0, cinema: 0, slowmo: 0, bossEnraged: false, vortexBg: 0,
 
   get stageDef() { return Levels.STAGES[this.stage]; },
@@ -25,7 +25,7 @@ const W = {
     this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
     if (this.bloodT > 0) { this.bloodT = 0; Audio8.tempo(1); }
     this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200;
-    this.sail = def.dock ? 1 : 0; this.roll = 0; this.docked = 0; this.dockT = 0; this.rogue = null; this.kraken = null;
+    this.sail = def.dock ? 1 : 0; this.roll = 0; this.rollAmp = 0; this.heave = 0; this.docked = 0; this.dockT = 0; this.rogue = null; this.kraken = null; this.gust = 0;
     this.spawners = def.zones.map(z => new Spawner(z));
     const torch = def.theme === 'courtyard';
     def.ents.forEach(d => {
@@ -41,6 +41,7 @@ const W = {
         case 'statue': this.spawn(new Statue(d)); break;
         case 'chest': this.spawn(new Chest(d)); break;
         case 'cargo': this.spawn(new Cargo(d)); break;
+        case 'zip': this.spawn(new Zipline(d)); break;
         case 'platform': this.platforms.push(this.spawn(new Platform(d.x, d.x1, d.y))); break;
         case 'chandelier': this.platforms.push(this.spawn(new Chandelier(d))); break;
         case 'pendulum': this.spawn(new Pendulum(d)); break;
@@ -102,9 +103,16 @@ const W = {
       z = 1 + zf.amp * Math.sin(Math.min(1, zf.t / zf.len) * Math.PI);
       if (zf.b) { px = clamp(zf.b.cx - this.cam.x, 40, vw - 40); py = clamp(zf.b.cy - this.cam.y, 40, 168); }
     }
-    if (!rot && z === 1) return;
-    const cover = 1 + Math.abs(rot) * (vw / 208 + 0.3); // leicht vergrößern, damit keine Ecken frei werden
-    ctx.translate(px, py); ctx.rotate(rot); ctx.scale(z * cover, z * cover); ctx.translate(-px, -py);
+    const heave = this.heave || 0;
+    if (!rot && z === 1 && !heave) return;
+    let cover = 1 + Math.abs(rot) * (vw / 208 + 0.3), hx = 0; // leicht vergrößern, damit keine Ecken frei werden
+    if (this.room.theme === 'ship') {
+      // Mode-7-Affintransformation: Rollen um einen Punkt an der Wasserlinie (oben im Mast schwankt das Bild weiter),
+      // dazu Stampfen; die Vergrößerung richtet sich nach dem Ausschlag, nicht nach dem Augenblick – sonst pumpt das Bild
+      hx = -Math.sin(this.roll) * clamp(this.room.h * T - this.cam.y - 104, 0, 380) * 0.3;
+      cover = 1 + (this.rollAmp * 1.2 + Math.abs(this.sway.a)) * (vw / 208 + 0.3) + (this.rollAmp * 380 * 0.3 * 2) / vw + Math.abs(heave) * 2 / 208;
+    }
+    ctx.translate(px + hx, py + heave); ctx.rotate(rot); ctx.scale(z * cover, z * cover); ctx.translate(-px, -py);
   },
 
   // Schiff: Rollen im Seegang, Fahrt (Meer und Wolken ziehen vorbei), Gischt, Knarzen.
@@ -112,8 +120,10 @@ const W = {
   updateShip() {
     const d = this.room.dock, p = this.player;
     this.sailX += 0.55 * this.sail;
-    const amp = 0.0105 * (0.3 + 0.7 * this.sail);
-    this.roll = Math.sin(this.frame * 0.011) * amp + Math.sin(this.frame * 0.029 + 1) * amp * 0.25;
+    const k = 0.2 + 0.8 * this.sail; // auf See stark, im Hafen ruhig
+    this.rollAmp = 0.03 * k;
+    this.roll = Math.sin(this.frame * 0.0166) * this.rollAmp + Math.sin(this.frame * 0.041 + 1) * this.rollAmp * 0.2;
+    this.heave = Math.sin(this.frame * 0.0332 + 0.6) * 3.5 * k; // Stampfen: das Bild hebt und senkt sich
     if (d && !this.docked && p.alive && p.cx > d.x * T) { this.docked = 1; this.dockT = 0; Game.shout('landHo'); Audio8.sfx('bell'); }
     if (this.docked) {
       this.dockT++;
@@ -133,6 +143,8 @@ const W = {
       for (let i = 0; i < 8; i++) this.spawn(new Particle(x + rnd(-8, 8), y, rnd(-1, 1), rnd(-4.2, -1.8), i % 2 ? '#a4b4e4' : '#5c6cb0', 36, 2, 0.2));
     }
     if (Math.random() < 0.0025) Audio8.sfx('creak');
+    if (this.gust > 0.01) this.gust *= 0.975; else this.gust = 0; // Böe: Segel reißen kurz weiter auf
+    if (this.sail > 0.5 && Math.random() < 0.0028) { this.gust = 1; Audio8.sfx('whoosh'); }
     // Monsterwelle: baut sich am Horizont auf, rollt heran und bricht über die Reling
     // Riesenkrake: drei Fangarme tauchen hinter dem Schiff auf, peitschen und schlagen aufs Wasser
     const K = this.kraken || (this.kraken = { t: -1, cd: 300, arms: [] });

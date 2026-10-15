@@ -127,6 +127,7 @@ const Audio8 = (() => {
     orb: () => arp(['a4', 'c#5', 'e5', 'a5', 'c#6', 'e6', 'a6'], 0.06, 'pulse', 0.15, 0.5),
     teleport: () => tone('pulse', 200, 1600, 0.35, 0.12, 0.125),
     rise: () => noise(0.4, 0.15, 'lowpass', 400, 1200),
+    eagle: () => { tone('pulse', 2400, 1300, 0.28, 0.07, 0.125); tone('pulse', 1800, 1100, 0.22, 0.05, 0.25); }, // Adlerschrei
     bat: () => tone('pulse', 2400, 1800, 0.05, 0.05, 0.125),
     roar: () => { noise(1.4, 0.55, 'lowpass', 900, 90); tone('pulse', 140, 50, 1.2, 0.22, 0.5); tone('triangle', 90, 40, 1.3, 0.4); },
     beat: () => { if (!ac) return; const t = ac.currentTime; tone('triangle', 75, 38, 0.14, 0.6, 0, t); tone('triangle', 70, 36, 0.12, 0.45, 0, t + 0.19); },

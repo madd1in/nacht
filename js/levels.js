@@ -49,7 +49,10 @@ const Levels = (() => {
       exitAt(x0, y0, x1, y1) { r.exit = { x0, y0, x1, y1 }; r.door = { x: x0 + 1 }; return api; },
       arena(boss) { r.arena = { boss }; return api; },
       // Schiff: Masten (Kachel-x), Steuerrad, Anlegen (ab Spieler-x legt das Schiff an, Laufplanke x0..x1 in Reihe row)
-      masts(...xs) { r.masts = xs; return api; },
+      // Mast: x (Kachel, Mitte), Mastkopf-Reihe, Rah-Reihen von oben nach unten, Segel-Index mit Wappen
+      mast(x, top, yards, emblem = -1) { (r.masts || (r.masts = [])).push({ x, top, yards, emblem }); return api; },
+      // Seilrutsche: Start (x0, Standreihe r0) oben → Ziel (x1, Standreihe r1)
+      zip(x0, r0, x1, r1) { r.ents.push({ type: 'zip', x0, y0: r0, x1, y1: r1 }); return api; },
       wheel(x, y) { r.wheel = { x, y }; return api; },
       dock(x, x0, x1, row) { r.dock = { x, x0, x1, row }; return api; },
       music(name) { r.music = name; return api; },
@@ -70,22 +73,34 @@ const Levels = (() => {
   // Galeone im Sturm: Achterdeck mit Steuerrad, Hauptdeck (Fischmenschen springen aus dem Meer an Bord),
   // Wanten hoch zur Rah, Back. Am Bug ruft der Ausguck „Land in Sicht!", das Schiff kracht an die Mole,
   // die Laufplanke fällt – an Land geht es weiter zum Burghof.
-  const r10 = room(96, 'ship')
-    .ground(0, 73)
-    .fill(0, 8, 10, 10, '#').stair(13, 10, 3, -1)
-    .fill(17, 9, 18, 10, '=')
-    .stair(26, 10, 5, 1).fill(31, 6, 37, 6, '=')
-    .fill(47, 9, 48, 10, '=')
-    .stair(57, 10, 3, 1).fill(60, 8, 73, 10, '#')
-    .fill(81, 8, 95, 8, '#').fill(83, 9, 83, 12, '#').fill(88, 9, 88, 12, '#').fill(93, 9, 93, 12, '#')
-    .masts(21, 34.5, 66.5).wheel(6, 8)
-    .candle(4, 6).candle(8, 6, 'W').candle(15, 9, 'H').candle(23, 9).candle(32, 4, 'H').candle(36, 4, '1')
-    .candle(41, 9).candle(45, 9, '$').candle(53, 9, 'H').candle(63, 6).candle(70, 6, 'H').candle(86, 6).candle(91, 6, 'W')
-    .enemy('skel', 44, 10).enemy('skel', 69, 7).enemy('bat', 20, 3).enemy('bat', 52, 2).enemy('raven', 34, 5)
-    .cargo(51, 10) // Frachtkiste „UPEL“ – Gruß an Infernax
+  const r10 = room(96, 'ship', 34)
+    .ground(0, 73)                                                     // Hauptdeck (Oberkante Reihe 32)
+    .fill(0, 29, 10, 31, '#').stair(13, 31, 3, -1)                     // Achterdeck
+    .fill(17, 30, 18, 31, '=').fill(47, 30, 48, 31, '=')               // Frachtkisten
+    .stair(57, 31, 3, 1).fill(60, 29, 73, 31, '#')                     // Back (Vorschiff)
+    .fill(81, 29, 95, 29, '#').fill(83, 30, 83, 33, '#').fill(88, 30, 88, 33, '#').fill(93, 30, 93, 33, '#') // Mole auf Pfählen
+    // Takelage: Wanten hoch in den Besan, Seilrutsche zum Großmast, hinauf in den höchsten Mastkorb, lange Rutsche zur Fock
+    .stair(9, 28, 5, 1).fill(14, 24, 26, 24, '=')                      // Besan: untere Rah
+    .stair(26, 23, 5, -1).fill(15, 19, 21, 19, '=')                    // obere Rah
+    .stair(15, 18, 5, 1).fill(20, 14, 23, 14, '=')                     // Mastkorb
+    .zip(23, 14, 35, 18)
+    .fill(33, 18, 44, 18, '=')                                         // Großmast: untere Rah
+    .stair(44, 17, 5, -1).fill(33, 13, 39, 13, '=')                    // Mittelrah
+    .stair(34, 12, 5, 1).fill(39, 8, 42, 8, '=')                       // Großmastkorb, ganz oben
+    .zip(42, 8, 62, 23)
+    .fill(61, 23, 72, 23, '=')                                         // Fock-Rah
+    .mast(20.5, 6, [14, 19, 24]).mast(38.5, 1, [8, 13, 18, 26], 2).mast(66.5, 10, [16, 23, 27]).wheel(6, 29)
+    .candle(4, 27).candle(8, 27, 'W').candle(15, 30, 'H').candle(23, 30).candle(41, 30).candle(45, 30, '$').candle(53, 30, 'H')
+    .candle(16, 22).candle(25, 22, 'H').candle(17, 17).candle(21, 12, 'W')
+    .candle(36, 16, 'H').candle(43, 16).candle(35, 11).candle(40, 6, 'R').candle(42, 6, 'H')
+    .candle(64, 21).candle(70, 21, '1').candle(63, 27).candle(70, 27, 'H').candle(86, 27).candle(91, 27, 'W')
+    .enemy('skel', 44, 31).enemy('skel', 69, 28).enemy('bat', 28, 10).enemy('bat', 50, 6).enemy('bat', 30, 22)
+    .enemy('raven', 17, 18).enemy('raven', 66, 22).enemy('ghost', 52, 14)
+    .cargo(51, 31) // Frachtkiste „UPEL“ – Gruß an Infernax
     .zone('sea', 14, 56, { interval: 150, max: 2 })
-    .dock(62, 74, 80, 8).music('sea')
-    .start(3, 7).exit(94).noDoor().done();
+    .zone('eagle', 6, 72, { interval: 300, max: 1 })
+    .dock(62, 74, 80, 29).music('sea')
+    .start(3, 28).exit(94).noDoor().done();
 
   // ======================= STAGE 1: Der Burghof =======================
   const r11 = room(72, 'courtyard')
@@ -224,7 +239,7 @@ const Levels = (() => {
     .start(2, 10).arena('count').done();
 
   const STAGES = [
-    { name: 'DER BURGHOF', music: 'stage1', time: 520, rooms: [r10, r11, v1, r12], boss: 'RIESENFLEDERMAUS' },
+    { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
     { name: 'DER BERGFRIED', music: 'stage3', time: 640, rooms: [r31, v3, vx, r32], boss: 'GRAF NACHTMAHR' },
   ];

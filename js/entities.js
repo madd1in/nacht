@@ -175,6 +175,7 @@ class Player {
     if (this.inv > 0 || !this.alive || W.cleared || Game.state === 'demo') return; // Demo: unverwundbar
     this.dangle = false; W.combo.n = 0; W.combo.t = 0; W.stats.hits++;
     if (this.state === 'swing') { this.state = 'normal'; this.ring = null; }
+    if (this.state === 'zip') { this.zip.line.cool = 40; this.state = 'normal'; this.zip = null; }
     this.hp -= dmg;
     Audio8.sfx('hurt'); Input.rumble(0.45, 0.7, 200);
     if (this.hp <= 0) { this.hp = 0; this.die(); return; }
@@ -220,6 +221,7 @@ class Player {
     this.recordTrail();
 
     if (this.state === 'swing') return this.updateSwing(I, P);
+    if (this.state === 'zip') return this.updateZip(P);
     if (this.state === 'stairs') return this.updateStairs(I, P);
     if (this.state === 'toStair') return this.updateToStair(I);
 
@@ -481,6 +483,22 @@ class Player {
     if (jump) { this.flipT = FLIP_LEN; Audio8.sfx('djump'); W.puff(this.cx, this.feet); }
   }
 
+  // ---------- Seilrutsche: am Seil schräg hinab, immer schneller; Sprung = abspringen ----------
+  updateZip(P) {
+    const z = this.zip, L = z.line;
+    z.v = Math.min(z.v + 0.09 * L.slope + 0.02, 4.6);
+    z.s += z.v / L.len;
+    const [hx, hy] = L.at(Math.min(1, z.s));
+    this.x = hx - this.w / 2; this.y = hy + 34 - this.h; this.face = L.dir;
+    if (W.frame % 9 === 0) { Audio8.sfx('whoosh'); W.sparks(hx, hy, 2); }
+    if (P.jump || z.s >= 1) {
+      L.cool = 30; this.state = 'normal'; this.zip = null; this.onGround = false; this.jumping = true; this.canDouble = true; this.flingT = 40;
+      this.vx = L.dir * Math.min(z.v, 3); this.vy = P.jump ? -4.2 : -1.2;
+      if (P.jump) { this.flipT = FLIP_LEN; Audio8.sfx('djump'); W.puff(this.cx, this.feet); }
+    }
+    this.clampRoom();
+  }
+
   // ---------- Peitsche drehen (Taste halten) / Schwertwirbel ----------
   startDangle() {
     this.dangle = true; this.dT = 0; this.dAngV = 0;
@@ -561,7 +579,7 @@ class Player {
   recordTrail() {
     this.trail.forEach(t => t.life--);
     this.trail = this.trail.filter(t => t.life > 0);
-    const fast = this.flipT > 0 || this.crashT > 0 || this.slideT > 0 || this.state === 'swing' || this.flingT > 25;
+    const fast = this.flipT > 0 || this.crashT > 0 || this.slideT > 0 || this.state === 'swing' || this.state === 'zip' || this.flingT > 25;
     if (!fast || W.frame % 2) return;
     if (this.flipT > 0 && !this.atkT && this.state === 'normal' && !this.onGround) {
       this.trail.push({ tuck: true, rot: this.saltoAngle(), x: this.cx, y: this.feet - 15, flip: this.face < 0, life: 10 });
@@ -578,7 +596,7 @@ class Player {
     const H = this.H, p = this.atkPose;
     if (this.state === 'dead') return this.onGround ? H.dead : H.hurt;
     if (this.state === 'hurt') return H.hurt;
-    if (this.state === 'swing') return H.swing;
+    if (this.state === 'swing' || this.state === 'zip') return H.swing;
     if (this.slideT > 0) return H.crouch;
     if (this.state === 'stairs') {
       if (this.atkT) return (this.stairUpPose ? H.satkUp : H.satkDown)[p];

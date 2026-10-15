@@ -23,7 +23,8 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 
 - **2 Helden**: Henrik (Peitsche) und Ragnor, Barbar aus dem Norden (Breitschwert + Wurfseil)
 - **3 Stages, 11 Räume** inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
-- **Ankunft per Schiff** (wie in Bloodstained): Galeone im Sturm, rollendes Deck, Fischmenschen entern von See aus, eigenes Seemannslied im 6/8-Takt – am Bug „Land in Sicht!“, das Schiff kracht an die Mole und die Laufplanke fällt
+- **Ankunft per Schiff** (wie in Bloodstained): hohe Galeone im Sturm – über Strickleitern hinauf in die Takelage bis in den Mastkorb, mit **Seilrutschen** von Mast zu Mast; Fischmenschen entern von See aus, **Seeadler** stoßen im Sturzflug herab; eigenes Seemannslied im 6/8-Takt – am Bug „Land in Sicht!“, das Schiff kracht an die Mole und die Laufplanke fällt
+- **Mode-7-Seegang**: das ganze Bild rollt und stampft mit dem Schiff (Drehpunkt an der Wasserlinie – oben im Mast schwankt es stärker), riesige Segel blähen sich zeilenweise im Wind (HDMA) samt Blutmond-Wappen
 - **Mode-7-Ozean**: perspektivisches Meer mit Höhenfeld – Dünungsberge rollen heran, eine Monsterwelle türmt sich über den Horizont, ein Riesenkrake reckt seine Fangarme aus dem Wasser
 - **3 Bosse** mit Kino-Auftritt, Musik-Eskalation in Phase 2 und Zeitlupen-Finale; der Graf verwandelt den Thronsaal in einen Strudel
 - **6 Sprachen**: Deutsch, Englisch, Französisch, Spanisch, Japanisch, Chinesisch (Optionen → Sprache)

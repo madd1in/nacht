@@ -413,10 +413,12 @@ const Tiles = (() => {
   // ---------------- Schiff: Meer mit Linescroll, Küste mit Burg, Takelage ----------------
   const SEA_Y = 122; // Horizont (Spielfeld-y)
   let coastC = null, waveC = null;
-  const mastCache = {}, sailCache = {};
   // Sturmsee als Mode-7-Ozean mit Höhenfeld (Monsterwellen); nach dem Anlegen beruhigt sich das Wasser im Hafen
+  // Hoch oben in der Takelage: Horizont sinkt etwas, die Mode-7-Kamera steigt – man blickt von oben aufs Meer
+  function shipView(cam) { const lift = Math.max(0, W.room.h * T - 208 - cam.y); return { lift, hy: SEA_Y + Math.round(lift * 0.12) }; }
   function drawSea(ctx, cam, frame) {
-    Mode7.drawOcean(ctx, View.w, frame, { camX: cam.x, sail: W.sailX || 0, calm: W.sail, rogue: W.rogue ? W.rogue.v : 0, kraken: W.kraken, flash: FX.stormOn(W.storm) });
+    const v = shipView(cam);
+    Mode7.drawOcean(ctx, View.w, frame, { camX: cam.x, sail: W.sailX || 0, calm: W.sail, rogue: W.rogue ? W.rogue.v : 0, kraken: W.kraken, flash: FX.stormOn(W.storm), lift: v.lift * 0.25, horizon: v.hy });
   }
   function buildCoast() {
     const c = C(260, 132), x = c.getContext('2d'), rock = '#0a0614', edge = '#1e1430', wall = '#07030e';
@@ -446,53 +448,56 @@ const Tiles = (() => {
     if (!coastC) coastC = buildCoast();
     const end = Math.max(0, W.room.w * T - View.w);
     const X = Math.round(View.w * 0.66 - 130 + (end - cam.x) * 0.16);
-    if (X < View.w && X > -270) ctx.drawImage(coastC, X, SEA_Y + 2 - 132);
+    if (X < View.w && X > -270) ctx.drawImage(coastC, X, shipView(cam).hy + 2 - 132);
   }
-  // Mast mit zwei Rahen und Wanten (Seile mit Webeleinen); base = y des Decks unter dem Mast
-  function buildMast(base) {
-    const w = 140, c = C(w, base + 2), x = c.getContext('2d'), m = w >> 1;
-    const rope = '#24160c', pole = ['#6c4420', '#4c2c10', '#2c1806'];
-    for (let s = -1; s <= 1; s += 2) {
-      const tx = m + s * 54;
-      for (let k = 0; k < 2; k++) {
-        const x0 = m + s * (2 + k * 3), x1 = tx + s * k * 6;
-        for (let y = 60; y < base; y++) px(x, rope, Math.round(x0 + (x1 - x0) * (y - 60) / (base - 60)), y);
+  // ---------------- Takelage: hohe Masten, Wanten, Wimpel und riesige Segel ----------------
+  // Segel werden zeilenweise gezeichnet (HDMA wie bei Mode 7): jede Zeile wird eigen verschoben und skaliert –
+  // der Bauch bläht sich, eine Welle läuft das Tuch hinab, Böen reißen es kurz weiter auf. Das Wappen verformt sich mit.
+  const BAT = ['..X.......X..', '.XX..X.X..XX.', 'XXXX.XXX.XXXX', 'XXXXXXXXXXXXX', 'X.XXXXXXXXX.X', '....XXXXX....', '.....X.X.....'];
+  const sailTexCache = {};
+  function sailTex(w, h, emblem) {
+    const key = w + 'x' + h + (emblem ? 'e' : '');
+    if (sailTexCache[key]) return sailTexCache[key];
+    const c = C(w, h), x = c.getContext('2d'), img = x.createImageData(w, h), d = img.data;
+    const cols = [[156, 148, 128], [132, 124, 106], [104, 98, 84], [72, 68, 58]];
+    const R = Math.min(w, h) * 0.3, ecx = w / 2, ecy = h * 0.48;
+    let s = 3 + w + h * 7; const hr = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    const notch = Array.from({ length: Math.ceil(w / 14) + 1 }, () => 2 + Math.floor(hr() * 7)); // ausgefranster Saum
+    for (let y = 0; y < h; y++) for (let X = 0; X < w; X++) {
+      if (y >= h - notch[Math.floor(X / 14)]) continue;
+      const u = X / w, v = y / h, b = bay(X, y);
+      let k = Math.abs(u - 0.5) * 1.3 + v * 0.3 - Math.sin(v * Math.PI) * 0.15 + b * 0.35;
+      if (X % 16 === 0 || y % 14 === 0) k += 0.45; // Bahnen und Nähte
+      let col = cols[k > 1.05 ? 3 : k > 0.75 ? 2 : k > 0.45 ? 1 : 0];
+      if (emblem) {
+        const dx = X - ecx, dy = y - ecy, dd = Math.hypot(dx, dy);
+        if (dd < R && b < 0.9 - (dd / R) * 0.25) col = dd < R - 2 ? [150 - (dd / R) * 40, 16, 24] : [90, 8, 16]; // Blutmond
+        const sc = Math.max(1, Math.floor(R / 5)), bx = Math.floor(dx / sc + 6.5), by = Math.floor(dy / sc + 3.5);
+        if (by >= 0 && by < 7 && bx >= 0 && bx < 13 && BAT[by][bx] === 'X') col = [18, 6, 14]; // Fledermaus
       }
-      for (let y = 70; y < base - 4; y += 7) {
-        const t = (y - 60) / (base - 60), a = Math.round(m + s * 2 + (tx - m - s * 2) * t), b = Math.round(m + s * 5 + (tx + s * 6 - m - s * 5) * t);
-        px(x, rope, Math.min(a, b), y, Math.abs(b - a) + 1, 1);
-      }
+      const i = (y * w + X) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
     }
-    px(x, pole[2], m - 3, 0, 7, base); px(x, pole[0], m - 2, 0, 2, base); px(x, pole[1], m, 0, 2, base);
-    [10, 56].forEach(yy => { px(x, pole[2], m - 46, yy, 92, 4); px(x, pole[0], m - 46, yy, 92, 1); px(x, pole[1], m - 46, yy + 1, 92, 2); });
-    if (base - 46 > 74) { const yy = base - 46; px(x, pole[2], m - 40, yy, 80, 3); px(x, pole[0], m - 40, yy, 80, 1); }
-    for (let i = 0; i < 6; i++) px(x, pole[2], m - 4 + (i % 2) * 6, 22 + i * 6, 2, 2);
-    return c;
+    x.putImageData(img, 0, 0);
+    return (sailTexCache[key] = c);
   }
-  // Zerschlissenes Segel, im Wind gebläht (6 Animationsphasen)
-  function buildSail(w, h, f) {
-    const c = C(w + 14, h), x = c.getContext('2d'), ph = f / 6 * Math.PI * 2;
-    const cols = ['#948c7c', '#7c7464', '#605a4c', '#423e34']; // im Mondlicht gedämpft
-    let s = 77 + w * 3 + h; const hr = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-    const holes = Array.from({ length: Math.round(w * h / 2600) + 1 }, () => ({ x: hr() * w, y: 0.4 + hr() * 0.5, r: 3 + hr() * 5 }));
-    for (let y = 0; y < h; y++) {
-      const t = y / Math.max(1, h - 1), bul = Math.sin(t * Math.PI) * (5 + 2 * Math.sin(ph + t * 2));
-      const rw = Math.round(w * (0.9 + 0.1 * (1 - t))), x0 = Math.round((w - rw) / 2 + bul);
-      for (let X = 0; X < rw; X++) {
-        if (holes.some(o => Math.hypot(X + x0 - o.x + (t - o.y) * h * 0.8, (t - o.y) * h * 2.2) < o.r)) continue; // schräge Risse
-        const v = Math.abs(X / rw - 0.5) * 1.4 + t * 0.35 * Math.sin(t * Math.PI) + bay(X, y) * 0.35;
-        let i = v > 0.95 ? 2 : v > 0.55 ? 1 : 0;
-        if (y % 11 === 5) i = Math.min(3, i + 1); // Nähte
-        px(x, cols[i], x0 + X + 6, y);
-      }
-      px(x, cols[3], x0 + 6, y); px(x, cols[3], x0 + rw + 5, y);
+  function drawSailM7(ctx, cx, top, w, h, t, emblem, gust) {
+    if (h < 8) return;
+    const tex = sailTex(w, h, emblem), step = View.lite ? 2 : 1;
+    const B = 7 + 3 * Math.sin(t * 0.045) + gust * 9;
+    for (let y = 0; y < h; y += step) {
+      const v = y / h, belly = Math.sin(v * Math.PI);
+      const sc = 1 + 0.07 * belly * (1 + 0.4 * Math.sin(t * 0.05)) + gust * 0.06 * belly; // Bauch wirkt näher → breiter
+      const off = belly * B + Math.sin(y * 0.16 - t * 0.14) * 1.6 * v;                   // Welle läuft das Tuch hinab
+      const ww = Math.round(w * sc);
+      ctx.drawImage(tex, 0, y, w, step, Math.round(cx - ww / 2 + off), top + y, ww, step);
     }
-    return c;
   }
-  function sail(w, h, frame) {
-    const key = w + 'x' + h, fr = sailCache[key] || (sailCache[key] = [0, 1, 2, 3, 4, 5].map(f => buildSail(w, h, f)));
-    return fr[Math.floor(frame / 10) % 6];
+  function ropeLine(ctx, x0, y0, x1, y1, col) {
+    const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) / 2);
+    ctx.fillStyle = col;
+    for (let k = 0; k <= n; k++) ctx.fillRect(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), 1, 2);
   }
+  const yardW = (k) => Math.min(200, 100 + k * 30); // untere Rahen und Segel breiter
   function mastBase(room, mx) {
     const col = Math.floor(mx);
     for (let cy = 0; cy < room.h; cy++) if (room.grid[cy][col] === '#') return cy * T;
@@ -508,19 +513,38 @@ const Tiles = (() => {
     for (const [cx, cy] of room.rail) {
       if (cx < c0 || cx > c1) continue;
       const X = cx * T - ox, Y = cy * T - oy;
+      if (Y < -20 || Y > 230) continue;
       ctx.fillStyle = '#2c1808'; ctx.fillRect(X, Y - 13, 16, 3); ctx.fillRect(X + 3, Y - 11, 2, 11); ctx.fillRect(X + 11, Y - 11, 2, 11);
       ctx.fillStyle = '#6c4420'; ctx.fillRect(X, Y - 13, 16, 1);
     }
-    (room.masts || []).forEach((mx, i) => {
-      const X = Math.round(mx * T) - ox;
-      if (X < -90 || X > View.w + 90) return;
-      const base = mastBase(room, mx), top = -oy;
-      ctx.drawImage(mastCache[base] || (mastCache[base] = buildMast(base)), X - 70, top);
-      ctx.drawImage(sail(84, 42, frame + i * 17), X - 48, top + 13);
-      const h2 = base - 46 - 60;
-      if (h2 > 20) ctx.drawImage(sail(88, h2, frame + i * 29), X - 50, top + 59);
-      ctx.fillStyle = '#1c1008'; ctx.fillRect(X + 38, top + 62, 5, 8); // Laterne an der unteren Rah
-      ctx.fillStyle = (frame >> 3) % 5 ? '#f8b800' : '#fce0a8'; ctx.fillRect(X + 39, top + 64, 3, 4);
+    const gust = W.gust || 0;
+    (room.masts || []).forEach((m, i) => {
+      const X = Math.round(m.x * T) - ox, half = yardW(m.yards.length - 1) / 2 + 40;
+      if (X < -half || X > View.w + half) return;
+      const base = mastBase(room, m.x) - oy, top = m.top * T - oy;
+      if (top > 214 || base < -6) return;
+      for (const s of [-1, 1]) ropeLine(ctx, X + s * 2, top + 10, X + s * (yardW(m.yards.length - 1) / 2 + 6), base - 12, '#24160c'); // Wanten
+      ctx.fillStyle = '#2c1806'; ctx.fillRect(X - 3, top, 7, base - top);
+      ctx.fillStyle = '#6c4420'; ctx.fillRect(X - 2, top, 2, base - top);
+      ctx.fillStyle = '#4c2c10'; ctx.fillRect(X, top, 2, base - top);
+      for (let k = 0; k < 28; k++) { // Wimpel am Mastkopf
+        const yy = top + 2 + Math.round(Math.sin(k * 0.35 - frame * 0.18) * (k / 28) * 3);
+        ctx.fillStyle = k % 9 < 6 ? '#a80020' : '#580010'; ctx.fillRect(X + 3 + k, yy, 1, Math.max(1, 5 - Math.floor(k / 6)));
+      }
+      for (let k = 0; k < m.yards.length - 1; k++) {
+        const y0 = m.yards[k] * T - oy, y1 = m.yards[k + 1] * T - oy;
+        if (y1 < -10 || y0 > 218) continue;
+        drawSailM7(ctx, X, y0 + 4, yardW(k + 1) - 8, y1 - y0 - 6, frame + i * 37 + k * 13, m.emblem === k, gust);
+      }
+      m.yards.forEach((yr, k) => { // Rahen vor den Segeln
+        const y = yr * T - oy, w = yardW(k);
+        if (y < -8 || y > 214) return;
+        ctx.fillStyle = '#2c1806'; ctx.fillRect(X - w / 2, y, w, 4);
+        ctx.fillStyle = '#7c5028'; ctx.fillRect(X - w / 2, y, w, 1); ctx.fillStyle = '#4c2c10'; ctx.fillRect(X - w / 2, y + 1, w, 2);
+      });
+      const ly = m.yards[0] * T - oy + 6, lx = X + yardW(0) / 2 - 8; // Laterne an der obersten Rah
+      ctx.fillStyle = '#1c1008'; ctx.fillRect(lx, ly, 5, 8);
+      ctx.fillStyle = (frame >> 3) % 5 ? '#f8b800' : '#fce0a8'; ctx.fillRect(lx + 1, ly + 2, 3, 4);
     });
     if (room.wheel) { // Steuerrad auf dem Achterdeck
       const X = Math.round(room.wheel.x * T + 8) - ox, Y = room.wheel.y * T - 14 - oy, a = Math.sin(frame * 0.013) * 0.6;
@@ -535,11 +559,20 @@ const Tiles = (() => {
   }
   // Lichter der Mast-Laternen (für FX.render)
   function shipLights(L, cam) {
-    const room = W.room;
-    (room.masts || []).forEach(mx => {
-      const X = Math.round(mx * T - cam.x);
-      if (X > -60 && X < View.w + 60) L.push({ x: X + 40, y: 66 - cam.y, r: 30, c: [248, 160, 60], a: 0.5 });
+    (W.room.masts || []).forEach(m => {
+      const X = Math.round(m.x * T - cam.x) + yardW(0) / 2 - 6, Y = m.yards[0] * T + 10 - cam.y;
+      if (X > -60 && X < View.w + 60 && Y > -60 && Y < 270) L.push({ x: X, y: Y, r: 30, c: [248, 160, 60], a: 0.5 });
     });
+  }
+  // Strickleiter (Wanten) statt Holzstufen: zwei Taue entlang der Schräge, Sprossen dazwischen
+  function ratline(dir) {
+    const c = C(16, 16), x = c.getContext('2d');
+    for (let i = 0; i < 16; i++) {
+      const X = dir > 0 ? i : 15 - i, Y = 15 - i;
+      px(x, '#5c4024', X, Y); if (Y - 7 >= 0) px(x, '#5c4024', X, Y - 7);
+      if (i % 4 === 1) { px(x, '#a88c60', X, Math.max(0, Y - 7), 1, 7); px(x, '#c8b088', X, Math.max(0, Y - 7), 1, 1); }
+    }
+    return c;
   }
   // Brandung vor dem Rumpf (zwei Wellenreihen, fahren mit dem Schiff)
   function buildWaves() {
@@ -804,7 +837,7 @@ const Tiles = (() => {
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
-      spikes: spikes(), up: stairTile(p.b, 1), down: stairTile(p.b, -1),
+      spikes: spikes(), up: theme === 'ship' ? ratline(1) : stairTile(p.b, 1), down: theme === 'ship' ? ratline(-1) : stairTile(p.b, -1),
       toppers: [0, 1, 2, 3].map(v => topper(theme, v)), hangers: [0, 1, 2].map(v => hanger(theme, v)),
       bg: buildBg(theme), crate: theme === 'ship' ? crate(p.b) : null,
     };

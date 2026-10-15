@@ -50,6 +50,11 @@
     ],
   };
 
+  // ---------- Seeadler (Schiff) ----------
+  S.eagle = [make(['................BB......', '..............BBbB......', '............BBbbB.......', '..........BBbbbB........', '........BBbbbBB.........', '...ww..BbbbbB...........', '.wwWwBBbbbbbbbbbbB......', 'yykWwbbbbbbbbbbbbBBwwW..', '.yywwBbbbbbbbbbbBB..wwW.', '.....BBBBbbbbBBB....ww..', '........y...y...........', '........yy..yy..........']),
+    make(['........................', '........................', '........................', '........................', '...ww...................', '.wwWw..BBBBBBBBBBBBB....', 'yykWwBbbbbbbbbbbbbbbBB..', '.yywwBbbbbbbbbbbbbbBBwwW', '.....BBbbbbbbbbbBB..wwW.', '......BBBBBBBBBB....ww..', '........y...y...........', '........yy..yy..........']),
+    make(['........................', '........................', '........................', '...ww...................', '.wwWw...................', 'yykWwBBbbbbbbbbbBB......', '.yywwbbbbbbbbbbbbbBBwwW.', '.....BbbbbbbbbbbBB..wwW.', '......BBbbbbbBB.....ww..', '........BBbbbbB.........', '..........BBbbbB........', '............BBBB........'])];
+
   // ---------- Flammenschädel ----------
   const skullBody = [
     '....wwwwwwww....', '...wwwwwwwwww...', '..wwWWwwwwWWww..', '..wwkkWwwWkkww..',
