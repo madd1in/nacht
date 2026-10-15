@@ -1348,10 +1348,10 @@ const Tiles = (() => {
     const w = View.w, H = 208, tb = tubeTable(w), TX = tubeTex(tex, glow), TW = TX.w, TH = TX.h;
     if (!tubeOut || tubeOut.w !== w) { const c = Sprites.canvas(w, H), x = c.getContext('2d'), img = x.createImageData(w, H); tubeOut = { w, c, x, img, buf: new Int32Array(img.data.buffer) }; }
     if (W.tubeRotS === undefined) W.tubeRotS = W.tubeRot || 0;
-    W.tubeRotS += ((W.tubeRot || 0) - W.tubeRotS) * 0.12;
+    W.tubeRotS += ((W.tubeRot || 0) - W.tubeRotS) * 0.08; // weich nachziehen
     const cloud = 0.5 + 0.3 * Math.sin(frame * 0.011) + 0.2 * Math.sin(frame * 0.0037 + 1.3); // Wolken ziehen am Mond vorbei
     const src = TX.levels[FX.stormOn(W.storm) ? 4 : Math.max(0, Math.min(3, Math.round(cloud * 3)))];
-    const u0 = cam.x * 0.5 + W.tubeRotS + frame * 0.3, camV = cam.y * 0.5 + 104, out = tubeOut.buf; // dreht sich stetig, die Treppe gibt Schub vor und zurück
+    const u0 = cam.x * 0.5 + W.tubeRotS, camV = cam.y * 0.5 + 104, out = tubeOut.buf; // dreht sich nur, wenn der Held sich bewegt (Treppe: vor und zurück)
     for (let x = 0; x < w; x++) {
       const s = tb.s[x], su = ((Math.floor(u0 + tb.u[x]) % TW) + TW) % TW;
       let v = (((camV - 104 * s) % TH) + TH) % TH;

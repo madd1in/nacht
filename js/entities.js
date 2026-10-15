@@ -455,7 +455,7 @@ class Player {
     else if (I.down || (s.dir > 0 ? I.left : I.right)) m = -1;
     if (m) {
       this.stairPos += m * 0.95;
-      if (W.room.theme === 'glass') W.tubeRot = (W.tubeRot || 0) + m * 2.6; // Röhre dreht sich mit: hinauf vorwärts, hinunter zurück
+      if (W.room.theme === 'glass') W.tubeRot = (W.tubeRot || 0) + m * 1.1; // Röhre dreht sich mit: hinauf vorwärts, hinunter zurück
       this.face = m > 0 ? s.dir : -s.dir;
       this.stairUpPose = m > 0;
       if (this.stairPos >= s.len || this.stairPos <= 0) {

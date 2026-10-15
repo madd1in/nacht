@@ -446,9 +446,9 @@ class TentArm {
         this.idlePose(); this.ease = 0.06;
         if (t > 52) this.go('idle');
         break;
-      case 'idle': this.idlePose(); this.ease = 0.05; this.harm = this.n - 7; break;
+      case 'idle': this.idlePose(); this.ease = 0.05; this.harm = this.n - 4; break;
       case 'aim': { // bäumt sich hoch über dem Helden auf; die letzten Frames steht das Ziel fest
-        const lock = ph2 ? 24 : 32, end = ph2 ? 42 : 54;
+        const lock = ph2 ? 34 : 42, end = ph2 ? 56 : 66; // gemächlich ausholen: ein Gag-Boss, kein Brocken
         if (t < lock) this.lockX = clamp(p.cx, b.ax + 14, b.ax + b.aw - 14);
         this.ex = this.bx + this.inward * 16; this.ey = H - 150;
         this.tx = this.bx + (this.lockX - this.bx) * 0.55; this.ty = Math.max(top, H - 184); this.ease = 0.09; this.harm = this.n - 6;
@@ -465,20 +465,20 @@ class TentArm {
       case 'stuck': // liegt betäubt auf den Planken: harmlos und verwundbar
         this.amp = 1; buoy = false;
         if (t % 9 === 0) { const q = this.q[this.n - 2 - (t % 7)]; W.dust(q.x, Tent.floorAt(q.x), 2); }
-        if (t > (ph2 ? 56 : 76)) this.go('lift');
+        if (t > (ph2 ? 92 : 112)) this.go('lift');
         break;
       case 'lift': this.idlePose(); this.ease = 0.07; if (t > 26) b.done(this); break;
       case 'coil': // rollt sich am eigenen Rand ein, dann fegt er knapp über die Planken
         this.ex = this.bx + this.inward * 6; this.ey = H - 60;
         this.tx = this.bx + this.inward * 30; this.ty = H - 34; this.ease = 0.12; this.amp = 7; this.harm = this.n - 5;
         if (t === 1) Audio8.sfx('creak', this.bx);
-        if (t > (ph2 ? 24 : 34)) { this.go('sweep'); Audio8.sfx('whoosh', this.bx); }
+        if (t > 40) { this.go('sweep'); Audio8.sfx('whoosh', this.bx); }
         break;
       case 'sweep': case 'sweepBack': {
-        const len = this.state === 'sweep' ? (ph2 ? 40 : 50) : (ph2 ? 34 : 42), k = Math.min(1, t / len);
+        const len = this.state === 'sweep' ? (ph2 ? 56 : 64) : (ph2 ? 50 : 56), k = Math.min(1, t / len);
         const x0 = this.bx + this.inward * 30, x1 = this.side < 0 ? b.ax + b.aw - 8 : b.ax + 8;
         const x = this.state === 'sweep' ? x0 + (x1 - x0) * k : x1 + (x0 - x1) * k;
-        this.tx = x; this.ty = Tent.floorAt(x) - 9; this.ease = 0.5; this.harm = this.n - 5; buoy = false;
+        this.tx = x; this.ty = Tent.floorAt(x) - 6; this.ease = 0.5; this.harm = this.n - 4; buoy = false;
         if (t % 4 === 0) { const q = this.q[this.n - 1]; W.dust(q.x, Tent.floorAt(q.x), 2); }
         if (k >= 1) { if (this.state === 'sweep') { this.go('sweepBack'); Audio8.sfx('whoosh', x); } else this.go('lift'); }
         break;
@@ -486,7 +486,7 @@ class TentArm {
       case 'spit': // bäumt sich auf und spuckt Tinte in hohen Bögen
         this.ex = this.bx + this.inward * 14; this.ey = H - 140;
         this.tx = this.bx + this.inward * 44; this.ty = Math.max(top, H - 168); this.ease = 0.08; this.harm = this.n - 5;
-        if (t === 24 || t === 32 || (ph2 && t === 40)) this.spit(p, (t - 32) / 8);
+        if (t === 24 || t === 40) this.spit(p, (t - 32) / 8);
         if (t > 54) this.go('idle');
         break;
       case 'retract': depthGoal = 1; this.tx = this.bx + this.inward * 8; this.ty = this.by - 40; this.ease = 0.07; buoy = false; if (t > 50) this.go('hidden'); break;
@@ -597,8 +597,8 @@ class TentArm {
     if (!this.visible()) return;
     const e = this.eyeAt();
     if (!e.up) return;
-    const pad = this.state === 'stuck' ? 12 : 4;
-    out.push({ x: e.x - e.r - 4, y: e.y - e.r - pad, w: 2 * e.r + 8, h: 2 * e.r + pad + 4, arm: this });
+    const pad = this.state === 'stuck' ? 18 : 8; // großzügig: das Auge soll man leicht treffen
+    out.push({ x: e.x - e.r - 7, y: e.y - e.r - pad, w: 2 * e.r + 14, h: 2 * e.r + pad + 6, arm: this });
   }
   drawEye(ctx, t, rage) {
     if (!this.visible()) return;
@@ -689,7 +689,7 @@ class TentArm {
 
 // Tintenkugel: fliegt im Bogen, zerplatzt auf den Planken; die Peitsche schlägt sie weg
 class InkBlob extends EProj {
-  constructor(x, y, vx, vy) { super('ink', x, y, vx, vy, 0.14, 2); }
+  constructor(x, y, vx, vy) { super('ink', x, y, vx, vy, 0.14, 1); }
   update() {
     super.update();
     if (this.dead) return;
@@ -709,14 +709,14 @@ class InkBlob extends EProj {
 
 class TentacleBoss extends Boss {
   constructor(ax, aw) {
-    super(ax + aw / 2 - 20, W.room.h * T - 90, 40, 40, 14, 2);
+    super(ax + aw / 2 - 20, W.room.h * T - 90, 40, 40, 6, 1); // Gag-Miniboss: wenig Leben, wenig Schaden
     this.ax = ax; this.aw = aw; this.mini = true; this.sea = true; this.score = 5000;
     this.nameKey = 'bossTentacle'; this.voice = 'tentacle'; this.music = 'kraken'; this.hinted = false; this.lastDeflect = 0;
     this.deckY = (W.room.h - 2) * T; // Hauptdeck: Bezug für Höhen, damit die Arme auch über der erhöhten Back im Bild bleiben
     this.arms = [new TentArm(this, -1, 28, 11, 14), new TentArm(this, 1, 28, 11, 14)];
     this.burst = new TentArm(this, 0, 15, 9, 9);
     this.turn = W.player.cx < ax + aw / 2 ? 1 : 0; // der Arm auf der anderen Seite taucht zuerst auf
-    this.gap = 0; this.inkCd = 110; this.burstCd = 150; this.ph2 = false;
+    this.gap = 0; this.inkCd = 160; this.burstCd = 300; this.ph2 = false;
   }
   all() { return [this.arms[0], this.arms[1], this.burst]; }
   vulnerable() { return this.hurtBoxes().length > 0; }
@@ -728,7 +728,7 @@ class TentacleBoss extends Boss {
     for (const b of this.hurtBoxes()) { const d = Math.hypot(b.x + b.w / 2 - hx, b.y + b.h / 2 - hy); if (d < bd) { bd = d; best = b; } }
     if (best) { this.x = best.x + best.w / 2 - 20; this.y = best.y + best.h / 2 - 20; }
     const ok = super.hit(dmg, id);
-    if (ok && best) { best.arm.hitT = 14; best.arm.blinkT = 0; W.sparks(best.x + best.w / 2, best.y + best.h / 2, 10); }
+    if (ok && best) { best.arm.hitT = 14; best.arm.blinkT = 0; W.sparks(best.x + best.w / 2, best.y + best.h / 2, 10); Audio8.sfx('squeak', best.x); } // quietscht wie das Gummihuhn
     return ok;
   }
   deflect(id, b) { // Treffer aufs Fleisch: prallt ab (Funken, heller Klang) – und der Tipp erscheint
@@ -758,9 +758,9 @@ class TentacleBoss extends Boss {
       if (A.state === 'idle' && A.t > (this.ph2 ? 24 : 36) && --this.gap <= 0) A.go(Math.random() < 0.55 ? 'aim' : 'coil');
       if (this.ph2) {
         if (B.state === 'hidden') B.go('rise');
-        if (B.state === 'idle' && B.t > 30 && --this.inkCd <= 0) { B.go('spit'); this.inkCd = 140 + rnd(0, 60); }
+        if (B.state === 'idle' && B.t > 30 && --this.inkCd <= 0) { B.go('spit'); this.inkCd = 220 + rnd(0, 80); }
         if (this.burst.state === 'hidden' && this.burst.hole === 0 && --this.burstCd <= 0 && p.alive && p.onGround) {
-          this.burst.bx = clamp(p.cx, this.ax + 20, this.ax + this.aw - 20); this.burst.go('warn'); this.burstCd = 240 + rnd(0, 80);
+          this.burst.bx = clamp(p.cx, this.ax + 20, this.ax + this.aw - 20); this.burst.go('warn'); this.burstCd = 420 + rnd(0, 120);
         }
       }
     }
