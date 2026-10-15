@@ -696,7 +696,7 @@ class FallingChandelier extends Ent {
   }
   lights(L, cx, cy, flick) {
     if (!this.lit) return;
-    L.push({ x: this.cx - cx, y: this.y + 2 - cy, r: (this.state === 'wreck' ? 30 : 46) + flick(this.ax), c: [248, 170, 70], a: 0.6 });
+    L.push({ x: this.cx - cx, y: this.y + 2 - cy, r: (this.state === 'wreck' ? 24 : 32) + flick(this.ax), c: [248, 170, 70], a: 0.42 }); // nur ein schwacher Schein – den Saal erhellen die Blitze
   }
   draw(ctx) {
     const cx = W.cam.x, cy = W.cam.y, sh = this.state === 'warn' ? Math.round(Math.sin(this.wt * 1.7) * 1.5) : 0;
@@ -755,5 +755,77 @@ class ArmorSuit extends Ent {
     if (eyes) { R(eyes, X + 5, 5, 1, 1); R(eyes, X + 8, 5, 1, 1); }
     const fx = this.flip ? -6 : 16; // Hellebarde
     R('#3c2410', X + fx, -6, 2, 40); R('#c8c4d0', X + fx - 2, -8, 6, 3); R('#8c8898', X + fx + (this.flip ? -2 : 2), -5, 3, 4);
+  }
+}
+
+// ---------------- Bibliothek: Lesepult mit aufgeschlagenem Buch, dessen Seiten sich von selbst umblättern ----------------
+class Lectern extends Ent {
+  constructor(d) { super(d.x * T - 2, (d.y + 1) * T - 30, 20, 30); this.kind = 'prop'; this.flipT = -1; this.t = d.x * 13; }
+  update() {
+    this.t++;
+    if (this.flipT >= 0 && ++this.flipT > 24) this.flipT = -1;
+    if (this.flipT < 0 && this.t % 150 === 0 && this.onScreen(0)) { this.flipT = 0; Audio8.sfx('page', this.cx); }
+  }
+  lights(L, cx, cy, flick) { L.push({ x: this.x + 18 - cx, y: this.y - 2 - cy, r: 30 + flick(this.x), c: [248, 150, 60], a: 0.5 }); }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#1c0c04', 2, 27, 16, 3); R('#7c4c20', 2, 27, 16, 1); R('#3c1c08', 4, 25, 12, 2); // Fuß
+    R('#3c1c08', 8, 12, 4, 13); R('#8c5c2c', 8, 12, 1, 13); R('#5c3414', 6, 17, 8, 2); R('#a0703c', 6, 17, 8, 1); // gedrechselte Säule
+    R('#2c1406', 0, 9, 20, 4); R('#a0703c', 0, 9, 20, 1); R('#140802', 1, 12, 18, 1); // schräge Pultplatte
+    R('#4c0c14', 1, 6, 18, 3); R('#f0e8d0', 2, 4, 7, 3); R('#f0e8d0', 11, 4, 7, 3); R('#c8bca0', 9, 5, 2, 2); // Buch
+    for (let k = 0; k < 2; k++) { R('#8c8070', 3, 5 + k, 5, 1); R('#8c8070', 12, 5 + k, 5, 1); }
+    R('#d82828', 10, 9, 1, 4); // Lesebändchen
+    if (this.flipT >= 0) { // eine Seite hebt sich und schlägt um
+      const a = this.flipT / 24 * Math.PI;
+      for (let r = 1; r <= 7; r++) R(r > 5 ? '#d8ccb0' : '#fcf4e0', Math.round(10 + Math.cos(a) * r), Math.round(4 - Math.sin(a) * r * 0.9), 1, 2);
+    }
+    R('#3c2c1c', 15, 3, 6, 1); R('#e8e0c8', 17, -3, 2, 6); R(((this.t >> 2) % 3) ? '#fcd040' : '#f87800', 17, -6, 2, 3); // Kerze
+  }
+}
+
+// ---------------- Bibliothek: Globus auf geschnitztem Gestell – die Kugel dreht sich (Kugelabbildung, 32 vorberechnete Bilder) ----------------
+const GLOBE_FR = (() => {
+  const R = 11, N = 32, D = R * 2 + 1, MW = 64, MH = 32;
+  const hh = (X, Y) => { let n = Math.imul(X * 374761393 + Y * 668265263, 1274126177); n ^= n >>> 13; return ((Math.imul(n, 1274126177) >>> 0) % 1000) / 1000; };
+  const map = new Uint8Array(MW * MH); // Weltkarte: Kontinente aus Wertrauschen, nahtlos in Längsrichtung
+  for (let Y = 0; Y < MH; Y++) for (let X = 0; X < MW; X++) {
+    let v = 0;
+    for (const [s, w] of [[8, 0.55], [4, 0.3], [2, 0.15]]) {
+      const mw = MW / s, gx = X / s, gy = Y / s, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
+      const a = hh(x0 % mw, y0), b = hh((x0 + 1) % mw, y0), c = hh(x0 % mw, y0 + 1), d = hh((x0 + 1) % mw, y0 + 1);
+      v += w * (a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy);
+    }
+    map[Y * MW + X] = v > 0.56 ? 2 : v > 0.51 ? 1 : 0; // Land, Küste, Meer
+  }
+  const frames = [];
+  for (let f = 0; f < N; f++) {
+    const c = Sprites.canvas(D, D), x = c.getContext('2d'), img = x.createImageData(D, D), d = img.data;
+    for (let py = -R; py <= R; py++) for (let qx = -R; qx <= R; qx++) {
+      const q = (qx * qx + py * py) / (R * R);
+      if (q > 1) continue;
+      const nz = Math.sqrt(1 - q), lon = Math.atan2(qx / R, nz) + f / N * Math.PI * 2, lat = Math.asin(py / R);
+      const u = ((Math.floor(lon / (Math.PI * 2) * MW) % MW) + MW) % MW, v = Math.min(MH - 1, Math.floor((lat / Math.PI + 0.5) * MH));
+      const m = map[v * MW + u], base = m === 2 ? [200, 164, 100] : m === 1 ? [140, 100, 56] : [56, 98, 104]; // Pergamentland, Küste, Meer
+      let k = Math.max(0.28, Math.min(1.15, 0.4 + nz * 0.65 - qx / R * 0.3 - py / R * 0.22)); // Licht von links oben
+      if (Math.abs(((lon / (Math.PI / 4)) % 1 + 1) % 1 - 0.5) > 0.46 || Math.abs((((lat + 0.001) / (Math.PI / 6)) % 1 + 1) % 1 - 0.5) > 0.45) k *= 0.72; // Grade
+      const i = ((py + R) * D + qx + R) * 4;
+      d[i] = base[0] * k; d[i + 1] = base[1] * k; d[i + 2] = base[2] * k; d[i + 3] = 255;
+    }
+    x.putImageData(img, 0, 0); frames.push(c);
+  }
+  return frames;
+})();
+class Globe extends Ent {
+  constructor(d) { super(d.x * T - 4, (d.y + 1) * T - 40, 24, 40); this.kind = 'prop'; this.t = d.x * 5; }
+  update() { this.t++; }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w = 1, h = 1) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#1c0c04', 2, 38, 20, 2); R('#3c1c08', 3, 34, 3, 5); R('#3c1c08', 18, 34, 3, 5); R('#7c4c20', 3, 34, 1, 5); // Beine
+    R('#3c1c08', 4, 32, 16, 2); R('#8c5c2c', 4, 32, 16, 1); R('#5c3414', 10, 25, 4, 8); R('#a0703c', 10, 25, 1, 8); // Säule
+    for (let a = Math.PI; a <= Math.PI * 2; a += 0.12) R('#8c6414', Math.round(12 + Math.cos(a) * 15), Math.round(13 + Math.sin(a) * 3.5)); // Horizontring hinten
+    ctx.drawImage(GLOBE_FR[Math.floor(this.t / 8) % GLOBE_FR.length], x + 1, y + 2);
+    for (let a = 0; a < Math.PI * 2; a += 0.07) { const ca = Math.cos(a), sa = Math.sin(a); R(ca > 0.3 && sa < 0 ? '#fce0a8' : '#c8982c', Math.round(12 + ca * 12.6), Math.round(13 + sa * 12.6)); } // Meridianring aus Messing
+    for (let a = 0; a <= Math.PI; a += 0.12) R('#c8982c', Math.round(12 + Math.cos(a) * 15), Math.round(13 + Math.sin(a) * 3.5)); // Horizontring vorne
+    R('#fce0a8', 11, 0, 2, 1); R('#8c6414', 11, 26, 2, 1); // Achse
   }
 }

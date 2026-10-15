@@ -165,6 +165,9 @@ const Audio8 = (() => {
     growl: () => { noise(0.5, 0.3, 'lowpass', 500, 160); tone('sawtooth', 110, 70, 0.45, 0.12); tone('pulse', 220, 140, 0.3, 0.05, 0.25); }, // Jaguar faucht
     shatter: () => { noise(0.5, 0.45, 'highpass', 5000, 1800); arp(['e7', 'c7', 'g6', 'e7', 'b6', 'g7'], 0.03, 'pulse', 0.06, 0.125); tone('triangle', 180, 60, 0.3, 0.3); }, // Kristall zerspringt
     clank: () => { tone('square', 340, 300, 0.07, 0.1); tone('square', 520, 470, 0.05, 0.07); noise(0.12, 0.2, 'bandpass', 2600, 1600); }, // Rüstung scheppert
+    flap: () => { noise(0.07, 0.14, 'bandpass', 1300, 700); noise(0.05, 0.1, 'bandpass', 1700, 900, ac.currentTime + 0.08); }, // Buchdeckel schlagen
+    page: () => noise(0.16, 0.09, 'highpass', 2600, 6000), // Papier raschelt
+    tome: () => { tone('sine', 196, 98, 0.5, 0.14); tone('triangle', 392, 370, 0.4, 0.06); arp(['e6', 'g6', 'a#6', 'e7'], 0.05, 'pulse', 0.04, 0.125); }, // Zauberbuch schlägt auf
     tink: () => { tone('square', 2600, 2100, 0.05, 0.07); tone('pulse', 3400, 3000, 0.07, 0.05, 0.125); noise(0.05, 0.12, 'highpass', 6000); }, // abgeprallt
     stepWet: () => { noise(0.07, 0.06, 'bandpass', 2600, 900); noise(0.04, 0.05, 'lowpass', 900, 250); },
   };
@@ -238,6 +241,10 @@ const Audio8 = (() => {
   const CH = { Em: ['e4', 'g4', 'b4'], Am: ['a3', 'c4', 'e4'], B: ['b3', 'd#4', 'f#4'], C: ['c4', 'e4', 'g4'], G: ['g3', 'b3', 'd4'], D: ['d4', 'f#4', 'a4'] };
   const CH_B = { Em: 'e2', Am: 'a1', B: 'b1', C: 'c2', G: 'g1', D: 'd2' };
   const CH_C = ['Em', 'Em', 'Am', 'B', 'Em', 'C', 'Am', 'B', 'G', 'D', 'Em', 'C', 'Am', 'B', 'Em', 'B'];
+  // Bibliothek – Cembalo-Menuett als Totentanz (a-Moll, 3/4, 12 Schritte pro Takt)
+  const LB = { Am: ['a3', 'c4', 'e4'], E: ['g#3', 'b3', 'e4'], Dm: ['d4', 'f4', 'a4'], G: ['g3', 'b3', 'd4'], C: ['c4', 'e4', 'g4'], F: ['f3', 'a3', 'c4'] };
+  const LB_B = { Am: ['a1', 'a2'], E: ['e1', 'e2'], Dm: ['d2', 'd3'], G: ['g1', 'g2'], C: ['c2', 'c3'], F: ['f1', 'f2'] };
+  const LB_C = ['Am', 'E', 'Am', 'Dm', 'G', 'C', 'F', 'E', 'Am', 'Dm', 'G', 'C', 'F', 'Dm', 'E', 'Am'];
   const toccata = (a, b, c) => { const up = (n) => n.replace(/\d/, d => +d + 1); return `${a}:1 ${b}:1 ${c}:1 ${b}:1 ${a}:1 ${b}:1 ${c}:1 ${up(a)}:1 ${c}:1 ${up(a)}:1 ${up(b)}:1 ${up(a)}:1 ${c}:1 ${b}:1 ${a}:1 ${b}:1`; };
 
   const SONGS = {
@@ -308,15 +315,15 @@ const Audio8 = (() => {
     },
     // Schiff – Seemannslied im 6/8-Takt (d-Moll, 132 BPM): schunkelnd, mit Akkordeon-artigen Pulsen
     sea: {
-      bpm: 132, loop: true, echo: { delay: 3, vol: 0.3 },
+      bpm: 142, loop: true, echo: { delay: 3, vol: 0.3 },
       p1: ['a4:3 d5:3 d5:2 e5:1 f5:3', 'e5:3 d5:3 a4:6', 'g4:3 c5:3 c5:2 d5:1 e5:3', 'd5:3 c5:3 g4:6',
         'a4:3 d5:3 f5:2 e5:1 d5:3', 'f5:3 a5:3 g5:2 f5:1 e5:3', 'e5:3 c#5:3 a4:3 b4:3', 'c#5:3 e5:3 a5:6',
         'c5:3 f5:3 f5:2 g5:1 a5:3', 'g5:3 e5:3 c5:6', 'd5:3 f5:3 a5:2 g5:1 f5:3', 'f5:3 d5:3 a#4:6',
         'a4:3 c#5:3 e5:3 g5:3', 'f5:3 e5:3 d5:6', 'e5:3 c#5:2 d5:1 e5:3 a4:3', 'd5:9 -:3'].join(' '),
       p2: SEA_C.map(c => { const [a, b, d] = SEA[c]; return `${a}:2 ${b}:2 ${d}:2 ${b}:2 ${d}:2 ${b}:2`; }).join(' '),
-      tri: SEA_C.map(c => { const [lo, hi] = SEA_B[c]; return `${lo}:3 ${hi}:3 ${lo}:3 ${hi}:3`; }).join(' '),
+      tri: SEA_C.map(c => { const [lo, hi] = SEA_B[c]; return `${lo}:2 ${hi}:1 ${lo}:2 ${hi}:1 ${lo}:2 ${hi}:1 ${lo}:2 ${hi}:1`; }).join(' '), // hüpfender Bass
       pad: SEA_C.map(c => SEA[c].join('+') + ':12').join(' '),
-      dr: SEA_C.map((c, i) => i % 4 === 3 ? 'k:2 h:2 k:2 s:2 h:2 t:1 u:1' : 'k:2 h:2 h:2 s:2 h:2 h:2').join(' '),
+      dr: SEA_C.map((c, i) => i % 4 === 3 ? 'k:2 h:1 s:2 h:1 k:1 k:1 s:1 t:1 u:1 s:1' : i % 8 === 0 ? 'x:2 h:1 h:2 h:1 s:2 h:1 k:2 o:1' : 'k:2 h:1 h:2 h:1 s:2 h:1 k:2 h:1').join(' '),
     },
     // Miniboss auf dem Schiff: der lila Tentakel
     kraken: {
@@ -341,15 +348,27 @@ const Audio8 = (() => {
     },
     // Glasturm: Orgel-Toccata zwischen den Buntglasfenstern
     chapel: {
-      bpm: 116, loop: true, echo: { delay: 6, vol: 0.34 },
+      bpm: 126, loop: true, echo: { delay: 6, vol: 0.34 },
       p1: ['b4:8 e5:4 g5:4', 'f#5:4 e5:4 d#5:4 e5:4', 'c5:8 e5:4 a5:4', 'g5:4 f#5:4 d#5:8',
         'e5:8 b5:4 g5:4', 'e5:4 g5:4 c6:8', 'b5:4 a5:4 g5:4 e5:4', 'f#5:12 -:4',
         'd5:8 g5:4 b5:4', 'a5:4 f#5:4 d5:8', 'e5:4 g5:4 b5:4 e6:4', 'd6:4 c6:4 b5:4 g5:4',
         'a5:8 c6:4 e6:4', 'd#6:4 c6:4 b5:4 a5:4', 'g5:4 f#5:4 e5:8', 'd#5:8 f#5:4 b4:4'].join(' '),
       p2: CH_C.map(c => toccata(...CH[c])).join(' '),
-      tri: CH_C.map(c => `${CH_B[c]}:12 ${CH_B[c].replace(/\d/, d => +d + 1)}:4`).join(' '),
+      tri: CH_C.map(c => { const lo = CH_B[c], hi = lo.replace(/\d/, d => +d + 1); return `${lo}:2 ${lo}:2 ${hi}:2 ${lo}:2 ${lo}:2 ${hi}:2 ${lo}:2 ${hi}:2`; }).join(' '), // Orgelpedal in Achteln
       pad: CH_C.map(c => CH[c].join('+') + ':16').join(' '),
-      dr: CH_C.map((c, i) => i % 4 === 3 ? 'p:4 -:4 p:2 p:2 p:4' : i % 2 ? '-:16' : 'p:16').join(' '),
+      dr: CH_C.map((c, i) => i % 4 === 3 ? 'p:2 h:2 s:2 h:2 p:1 p:1 s:2 t:2 u:2' : i % 4 === 0 ? 'p:2 h:2 s:2 h:2 k:2 h:2 s:2 h:2' : 'k:2 h:2 s:2 h:2 k:2 k:2 s:2 o:2').join(' '),
+    },
+    // Bibliothek: gebrochene Cembalo-Akkorde, Generalbass, Walzer-Schlag
+    library: {
+      bpm: 138, loop: true, echo: { delay: 3, vol: 0.3 },
+      p1: ['e5:4 a4:2 b4:2 c5:2 d5:2', 'e5:4 g#4:4 b4:4', 'c5:4 d5:2 c5:2 b4:2 a4:2', 'f5:4 a4:4 d5:4',
+        'd5:4 g5:2 f5:2 e5:2 d5:2', 'e5:4 c5:4 g4:4', 'a4:2 c5:2 f5:4 e5:2 d5:2', 'b4:6 g#4:2 e4:4',
+        'a4:2 c5:2 e5:2 a5:2 g5:2 f5:2', 'f5:4 d5:2 e5:2 f5:2 a5:2', 'g5:4 b4:2 c5:2 d5:2 g5:2', 'e5:6 d5:2 c5:4',
+        'c5:2 a4:2 f5:4 e5:2 d5:2', 'd5:2 f5:2 a5:4 g#5:2 f5:2', 'e5:2 g#5:2 b5:4 a5:2 g#5:2', 'a5:8 -:4'].join(' '),
+      p2: LB_C.map(c => { const [a, b, d] = LB[c]; return `${a}:2 ${b}:2 ${d}:2 ${a.replace(/\d/, n => +n + 1)}:2 ${d}:2 ${b}:2`; }).join(' '),
+      tri: LB_C.map(c => { const [lo, hi] = LB_B[c]; return `${lo}:4 ${hi}:2 ${lo}:2 ${hi}:4`; }).join(' '),
+      pad: LB_C.map(c => LB[c].join('+') + ':12').join(' '),
+      dr: LB_C.map((c, i) => i % 4 === 3 ? 'k:4 s:2 s:2 t:2 u:2' : 'k:4 h:4 h:4').join(' '),
     },
     clear: {
       bpm: 150, loop: false,
@@ -559,6 +578,11 @@ const Audio8 = (() => {
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 4200; hp.connect(lp); lp.connect(out);
       const bp = ambNoise(nodes, out, 'bandpass', 480, 6); ambLfo(nodes, bp.frequency, 0.06, 220);
       ambLfo(nodes, out.gain, 0.1, 0.01); level = 0.028;
+    } else if (theme === 'library') { // Bibliothek: gedämpfter Regen an den hohen Fenstern, tiefer Raumklang
+      const hp = ambNoise(nodes, out, 'highpass', 1200), lp = ac.createBiquadFilter();
+      hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 3000; hp.connect(lp); lp.connect(out);
+      ambDrone(nodes, out, 'sine', 65.4, 0.25);
+      level = 0.018;
     } else if (theme === 'hall' || theme === 'tower') { // heulender Wind durch die Turmfenster
       const bp = ambNoise(nodes, out, 'bandpass', 520, 7);
       ambLfo(nodes, bp.frequency, 0.07, 260); ambLfo(nodes, out.gain, 0.11, 0.008);
@@ -614,6 +638,9 @@ const Audio8 = (() => {
       tone('sine', 1800 + Math.random() * 1600, 0, 0.5, 0.02, 0, t);
     } else if (theme === 'ship' && Math.random() < 0.004) { // Schiffsrumpf ächzt
       tone('sawtooth', 60 + Math.random() * 25, 45, 0.7, 0.03, 0, t);
+    } else if (theme === 'library') { // Standuhr tickt gemächlich, irgendwo raschelt eine Seite
+      if (ambT % 45 === 0) tone('triangle', ambT % 90 ? 820 : 640, 0, 0.05, 0.03, 0, t);
+      if (Math.random() < 0.002) noise(0.18, 0.025, 'highpass', 3000, 6000, t);
     } else if (theme === 'hall' && Math.random() < 0.0015) { // Gebälk knarzt
       tone('sawtooth', 70 + Math.random() * 20, 50, 0.6, 0.025, 0, t);
     }

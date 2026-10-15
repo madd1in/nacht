@@ -21,6 +21,7 @@ const Tiles = (() => {
     vortex: { a: ['#e8b8fc', '#a868d8', '#6c2c9c', '#401060', '#14041c'], b: ['#fca0cc', '#d84080', '#9c1c50', '#5c0c2c', '#1c0410'] },
     glass: { a: ['#d0c8e0', '#a098b8', '#706888', '#484060', '#16101e'], b: ['#fce0a8', '#d8a838', '#a87000', '#684000', '#1c0c00'] },
     foyer: { a: ['#e8e4dc', '#b8b0a8', '#7c7480', '#3c3444', '#120e18'], b: ['#c89058', '#8c5428', '#5c3014', '#3c1c08', '#140804'] },
+    library: { a: ['#e8b070', '#a86c34', '#7c4820', '#4c2810', '#180a04'], b: ['#c8884c', '#8c5428', '#5c3014', '#3c1c08', '#140804'] },
     ship: { a: ['#e8b070', '#b87c44', '#8a5428', '#5a3214', '#1e0c04'], b: ['#dcb47c', '#a8783c', '#7a4c20', '#4a2a0c', '#160802'] },
   };
 
@@ -96,6 +97,36 @@ const Tiles = (() => {
     px(x, '#fce0a8', 0, 0, 16, 1); px(x, '#c89020', 0, 1, 16, 1); px(x, '#6c3c14', 0, 2, 16, 1);
     for (let k = 0; k < 2; k++) { const ox = k * 8; px(x, '#5c3418', ox + 1, 5, 6, 1); px(x, '#5c3418', ox + 1, 6, 1, 7); px(x, '#5c3418', ox + 6, 6, 1, 7); px(x, '#120804', ox + 2, 6, 4, 7); px(x, '#8c5c2c', ox + 2, 5, 4, 1); } // Bögen
     px(x, '#c89020', 0, 13, 16, 1); px(x, '#100804', 0, 14, 16, 2);
+    return c;
+  }
+  // Bibliothek: Eichenparkett im Flechtmuster (je 8×8 abwechselnd längs und quer), gewachst; top = Kante mit Glanz
+  function parquet(opts = {}) {
+    const c = C(16, 16), x = c.getContext('2d'), sd = ri(0, 99999);
+    const tones = ['#5c3014', '#6c3c18', '#7c4820', '#8c5428'];
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
+      const hor = ((X >> 3) + (y >> 3)) % 2 === 0, lx = X & 7, ly = y & 7, plank = hor ? ly >> 2 : lx >> 2, along = hor ? lx : ly, across = hor ? ly & 3 : lx & 3;
+      const id = (X >> 3) * 7 + (y >> 3) * 13 + plank * 3;
+      let col = tones[Math.floor(hn(id, 1, sd) * 4)];
+      if (hn(along >> 1, id, sd + 5) > 0.8) col = '#4c2810'; // Maserung
+      if (across === 0) col = '#9c6430';
+      if (across === 3 || along === 7) col = '#2c1406'; // Fugen
+      px(x, col, X, y);
+    }
+    if (opts.top) { px(x, '#e8b070', 0, 0, 16, 1); px(x, '#b07c44', 0, 1, 16, 1); px(x, 'rgba(255,230,180,0.14)', 0, 2, 16, 2); }
+    return c;
+  }
+  function shelfWalk() { // Galerie der Bibliothek: Laufsteg auf einem Bücherregal – Messingkante, darunter eine Reihe Buchrücken
+    const c = C(16, 16), x = c.getContext('2d');
+    const BK = [['#6c1420', '#9c3034'], ['#1c2860', '#34488c'], ['#14461e', '#2c6c38'], ['#5c3410', '#86562a'], ['#541858', '#7c3484'], ['#5c4c10', '#8c7424']];
+    px(x, '#0c0402', 0, 0, 16, 16);
+    for (let X = 0; X < 16;) {
+      const w = Math.min(16 - X, ri(2, 3)), h = ri(7, 9), [m, l] = BK[ri(0, BK.length - 1)];
+      if (rand() < 0.12) { X += w; continue; }
+      px(x, m, X, 14 - h, w, h); px(x, l, X, 14 - h, 1, h); px(x, '#c8982c', X, 16 - h, w, 1); px(x, '#c8982c', X, 12, w, 1);
+      X += w;
+    }
+    px(x, '#fce0a8', 0, 0, 16, 1); px(x, '#c8982c', 0, 1, 16, 1); px(x, '#7c4c20', 0, 2, 16, 2); px(x, '#2c1406', 0, 4, 16, 1); // Brett mit Messingkante
+    px(x, '#7c4c20', 0, 14, 16, 1); px(x, '#140802', 0, 15, 16, 1); // Regalboden
     return c;
   }
   function carpetStair(dir) { // Holztreppe mit rotem Läufer und Messingstangen
@@ -222,6 +253,10 @@ const Tiles = (() => {
       if (v === 1) { px(x, '#7c4830', 3, 4, 3, 2); px(x, '#6c3c28', 9, 5, 2, 1); px(x, '#a4b4e4', 12, 5, 1, 1); }
       else if (v === 3) { px(x, '#4c4458', 5, 5, 4, 1); px(x, '#a4b4e4', 10, 5, 2, 1); }
       else return null;
+    } else if (theme === 'library') { // Bücherstapel und lose Seiten auf dem Boden
+      if (v === 1) { px(x, '#6c1420', 2, 4, 9, 2); px(x, '#e8dcc0', 10, 4, 1, 2); px(x, '#1c2860', 3, 2, 7, 2); px(x, '#e8dcc0', 9, 2, 1, 2); px(x, '#c8982c', 3, 2, 1, 2); }
+      else if (v === 3) { px(x, '#e8dcc0', 7, 5, 5, 1); px(x, '#c8bca0', 8, 4, 3, 1); }
+      else return null;
     } else if (theme === 'cave') {
       for (let X = 0; X < 16; X++) if (rand() < 0.7) { const h = ri(1, 2); px(x, m[0], X, 6 - h, 1, h); if (rand() < 0.4) px(x, m[1], X, 6 - h, 1, 1); }
       if (v === 1) { px(x, '#d8d8a0', 9, 2, 3, 1); px(x, '#a8a870', 10, 3, 1, 3); px(x, '#58f898', 10, 2, 1, 1); }
@@ -242,7 +277,7 @@ const Tiles = (() => {
       const X0 = v ? 11 : 4;
       for (let y = 0; y < (v ? 6 : 9); y++) px(x, '#3c2814', X0 + (y > 5 ? 1 : 0), y);
       px(x, '#5c4024', X0, 0, 1, 2); if (v) px(x, '#3c2814', X0 - 1, 6, 3, 2);
-    } else if (theme === 'foyer') { // Spinnweben unter der Galerie
+    } else if (theme === 'foyer' || theme === 'library') { // Spinnweben unter der Galerie
       if (v === 2) return null;
       x.fillStyle = 'rgba(210,210,232,0.4)';
       for (let k = 0; k < 8; k++) { x.fillRect(v ? 15 - k : k, k, 1, 1); x.fillRect(v ? 15 - k * 2 : k * 2, 0, 1, 1); }
@@ -322,6 +357,7 @@ const Tiles = (() => {
   }
   // Rosette im Thronsaal: Lage in der Wandebene (512 px breit, Parallaxe 0.5) + Buntglas mit Bleiruten
   const ROSE = { x: 128, y: 66, r: 30 };
+  const LIB_WIN = [296, 24, 48, 98]; // Bibliothek: Bogenfenster in der Wandebene (x, Oberkante, Breite, Höhe) – wie STORM_WINS.library
   function roseGlass(x, rx, ry, rr) {
     for (let y = -rr; y <= rr; y++) for (let X = -rr; X <= rr; X++) {
       const d = Math.hypot(X, y);
@@ -1228,6 +1264,121 @@ const Tiles = (() => {
       // Deckengesims mit Riss
       px(x, '#2c2434', 0, 0, 512, 10); px(x, '#5c5468', 0, 8, 512, 2); for (let X = 0; X < 512; X += 8) px(x, '#3c3448', X, 3, 4, 4);
       add('wall', c, 0.5, { vtile: true });
+    } else if (theme === 'library') { // Bibliothek: deckenhohe Bücherwände, Galerie mit Balustrade, Rollleitern, hohes Bogenfenster mit Sturm dahinter
+      const sky = C(640, 208), xs = sky.getContext('2d');
+      smooth(xs, 640, 208, ['#000000', '#04010c', '#0a0418', '#120826', '#1c0c34', '#26103e', '#301446', '#3a184c', '#421c50']);
+      for (let i = 0; i < 60; i++) px(xs, rand() < 0.3 ? '#fcfcfc' : '#7c7c9c', ri(0, 639), ri(0, 90));
+      add('sky', sky, 0, { wrap: false });
+      const cl = C(512, 208), xc = cl.getContext('2d');
+      for (let i = 0; i < 30; i++) {
+        const cx = ri(0, 511), cy = ri(10, 150), rx = ri(16, 40), ry = ri(6, 16);
+        for (let y = -ry; y <= ry; y++) for (let X = -rx; X <= rx; X++) {
+          const q = (X * X) / (rx * rx) + (y * y) / (ry * ry);
+          if (q > 1 || bay(X + cx, y + cy) < (q - 0.65) * 3) continue;
+          px(xc, y > ry * 0.4 ? '#1c0c30' : '#0c0618', (cx + X + 512) % 512, cy + y);
+        }
+      }
+      add('clouds', cl, 0.06, { drift: 0.25 });
+      L.push({ name: 'rainOut', custom: drawRainOut, par: 0, c: C(1, 1) });
+      const H = 320, c = C(512, H), x = c.getContext('2d');
+      const [wx, wy, ww, wh] = LIB_WIN, wr = ww / 2;
+      const inWin = (X, Y) => { if (X < wx || X >= wx + ww || Y < wy || Y >= wy + wh) return false; if (Y >= wy + wr) return true; return (X + 0.5 - wx - wr) ** 2 + (Y + 0.5 - wy - wr) ** 2 <= wr * wr; };
+      const BOOK = [['#3c0810', '#6c1420', '#9c3034'], ['#0c1034', '#1c2860', '#34488c'], ['#08240e', '#14461e', '#2c6c38'], ['#2c1806', '#5c3410', '#86562a'], ['#2c0830', '#541858', '#7c3484'], ['#342c06', '#5c4c10', '#8c7424'], ['#140e10', '#2a2024', '#463a40']];
+      const G1 = '#b8882c', G2 = '#fce0a8';
+      px(x, '#120804', 0, 0, 512, H);
+      const board = (x0, x1, y) => { px(x, '#1c0c04', x0, y - 1, x1 - x0, 1); px(x, '#9c6834', x0, y, x1 - x0, 1); px(x, '#5c3414', x0, y + 1, x1 - x0, 2); px(x, '#140802', x0, y + 3, x1 - x0, 1); };
+      const curio = (X, yb) => { // Kuriositäten zwischen den Büchern: Schädel, Sanduhr, Trankflasche, Kerzenstumpf
+        const k = ri(0, 3);
+        if (k === 0) { px(x, '#c8c4b4', X + 1, yb - 5, 5, 4); px(x, '#ece8d8', X + 1, yb - 5, 5, 1); px(x, '#140c08', X + 2, yb - 3, 1, 1); px(x, '#140c08', X + 4, yb - 3, 1, 1); px(x, '#9c9888', X + 2, yb - 1, 3, 1); }
+        else if (k === 1) { px(x, '#5c3414', X + 1, yb - 9, 1, 9); px(x, '#5c3414', X + 5, yb - 9, 1, 9); px(x, G1, X, yb - 10, 7, 1); px(x, G1, X, yb - 1, 7, 1); px(x, '#8c9cc8', X + 2, yb - 9, 3, 3); px(x, '#8c9cc8', X + 3, yb - 6, 1, 1); px(x, '#8c9cc8', X + 2, yb - 5, 3, 3); px(x, '#e8c070', X + 2, yb - 4, 3, 2); px(x, '#e8c070', X + 3, yb - 7, 1, 2); }
+        else if (k === 2) { px(x, '#14482c', X + 1, yb - 6, 5, 6); px(x, '#3c9c6c', X + 2, yb - 5, 1, 3); px(x, '#6cd89c', X + 2, yb - 5, 1, 1); px(x, '#5c3414', X + 2, yb - 8, 3, 2); }
+        else { px(x, '#3c2c1c', X, yb - 1, 7, 1); px(x, '#d8d0b8', X + 2, yb - 6, 3, 5); px(x, '#a89c84', X + 4, yb - 6, 1, 5); px(x, '#e8e0c8', X + 2, yb - 7, 1, 1); }
+      };
+      const shelfRow = (x0, x1, y0, y1) => { // eine Regalreihe: Buchrücken verschiedener Höhe mit Goldprägung, mal schräg angelehnt, mal gestapelt, ab und zu eine Lücke
+        let X = x0 + ri(0, 2);
+        while (X < x1 - 3) {
+          const r = rand();
+          if (r < 0.06 && x1 - X > 13) { // liegender Stapel
+            let yy = y1;
+            for (let k = 0, n = ri(2, 4); k < n; k++) { const bw = ri(8, 11), [d, m, l] = BOOK[ri(0, BOOK.length - 1)]; px(x, m, X + (k & 1), yy - 2, bw, 2); px(x, l, X + (k & 1), yy - 2, bw, 1); px(x, '#d8ccb0', X + (k & 1) + bw - 1, yy - 2, 1, 2); px(x, d, X + (k & 1), yy - 1, 1, 1); yy -= 2; }
+            X += 13; continue;
+          }
+          if (r < 0.1 && x1 - X > 9) { curio(X, y1); X += 8; continue; }
+          if (r < 0.15) { // Lücke: hier ist ein Buch davongeflogen – nur der Staubrand bleibt
+            const gw = ri(3, 6); for (let k = 0; k < gw; k++) px(x, '#2c1a10', X + k, y1 - 1, 1, 1); X += gw; continue;
+          }
+          const bw = ri(3, 5), bh = Math.min(y1 - y0 - 1, ri(9, 15)), [d, m, l] = BOOK[ri(0, BOOK.length - 1)];
+          const lean = r > 0.94 && X > x0 + 5;
+          for (let yy = 0; yy < bh; yy++) {
+            const sx = X + (lean ? Math.floor((bh - yy) / 4) : 0), Y = y1 - bh + yy;
+            px(x, m, sx, Y, bw, 1); px(x, l, sx, Y, 1, 1); px(x, d, sx + bw - 1, Y, 1, 1);
+          }
+          if (!lean) {
+            px(x, d, X, y1 - bh, bw, 1);
+            if (rand() < 0.75) { px(x, G1, X, y1 - bh + 2, bw, 1); px(x, G1, X, y1 - 3, bw, 1); } // Goldbünde
+            if (bh > 11 && rand() < 0.5) { px(x, '#140808', X + 1, y1 - bh + 4, bw - 2, 3); px(x, G2, X + 1, y1 - bh + 5, bw - 2, 1); } // Titelschild
+          }
+          X += bw + (lean ? 3 : 0);
+        }
+        for (let X2 = x0; X2 < x1; X2++) for (let k = 0; k < 4; k++) if (bay(X2, y0 + k) < (4 - k) / 5) px(x, '#060201', X2, y0 + k); // Schatten unter dem Brett
+      };
+      // Buchten zwischen den Pilastern (alle 128 px), oben über der Galerie und unten
+      for (let b = 0; b < 4; b++) {
+        const x0 = b * 128 + 10, x1 = b * 128 + 118;
+        for (let yb = 14; yb < 134; yb += 20) { if (b !== 2) { shelfRow(x0, x1, yb + 4, yb + 19); board(x0, x1, yb); } }
+        for (let yb = 158; yb < H; yb += 20) { shelfRow(x0, x1, yb + 4, Math.min(H - 1, yb + 19)); board(x0, x1, yb); }
+      }
+      // mittlere Bucht oben: hohes Bogenfenster, links und rechts schwere grüne Samtvorhänge
+      for (let Y = 14; Y < 134; Y++) for (let X = 266; X < 374; X++) px(x, (X + Y) % 9 ? '#1a0e06' : '#22140a', X, Y); // Holzvertäfelung
+      for (let Y = wy - 6; Y < wy + wh + 4; Y++) for (let X = wx - 6; X < wx + ww + 6; X++) {
+        const inside = inWin(X, Y), near = inWin(X - 5, Y) || inWin(X + 5, Y) || inWin(X, Y + 5) || inWin(X, Y - 5);
+        if (!inside && near) { px(x, ((Y >> 3) + (X >> 4)) % 2 ? '#5c5468' : '#6c6478', X, Y); continue; } // Steinlaibung
+        if (!inside) continue;
+        const lx = X - wx, ly = Y - wy, mull = Math.abs(lx - ww / 2 + 0.5) < 1.5, tran = ly > wr + 30 && ly < wr + 33;
+        const lead = (lx + ly) % 8 === 0 || (lx - ly + 800) % 8 === 0;
+        if (mull || tran) px(x, '#4c4458', X, Y);
+        else if (lead) px(x, '#100c18', X, Y);
+        else x.clearRect(X, Y, 1, 1); // klares Glas: Himmel, Regen und Blitze scheinen durch
+      }
+      px(x, '#7c7488', wx - 8, wy + wh + 2, ww + 16, 2); px(x, '#3c3448', wx - 8, wy + wh + 4, ww + 16, 2); // Sohlbank
+      [[266, 1], [350, -1]].forEach(([cx0, side]) => { // Vorhänge mit Raffhalter
+        for (let Y = 16; Y < 132; Y++) {
+          const tie = 92, g = Y < tie ? 1 - (Y - 16) / (tie - 16) * 0.5 : 0.5 + (Y - tie) / 60 * 0.4, w = Math.round(24 * g), X0 = side > 0 ? cx0 : cx0 + 24 - w;
+          for (let X = 0; X < w; X++) { const f = Math.sin((X / Math.max(1, w)) * Math.PI * 3 + Y * 0.015) * 0.5 + 0.5; px(x, f > 0.78 ? '#2c6c3c' : f > 0.42 ? '#1c4c28' : f > 0.14 ? '#10341a' : '#08200e', X0 + X, Y); }
+          if (Y > tie - 2 && Y < tie + 2) px(x, G1, X0 - 1, Y, w + 2, 1);
+        }
+        px(x, '#f8b800', side > 0 ? cx0 + 11 : cx0 + 11, 94, 3, 3); for (let k = 0; k < 7; k++) px(x, k % 2 ? G1 : G2, cx0 + 10 + (k % 4), 97 + (k >> 1), 1, 3);
+      });
+      px(x, G1, 262, 14, 116, 2); px(x, G2, 262, 14, 116, 1); // Vorhangstange
+      // geschnitzte Pilaster mit Kanneluren
+      const PT = ['#140802', '#2c1406', '#4c2810', '#6c3c18', '#8c5c2c', '#a0703c', '#8c5c2c', '#6c3c18', '#4c2810', '#2c1406'];
+      for (let b = 0; b <= 4; b++) for (let X = -10; X < 10; X++) {
+        const XX = b * 128 + X; if (XX < 0 || XX >= 512) continue;
+        const col = PT[(X + 10) >> 1], flute = (X + 10) % 5 === 2;
+        px(x, flute ? '#2c1406' : col, XX, 0, 1, H);
+        px(x, (X + 10) % 5 === 3 ? '#b8844c' : col, XX, 16, 1, 6); px(x, '#140802', XX, 22, 1, 1); // Kapitell
+      }
+      // Galerie: Handlauf, Balustersäulen, geschnitzte Brüstung
+      px(x, '#3c1c08', 0, 128, 512, 3); px(x, '#b07c44', 0, 128, 512, 1); px(x, '#140802', 0, 131, 512, 1);
+      for (let X = 2; X < 512; X += 7) { px(x, '#3c1c08', X, 132, 3, 12); px(x, '#7c4c20', X + 1, 133, 1, 10); px(x, '#8c5c2c', X, 136, 3, 3); px(x, '#a0703c', X + 1, 137, 1, 1); }
+      px(x, '#3c1c08', 0, 144, 512, 2); px(x, '#2c1406', 0, 146, 512, 12); px(x, '#b07c44', 0, 146, 512, 1); px(x, G1, 0, 148, 512, 1); px(x, '#6c3c18', 0, 156, 512, 1); px(x, '#0c0402', 0, 157, 512, 1);
+      for (let X = 8; X < 512; X += 32) { px(x, '#4c2810', X, 150, 22, 5); px(x, '#1c0c04', X + 1, 151, 20, 3); px(x, G1, X + 10, 152, 2, 1); } // Füllungen mit Goldknopf
+      // Deckengesims mit Zahnschnitt
+      px(x, '#1c0c04', 0, 0, 512, 14); px(x, '#3c2010', 0, 0, 512, 3); for (let X = 0; X < 512; X += 6) px(x, '#5c3418', X, 5, 4, 4); px(x, '#8c5c2c', 0, 10, 512, 1); px(x, '#5c3414', 0, 11, 512, 2); px(x, '#0a0402', 0, 13, 512, 1);
+      // Messingschienen und Rollleitern
+      px(x, G1, 0, 18, 512, 1); px(x, G1, 0, 162, 512, 1);
+      const ladder = (xt, yt, xb, yb) => {
+        const n = yb - yt;
+        for (let i = 0; i <= n; i++) { const X = Math.round(xt + (xb - xt) * i / n), Y = yt + i; px(x, '#5c3414', X, Y, 2, 1); px(x, '#a8743c', X, Y, 1, 1); px(x, '#5c3414', X + 10, Y, 2, 1); px(x, '#a8743c', X + 10, Y, 1, 1); if (i % 8 === 4) px(x, '#7c4c20', X + 2, Y, 8, 1); }
+        px(x, G2, xt, yt - 1, 3, 1); px(x, G2, xt + 10, yt - 1, 3, 1); // Haken an der Schiene
+      };
+      ladder(60, 19, 74, 127); ladder(424, 163, 440, 318);
+      // Spinnweben in den oberen Ecken einiger Buchten
+      [[10, 14, 1], [246, 14, -1], [394, 158, 1], [118, 158, -1]].forEach(([X, Y, d]) => { for (let k = 0; k < 12; k++) { px(x, 'rgba(210,210,230,0.32)', X + d * k, Y + 1, 1, 1); px(x, 'rgba(210,210,230,0.32)', X, Y + 1 + k, 1, 1); px(x, 'rgba(210,210,230,0.28)', X + d * k, Y + 12 - k, 1, 1); } });
+      shade(x, 512, H, '#060201', 0, 50);
+      x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(10,4,6,0.42)'; x.fillRect(0, 0, 512, H); x.globalCompositeOperation = 'source-over'; // Hintergrund zurücknehmen, damit die begehbaren Regale vorn klar lesbar bleiben
+      add('wall', c, 0.5, { vtile: true });
+      L.push({ name: 'books', custom: drawBookFlock, par: 0.7, c: C(1, 1) }); // in der Ferne kreisen Bücherschwärme
     } else if (theme === 'courtyard') {
       const sky = C(640, 208), x = sky.getContext('2d');
       smooth(x, 640, 208, ['#000000', '#05010f', '#0c031c', '#160629', '#220a36', '#320e44', '#461250', '#5a1658', '#6c1c5c']);
@@ -1259,13 +1410,61 @@ const Tiles = (() => {
         }
       }
       add('clouds', cl, 0.04, { drift: 0.06 });
-      const mt = C(512, 208), mx = mt.getContext('2d');
-      for (let X = 0; X < 512; X++) {
-        const a = X / 512 * Math.PI * 2;
-        const top = Math.round(118 + Math.sin(a * 3) * 10 + Math.sin(a * 7 + 1) * 6 + Math.sin(a * 13) * 3);
-        px(mx, '#1a0828', X, top, 1, 208 - top); px(mx, '#3c1450', X, top, 1, 1);
+      // Bergketten im Blutmondlicht: hinten hohe, verschneite Gipfel, davor dunklere Felsgrate mit Tannen, Nebel in den Tälern,
+      // ganz vorn ein Tannenwald. Grate per Mittelpunktverschiebung (nahtlos über 512 px); die zum Mond (rechts oben) gewandten Flanken hell
+      const ridge = (base, amp, rough, lo, hi) => {
+        const h = new Float32Array(513); h[0] = h[512] = base;
+        for (let s = 256; s >= 1; s >>= 1) for (let i = s; i < 512; i += s * 2) h[i] = (h[i - s] + h[i + s]) / 2 + (rand() - 0.5) * amp * Math.pow(s / 256, rough);
+        for (let i = 0; i <= 512; i++) h[i] = Math.max(lo, Math.min(hi, h[i]));
+        return h;
+      };
+      const peaks = (n, yTop, yBot, sMin, sMax, jag) => { // einzelne Gipfel (Kegel, leicht schief) vereinigt, darüber fraktal gezackte Grate
+        const h = new Float32Array(513).fill(yBot);
+        for (let i = 0; i < n; i++) {
+          const cx = ri(0, 511), top = ri(yTop, yBot - 24), sl = sMin + rand() * (sMax - sMin), asym = 0.7 + rand() * 0.6;
+          for (let X = 0; X <= 512; X++) for (const o of [-512, 0, 512]) { const dx = X - cx - o, y = top + Math.abs(dx) * (dx < 0 ? sl * asym : sl); if (y < h[X]) h[X] = y; }
+        }
+        const nz = ridge(0, jag, 0.8, -999, 999);
+        for (let X = 0; X <= 512; X++) h[X] += nz[X];
+        return h;
+      };
+      const range = (cv, h, P, snowLine, mist) => {
+        const g = cv.getContext('2d'), at = (X) => h[((X % 512) + 512) % 512];
+        for (let X = 0; X < 512; X++) {
+          const top = Math.round(h[X]), sl = at(X + 5) - at(X - 5), face = sl > 2 ? 2 : sl < -2 ? 0 : 1; // geglättete Hangneigung: 2 = zum Mond
+          const snowD = snowLine && top < snowLine ? (snowLine - top) * 0.6 + hn(X >> 1, 1, 5) * 5 : 0; // Schnee nur auf den höchsten Gipfeln
+          const band = 12 + hn(X >> 2, 3, 9) * 10;
+          for (let Y = Math.max(0, top); Y < 208; Y++) {
+            const d = Y - top, f = d < band || (d < band + 10 && bay(X, Y) < 1 - (d - band) / 10) ? face : 1; // Licht-/Schattenseite nahe am Grat
+            const deep = Math.min(1, d / 90);
+            let c = deep > 0.45 && bay(X, Y) < (deep - 0.45) * 2 ? P.deep : P.face[f];
+            if (snowD) { if (d < snowD) c = P.snow[face]; else if (d < snowD + 2 && bay(X, Y) < 0.5) c = P.snow[0]; }
+            if (d === 0) c = face === 2 ? P.rimLit : P.rim;
+            if (mist && Y > mist.from && bay(X, Y) < Math.min(0.85, (Y - mist.from) / mist.len)) c = mist.col;
+            px(g, c, X, Y);
+          }
+        }
+      };
+      const pk = C(512, 208), hp = peaks(6, 38, 150, 0.6, 1.2, 22);
+      range(pk, hp, { face: ['#28163e', '#382252', '#52366c'], deep: '#2c1844', rim: '#5c4478', rimLit: '#b49cd4', snow: ['#6c5c8c', '#8c7cac', '#d0c0e8'] }, 84, { from: 120, len: 56, col: '#2c1642' });
+      add('peaks', pk, 0.06);
+      const mt = C(512, 208), mx = mt.getContext('2d'), hm = peaks(8, 92, 176, 0.45, 0.85, 14);
+      range(mt, hm, { face: ['#10061a', '#1a0a26', '#2a1238'], deep: '#14081e', rim: '#30163e', rimLit: '#6c2a58' }, 0, { from: 162, len: 46, col: '#2a1238' });
+      for (let i = 0; i < 80; i++) { // Tannen auf den unteren Hängen
+        const X = ri(0, 511), base = Math.max(Math.round(hm[X]) + 16, ri(150, 180)), hgt = ri(5, 11);
+        for (let r = 0; r < hgt; r++) { const w = Math.max(1, Math.round((r / hgt) * 4)); px(mx, '#08020e', X - (w >> 1), base - hgt + r, w, 1); }
+        px(mx, '#08020e', X, base, 1, 2);
       }
-      add('mountains', mt, 0.1);
+      add('mountains', mt, 0.12);
+      const fo = C(512, 208), fx2 = fo.getContext('2d');
+      for (let i = 0; i < 95; i++) { // dunkler Tannenwald am Fuß der Berge, die Spitzen im Mondlicht
+        const X = ri(0, 511), base = ri(178, 202), hgt = ri(14, 32);
+        for (let r = 0; r < hgt; r++) { const w = Math.max(1, Math.round(r / 3) - (r % 5 === 4 ? 1 : 0)); px(fx2, '#06020a', X - (w >> 1), base - hgt + r, w, 1); if (r > 1) px(fx2, '#2c1236', X + (w >> 1), base - hgt + r, 1, 1); }
+        px(fx2, '#06020a', X, base, 1, 208 - base);
+      }
+      px(fx2, '#06020a', 0, 198, 512, 10);
+      for (let Y = 176; Y < 208; Y++) for (let X = 0; X < 512; X++) if (bay(X, Y) < (Y - 176) / 64 * 0.65 && hn(X >> 3, Y >> 2, 21) > 0.3) px(fx2, '#2a1438', X, Y); // Bodennebel
+      add('forest', fo, 0.18);
       const cs = C(512, 208), x2 = cs.getContext('2d'), col = '#12061a';
       const tower = (tx, ty, tw, roof) => {
         px(x2, col, tx, ty, tw, 208 - ty);
@@ -1290,15 +1489,49 @@ const Tiles = (() => {
       for (let i = 0; i < 22; i++) { const wx = 160 + ri(0, 280), wy = 125 + ri(0, 50); px(x2, '#f8b800', wx, wy, 1, 2); }
       add('castle', cs, 0.25);
       const nr = C(512, 208), x3 = nr.getContext('2d');
-      const tree = (tx) => {
-        for (let y = 60; y < 180; y++) px(x3, '#000', tx + (y < 90 ? Math.round(Math.sin(y / 9)) : 0), y, 6 - (y < 80 ? 2 : 0), 1);
-        const branch = (bx, by, dx, len, depth) => {
-          for (let i = 0; i < len; i++) px(x3, '#000', bx + i * dx, by - Math.floor(i * 0.7), depth > 0 ? 2 : 1, 1);
-          if (depth > 0) { branch(bx + len * dx, by - Math.floor(len * 0.7), dx, Math.floor(len * 0.6), depth - 1); branch(bx + Math.floor(len / 2) * dx, by - Math.floor(len * 0.35), -dx, Math.floor(len * 0.4), 0); }
-        };
-        branch(tx + 5, 100, 1, 18, 2); branch(tx, 90, -1, 16, 2); branch(tx + 4, 75, 1, 10, 1); branch(tx + 1, 122, -1, 20, 1);
+      // knorrige, tote Bäume: sich verjüngende, verzweigte Äste mit Zweigen, Wurzeln und Moosbärten; die zum Mond gewandte
+      // Kante leuchtet rötlich-violett, auf den Ästen sitzen eine Eule mit glühenden Augen und ein Rabe
+      const tcv = C(512, 208), tcx = tcv.getContext('2d'), perch = [], moss = [], TC = '#030106';
+      const blob = (X, Y, r) => { const R = Math.ceil(r); for (let yy = -R; yy <= R; yy++) for (let xx = -R; xx <= R; xx++) if (xx * xx + yy * yy <= r * r + 0.35) px(tcx, TC, Math.round(X + xx), Math.round(Y + yy)); };
+      const limb = (X, Y, a, len, th, depth) => {
+        for (let i = 0; i < len; i++) {
+          blob(X, Y, Math.max(0.5, th * (1 - i / len * 0.45) / 2));
+          X += Math.cos(a); Y += Math.sin(a); a += (rand() - 0.5) * 0.18;
+          if (a > -0.15) a -= 0.04; else if (a < -Math.PI + 0.15) a += 0.04; // Äste hängen nicht nach unten
+          if (depth === 1 && i === Math.floor(len * 0.55) && Math.abs(Math.sin(a)) < 0.6) perch.push([X, Y]);
+          if (depth === 2 && i === Math.floor(len * 0.5)) moss.push([X, Y]);
+        }
+        if (depth > 0) {
+          const n = 2 + (depth > 1 && rand() < 0.5 ? 1 : 0);
+          for (let k = 0; k < n; k++) limb(X, Y, a + (k - (n - 1) / 2) * (0.55 + rand() * 0.35), len * (0.6 + rand() * 0.15), th * 0.6, depth - 1);
+        } else for (let k = 0; k < 3; k++) { // Zweige
+          let x1 = X, y1 = Y, a1 = a + (rand() - 0.5) * 1.8;
+          for (let i = ri(3, 7); i > 0; i--) { px(tcx, TC, Math.round(x1), Math.round(y1)); x1 += Math.cos(a1); y1 += Math.sin(a1); a1 += (rand() - 0.5) * 0.6; }
+        }
       };
-      tree(70); tree(330); tree(460);
+      const tree = (X0, len, lean) => {
+        for (const s of [-1, 1]) for (let k = 0; k < 2; k++) { let rx = X0 + s * 2, ry = 176 + k * 2; for (let i = ri(8, 15); i > 0; i--) { blob(rx, ry, i > 6 ? 1.5 : 0.8); rx += s * (0.8 + rand() * 0.5); ry += rand() < 0.35 ? 1 : 0; } } // Wurzeln
+        limb(X0, 180, -Math.PI / 2 + lean, len, 10, 3);
+      };
+      tree(70, 44, -0.08); tree(330, 50, 0.1); tree(460, 38, -0.04);
+      const tid = tcx.getImageData(0, 0, 512, 208), td = tid.data, sol = (X, Y) => X >= 0 && X < 512 && Y >= 0 && Y < 208 && td[(Y * 512 + X) * 4 + 3] > 0;
+      const lit = new Uint8ClampedArray(td);
+      for (let Y = 0; Y < 208; Y++) for (let X = 0; X < 512; X++) {
+        if (!sol(X, Y)) continue;
+        let c = null;
+        if (!sol(X + 1, Y) || (!sol(X, Y - 1) && !sol(X + 1, Y - 1))) c = [104, 44, 76]; // Kante zum Mond
+        else if (!sol(X + 2, Y) && hn(X, Y >> 1, 3) > 0.35) c = [48, 20, 46];          // gedämpfte zweite Lichtreihe
+        else if (sol(X - 2, Y) && sol(X + 2, Y) && hn(X >> 1, Y >> 2, 11) > 0.8) c = [20, 9, 24]; // Borke
+        if (c) { const i = (Y * 512 + X) * 4; lit[i] = c[0]; lit[i + 1] = c[1]; lit[i + 2] = c[2]; }
+      }
+      td.set(lit); tcx.putImageData(tid, 0, 0);
+      moss.forEach(([X, Y]) => { for (let k = -2; k <= 2; k++) { const len = ri(4, 12); for (let y = 1; y < len; y++) if (bay(X + k, Y + y) < 0.6) px(tcx, '#1c0e24', Math.round(X + k), Math.round(Y + y)); } }); // Moosbärte
+      if (perch.length > 1) { const X = Math.round(perch[1][0]), Y = Math.round(perch[1][1]) - 1; // Eule
+        px(tcx, TC, X - 2, Y - 7, 5, 7); px(tcx, TC, X - 2, Y - 8, 1, 1); px(tcx, TC, X + 2, Y - 8, 1, 1); px(tcx, '#5c2448', X + 2, Y - 6, 1, 5);
+        px(tcx, '#fcd040', X - 1, Y - 6, 1, 1); px(tcx, '#fcd040', X + 1, Y - 6, 1, 1); }
+      if (perch.length > 4) { const X = Math.round(perch[4][0]), Y = Math.round(perch[4][1]) - 1; // Rabe
+        px(tcx, TC, X - 3, Y - 4, 6, 3); px(tcx, TC, X + 2, Y - 6, 2, 2); px(tcx, '#5c2448', X + 4, Y - 5, 1, 1); px(tcx, TC, X - 5, Y - 3, 2, 1); px(tcx, TC, X - 1, Y - 1, 1, 1); }
+      x3.drawImage(tcv, 0, 0);
       for (let i = 0; i < 512; i += 6) {
         px(x3, '#2a2636', i, 146, 2, 30); px(x3, '#4c4458', i, 146, 1, 30);
         px(x3, '#5c5468', i, 141, 2, 1); px(x3, '#4c4458', i - 1, 143, 4, 1); px(x3, '#4c4458', i, 142, 2, 3);
@@ -1430,17 +1663,18 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), ship: () => planks(p.a, { hull: true }) }[theme];
+    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
       : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true }))
       : theme === 'glass' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true }))
+      : theme === 'library' ? [0, 1, 2, 3].map(() => parquet({ top: true }))
       : theme === 'foyer' ? [checker({ top: true }), checker({ top: true, crack: true }), checker({ top: true }), checker({ top: true })] : ground;
-    const alt = theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+    const alt = theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
-      spikes: spikes(), up: theme === 'foyer' ? carpetStair(1) : theme === 'ship' ? ratline(1) : theme === 'glass' ? stairTile(p.a, 1, '#fce0a8') : stairTile(p.b, 1), down: theme === 'foyer' ? carpetStair(-1) : theme === 'ship' ? ratline(-1) : theme === 'glass' ? stairTile(p.a, -1, '#fce0a8') : stairTile(p.b, -1),
+      spikes: spikes(), up: theme === 'library' ? stairTile(p.b, 1, '#e8c070') : theme === 'foyer' ? carpetStair(1) : theme === 'ship' ? ratline(1) : theme === 'glass' ? stairTile(p.a, 1, '#fce0a8') : stairTile(p.b, 1), down: theme === 'library' ? stairTile(p.b, -1, '#e8c070') : theme === 'foyer' ? carpetStair(-1) : theme === 'ship' ? ratline(-1) : theme === 'glass' ? stairTile(p.a, -1, '#fce0a8') : stairTile(p.b, -1),
       toppers: [0, 1, 2, 3].map(v => topper(theme, v)), hangers: [0, 1, 2].map(v => hanger(theme, v)),
       bg: buildBg(theme), crate: theme === 'ship' ? crate(p.b) : null,
     };
@@ -1457,6 +1691,27 @@ const Tiles = (() => {
     for (let i = 0; i < n; i++) {
       const sx = (i * 97 + frame * 3.1) % (w + 60) - 30, sy = ((i * 53 + frame * 9.5) % 260) - 30, len = 6 + (i % 3) * 3;
       for (let k = 0; k < len; k++) ctx.fillRect(Math.round(sx - k * 0.35), Math.round(sy + k), 1, 1);
+    }
+  }
+
+  // Bibliothek: in der Ferne kreisen Bücher wie Vogelschwärme unter dem Gewölbe (eigene Ebene, Parallaxe 0.7)
+  let flockBooks = null;
+  function drawBookFlock(ctx, cam, frame) {
+    if (!flockBooks) flockBooks = [['#3c1418', '#6c2c30'], ['#141c3c', '#2c3c6c'], ['#142c1c', '#2c5434'], ['#3c2810', '#6c4c24']].map(([d, l]) => [0.9, 0.35, -0.2, 0.35].map(a => {
+      const c = C(11, 7), x = c.getContext('2d'), ap = Math.max(a, 0) + 0.6;
+      for (const s of [-1, 1]) {
+        for (let r = 1; r <= 3; r++) px(x, '#a89c84', Math.round(5 + s * r * Math.cos(ap)), Math.round(4 - r * Math.sin(ap)));
+        for (let r = 0; r <= 5; r++) px(x, r > 3 ? l : d, Math.round(5 + s * r * Math.cos(a)), Math.round(4 - r * Math.sin(a)));
+      }
+      px(x, d, 5, 5);
+      return c;
+    }));
+    const n = View.lite ? 6 : 12, w = View.w + 160, oy = cam.y * 0.7;
+    for (let i = 0; i < n; i++) {
+      const dir = i % 3 === 0 ? -1 : 1, sp = 0.16 + (i % 4) * 0.07;
+      const X = (((i * 173 + dir * frame * sp - cam.x * 0.7) % w) + w) % w - 80;
+      const Y = ((((i * 61) % 150 + 24 - oy) % 260) + 260) % 260 - 30 + Math.sin(frame * 0.02 + i * 1.7) * 14;
+      ctx.drawImage(flockBooks[i % 4][(Math.floor(frame / 5) + i) % 4], Math.round(X), Math.round(Y));
     }
   }
 
@@ -1566,6 +1821,10 @@ const Tiles = (() => {
         px(x, '#2c0408', X, 0, 1, h); px(x, '#5c0a14', X, h - 3, 1, 2); if (sc % 4 === 0) px(x, '#7c1018', X, 0, 1, h - 3);
         if (sc === 0) { px(x, '#c89020', X - 1, 0, 3, 14); px(x, '#f8b800', X - 1, 12, 3, 4); }
       }
+    } else if (theme === 'library') { // Deckenbalken mit geschnitzten Konsolen, hängende Öllampen an Ketten
+      px(x, '#0a0402', 0, 0, 640, 6);
+      [0, 160, 320, 480].forEach(bx => { px(x, '#0a0402', bx, 0, 14, 12); for (let k = 0; k < 8; k++) px(x, '#0a0402', bx + 2 + k, 12 + k, 10 - k, 1); px(x, '#2c1406', bx + 13, 0, 1, 12); });
+      [96, 416].forEach(lx => { for (let y = 6; y < 38; y += 3) px(x, '#1c1418', lx, y, 1, 2); px(x, '#140c08', lx - 4, 38, 9, 7); px(x, '#5c3c1c', lx - 3, 39, 7, 1); px(x, '#fcd040', lx - 1, 41, 3, 3); px(x, '#140c08', lx - 2, 45, 5, 2); });
     } else if (theme === 'hall' || theme === 'throne') {
       [0, 320].forEach(cx => {
         for (let X = 0; X < 120; X++) { const h = 10 + Math.round(Math.sin(X / 120 * Math.PI) * -6 + 6 + (X % 8 < 4 ? 1 : 0)); px(x, '#1c0006', cx + X, 0, 1, h + 10); px(x, '#3c0010', cx + X, h + 9, 1, 1); }

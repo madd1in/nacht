@@ -229,6 +229,31 @@ const Levels = (() => {
     .zone('skull', 30, 60, { interval: 380, max: 1 })
     .start(2, 10).exit(62).done();
 
+  // Bibliothek: deckenhohe Bücherwände, Galerien auf den Regalen, fliegende Bücher, schwebende Zauberbücher,
+  // Lesepulte mit sich selbst umblätternden Büchern, drehende Globen – oben unter dem Gewölbe ein Lesesaal mit Truhe
+  const lb = room(100, 'library', 22)
+    .ground(0, 99, 20)
+    .stair(8, 19, 5, 1).fill(13, 15, 30, 15, '=')                        // Galerie links
+    .stair(26, 14, 5, 1).fill(31, 10, 46, 10, '=')                       // obere Galerie
+    .stair(42, 9, 5, 1).fill(47, 5, 58, 5, '=')                          // Lesesaal unter dem Gewölbe
+    .stair(63, 9, 5, -1).fill(60, 10, 76, 10, '=')                       // obere Galerie rechts
+    .stair(81, 14, 5, -1).fill(74, 15, 86, 15, '=')                      // Galerie rechts
+    .stair(91, 19, 5, -1)
+    .fill(38, 18, 40, 19, '=').fill(66, 19, 67, 19, '=')                 // niedrige Bücherregale im Weg
+    .prop('lectern', { x: 6, y: 19 }).prop('lectern', { x: 54, y: 4 }).prop('lectern', { x: 69, y: 9 })
+    .prop('globe', { x: 20, y: 19 }).prop('globe', { x: 82, y: 19 })
+    .enemy('book', 18, 14).enemy('book', 24, 14).enemy('book', 36, 9).enemy('book', 51, 4).enemy('book', 72, 9).enemy('book', 83, 14)
+    .enemy('book', 30, 19).enemy('book', 58, 19)
+    .enemy('tome', 53, 11).enemy('tome', 71, 16)
+    .candle(4, 17).candle(12, 17, 'H').candle(16, 12).candle(22, 12, 'W').candle(26, 17).candle(34, 7).candle(40, 7, 'H')
+    .candle(44, 17, '$').candle(50, 2, '$').candle(56, 2, 'H').candle(62, 17).candle(64, 7).candle(74, 7, '2')
+    .candle(76, 17, 'H').candle(78, 12, 'H').candle(84, 12).candle(94, 17)
+    .chest(57, 4, 'big')
+    .statue(48, 19)
+    .zone('books', 4, 96, { interval: 200, max: 2 })
+    .music('library')
+    .start(2, 19).exit(98).done();
+
   // Uhrwerk: vertikaler Aufstieg (Aufzüge, Treppen, Pendel-Kronleuchter), Stürze landen auf unteren Ebenen
   const v3 = room(28, 'tower', 32)
     .ground(0, 27, 30)
@@ -287,7 +312,7 @@ const Levels = (() => {
   const STAGES = [
     { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
-    { name: 'DER BERGFRIED', music: 'stage3', time: 780, rooms: [r31, v3, vx, vg, r32], boss: 'GRAF NACHTMAHR' },
+    { name: 'DER BERGFRIED', music: 'stage3', time: 960, rooms: [r31, lb, v3, vx, vg, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
   return { STAGES };

@@ -30,8 +30,8 @@ const FX = (() => {
     return c;
   }
 
-  const AMB = { foyer: 0.6, glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
-  const TINT = { foyer: '8,4,26', glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
+  const AMB = { library: 0.5, foyer: 0.6, glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
+  const TINT = { library: '20,8,2', foyer: '8,4,26', glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
   const lc = Sprites.canvas(256, 208), lx = lc.getContext('2d');
   let vignette = null;
 
@@ -181,6 +181,9 @@ const FX = (() => {
     glass: { max: 26, rate: 0.25, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 208, vx: 0.05, vy: -0.08, life: 320, col: ['#fc7460', '#a4e4fc', '#fce0a8', '#c8a0fc'][Math.floor(Math.random() * 4)], kind: 'mote' }) }, // bunter Staub im Glaslicht
     ship: { max: 16, rate: 0.18, make: (c) => ({ x: c.x + View.w + 4, y: c.y + 96 + Math.random() * 100, vx: -1.5 - Math.random(), vy: -0.15, life: 260, col: '#c8e4fc', kind: 'spray' }) }, // Gischt im Wind
     courtyard: { max: 14, rate: 0.12, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + 110 + Math.random() * 60, vx: 0, vy: 0, life: 240, col: '#c8f818', kind: 'firefly' }) },
+    library: { max: 24, rate: 0.22, make: (c) => Math.random() < 0.22 // Staub im Kerzenlicht, ab und zu segelt eine lose Seite herab
+      ? ({ x: c.x + Math.random() * View.w, y: c.y - 4, vx: 0.1, vy: 0.28, life: 700, col: '#d8ccb0', kind: 'page' })
+      : ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 190, vx: 0.06, vy: 0.03, life: 320, col: '#fce0a8', kind: 'dust' }) },
     hall: { max: 26, rate: 0.25, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 176, vx: 0.08, vy: 0.04, life: 300, col: '#fce0a8', kind: 'dust' }) },
     cave: { max: 18, rate: 0.2, make: (c) => Math.random() < 0.35
       ? ({ x: c.x + Math.random() * View.w, y: c.y, vx: 0, vy: 2.6, life: 120, col: '#3cbcfc', kind: 'drip' })
@@ -261,6 +264,7 @@ const FX = (() => {
         const fade = p.t > p.life - 30 ? (p.t & 2) : 1;
         if (!fade) continue;
         ctx.fillStyle = p.col;
+        if (p.kind === 'page') { const k = (p.t >> 4) & 1; ctx.fillRect(x, y, k ? 3 : 2, k ? 1 : 2); continue; }
         ctx.fillRect(x, y, 1, 1);
         if (p.kind === 'wisp' && (p.t & 8)) { ctx.globalAlpha = 0.4; ctx.fillRect(x - 1, y + 1, 3, 1); ctx.globalAlpha = 1; }
       }

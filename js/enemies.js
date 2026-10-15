@@ -531,6 +531,7 @@ class EProj extends Ent {
   update() {
     this.t++;
     this.vy += this.grav; this.x += this.vx; this.y += this.vy;
+    if (this.type === 'page') this.y += Math.sin(this.t * 0.22) * 0.45; // Buchseite flattert
     if (this.type === 'rock') {
       if (this.vy > 0 && Phys.solidTile(Math.floor(this.cx / T), Math.floor((this.y + this.h) / T))) {
         this.dead = true; W.debris(this.cx, this.y + this.h, '#7c7c7c', 5);
@@ -554,6 +555,10 @@ class EProj extends Ent {
       ctx.fillStyle = PAL.G; ctx.fillRect(x - 1, y - 1, 9, 8);
       ctx.fillStyle = PAL.g; ctx.fillRect(x, y, 6, 5);
       ctx.fillStyle = PAL.W; ctx.fillRect(x, y, 3, 1);
+    } else if (this.type === 'page') { // fliegende Buchseite: kippt beim Flattern hin und her
+      const k = (this.t >> 3) & 1;
+      ctx.fillStyle = '#f0e8d0'; ctx.fillRect(x, y + k, 7, 5 - k * 2); ctx.fillStyle = '#c8bca0'; ctx.fillRect(x + (k ? 6 : 0), y + k, 1, 5 - k * 2);
+      ctx.fillStyle = '#8c3040'; ctx.fillRect(x + 1, y + 1 + k, 4, 1); if (!k) ctx.fillRect(x + 1, y + 3, 3, 1);
     } else {
       const r = Math.floor(this.t / 5) % 4;
       Sprites.draw(ctx, S.bone, x, y, r === 1 || r === 3);
@@ -623,6 +628,14 @@ class Spawner {
       const col = Math.floor(x / T);
       if (!Phys.solidTile(col, deck) || Phys.tile(col, deck - 1) !== '.' || Phys.tile(col, deck - 2) !== '.') continue;
       return new Fishman(x, W.room.h * T);
+    }
+    return null;
+  }
+  spawn_books(p, c) { // Bibliothek: ein Buch löst sich aus der Bücherwand und flattert los
+    for (let tries = 0; tries < 6; tries++) {
+      const x = c.x + rnd(24, View.w - 24), y = clamp(p.cy - rnd(30, 90), c.y + 20, c.y + 150);
+      if (Math.abs(x - p.cx) < 56 || Phys.solidTile(Math.floor(x / T), Math.floor(y / T))) continue;
+      return new FlyBook(x, y, { dir: Math.sign(p.cx - x) || 1 });
     }
     return null;
   }
@@ -702,5 +715,137 @@ class Panther extends Enemy {
   draw(ctx) {
     const S = PANTHER_SPR, s = this.state === 'rest' ? S.rest : this.state === 'crouch' ? S.crouch : this.state === 'leap' && !this.onGround ? S.leap : S.run[Math.floor(this.t / 4) % 2];
     this.ds(ctx, s, Math.round(this.cx - 15 - W.cam.x), Math.round(this.y + this.h - 16 - W.cam.y), this.face < 0, this.flash);
+  }
+}
+
+// ---------------- Bibliothek: fliegende Bücher ----------------
+// Bücher lösen sich aus den Regalen und schlagen mit den Buchdeckeln wie mit Flügeln; dazwischen fächern sich die Seiten
+// auf, ein rotes Lesebändchen flattert hinterher. Ab und zu stoßen sie im Sturzflug auf den Helden herab.
+const BOOK_COLS = [['#4c0c14', '#a02830', '#d85048'], ['#101848', '#2c3c8c', '#5068c0'], ['#0c3018', '#1c6430', '#3c9050'], ['#3c2008', '#7c4c1c', '#b07838'], ['#3c0c3c', '#6c2470', '#9c48a0']];
+const BOOK_SPR = BOOK_COLS.map(([d, m, l]) => {
+  const mk = (ang, closed, rib) => {
+    const c = Sprites.canvas(20, 16), x = c.getContext('2d'), P = (col, X, Y) => { x.fillStyle = col; x.fillRect(Math.round(X), Math.round(Y), 1, 1); };
+    const cx = 10, cy = 8;
+    if (closed) { // zugeklappt, liegt auf dem Regalbrett: Deckel, Seitenschnitt, Rücken mit Goldbünden
+      for (let X = 4; X < 17; X++) { P(m, X, 10); P('#ece4cc', X, 11); P('#c8bca0', X, 12); P(d, X, 13); }
+      P(l, 5, 10); P(l, 6, 10); P('#e8c070', 15, 10); P('#e8c070', 15, 13);
+      for (let Y = 10; Y < 14; Y++) P(Y === 11 || Y === 12 ? '#e8c070' : l, 3, Y);
+      P('#d82828', 16, 14); P('#a81818', 17, 15);
+      return Sprites.fromCanvas(c);
+    }
+    for (const s of [-1, 1]) {
+      const a0 = Math.max(ang, 0) + 0.25;
+      for (let k = 0; k < 4; k++) { // Seitenfächer zwischen den Deckeln
+        const a = a0 + (Math.PI / 2 - a0) * (0.12 + k * 0.22);
+        for (let r = 1; r <= 6; r++) P(k % 2 ? '#d8ccb0' : '#f4ecd8', cx + s * r * Math.cos(a), cy - r * Math.sin(a));
+      }
+      for (let r = 0; r <= 8; r++) { // Buchdeckel: Leder, dunkle Unterkante, Goldecke an der Spitze
+        const X = cx + s * r * Math.cos(ang), Y = cy - r * Math.sin(ang);
+        P(d, X, Y + 1); P(r > 6 ? '#e8c070' : r === 4 ? l : m, X, Y);
+      }
+    }
+    P(d, cx - 1, cy + 1); P(d, cx, cy + 1); P(d, cx + 1, cy + 1); P('#e8c070', cx, cy + 2); // Rücken
+    P('#d82828', cx + rib, cy + 3); P('#d82828', cx + rib * 2, cy + 4); P('#a81818', cx + rib * 2, cy + 5); // Lesebändchen
+    return Sprites.fromCanvas(c);
+  };
+  return { fly: [1.05, 0.62, 0.18, -0.3, 0.18, 0.62].map((a, i) => mk(a, false, i % 3 === 0 ? 0 : i < 3 ? 1 : -1)), dive: mk(1.3, false, 0), closed: mk(0, true, 0) };
+});
+
+class FlyBook extends Enemy {
+  // rest: liegt zugeklappt auf einem Brett und erwacht, wenn der Held näher kommt; sonst löst es sich aus der Bücherwand
+  constructor(x, y, opts = {}) {
+    super(x - 6, y - 5, 12, 10, 1, 1, 150);
+    this.col = opts.col !== undefined ? opts.col : Math.floor(Math.random() * BOOK_COLS.length);
+    this.state = opts.rest ? 'rest' : 'emerge'; this.face = opts.dir || -1; this.cd = 70 + rnd(0, 90); this.t2 = 0;
+    if (this.state === 'emerge') Audio8.sfx('flap', this.cx);
+  }
+  update() {
+    super.update();
+    const p = W.player;
+    if (this.state === 'rest') {
+      if (p.alive && this.onScreen(0) && Math.abs(p.cx - this.cx) < 84 && Math.abs(p.cy - this.cy) < 90) { this.state = 'wake'; this.t2 = 0; this.face = Math.sign(p.cx - this.cx) || -1; Audio8.sfx('flap', this.cx); W.dust(this.cx, this.y + this.h, 2); }
+      return;
+    }
+    if (this.state === 'wake') { this.y -= Math.max(0, 1.3 - this.t2 * 0.07); if (++this.t2 > 20) { this.state = 'fly'; this.vx = 0; this.vy = -0.3; } this.touch(); return; } // klappt auf und hebt ab
+    if (this.state === 'emerge') { this.y -= 0.15; if (this.t > 24) { this.state = 'fly'; this.vx = 0; this.vy = 0; } return; } // tritt aus dem Regal im Hintergrund hervor
+    const dx = p.cx - this.cx, dy = p.cy - 10 - this.cy;
+    if (this.state === 'fly') { // flattert in Wellen auf den Helden zu
+      this.vx = clamp(this.vx + clamp(dx * 0.003, -0.045, 0.045), -1.1, 1.1);
+      this.vy = clamp(this.vy + clamp(dy * 0.003, -0.035, 0.035), -0.7, 0.7);
+      this.x += this.vx; this.y += this.vy + Math.sin(this.t * 0.17) * 0.6;
+      if (p.alive && --this.cd <= 0 && Math.abs(dx) < 100 && Math.abs(dy) < 80) {
+        this.state = 'dive'; this.t2 = 0;
+        const a = Math.atan2(dy + 10, dx); this.vx = Math.cos(a) * 2.4; this.vy = Math.sin(a) * 2.4;
+        Audio8.sfx('flap', this.cx);
+      }
+    } else { // Sturzflug, dann abfangen
+      this.x += this.vx; this.y += this.vy; this.vx *= 0.975; this.vy *= 0.975;
+      if (++this.t2 > 42) { this.state = 'fly'; this.cd = 110 + rnd(0, 90); }
+    }
+    if (Math.abs(this.vx) > 0.1) this.face = Math.sign(this.vx);
+    this.touch();
+    if (this.t > 1500 || (this.t > 200 && !this.onScreen(96))) this.dead = true;
+  }
+  kill(silent) {
+    super.kill(silent);
+    if (!silent) for (let i = 0; i < 9; i++) W.spawn(new Particle(this.cx + rnd(-5, 5), this.cy + rnd(-3, 3), rnd(-1.4, 1.4), rnd(-1.8, -0.3), i % 3 ? '#f0e8d0' : BOOK_COLS[this.col][1], 80, 2, 0.04)); // Seiten stieben auseinander
+  }
+  draw(ctx) {
+    const S = BOOK_SPR[this.col];
+    const s = this.state === 'rest' ? S.closed : this.state === 'dive' ? S.dive : S.fly[Math.floor(this.t / (this.state === 'wake' ? 2 : 4)) % 6];
+    if (this.state === 'emerge') ctx.globalAlpha = Math.min(1, this.t / 24);
+    this.ds(ctx, s, Math.round(this.cx - 10 - W.cam.x), Math.round(this.cy - 8 - W.cam.y), this.face < 0, this.flash);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Zauberbuch: schwebt, schlägt sich auf – rote Runen glühen – und schleudert Seiten im Fächer; jedes dritte Mal ruft es Bücher herbei
+const TOME_SPR = (() => {
+  const closed = Sprites.canvas(24, 24), x = closed.getContext('2d'), R = (cx, col, a, b, w, h) => { cx.fillStyle = col; cx.fillRect(a, b, w, h); };
+  R(x, '#1c0620', 4, 2, 17, 21); R(x, '#3c1044', 5, 2, 15, 20); R(x, '#541c5c', 6, 3, 2, 18); // Deckel
+  R(x, '#e8dcc0', 20, 4, 2, 18); R(x, '#b8ac90', 21, 5, 1, 16); // Seitenschnitt
+  R(x, '#c8982c', 5, 2, 15, 1); R(x, '#c8982c', 5, 21, 15, 1); R(x, '#c8982c', 19, 2, 1, 20); R(x, '#c8982c', 5, 2, 1, 20); // Goldrahmen
+  [[5, 2], [17, 2], [5, 19], [17, 19]].forEach(([a, b]) => { R(x, '#fce0a8', a, b, 3, 3); R(x, '#8c6414', a + 1, b + 1, 1, 1); });
+  R(x, '#e8e0d0', 9, 10, 8, 4); R(x, '#e8e0d0', 10, 9, 6, 1); R(x, '#e8e0d0', 10, 14, 6, 1); R(x, '#a80020', 12, 10, 3, 4); R(x, '#100008', 13, 11, 1, 2); R(x, '#fc7c7c', 12, 10, 1, 1); // Auge
+  R(x, '#c8982c', 21, 11, 3, 3); R(x, '#fce0a8', 21, 11, 2, 1); // Schließe
+  const open = Sprites.canvas(32, 22), y = open.getContext('2d');
+  R(y, '#1c0620', 0, 4, 32, 16); R(y, '#3c1044', 1, 5, 30, 14); // Einband
+  R(y, '#f0e8d0', 2, 2, 13, 16); R(y, '#f0e8d0', 17, 2, 13, 16); R(y, '#c8bca0', 14, 2, 1, 16); R(y, '#c8bca0', 17, 2, 1, 16); R(y, '#5c4c3c', 15, 3, 2, 16); // Seiten, Falz
+  for (let k = 0; k < 5; k++) { R(y, '#e0283c', 4 + (k % 2), 5 + k * 3, 8 - (k % 3), 1); R(y, '#e0283c', 19 + (k % 3), 5 + k * 3, 8 - (k % 2) * 2, 1); } // Runen
+  R(y, '#fc7c8c', 6, 8, 3, 3); R(y, '#e0283c', 7, 9, 1, 1); R(y, '#fc7c8c', 22, 11, 3, 3); R(y, '#e0283c', 23, 12, 1, 1);
+  return { closed: Sprites.fromCanvas(closed), open: Sprites.fromCanvas(open) };
+})();
+
+class Tome extends Enemy {
+  constructor(tx, ty) { super(tx * T - 2, ty * T, 20, 20, 4, 2, 600); this.bx = this.x; this.by = this.y; this.cd = 80; this.openT = 0; this.n = 0; }
+  update() {
+    super.update();
+    const p = W.player;
+    this.face = Math.sign(p.cx - this.cx) || this.face;
+    this.x = this.bx + Math.sin(this.t * 0.017) * 14; this.y = this.by + Math.sin(this.t * 0.045) * 6;
+    if (this.openT > 0) {
+      if (--this.openT === 22) this.cast();
+      if (this.t % 3 === 0) W.spawn(new Particle(this.cx + rnd(-12, 12), this.y + rnd(0, 6), rnd(-0.2, 0.2), -rnd(0.3, 0.8), Math.random() < 0.5 ? '#fc3c64' : '#fca0cc', 26, 1, -0.01)); // Runenfunken
+    } else if (p.alive && this.onScreen(-12) && --this.cd <= 0) { this.openT = 46; this.cd = 150 + rnd(0, 50); Audio8.sfx('tome', this.cx); }
+    this.touch();
+  }
+  cast() {
+    const p = W.player;
+    if (++this.n % 3 === 0 && W.ents.filter(e => e instanceof FlyBook && !e.dead).length < 5) { // ruft zwei Bücher aus den Regalen
+      for (const s of [-1, 1]) W.spawn(new FlyBook(this.cx + s * 22, this.cy - 14, { dir: s }));
+      return;
+    }
+    const a0 = Math.atan2(p.cy - this.cy, p.cx - this.cx);
+    for (const da of [-0.32, 0, 0.32]) W.spawn(new EProj('page', this.cx, this.cy, Math.cos(a0 + da) * 1.35, Math.sin(a0 + da) * 1.35, 0, 1));
+    Audio8.sfx('page', this.cx);
+  }
+  kill(silent) {
+    super.kill(silent);
+    if (!silent) for (let i = 0; i < 16; i++) W.spawn(new Particle(this.cx + rnd(-8, 8), this.cy + rnd(-6, 6), rnd(-1.8, 1.8), rnd(-2.2, -0.4), i % 4 ? '#f0e8d0' : '#fc3c64', 90, 2, 0.035));
+  }
+  get open() { return this.openT > 0 && this.openT < 44; }
+  draw(ctx) {
+    const s = this.open ? TOME_SPR.open : TOME_SPR.closed;
+    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.cy - s.h / 2 - W.cam.y), this.face < 0 && !this.open, this.flash);
   }
 }
