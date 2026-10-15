@@ -20,6 +20,7 @@ const Tiles = (() => {
     throne: { a: ['#fce0a8', '#f8b800', '#a80020', '#680010', '#1c0008'], b: ['#e0d0fc', '#a088f8', '#6844fc', '#4428bc', '#120628'] },
     vortex: { a: ['#e8b8fc', '#a868d8', '#6c2c9c', '#401060', '#14041c'], b: ['#fca0cc', '#d84080', '#9c1c50', '#5c0c2c', '#1c0410'] },
     glass: { a: ['#d0c8e0', '#a098b8', '#706888', '#484060', '#16101e'], b: ['#fce0a8', '#d8a838', '#a87000', '#684000', '#1c0c00'] },
+    foyer: { a: ['#e8e4dc', '#b8b0a8', '#7c7480', '#3c3444', '#120e18'], b: ['#c89058', '#8c5428', '#5c3014', '#3c1c08', '#140804'] },
     ship: { a: ['#e8b070', '#b87c44', '#8a5428', '#5a3214', '#1e0c04'], b: ['#dcb47c', '#a8783c', '#7a4c20', '#4a2a0c', '#160802'] },
   };
 
@@ -71,6 +72,43 @@ const Tiles = (() => {
     for (let k = 0; k < 4; k++) { const [ox, oy] = [[0, -2], [2, 0], [0, 2], [-2, 0]][k]; // Vierpass in Gold
       for (let a = 0; a < 12; a++) { const an = a / 12 * Math.PI * 2; px(x, '#d8a838', Math.round(8 + ox + Math.cos(an) * 1.7), Math.round(8 + oy + Math.sin(an) * 1.7)); } }
     px(x, '#fce0a8', 8, 8); px(x, '#a80020', 0, 7, 1, 2); px(x, '#a80020', 15, 7, 1, 2);
+    return c;
+  }
+  // Eingangshalle: abgetretener Schachbrett-Marmor mit Rissen und Schmutz
+  function checker(opts = {}) {
+    const c = C(16, 16), x = c.getContext('2d'), sd = ri(0, 99999);
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
+      const light = ((X >> 3) + (y >> 3)) % 2 === 0, n = hn(X, y, sd);
+      let col = light ? (n > 0.82 ? '#b8b0a8' : n > 0.15 ? '#d8d0c4' : '#e8e4dc') : (n > 0.85 ? '#3c3444' : n > 0.2 ? '#241e2c' : '#2c2634');
+      if (Math.abs(Math.sin(X * 0.6 + y * 0.35 + sd) ) < 0.07) col = light ? '#a8a098' : '#4c4458'; // Marmoradern
+      if ((X & 7) === 0 || (y & 7) === 0) col = '#16121c';                                         // Fugen
+      px(x, col, X, y);
+    }
+    if (opts.top) { px(x, '#fcf8f0', 0, 0, 16, 1); px(x, 'rgba(255,255,255,0.18)', 0, 2, 16, 1); }
+    if (opts.crack) { let cx = ri(3, 12), cy = 0; for (let i = 0; i < 9 && cy < 15; i++) { px(x, '#08060c', cx, cy); cy++; cx += ri(-1, 1); } }
+    for (let i = 0; i < 3; i++) px(x, 'rgba(40,30,20,0.35)', ri(0, 13), ri(1, 14), ri(2, 3), 1); // Schmutz
+    return c;
+  }
+  function gallery() { // Galerie: dunkle Eiche mit vergoldeter Kante und geschnitzten Bögen
+    const c = C(16, 16), x = c.getContext('2d');
+    px(x, '#1c0e06', 0, 0, 16, 16);
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) if (hn(X, y >> 1, 77) > 0.35) px(x, (X + (y >> 2)) % 5 ? '#3c2010' : '#2c160a', X, y);
+    px(x, '#fce0a8', 0, 0, 16, 1); px(x, '#c89020', 0, 1, 16, 1); px(x, '#6c3c14', 0, 2, 16, 1);
+    for (let k = 0; k < 2; k++) { const ox = k * 8; px(x, '#5c3418', ox + 1, 5, 6, 1); px(x, '#5c3418', ox + 1, 6, 1, 7); px(x, '#5c3418', ox + 6, 6, 1, 7); px(x, '#120804', ox + 2, 6, 4, 7); px(x, '#8c5c2c', ox + 2, 5, 4, 1); } // Bögen
+    px(x, '#c89020', 0, 13, 16, 1); px(x, '#100804', 0, 14, 16, 2);
+    return c;
+  }
+  function carpetStair(dir) { // Holztreppe mit rotem Läufer und Messingstangen
+    const c = C(16, 16), x = c.getContext('2d');
+    for (let X = 0; X < 16; X++) {
+      const lx = dir > 0 ? X : 15 - X, top = lx < 8 ? 8 : 0, bottom = Math.min(15, 15 - lx + 3);
+      for (let y = top; y <= bottom; y++) {
+        const d = y - top, edge = X < 2 || X > 13;
+        const carpet = d === 0 ? '#e84060' : d < 3 ? '#a80020' : d === 3 ? '#5c0010' : null;
+        px(x, edge ? (d === 0 ? '#c89058' : y === bottom ? '#140804' : '#5c3014') : carpet || (y === bottom ? '#140804' : '#3c1c08'), X, y);
+        if (!edge && d === 2 && lx % 8 === 3) px(x, '#f8b800', X, y);
+      }
+    }
     return c;
   }
   // Schiffsplanken: waagrechte Bohlen mit Stoßfugen, Nägeln und Maserung; top = Deck (helle Kante), hull = Rumpf
@@ -180,6 +218,10 @@ const Tiles = (() => {
         px(x, m[0], X, 6 - h, 1, h); if (h > 2) px(x, m[1], X, 6 - h, 1, 1); if (h > 3 && rand() < 0.3) px(x, m[2], X, 6 - h, 1, 1);
       }
       if (v === 2) { px(x, '#d82800', 6, 1, 2, 2); px(x, '#f8b800', 6, 1, 1, 1); px(x, m[0], 7, 3, 1, 3); }
+    } else if (theme === 'foyer') { // Putzbrocken und Scherben auf dem Boden
+      if (v === 1) { px(x, '#7c4830', 3, 4, 3, 2); px(x, '#6c3c28', 9, 5, 2, 1); px(x, '#a4b4e4', 12, 5, 1, 1); }
+      else if (v === 3) { px(x, '#4c4458', 5, 5, 4, 1); px(x, '#a4b4e4', 10, 5, 2, 1); }
+      else return null;
     } else if (theme === 'cave') {
       for (let X = 0; X < 16; X++) if (rand() < 0.7) { const h = ri(1, 2); px(x, m[0], X, 6 - h, 1, h); if (rand() < 0.4) px(x, m[1], X, 6 - h, 1, 1); }
       if (v === 1) { px(x, '#d8d8a0', 9, 2, 3, 1); px(x, '#a8a870', 10, 3, 1, 3); px(x, '#58f898', 10, 2, 1, 1); }
@@ -200,6 +242,11 @@ const Tiles = (() => {
       const X0 = v ? 11 : 4;
       for (let y = 0; y < (v ? 6 : 9); y++) px(x, '#3c2814', X0 + (y > 5 ? 1 : 0), y);
       px(x, '#5c4024', X0, 0, 1, 2); if (v) px(x, '#3c2814', X0 - 1, 6, 3, 2);
+    } else if (theme === 'foyer') { // Spinnweben unter der Galerie
+      if (v === 2) return null;
+      x.fillStyle = 'rgba(210,210,232,0.4)';
+      for (let k = 0; k < 8; k++) { x.fillRect(v ? 15 - k : k, k, 1, 1); x.fillRect(v ? 15 - k * 2 : k * 2, 0, 1, 1); }
+      x.fillRect(v ? 9 : 4, 3, 3, 1);
     } else if (theme === 'crypt' && v === 0) { // feine Spinnweben-Fäden
       x.fillStyle = 'rgba(0,0,0,0.45)'; x.fillRect(0, 0, 16, 2);
       x.fillStyle = 'rgba(200,200,232,0.45)';
@@ -1088,6 +1135,99 @@ const Tiles = (() => {
       L.push({ name: 'coast', custom: drawCoast, par: 0, c: C(1, 1) });
       L.push({ name: 'sea', custom: drawSea, par: 0, c: C(1, 1) });
       L.push({ name: 'rig', custom: drawRig, par: 1, c: C(1, 1) });
+    } else if (theme === 'foyer') { // Eingangshalle: deckenhohe Fenster mit Sturm dahinter, schwere Vorhänge, Risse und Verfall
+      const sky = C(640, 208), xs = sky.getContext('2d');
+      smooth(xs, 640, 208, ['#000000', '#04010c', '#0a0418', '#120826', '#1c0c34', '#26103e', '#301446', '#3a184c', '#421c50']);
+      for (let i = 0; i < 70; i++) px(xs, rand() < 0.3 ? '#fcfcfc' : '#7c7c9c', ri(0, 639), ri(0, 90));
+      add('sky', sky, 0, { wrap: false });
+      const cl = C(512, 208), xc = cl.getContext('2d');
+      for (let i = 0; i < 36; i++) {
+        const cx = ri(0, 511), cy = ri(10, 150), rx = ri(16, 40), ry = ri(6, 16);
+        for (let y = -ry; y <= ry; y++) for (let X = -rx; X <= rx; X++) {
+          const q = (X * X) / (rx * rx) + (y * y) / (ry * ry);
+          if (q > 1 || bay(X + cx, y + cy) < (q - 0.65) * 3) continue;
+          px(xc, y > ry * 0.4 ? '#1c0c30' : '#0c0618', (cx + X + 512) % 512, cy + y);
+        }
+      }
+      add('clouds', cl, 0.06, { drift: 0.25 });
+      L.push({ name: 'rainOut', custom: drawRainOut, par: 0, c: C(1, 1) });
+      const H = 320, c = C(512, H), x = c.getContext('2d');
+      const WINS = [[44, 20, 56, 216], [300, 20, 56, 216]]; // x, Oberkante, Breite, Höhe (bis zum Boden)
+      const inWin = (X, Y, [wx, wy, ww, wh]) => { const r = ww / 2, cx = wx + r; if (X < wx || X >= wx + ww || Y >= wy + wh) return false; if (Y >= wy + r) return true; return (X + 0.5 - cx) ** 2 + (Y + 0.5 - (wy + r)) ** 2 * 0.55 <= r * r && Y >= wy; };
+      // Damasttapete in dunklem Karmesin, Holzvertäfelung unten
+      for (let Y = 0; Y < H; Y++) for (let X = 0; X < 512; X++) {
+        const u = (X % 24) - 12, v = (Y % 32) - 16, fl = Math.abs(u) < 8 - Math.abs(v) * 0.45 && Math.abs(Math.sin(u * 0.5) * 5 - v * 0.6) < 4;
+        let col = fl ? '#4a1420' : (X + Y) % 7 === 0 ? '#2e0a12' : '#360c16';
+        if (Y > 232) col = (Y % 22 === 0 || X % 48 === 0) ? '#140804' : (X % 48 < 3 || Y % 22 === 1) ? '#5c3418' : '#2c1608';
+        px(x, col, X, Y);
+      }
+      shade(x, 512, H, '#08020a', 0, 60);
+      // Verfall: abgeplatzter Putz mit Ziegeln dahinter, Wasserflecken, Risse
+      for (let k = 0; k < 7; k++) {
+        const cx = ri(10, 500), cy = ri(30, 220), rx = ri(8, 22), ry = ri(6, 16);
+        for (let y = -ry; y <= ry; y++) for (let X = -rx; X <= rx; X++) {
+          const q = (X * X) / (rx * rx) + (y * y) / (ry * ry) + (rand() - 0.5) * 0.25;
+          if (q > 1) continue;
+          const bx = cx + X, by = cy + y, brick = by % 8 === 0 || (bx + (Math.floor(by / 8) % 2) * 8) % 16 === 0;
+          px(x, q > 0.85 ? '#1c0c08' : brick ? '#2c140c' : (bx + by) % 5 ? '#6c3c28' : '#7c4830', (bx + 512) % 512, by);
+        }
+      }
+      WINS.forEach(([wx, wy, ww, wh]) => { for (let k = 0; k < ww; k += 3) for (let y = wy + wh; y < wy + wh + ri(20, 60); y++) if (bay(wx + k, y) < 0.5) px(x, '#1c060c', wx + k + ri(-1, 1), y); }); // Wasserflecken
+      const crack = (X, Y, n, dir) => { for (let i = 0; i < n; i++) { px(x, '#08020a', X, Y); px(x, '#5c2430', X + 1, Y); Y++; X += dir * (rand() < 0.6 ? 1 : 0) + (rand() < 0.15 ? -dir : 0); if (rand() < 0.08) crackBranch(X, Y, ri(5, 14), -dir); } };
+      const crackBranch = (X, Y, n, dir) => { for (let i = 0; i < n; i++) { px(x, '#08020a', X, Y); Y++; X += dir * (rand() < 0.5 ? 1 : 0); } };
+      [[30, 4, 90, 1], [130, 0, 120, 1], [250, 10, 70, -1], [380, 0, 140, 1], [470, 30, 80, -1], [190, 150, 60, 1], [420, 170, 50, -1]].forEach(([X, Y, n, d]) => crack(X, Y, n, d));
+      // Wandschilde mit gekreuzten Schwertern zwischen den Fenstern, ein schiefes Ahnenporträt
+      const shield = (cx, cy, c1, c2) => {
+        for (let k = -26; k <= 26; k++) { const a = k / 26; px(x, '#9c9ca8', cx + Math.round(a * 22), cy + Math.round(a * 22) - 4, 2, 2); px(x, '#9c9ca8', cx - Math.round(a * 22), cy + Math.round(a * 22) - 4, 2, 2); }
+        [[-22, 18], [22, 18]].forEach(([dx, dy]) => { px(x, '#c89020', cx + dx - 3, cy + dy - 6, 7, 2); px(x, '#3c2410', cx + dx - 1, cy + dy - 4, 3, 6); });
+        for (let y = -14; y <= 16; y++) { const hw = y < 4 ? 12 : Math.round(12 * (1 - (y - 4) / 13)); for (let X = -hw; X <= hw; X++) px(x, Math.abs(X) === hw || y === -14 ? '#c89020' : (X < 0) === (y < 1) ? c1 : c2, cx + X, cy + y); }
+        px(x, '#fce0a8', cx - 2, cy - 2, 4, 4); px(x, '#140c08', cx - 1, cy - 1, 2, 2);
+      };
+      shield(170, 70, '#a80020', '#24206c'); shield(428, 74, '#24206c', '#c89020');
+      for (let y = 0; y < 44; y++) for (let X = 0; X < 34; X++) { // schiefes Porträt mit aufgeschlitzter Leinwand
+        const sx = 156 + X + Math.floor(y * 0.12), sy = 120 + y, edge = X < 3 || X > 30 || y < 3 || y > 40;
+        const face = (X - 17) ** 2 / 60 + (y - 18) ** 2 / 90 < 1, slash = Math.abs(X - 8 - y * 0.5) < 1 && y > 8 && y < 34;
+        px(x, edge ? (X + y) % 3 ? '#a87000' : '#6c4400' : slash ? '#0c0408' : face ? (y > 14 && y < 17 && Math.abs(X - 17) > 2 && Math.abs(X - 17) < 6 ? '#140808' : '#8c6c5c') : y > 28 ? '#2c1418' : '#1c1420', sx, sy);
+      }
+      // deckenhohe Spitzbogenfenster: steinerne Laibung, Mittelpfosten, Querriegel, Bleiruten, zerbrochene Scheiben
+      WINS.forEach(([wx, wy, ww, wh], wi) => {
+        for (let Y = wy - 8; Y < wy + wh + 6; Y++) for (let X = wx - 8; X < wx + ww + 8; X++) {
+          const inside = inWin(X, Y, [wx, wy, ww, wh]), near = inWin(X - 6, Y, [wx, wy, ww, wh]) || inWin(X + 6, Y, [wx, wy, ww, wh]) || inWin(X, Y + 7, [wx, wy, ww, wh]);
+          if (!inside && near) { px(x, (Y >> 3) % 2 ? '#5c5468' : '#6c6478', X, Y); continue; } // Laibung
+          if (!inside) continue;
+          const lx = X - wx, ly = Y - wy, mull = Math.abs(lx - ww / 2) < 2, tran = ly > 40 && (ly - 40) % 44 < 2;
+          const lead = (lx % 9 === 0) || (ly % 11 === 0), broken = (wi === 0 && ly > 120 && ly < 150 && lx > 8 && lx < 22 && (lx * 7 + ly * 3) % 11 > 2) || (wi === 1 && ly > 60 && ly < 80 && lx > 34 && lx < 50 && (lx + ly) % 5 > 1);
+          if (mull || tran) px(x, mull ? '#4c4458' : '#3c3448', X, Y);
+          else if (broken) x.clearRect(X, Y, 1, 1);                  // Loch: Sturm direkt dahinter
+          else if (lead) px(x, '#0c0a14', X, Y);
+          else x.clearRect(X, Y, 1, 1);                              // klares Glas: Himmel, Regen und Blitze scheinen durch
+        }
+        // Scherben auf dem Sims
+        for (let k = 0; k < 6; k++) px(x, '#a4b4e4', wx + ri(2, ww - 4), wy + wh + ri(-1, 1));
+      });
+      // schwere Samtvorhänge links und rechts jedes Fensters: Falten, Raffhalter mit Quaste, zerfetzte Säume
+      WINS.forEach(([wx, wy, ww, wh]) => {
+        px(x, '#c89020', wx - 30, 12, ww + 60, 3); px(x, '#fce0a8', wx - 30, 12, ww + 60, 1); // Vorhangstange
+        [[wx - 30, 1], [wx + ww + 4, -1]].forEach(([cx0, side]) => {
+          for (let Y = 15; Y < 300; Y++) {
+            const tie = 150, gather = Y < tie ? 1 - (Y - 15) / (tie - 15) * 0.55 : 0.45 + (Y - tie) / (300 - tie) * 0.65;
+            const w = Math.round(26 * gather), x0 = side > 0 ? cx0 : cx0 + 26 - w;
+            const torn = Y > 270 && hn(Math.floor((Y - 270) / 3), cx0, 9) > 0.5 && Y > 270 + hn(cx0 + Y, 3, 4) * 30;
+            for (let X = 0; X < w; X++) {
+              if (torn && X % 5 < 2) continue;
+              const f = Math.sin((X / Math.max(1, w)) * Math.PI * 4 + Y * 0.01) * 0.5 + 0.5;
+              px(x, f > 0.8 ? '#a01c28' : f > 0.45 ? '#7c1018' : f > 0.15 ? '#560a12' : '#30040a', x0 + X, Y);
+            }
+            if (Y > tie - 3 && Y < tie + 3) { px(x, '#c89020', x0 - 1, Y, w + 2, 1); }
+          }
+          const tx = side > 0 ? cx0 + 14 : cx0 + 12; // Quaste
+          px(x, '#f8b800', tx, 153, 3, 4); for (let k = 0; k < 9; k++) px(x, k % 2 ? '#c89020' : '#fce0a8', tx - 1 + (k % 5), 157 + Math.floor(k / 2), 1, 3);
+        });
+        for (let k = 0; k < 14; k++) px(x, 'rgba(210,210,230,0.35)', wx - 30 + k, 15 + Math.floor(k * 0.8), 1, 1); // Spinnweben in der Ecke
+      });
+      // Deckengesims mit Riss
+      px(x, '#2c2434', 0, 0, 512, 10); px(x, '#5c5468', 0, 8, 512, 2); for (let X = 0; X < 512; X += 8) px(x, '#3c3448', X, 3, 4, 4);
+      add('wall', c, 0.5, { vtile: true });
     } else if (theme === 'courtyard') {
       const sky = C(640, 208), x = sky.getContext('2d');
       smooth(x, 640, 208, ['#000000', '#05010f', '#0c031c', '#160629', '#220a36', '#320e44', '#461250', '#5a1658', '#6c1c5c']);
@@ -1290,16 +1430,17 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), ship: () => planks(p.a, { hull: true }) }[theme];
+    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), ship: () => planks(p.a, { hull: true }) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
       : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true }))
-      : theme === 'glass' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true })) : ground;
-    const alt = theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+      : theme === 'glass' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true }))
+      : theme === 'foyer' ? [checker({ top: true }), checker({ top: true, crack: true }), checker({ top: true }), checker({ top: true })] : ground;
+    const alt = theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
-      spikes: spikes(), up: theme === 'ship' ? ratline(1) : theme === 'glass' ? stairTile(p.a, 1, '#fce0a8') : stairTile(p.b, 1), down: theme === 'ship' ? ratline(-1) : theme === 'glass' ? stairTile(p.a, -1, '#fce0a8') : stairTile(p.b, -1),
+      spikes: spikes(), up: theme === 'foyer' ? carpetStair(1) : theme === 'ship' ? ratline(1) : theme === 'glass' ? stairTile(p.a, 1, '#fce0a8') : stairTile(p.b, 1), down: theme === 'foyer' ? carpetStair(-1) : theme === 'ship' ? ratline(-1) : theme === 'glass' ? stairTile(p.a, -1, '#fce0a8') : stairTile(p.b, -1),
       toppers: [0, 1, 2, 3].map(v => topper(theme, v)), hangers: [0, 1, 2].map(v => hanger(theme, v)),
       bg: buildBg(theme), crate: theme === 'ship' ? crate(p.b) : null,
     };
@@ -1308,6 +1449,16 @@ const Tiles = (() => {
   }
 
   function layer(theme, name) { return build(theme).bg.find(l => l.name === name); }
+
+  // Eingangshalle: Regen draußen – wird von der Wand verdeckt, sichtbar nur durch die Fenster
+  function drawRainOut(ctx, cam, frame) {
+    ctx.fillStyle = 'rgba(150,160,220,0.42)';
+    const w = View.w, n = View.lite ? 50 : 90;
+    for (let i = 0; i < n; i++) {
+      const sx = (i * 97 + frame * 3.1) % (w + 60) - 30, sy = ((i * 53 + frame * 9.5) % 260) - 30, len = 6 + (i % 3) * 3;
+      for (let k = 0; k < len; k++) ctx.fillRect(Math.round(sx - k * 0.35), Math.round(sy + k), 1, 1);
+    }
+  }
 
   // ---------------- Glasturm als Röhre (Mode 7): senkrechte Achse, Blick von innen auf die Wand ----------------
   // Jede Bildspalte ist ein Strahl von einem Punkt hinter der Achse auf die Zylinderwand: gegenüber liegt die
@@ -1409,6 +1560,12 @@ const Tiles = (() => {
       for (let X = 0; X < 640; X++) { const h = 3 + Math.round(Math.abs(Math.sin(X * 0.21) * 4 + Math.sin(X * 0.07) * 3)); px(x, dark, X, 208 - h, 1, h); }
       [60, 300, 520].forEach(bx => { for (let i = 0; i < 26; i++) px(x, dark, bx + i, 190 + Math.abs(13 - i) / 2, 1, 18); });
       [140, 430].forEach(tx => { for (let i = 0; i < 70; i++) px(x, dark, tx + i, Math.floor(i * 0.35), 3, 2); for (let i = 0; i < 20; i++) px(x, dark, tx + 30 + i, 12 + i, 1, 1); });
+    } else if (theme === 'foyer') { // schwerer Samt-Volant oben, zerrissen
+      for (let X = 0; X < 640; X++) {
+        const sc = X % 80, h = 10 + Math.round(Math.sin(sc / 80 * Math.PI) * 9) + (hn(X >> 2, 1, 5) > 0.8 ? 3 : 0);
+        px(x, '#2c0408', X, 0, 1, h); px(x, '#5c0a14', X, h - 3, 1, 2); if (sc % 4 === 0) px(x, '#7c1018', X, 0, 1, h - 3);
+        if (sc === 0) { px(x, '#c89020', X - 1, 0, 3, 14); px(x, '#f8b800', X - 1, 12, 3, 4); }
+      }
     } else if (theme === 'hall' || theme === 'throne') {
       [0, 320].forEach(cx => {
         for (let X = 0; X < 120; X++) { const h = 10 + Math.round(Math.sin(X / 120 * Math.PI) * -6 + 6 + (X % 8 < 4 ? 1 : 0)); px(x, '#1c0006', cx + X, 0, 1, h + 10); px(x, '#3c0010', cx + X, h + 9, 1, 1); }

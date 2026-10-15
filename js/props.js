@@ -652,3 +652,108 @@ class SkullStake extends Ent {
     if ((this.t >> 5) % 3 === 0) R('#6c0010', -1, 4, 1, 1);
   }
 }
+
+// ---------------- Eingangshalle: Kronleuchter, der herabstürzt ----------------
+// Hängt an einer Kette von der Decke. Geht der Held darunter durch, knarrt er, rieselt Staub – dann reißt die
+// Kette. Mit der Peitsche (oder einer Wurfwaffe) lässt er sich auch absichtlich auf Gegner fallen lassen.
+class FallingChandelier extends Ent {
+  constructor(d) {
+    super(d.x * T - 22, d.y * T + d.len, 44, 18);
+    this.kind = 'candle'; this.ax = d.x * T; this.ay = d.y * T; this.len = d.len;
+    this.state = 'hang'; this.vy = 0; this.wt = 0; this.lit = true; this.fade = 1;
+  }
+  hit() { if (this.state === 'hang') { this.state = 'warn'; this.wt = 14; Audio8.sfx('crack', this.cx); } } // abgeschlagen: fällt sofort
+  update() {
+    this.t++;
+    const p = W.player;
+    if (this.state === 'hang') {
+      if (p.alive && Math.abs(p.cx - this.cx) < 38 && p.cy > this.y + 10 && p.cy - this.y < 220) { this.state = 'warn'; this.wt = 0; Audio8.sfx('creak', this.cx); }
+    } else if (this.state === 'warn') { // Vorwarnung: zittert, Staub rieselt
+      if (++this.wt % 6 === 0) W.dust(this.ax + rnd(-6, 6), this.ay + 2, 2);
+      if (this.wt === 20) Audio8.sfx('creak', this.cx);
+      if (this.wt > 34) { this.state = 'fall'; Audio8.sfx('crack', this.cx); Audio8.sfx('chain', this.cx); }
+    } else if (this.state === 'fall') {
+      this.vy = Math.min(this.vy + 0.36, 9); this.y += this.vy;
+      for (const e of W.ents) if (e.kind === 'enemy' && !e.dead && Phys.overlap(this, e)) { e.hp = 0; e.kill(); } // zerschmettert Gegner
+      if (p.alive && Phys.overlap(this, p)) p.hurt(3, this.cx);
+      const c0 = Math.floor((this.x + 6) / T), c1 = Math.floor((this.x + this.w - 6) / T), row = Math.floor((this.y + this.h) / T);
+      for (let c = c0; c <= c1; c++) if (Phys.solidTile(c, row)) { this.crash(row * T); break; }
+      if (this.y > W.room.h * T) this.dead = true;
+    } else if (this.state === 'wreck') {
+      if (this.t % 9 === 0 && this.lit) W.spawn(new Particle(this.cx + rnd(-14, 14), this.y + 6, rnd(-0.2, 0.2), rnd(-1.2, -0.5), this.t % 18 ? '#f87800' : '#fcd040', 22, 1, -0.02));
+      if (++this.wt > 600) { this.lit = false; this.fade = Math.max(0, this.fade - 0.01); if (this.fade <= 0) this.dead = true; }
+    }
+  }
+  crash(floorY) {
+    this.y = floorY - this.h + 6; this.state = 'wreck'; this.wt = 0; this.vy = 0;
+    W.shake = Math.max(W.shake, 12); Input.rumble(0.8, 0.6, 350);
+    Audio8.sfx('shatter', this.cx); Audio8.sfx('boom', this.cx);
+    for (let i = 0; i < 22; i++) W.spawn(new Particle(this.cx + rnd(-18, 18), floorY - 4, rnd(-2.6, 2.6), rnd(-4, -1), i % 3 ? '#c8d8fc' : '#fcfcfc', 40, 1, 0.2)); // Kristallsplitter
+    for (let i = 0; i < 10; i++) W.spawn(new Particle(this.cx + rnd(-16, 16), floorY - 4, rnd(-1.5, 1.5), rnd(-3, -1), i % 2 ? '#f87800' : '#fcd040', 30, 2, 0.15));
+    W.dust(this.cx, floorY, 8);
+    const p = W.player;
+    if (p.alive && Math.abs(p.cx - this.cx) < 26 && Math.abs(p.feet - floorY) < 12) p.hurt(3, this.cx);
+  }
+  lights(L, cx, cy, flick) {
+    if (!this.lit) return;
+    L.push({ x: this.cx - cx, y: this.y + 2 - cy, r: (this.state === 'wreck' ? 30 : 46) + flick(this.ax), c: [248, 170, 70], a: 0.6 });
+  }
+  draw(ctx) {
+    const cx = W.cam.x, cy = W.cam.y, sh = this.state === 'warn' ? Math.round(Math.sin(this.wt * 1.7) * 1.5) : 0;
+    const x = Math.round(this.x - cx) + sh, y = Math.round(this.y - cy);
+    if (this.state === 'hang' || this.state === 'warn') { // Kette bis zur Decke
+      for (let yy = Math.round(this.ay - cy); yy < y - 6; yy += 3) { ctx.fillStyle = (yy >> 1) % 2 ? '#3c3c48' : '#8c8898'; ctx.fillRect(x + 21, yy, 2, 2); }
+    } else if (this.state === 'fall') { // gerissenes Kettenende
+      for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#3c3c48' : '#8c8898'; ctx.fillRect(x + 21, y - 8 - k * 3, 2, 2); }
+    }
+    ctx.globalAlpha = this.fade;
+    if (this.state === 'wreck') { // zerschellt: verbogener Reif, Kristalle, glimmende Kerzen
+      ctx.fillStyle = '#5c4010'; ctx.fillRect(x + 2, y + 10, 40, 3); ctx.fillStyle = '#c89020'; ctx.fillRect(x + 4, y + 9, 14, 1); ctx.fillRect(x + 26, y + 11, 12, 1);
+      ctx.fillStyle = '#a4b4e4'; for (let k = 0; k < 7; k++) ctx.fillRect(x + 3 + k * 6, y + 12 + (k % 2), 2, 1);
+      if (this.lit) for (let k = 0; k < 3; k++) { ctx.fillStyle = '#e8e0c8'; ctx.fillRect(x + 8 + k * 12, y + 6 + (k % 2) * 2, 2, 4); ctx.fillStyle = (this.t >> 2) % 2 ? '#fcd040' : '#f87800'; ctx.fillRect(x + 8 + k * 12, y + 4 + (k % 2) * 2, 2, 2); }
+      ctx.globalAlpha = 1;
+      return;
+    }
+    // prächtiger Kronleuchter: Krone, zwei Reifen, Kristallgehänge, brennende Kerzen
+    ctx.fillStyle = '#5c4010'; ctx.fillRect(x + 19, y - 6, 6, 6);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(x + 4, y, 36, 3); ctx.fillRect(x + 10, y + 7, 24, 2); ctx.fillRect(x + 20, y - 2, 4, 14);
+    ctx.fillStyle = '#fce0a8'; ctx.fillRect(x + 4, y, 36, 1); ctx.fillRect(x + 10, y + 7, 24, 1);
+    ctx.fillStyle = '#a4b4e4'; for (let k = 0; k < 9; k++) ctx.fillRect(x + 5 + k * 4, y + 3 + (k % 2), 1, 3 + (k % 3));
+    ctx.fillStyle = '#e8f0fc'; ctx.fillRect(x + 21, y + 12, 2, 4);
+    for (let k = 0; k < 5; k++) { const kx = x + 4 + k * 8; ctx.fillStyle = '#e8e0c8'; ctx.fillRect(kx, y - 5, 2, 5); ctx.fillStyle = ((this.t >> 2) + k) % 3 ? '#fcd040' : '#f87800'; ctx.fillRect(kx, y - 8, 2, 3); }
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ---------------- Ritterrüstung: Deko auf einem Sockel – manche erwachen zum Leben ----------------
+class ArmorSuit extends Ent {
+  constructor(d) { super(d.x * T + 2, (d.y + 1) * T - 38, 14, 38); this.kind = 'prop'; this.live = !!d.live; this.state = 'still'; this.wt = 0; this.flip = !!d.flip; this.d = d; }
+  update() {
+    this.t++;
+    if (!this.live || this.state === 'empty') return;
+    const p = W.player;
+    if (this.state === 'still' && p.alive && Math.abs(p.cx - this.cx) < 64 && Math.abs(p.feet - (this.y + this.h)) < 40) { this.state = 'wake'; this.wt = 0; Audio8.sfx('clank', this.cx); }
+    if (this.state === 'wake' && ++this.wt > 36) { // steigt vom Sockel: wird zum Ritter
+      this.state = 'empty';
+      const k = W.spawn(new Knight(this.d.x, this.d.y));
+      k.face = Math.sign(p.cx - this.cx) || 1; k.y = this.y + this.h - 4 - k.h;
+      W.dust(this.cx, this.y + this.h - 4, 5); Audio8.sfx('clank', this.cx); W.shake = Math.max(W.shake, 3);
+    }
+  }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#2c2834', -3, 34, 20, 4); R('#5c5468', -3, 34, 20, 1); R('#1c1824', -2, 37, 18, 1); // Sockel
+    if (this.state === 'empty') return;
+    const sh = this.state === 'wake' ? Math.round(Math.sin(this.wt * 2.1)) : 0, X = sh;
+    const S = '#8c8898', L = '#c8c4d0', D = '#4c4858', K = '#1c1824';
+    R(D, X + 3, 22, 3, 12); R(D, X + 8, 22, 3, 12); R(S, X + 3, 22, 2, 11); R(S, X + 8, 22, 2, 11); R(K, X + 2, 32, 4, 2); R(K, X + 8, 32, 4, 2); // Beine
+    R(D, X + 1, 10, 12, 13); R(S, X + 2, 10, 10, 12); R(L, X + 3, 11, 3, 8); R(D, X + 2, 16, 10, 1); R(D, X + 2, 20, 10, 2); // Brustharnisch
+    R(D, X - 1, 10, 3, 5); R(D, X + 12, 10, 3, 5); R(L, X - 1, 10, 3, 1); R(L, X + 12, 10, 3, 1); // Schulterstücke
+    R(S, X - 1, 15, 2, 7); R(S, X + 13, 15, 2, 7);
+    R(D, X + 3, 1, 8, 9); R(S, X + 4, 1, 6, 8); R(L, X + 4, 1, 2, 5); R(K, X + 4, 5, 6, 1); R('#a80020', X + 6, -3, 2, 4); // Helm mit Federbusch
+    const eyes = this.state === 'wake' ? ((this.wt >> 2) % 2 ? '#fc3c3c' : '#fcd040') : this.live && (this.t % 240) < 4 ? '#6c1010' : null; // erwachende Rüstung: Augen glühen
+    if (eyes) { R(eyes, X + 5, 5, 1, 1); R(eyes, X + 8, 5, 1, 1); }
+    const fx = this.flip ? -6 : 16; // Hellebarde
+    R('#3c2410', X + fx, -6, 2, 40); R('#c8c4d0', X + fx - 2, -8, 6, 3); R('#8c8898', X + fx + (this.flip ? -2 : 2), -5, 3, 4);
+  }
+}

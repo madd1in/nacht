@@ -162,6 +162,9 @@ const Audio8 = (() => {
     step: () => { noise(0.045, 0.07, 'lowpass', 1100, 250); tone('triangle', 120, 70, 0.04, 0.05); },
     chain: () => { if (!ac) return; const t = ac.currentTime; for (let i = 0; i < 4; i++) { noise(0.03, 0.1, 'bandpass', 3400 - i * 200, 2200, t + i * 0.05); tone('square', 1900 - i * 120, 1500, 0.02, 0.025, null, t + i * 0.05); } }, // Kettenrasseln
     spin: () => noise(0.09, 0.07, 'bandpass', 1400, 2600), // wirbelndes Wurfkreuz
+    growl: () => { noise(0.5, 0.3, 'lowpass', 500, 160); tone('sawtooth', 110, 70, 0.45, 0.12); tone('pulse', 220, 140, 0.3, 0.05, 0.25); }, // Jaguar faucht
+    shatter: () => { noise(0.5, 0.45, 'highpass', 5000, 1800); arp(['e7', 'c7', 'g6', 'e7', 'b6', 'g7'], 0.03, 'pulse', 0.06, 0.125); tone('triangle', 180, 60, 0.3, 0.3); }, // Kristall zerspringt
+    clank: () => { tone('square', 340, 300, 0.07, 0.1); tone('square', 520, 470, 0.05, 0.07); noise(0.12, 0.2, 'bandpass', 2600, 1600); }, // Rüstung scheppert
     tink: () => { tone('square', 2600, 2100, 0.05, 0.07); tone('pulse', 3400, 3000, 0.07, 0.05, 0.125); noise(0.05, 0.12, 'highpass', 6000); }, // abgeprallt
     stepWet: () => { noise(0.07, 0.06, 'bandpass', 2600, 900); noise(0.04, 0.05, 'lowpass', 900, 250); },
   };
@@ -551,6 +554,11 @@ const Audio8 = (() => {
       const hp = ambNoise(nodes, out, 'highpass', 700), lp = ac.createBiquadFilter();
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 5200; hp.connect(lp); lp.connect(out);
       ambLfo(nodes, out.gain, 0.13, 0.01);
+    } else if (theme === 'foyer') { // Eingangshalle: Regen an den hohen Fenstern, Wind heult durch zerbrochene Scheiben
+      const hp = ambNoise(nodes, out, 'highpass', 900), lp = ac.createBiquadFilter();
+      hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 4200; hp.connect(lp); lp.connect(out);
+      const bp = ambNoise(nodes, out, 'bandpass', 480, 6); ambLfo(nodes, bp.frequency, 0.06, 220);
+      ambLfo(nodes, out.gain, 0.1, 0.01); level = 0.028;
     } else if (theme === 'hall' || theme === 'tower') { // heulender Wind durch die Turmfenster
       const bp = ambNoise(nodes, out, 'bandpass', 520, 7);
       ambLfo(nodes, bp.frequency, 0.07, 260); ambLfo(nodes, out.gain, 0.11, 0.008);

@@ -30,8 +30,8 @@ const FX = (() => {
     return c;
   }
 
-  const AMB = { glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
-  const TINT = { glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
+  const AMB = { foyer: 0.6, glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
+  const TINT = { foyer: '8,4,26', glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
   const lc = Sprites.canvas(256, 208), lx = lc.getContext('2d');
   let vignette = null;
 
@@ -48,11 +48,11 @@ const FX = (() => {
   }
 
   // lights: [{x, y, r, c:[r,g,b], a}] in Bildschirmkoordinaten (Spielfeld).
-  function render(ctx, lights, theme) {
+  function render(ctx, lights, theme, amb) { // amb: Dunkelheit überschreiben (Gewitter: dunkel ↔ Blitz)
     if (!vignette || lc.width !== View.w) { lc.width = View.w; vignette = makeVignette(View.w); }
     lx.globalCompositeOperation = 'source-over';
     lx.clearRect(0, 0, View.w, 208);
-    lx.fillStyle = `rgba(${TINT[theme] || '0,0,0'},${AMB[theme] ?? 0.3})`;
+    lx.fillStyle = `rgba(${TINT[theme] || '0,0,0'},${amb ?? AMB[theme] ?? 0.3})`;
     lx.fillRect(0, 0, View.w, 208);
     lx.drawImage(vignette, 0, 0);
     lx.globalCompositeOperation = 'destination-out';

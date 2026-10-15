@@ -636,3 +636,71 @@ class Spawner {
     return null;
   }
 }
+
+// ---------------- Jaguar (schwarzer Panther wie in Castlevania 1) ----------------
+// Liegt lauernd auf Simsen und Galerien. Kommt der Held nahe, duckt er sich fauchend und springt ihn an,
+// landet und hetzt weiter; an Kanten springt er erneut.
+const PANTHER_SPR = (() => {
+  const W0 = 30, H0 = 16;
+  const frame = (pose) => {
+    const c = Sprites.canvas(W0, H0), x = c.getContext('2d'), R = (col, a, b, w, h) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    const B = '#1c1424', M = '#2c2238', L = '#4c3c60', E = '#f8e800';
+    if (pose === 'rest') { // liegt, Kopf erhoben, Schwanz eingerollt
+      R(B, 4, 10, 20, 5); R(M, 6, 9, 16, 2); R(L, 8, 9, 12, 1);
+      R(B, 22, 5, 7, 6); R(M, 23, 5, 5, 2); R(B, 23, 3, 2, 2); R(B, 27, 3, 2, 2); R(E, 26, 7, 2, 1);
+      R(B, 1, 12, 4, 2); R(B, 0, 10, 2, 3); R(B, 20, 14, 8, 2);
+    } else if (pose === 'crouch') { // geduckt, sprungbereit, Maul offen
+      R(B, 3, 9, 20, 6); R(M, 5, 8, 16, 2); R(L, 7, 8, 12, 1);
+      R(B, 21, 7, 8, 6); R(M, 22, 7, 6, 2); R(B, 22, 5, 2, 2); R(B, 26, 5, 2, 2); R(E, 25, 9, 2, 1); R('#a80020', 26, 11, 3, 2); R('#fcfcfc', 27, 11, 1, 1);
+      R(B, 0, 6, 3, 2); R(B, 2, 8, 2, 2); R(B, 4, 14, 4, 2); R(B, 18, 14, 4, 2);
+    } else if (pose === 'leap') { // gestreckt im Sprung
+      R(B, 4, 5, 20, 6); R(M, 6, 4, 16, 2); R(L, 8, 4, 12, 1);
+      R(B, 22, 2, 8, 6); R(M, 23, 2, 6, 2); R(B, 23, 0, 2, 2); R(B, 27, 0, 2, 2); R(E, 26, 4, 2, 1); R('#a80020', 27, 6, 3, 2);
+      R(B, 24, 8, 5, 2); R(B, 27, 9, 3, 2); R(B, 1, 9, 5, 2); R(B, 0, 10, 3, 2); R(B, 0, 4, 4, 2);
+    } else { // Lauf, zwei Phasen
+      const a = pose === 'run1';
+      R(B, 4, 6, 20, 6); R(M, 6, 5, 16, 2); R(L, 8, 5, 12, 1);
+      R(B, 22, 4, 7, 6); R(M, 23, 4, 5, 2); R(B, 23, 2, 2, 2); R(B, 27, 2, 2, 2); R(E, 26, 6, 2, 1);
+      R(B, 0, a ? 4 : 7, 4, 2);
+      if (a) { R(B, 6, 12, 3, 4); R(B, 2, 11, 4, 2); R(B, 20, 12, 3, 4); R(B, 24, 11, 4, 2); }
+      else { R(B, 8, 12, 3, 4); R(B, 11, 13, 3, 3); R(B, 17, 12, 3, 4); R(B, 14, 13, 3, 3); }
+    }
+    return Sprites.fromCanvas(c);
+  };
+  return { rest: frame('rest'), crouch: frame('crouch'), leap: frame('leap'), run: [frame('run1'), frame('run2')] };
+})();
+
+class Panther extends Enemy {
+  constructor(tx, ty) {
+    super(tx * T, (ty + 1) * T - 12, 26, 12, 2, 2, 300);
+    this.state = 'rest'; this.timer = 0; this.face = -1;
+  }
+  update() {
+    super.update();
+    const p = W.player;
+    this.timer++;
+    if (this.state === 'rest') {
+      if (p.alive) this.face = Math.sign(p.cx - this.cx) || this.face;
+      this.physics();
+      if (p.alive && Math.abs(p.cx - this.cx) < 120 && Math.abs(p.cy - this.cy) < 110) { this.state = 'crouch'; this.timer = 0; Audio8.sfx('growl', this.cx); }
+    } else if (this.state === 'crouch') {
+      this.physics();
+      if (this.timer > 20) { this.state = 'leap'; this.face = Math.sign(p.cx - this.cx) || this.face; this.vx = this.face * 2.7; this.vy = -4.4; this.onGround = false; Audio8.sfx('whoosh', this.cx); }
+    } else if (this.state === 'leap') {
+      this.vx = this.face * 2.7;
+      const wall = this.physics();
+      if (wall) this.face *= -1;
+      if (this.onGround) { this.state = 'run'; this.timer = 0; W.dust(this.cx, this.y + this.h, 3); }
+    } else { // run: hetzt los, springt an Kanten erneut
+      this.vx = this.face * 2.9;
+      if (this.onGround && !this.groundAhead(this.face) && this.timer > 10) { this.state = 'leap'; this.vy = -3.6; this.onGround = false; }
+      else if (this.physics()) this.face *= -1;
+      this.despawnOff(80);
+    }
+    this.touch();
+  }
+  draw(ctx) {
+    const S = PANTHER_SPR, s = this.state === 'rest' ? S.rest : this.state === 'crouch' ? S.crouch : this.state === 'leap' && !this.onGround ? S.leap : S.run[Math.floor(this.t / 4) % 2];
+    this.ds(ctx, s, Math.round(this.cx - 15 - W.cam.x), Math.round(this.y + this.h - 16 - W.cam.y), this.face < 0, this.flash);
+  }
+}

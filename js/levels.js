@@ -125,6 +125,23 @@ const Levels = (() => {
     .zone('ghoul', 29, 60, { interval: 110, max: 3 })
     .start(2, 10).exit(70).done();
 
+  // Eingangshalle: hoch, deckenhohe Fenster, Gewitter (Blitzlicht und Dunkelheit), fallende Kronleuchter,
+  // Jaguare auf Galerie und Simsen, Zombies, Fledermäuse, Ritterrüstungen – manche erwachen zum Leben
+  const eh = room(84, 'foyer', 20)
+    .ground(0, 83, 18)
+    .stair(20, 17, 6, 1).fill(26, 12, 46, 12, '=').stair(52, 17, 6, -1)   // große Treppe mit rotem Läufer zur Galerie
+    .fill(31, 7, 37, 7, '=')                                               // Sims über der Galerie
+    .fill(62, 13, 68, 13, '=')                                             // Sims rechts
+    .prop('fchand', { x: 12, y: 0, len: 128 }).prop('fchand', { x: 40, y: 0, len: 92 }).prop('fchand', { x: 58, y: 0, len: 140 }).prop('fchand', { x: 76, y: 0, len: 132 })
+    .prop('armor', { x: 5, y: 17 }).prop('armor', { x: 16, y: 17, live: true, flip: true }).prop('armor', { x: 28, y: 11 }).prop('armor', { x: 44, y: 11, live: true, flip: true })
+    .prop('armor', { x: 60, y: 17, live: true }).prop('armor', { x: 72, y: 17 })
+    .enemy('panther', 34, 6).enemy('panther', 65, 12).enemy('panther', 38, 11)
+    .enemy('bat', 24, 2).enemy('bat', 52, 3).enemy('bat', 79, 2)
+    .candle(3, 15).candle(9, 15, 'H').candle(23, 9).candle(33, 9, 'W').candle(42, 9).candle(48, 15, '$').candle(56, 15, 'H').candle(66, 10).candle(78, 15, '2')
+    .statue(48, 17)
+    .zone('ghoul', 4, 80, { interval: 170, max: 2 })
+    .start(2, 17).exit(82).done();
+
   // Glockenturm: vertikaler Aufstieg (Treppen, Aufzug, Kronleuchter)
   const v1 = room(28, 'hall', 30)
     .ground(0, 27, 28)
@@ -268,7 +285,7 @@ const Levels = (() => {
     .start(2, 10).arena('count').done();
 
   const STAGES = [
-    { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, v1, r12], boss: 'RIESENFLEDERMAUS' },
+    { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
     { name: 'DER BERGFRIED', music: 'stage3', time: 780, rooms: [r31, v3, vx, vg, r32], boss: 'GRAF NACHTMAHR' },
   ];

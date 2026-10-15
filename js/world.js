@@ -1,6 +1,10 @@
 // Spielwelt: Raum-Zustand, Entitäten, Kamera (horizontal + vertikal), Treffer-Logik, Rendering der Szene.
 'use strict';
 
+// Gewitter über dem ganzen Schloss: [Dunkelheit zwischen den Blitzen, Restdunkel im Blitz] (Hof und Schiff: Freiluft, ohne Abdunklung)
+const STORMY = { courtyard: null, ship: null, glass: [0.44, 0.12], foyer: [0.66, 0.03], hall: [0.5, 0.1], tower: [0.5, 0.1], throne: [0.46, 0.1] };
+// Fenster in der Wandebene (x, Oberkante, Breite, Höhe): werfen im Blitz Lichtbahnen in den Raum
+const STORM_WINS = { foyer: [[44, 20, 56, 216], [300, 20, 56, 216]], hall: [[64, 40, 32, 88], [320, 40, 32, 88]], throne: [[40, 38, 24, 92], [392, 38, 24, 92]] };
 const W = {
   room: null, stage: 0, roomIdx: 0, ents: [], platforms: [], stairs: [], spawners: [],
   player: null, cam: { x: 0, y: 0 }, camYf: 0, frame: 0, atkId: 0,
@@ -34,6 +38,9 @@ const W = {
         case 'bat': this.spawn(new Bat(d.x, d.y)); break;
         case 'skel': this.spawn(new Skeleton(d.x, d.y)); break;
         case 'knight': this.spawn(new Knight(d.x, d.y)); break;
+        case 'panther': this.spawn(new Panther(d.x, d.y)); break;
+        case 'fchand': this.spawn(new FallingChandelier(d)); break;
+        case 'armor': this.spawn(new ArmorSuit(d)); break;
         case 'pillar': this.spawn(new Pillar(d.x, d.y)); break;
         case 'raven': this.spawn(new Raven(d.x, d.y)); break;
         case 'ghost': this.spawn(new Ghost(d.x, d.y)); break;
@@ -438,9 +445,10 @@ const W = {
     }
 
     if (this.room.theme === 'courtyard') FX.updateFlock(View.w);
-    if (this.room.theme === 'courtyard' || this.room.theme === 'ship' || this.room.theme === 'glass') FX.updateStorm(this.storm, View.w, () => {
+    if (this.room.theme in STORMY) FX.updateStorm(this.storm, View.w, () => {
       setTimeout(() => Audio8.sfx('thunder'), 150 + Math.random() * 700);
       Input.rumble(0.35, 0.15, 450); this.shake = Math.max(this.shake, 4);
+      if (this.room.theme === 'foyer') this.storm.cd = Math.min(this.storm.cd, 90 + Math.random() * 160); // in der Eingangshalle blitzt es öfter
     });
   },
 
@@ -451,7 +459,7 @@ const W = {
     ctx.beginPath(); ctx.rect(0, 32, vw, 208); ctx.clip();
     ctx.translate(sx, 32 + sy);
     this.applyCamFx(ctx, vw);
-    const storm = theme === 'courtyard' || theme === 'ship' || theme === 'glass' ? this.storm : null; // Glasturm: Blitze lassen die Fenster aufleuchten
+    const storm = theme in STORMY ? this.storm : null; // Gewitter über dem ganzen Schloss: Blitze lassen Fenster und Räume aufleuchten
     Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); if (theme === 'courtyard') FX.drawFlock(c); } : null);
     this.drawDoor(ctx);
     Tiles.drawTiles(ctx, this.room, this.cam, this.frame);
@@ -463,14 +471,41 @@ const W = {
     Tiles.drawFront(ctx, this.room, this.cam);
     FX.drawFog(ctx, theme, this.cam, this.frame, this.room.h * T - this.cam.y);
     if (theme === 'courtyard' || theme === 'ship') this.drawRain(ctx);
-    if (storm && FX.stormOn(storm)) { ctx.fillStyle = 'rgba(220,214,255,0.16)'; ctx.fillRect(0, 0, vw, 208); }
-    FX.render(ctx, this.collectLights(), theme);
+    const flashOn = storm && FX.stormOn(storm), dark = STORMY[theme];
+    if (flashOn) { this.drawStormShafts(ctx); ctx.fillStyle = `rgba(220,214,255,${dark ? 0.24 : 0.16})`; ctx.fillRect(0, 0, vw, 208); }
+    FX.render(ctx, this.collectLights(), theme, dark ? (flashOn ? dark[1] : dark[0]) : undefined); // zwischen den Blitzen dunkel, im Blitz taghell
     Rays.draw(ctx, this.room, this.cam, this.frame);
     if (this.bloodT > 0) this.drawBloodMoon(ctx, vw);
     if (this.stopT > 0 && (this.stopT > 50 || (this.stopT & 4))) { ctx.fillStyle = 'rgba(120,150,230,0.16)'; ctx.fillRect(0, 0, vw, 208); } // angehaltene Zeit
     const p = this.player;
     if (p.alive && p.hp <= p.maxHp / 4) Drama.drawDanger(ctx, vw, 0.35 + Math.sin(this.frame * 0.14) * 0.2);
     if (this.flash > 0 && (this.flash % 6) < 3) { ctx.fillStyle = 'rgba(252,252,252,0.45)'; ctx.fillRect(-4, -4, vw + 8, 216); }
+    ctx.restore();
+  },
+
+  stormWindows() { // sichtbare Fenster der Wandebene in Bildkoordinaten (Wand mit Parallaxe 0.5, senkrecht gekachelt)
+    const wins = STORM_WINS[this.room.theme], L = wins && Tiles.layer(this.room.theme, 'wall'), out = [];
+    if (!L) return out;
+    const cam = this.cam, Hc = L.c.height, off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512;
+    const oy = L.vtile && this.room.h > 13 ? ((Math.floor(cam.y * 0.5) % Hc) + Hc) % Hc : 0;
+    for (const [wx, wy, ww, wh] of wins) for (let k = -1; k <= Math.ceil(View.w / 512) + 1; k++) for (const ty of oy ? [-oy, Hc - oy] : [0]) {
+      const x = wx - off + k * 512, y = wy + ty;
+      if (x > View.w || x + ww < -160 || y + wh < 0 || y > 208) continue; // nur Fenster, die man sieht
+      out.push([x, y, ww, wh]);
+    }
+    return out;
+  },
+  drawStormShafts(ctx) { // Blitz: die Fenster werfen helle Lichtbahnen schräg in den Raum (Mittelpfosten als Schatten)
+    const rects = this.stormWindows();
+    if (!rects.length) return;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const [x0, wy, ww, wh] of rects) {
+      const y0 = wy + wh * 0.35, len = 240, sl = 0.5, half = (ww - 4) / 2;
+      const g = ctx.createLinearGradient(0, y0, 0, y0 + len);
+      g.addColorStop(0, 'rgba(190,200,255,0.34)'); g.addColorStop(1, 'rgba(190,200,255,0)');
+      ctx.fillStyle = g;
+      for (const dx of [0, half + 4]) { ctx.beginPath(); ctx.moveTo(x0 + dx, y0); ctx.lineTo(x0 + dx + half, y0); ctx.lineTo(x0 + dx + half + len * sl, y0 + len); ctx.lineTo(x0 + dx + len * sl, y0 + len); ctx.closePath(); ctx.fill(); }
+    }
     ctx.restore();
   },
 
@@ -534,6 +569,7 @@ const W = {
       if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + (e.blood ? 10 + Math.sin(f * 0.15) * 4 : 0) + flick(e.x), c: e.blood ? [232, 24, 48] : [248, 140, 40], a: e.blood ? 0.65 : 0.5 });
       else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
       else if (e instanceof Gatehouse) e.lights(L, this.cam.x, this.cam.y, flick);
+      else if (e instanceof FallingChandelier) e.lights(L, this.cam.x, this.cam.y, flick);
       else if (e instanceof Chandelier) L.push({ x, y: e.y - cy - 6, r: 42 + flick(e.px), c: [248, 160, 60], a: 0.55 });
       else if (e instanceof Statue && e.active) L.push({ x, y: y - 8, r: 30, c: [60, 188, 252], a: 0.45 });
       else if (e instanceof Chest && e.opened) L.push({ x, y, r: 20, c: [248, 184, 0], a: 0.4 });
@@ -547,6 +583,9 @@ const W = {
       else if (e instanceof GiantBat && e.state !== 'sleep' && !e.dying) L.push({ x, y: y - 9, r: 22, c: [252, 40, 40], a: 0.55 });
       else if (e instanceof Count && e.state === 'open') L.push({ x, y: y - 6, r: 34, c: [168, 0, 32], a: 0.45 });
       else if (e instanceof Pillar && e.openT > 0) L.push({ x, y, r: 22, c: [248, 120, 0], a: 0.5 });
+    }
+    if (this.room.theme === 'foyer') for (const [wx, wy, ww, wh] of this.stormWindows()) { // Fenster schimmern im Mondlicht, auch zwischen den Blitzen
+      for (let k = 0; k < 3; k++) L.push({ x: wx + ww / 2, y: wy + wh * (0.2 + k * 0.3), r: 50, c: [90, 100, 170], a: 0.16 });
     }
     if (this.room.theme === 'ship') Tiles.shipLights(L, this.cam);
     this.doorLights(L);
