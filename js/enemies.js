@@ -545,6 +545,17 @@ class Spawner {
     const x = side > 0 ? c.x + View.w + 2 : c.x - 14;
     return new Skull(x, clamp(p.y + rnd(-14, 10), c.y + 24, c.y + 170), -side);
   }
+  spawn_sea(p, c) { // Schiff: Fischmenschen springen aus dem Meer über die Reling an Deck
+    const deck = W.room.h - 2;
+    for (let tries = 0; tries < 6; tries++) {
+      const x = p.cx + (Math.random() < 0.5 ? -1 : 1) * rnd(40, 110);
+      if (x < c.x + 8 || x > c.x + View.w - 8) continue;
+      const col = Math.floor(x / T);
+      if (!Phys.solidTile(col, deck) || Phys.tile(col, deck - 1) !== '.' || Phys.tile(col, deck - 2) !== '.') continue;
+      return new Fishman(x, W.room.h * T);
+    }
+    return null;
+  }
   spawn_fish(p, c) {
     for (let tries = 0; tries < 6; tries++) {
       const x = p.cx + (Math.random() < 0.5 ? -1 : 1) * rnd(36, 100);

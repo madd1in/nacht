@@ -77,7 +77,7 @@ class Player {
     this.state = 'normal'; this.atkT = 0; this.atkSub = false; this.crouch = false; this.crouchAtk = false;
     this.inv = 0; this.walkT = 0; this.jumping = false; this.stair = null; this.stairPos = 0;
     this.stairUpPose = true; this.deadT = 0; this.plat = null; this.powerT = 0;
-    this.canDouble = true; this.flipT = 0; this.scarf = null; this.hidden = false; this.coyote = 0; this.jumpBuf = 0; this.rageT = 0;
+    this.canDouble = true; this.flipT = 0; this.scarf = null; this.hidden = false; this.coyote = 0; this.jumpBuf = 0; this.rageT = 0; this.sunk = false;
     this.chargeT = 0; this.crashT = 0; this.landT = 0; this.lastSafe = { cx: fx, feet: fy };
     this.atkDir = 'fwd'; this.slideT = 0; this.flingT = 0; this.trail = []; this.dangle = false; this.ring = null;
   }
@@ -341,6 +341,7 @@ class Player {
       return this.fallPenalty(4);
     }
     if (this.onGround && Phys.tile(fc, Math.floor((this.feet + 1) / T)) === '^') return this.fallPenalty(3);
+    if (W.room.theme === 'ship' && !this.sunk && this.feet > W.room.h * T - 6) { this.sunk = true; W.splash(this.cx, W.room.h * T - 8); } // ins Meer
     if (this.y > W.room.h * T + 8) this.fallPenalty(4);
   }
 

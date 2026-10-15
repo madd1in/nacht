@@ -213,6 +213,10 @@ const Audio8 = (() => {
   const S2 = { Am: ['a3', 'c4', 'e4'], F: ['f3', 'a3', 'c4'], G: ['g3', 'b3', 'd4'], E: ['e3', 'g#3', 'b3'], Dm: ['d4', 'f4', 'a4'] };
   const S2B = { Am: ['a1', 'a2'], F: ['f1', 'f2'], G: ['g1', 'g2'], E: ['e1', 'e2'], Dm: ['d2', 'd3'] };
   const S2C = ['Am', 'Am', 'F', 'G', 'Am', 'Am', 'E', 'E', 'Dm', 'Dm', 'Am', 'Am', 'F', 'G', 'E', 'E'];
+  // Schiff – Seemannslied (d-Moll, 6/8): Akkorde pro Takt
+  const SEA = { Dm: ['d4', 'f4', 'a4'], C: ['c4', 'e4', 'g4'], A: ['a3', 'c#4', 'e4'], F: ['f3', 'a3', 'c4'], Bb: ['a#3', 'd4', 'f4'] };
+  const SEA_B = { Dm: ['d2', 'a2'], C: ['c2', 'g2'], A: ['a1', 'e2'], F: ['f1', 'c2'], Bb: ['a#1', 'f2'] };
+  const SEA_C = ['Dm', 'Dm', 'C', 'C', 'Dm', 'Dm', 'A', 'A', 'F', 'C', 'Dm', 'Bb', 'A', 'Dm', 'A', 'Dm'];
   // Stage 3 – Bergfried (e-Moll, 176 BPM)
   const S3 = { Em: ['e4', 'g4', 'b4'], C: ['c4', 'e4', 'g4'], D: ['d4', 'f#4', 'a4'], B: ['b3', 'd#4', 'f#4'], Am: ['a3', 'c4', 'e4'] };
   const S3B = { Em: ['e2', 'e3'], C: ['c2', 'c3'], D: ['d2', 'd3'], B: ['b1', 'b2'], Am: ['a1', 'a2'] };
@@ -283,6 +287,18 @@ const Audio8 = (() => {
       tri: [drive('d2', 'd3'), drive('d2', 'd3'), drive('d#2', 'd#3'), drive('d#2', 'd#3'), drive('d2', 'd3'), drive('d2', 'd3'), drive('c#2', 'c#3'), drive('c#2', 'c#3')].join(' '),
       pad: 'd3+f3+a3:32 d#3+g3+a#3:32 d3+f3+a3:32 c#3+e3+g#3:32',
       dr: [FOURX, DK, FOUR, FILLS, DK, DK, DK, FILLR].join(' '),
+    },
+    // Schiff – Seemannslied im 6/8-Takt (d-Moll, 132 BPM): schunkelnd, mit Akkordeon-artigen Pulsen
+    sea: {
+      bpm: 132, loop: true, echo: { delay: 3, vol: 0.3 },
+      p1: ['a4:3 d5:3 d5:2 e5:1 f5:3', 'e5:3 d5:3 a4:6', 'g4:3 c5:3 c5:2 d5:1 e5:3', 'd5:3 c5:3 g4:6',
+        'a4:3 d5:3 f5:2 e5:1 d5:3', 'f5:3 a5:3 g5:2 f5:1 e5:3', 'e5:3 c#5:3 a4:3 b4:3', 'c#5:3 e5:3 a5:6',
+        'c5:3 f5:3 f5:2 g5:1 a5:3', 'g5:3 e5:3 c5:6', 'd5:3 f5:3 a5:2 g5:1 f5:3', 'f5:3 d5:3 a#4:6',
+        'a4:3 c#5:3 e5:3 g5:3', 'f5:3 e5:3 d5:6', 'e5:3 c#5:2 d5:1 e5:3 a4:3', 'd5:9 -:3'].join(' '),
+      p2: SEA_C.map(c => { const [a, b, d] = SEA[c]; return `${a}:2 ${b}:2 ${d}:2 ${b}:2 ${d}:2 ${b}:2`; }).join(' '),
+      tri: SEA_C.map(c => { const [lo, hi] = SEA_B[c]; return `${lo}:3 ${hi}:3 ${lo}:3 ${hi}:3`; }).join(' '),
+      pad: SEA_C.map(c => SEA[c].join('+') + ':12').join(' '),
+      dr: SEA_C.map((c, i) => i % 4 === 3 ? 'k:2 h:2 k:2 s:2 h:2 t:1 u:1' : 'k:2 h:2 h:2 s:2 h:2 h:2').join(' '),
     },
     clear: {
       bpm: 150, loop: false,
@@ -502,6 +518,12 @@ const Audio8 = (() => {
       ambDrone(nodes, out, 'triangle', 73.4, 0.5); ambDrone(nodes, out, 'triangle', 110, 0.35); ambDrone(nodes, out, 'sine', 146.8, 0.2);
       ambLfo(nodes, out.gain, 0.05, 0.01);
       level = 0.022;
+    } else if (theme === 'ship') { // Brandung: anschwellendes Wellenrauschen + Wind in der Takelage
+      const lp = ambNoise(nodes, out, 'lowpass', 600);
+      ambLfo(nodes, lp.frequency, 0.08, 380); ambLfo(nodes, out.gain, 0.08, 0.014);
+      const bp = ambNoise(nodes, out, 'bandpass', 1400, 5);
+      ambLfo(nodes, bp.frequency, 0.05, 500);
+      level = 0.03;
     } else if (theme === 'vortex') { // Sog: schnell kreisender Wind
       const bp = ambNoise(nodes, out, 'bandpass', 900, 4);
       ambLfo(nodes, bp.frequency, 0.6, 500);
@@ -526,6 +548,8 @@ const Audio8 = (() => {
     } else if (theme === 'cave' && Math.random() < 0.006) drip(null, 0.6);
     else if (theme === 'crypt' && Math.random() < 0.0025) { // ferne Ketten
       for (let i = 0; i < 5; i++) noise(0.05, 0.035, 'bandpass', 3000 + Math.random() * 2000, 0, t + i * 0.07 + Math.random() * 0.03);
+    } else if (theme === 'ship' && Math.random() < 0.004) { // Schiffsrumpf ächzt
+      tone('sawtooth', 60 + Math.random() * 25, 45, 0.7, 0.03, 0, t);
     } else if (theme === 'hall' && Math.random() < 0.0015) { // Gebälk knarzt
       tone('sawtooth', 70 + Math.random() * 20, 50, 0.6, 0.025, 0, t);
     }

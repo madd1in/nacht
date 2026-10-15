@@ -165,6 +165,27 @@ class Chest extends Ent {
   draw(ctx) { Sprites.draw(ctx, Sprites.S.chest[this.opened ? 1 : 0], Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y)); }
 }
 
+// ---------------- Frachtkiste „UPEL“ – Gruß an Infernax (Alcedors Heimat) ----------------
+class Cargo extends Ent {
+  constructor(d) { super(d.x * T - 6, (d.y + 1) * T - 22, 28, 22); this.kind = 'candle'; }
+  hit() {
+    if (this.dead) return;
+    this.dead = true;
+    Audio8.sfx('crumble', this.cx); Audio8.sfx('chest', this.cx); W.shake = Math.max(W.shake, 4);
+    for (let i = 0; i < 14; i++) W.spawn(new Particle(this.cx + rnd(-12, 12), this.cy + rnd(-8, 8), rnd(-2, 2), rnd(-3.5, -1), i % 2 ? '#a8783c' : '#5a3214', 40, 2, 0.2));
+    ['oneUp', 'bagBig', 'heartB'].forEach((type, i) => { const it = W.spawn(new Item(type, this.cx, this.y)); it.vx = (i - 1) * 0.9; it.vy = -2.8; });
+    Game.note('upelNote');
+  }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#1e0c04', 0, 0, 28, 22); R('#8a5428', 1, 1, 26, 20);
+    for (let k = 4; k < 21; k += 4) R('#5a3214', 2, k, 24, 1);
+    R('#b87c44', 1, 1, 26, 2); R('#b87c44', 1, 1, 2, 20); R('#5a3214', 25, 1, 2, 20); R('#5a3214', 1, 19, 26, 2);
+    R('#2c2c34', 2, 2, 2, 2); R('#2c2c34', 24, 2, 2, 2); R('#2c2c34', 2, 17, 2, 2); R('#2c2c34', 24, 17, 2, 2);
+    Font.draw(ctx, 'UPEL', x + 14, y + 8, '#7c1c0c', { align: 'center' });
+  }
+}
+
 // ---------------- Ankerring (Peitsche schräg nach oben: einhaken und pendeln) ----------------
 class Ring extends Ent {
   constructor(d) { super(d.x * T + 3, d.y * T + 3, 10, 10); this.kind = 'prop'; }

@@ -116,6 +116,82 @@ const Mode7 = (() => {
     ctx.restore();
   }
 
+  // ---------------- Mode-7-Ozean mit Monsterwellen ----------------
+  // Perspektivische Meeresebene wie in Mode 7, dazu ein Höhenfeld, Spalte für Spalte von vorn nach hinten
+  // gezeichnet (Voxel-Prinzip): Dünungsberge rollen auf das Schiff zu und ragen über den Horizont; eine
+  // Monsterwelle (rogue = Entfernung) türmt sich auf, bevor sie gegen den Rumpf schlägt.
+  const OC_H = 84, OC_HOR = 41, OC_F = 60, OC_CAM = 30, OC_Z0 = 22, OC_Z1 = 420;
+  const OC_DEEP = [8, 14, 40], OC_MID = [22, 36, 86], OC_HI = [70, 92, 170], OC_FOAM = [196, 212, 252], OC_FOG = [42, 40, 88], OC_MOON = [200, 120, 130];
+  let OC = null, ocZ = null, ocZB = null;
+  const mixC = (a, b, k, l) => (255 << 24) | (Math.min(255, (a[2] + (b[2] - a[2]) * k) * l) << 16) | (Math.min(255, (a[1] + (b[1] - a[1]) * k) * l) << 8) | Math.min(255, (a[0] + (b[0] - a[0]) * k) * l);
+  // Riesenkrake: Fangarme als Kette perspektivischer Scheiben, mit Tiefenpuffer gegen die Wellen verdeckt.
+  // k = { t, arms: [{ u (relativ zur Blickmitte), z, len, ph }] }; t: 0–90 auftauchen, 330–364 zuschlagen, ab 370 versinken
+  const SKIN = [92, 28, 68], SKIN_HI = [160, 72, 120], SUCK = [232, 180, 200];
+  function drawTentacles(buf, zb, tw, u0, k, light) {
+    const r = Math.min(1, k.t / 90), rise = r * r * (3 - 2 * r);
+    const a = k.t > 330 ? Math.min(1, (k.t - 330) / 34) : 0, ang = a * a * 1.45, sink = k.t > 370 ? (k.t - 370) / 50 : 0;
+    for (const arm of k.arms) {
+      const N = 36;
+      for (let i = N; i >= 0; i--) {
+        const s = i / N, h = s * arm.len * rise;
+        const du = Math.sin(s * 3.2 + k.t * 0.045 + arm.ph) * 10 * s + (s > 0.7 ? Math.sin(k.t * 0.07 + arm.ph) * (s - 0.7) * 30 : 0);
+        const dz = Math.cos(s * 2 + k.t * 0.03 + arm.ph) * 6 * s;
+        const h2 = h * Math.cos(ang) - sink * arm.len, z2 = arm.z + dz - h * Math.sin(ang);
+        if (z2 < OC_Z0) continue;
+        const cx = tw / 2 + ((arm.u + du) / z2) / 0.95 * (tw / 2) - 0.5, cy = OC_HOR + (OC_CAM - h2) * OC_F / z2;
+        const R = ((1 - s * 0.85) * 6 + 1) * OC_F / z2, fog = Math.min(1, (z2 - OC_Z0) / (OC_Z1 - OC_Z0) * 1.25);
+        const cSkin = mixC(SKIN, OC_FOG, fog, light), cHi = mixC(SKIN_HI, OC_FOG, fog, light), cSuck = mixC(SUCK, OC_FOG, fog, light);
+        const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(tw - 1, Math.ceil(cx + R)), y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(OC_H - 1, Math.ceil(cy + R));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const ddx = x + 0.5 - cx, ddy = y + 0.5 - cy;
+          if (ddx * ddx + ddy * ddy > R * R) continue;
+          const idx = y * tw + x;
+          if (zb[idx] <= z2) continue;
+          zb[idx] = z2;
+          buf[idx] = ddx < -R * 0.35 ? cHi : (i % 3 === 0 && ddx > R * 0.25 && ddy * ddy < R * R * 0.2) ? cSuck : cSkin; // Saugnäpfe innen
+        }
+      }
+    }
+  }
+  function drawOcean(ctx, w, t, o = {}) {
+    const lo = MOBILE_RENDER || View.lite, sx = lo ? 3 : 2, tw = Math.ceil(w / sx);
+    if (!OC || OC.w !== tw) { const c = Sprites.canvas(tw, OC_H), x = c.getContext('2d'), img = x.createImageData(tw, OC_H); OC = { w: tw, c, x, img, buf: new Uint32Array(img.data.buffer) }; ocZB = new Float32Array(tw * OC_H); }
+    if (!ocZ || ocZ.lo !== lo) { ocZ = []; for (let z = OC_Z0; z < OC_Z1; z = z * (lo ? 1.035 : 1.022) + 0.6) ocZ.push(z); ocZ.lo = lo; }
+    const buf = OC.buf, zb = ocZB; buf.fill(0); zb.fill(1e9);
+    const calm = o.calm === undefined ? 1 : o.calm, A = 30 * (0.3 + 0.7 * calm), light = o.flash ? 1.7 : 1;
+    const rv = o.rogue || 0, AR = rv ? 80 * Math.sqrt(Math.max(0, 1 - rv / 430)) : 0;
+    const u0 = (o.camX || 0) * 0.06 + (o.sail || 0) * 0.8, moonX = (w - 92) / sx;
+    const fogFill = mixC(OC_FOG, OC_FOG, 0, light);
+    for (let x = 0; x < tw; x++) {
+      const dx = (x + 0.5 - tw / 2) / (tw / 2) * 0.95;
+      let ymin = OC_H;
+      for (let i = 0; i < ocZ.length && ymin > 0; i++) {
+        const z = ocZ[i], u = u0 + dx * z;
+        const s = (Math.sin(z * 0.045 + t * 0.035 + Math.sin(u * 0.012 + z * 0.004) * 1.2) + 1) * 0.5, s3 = s * s * s;
+        let h = s3 * A + Math.sin(u * 0.06 + z * 0.03 - t * 0.05) * 3 + Math.sin(u * 0.11 - z * 0.07 + t * 0.08) * 1.5, rog = 0;
+        if (AR) { const d = z - rv, q = d / (d < 0 ? 8 : 22); rog = Math.exp(-q * q) * (0.8 + 0.2 * Math.cos(u * 0.02 + t * 0.01)); h += rog * AR; } // steile Front, langer Rücken
+        const sy = Math.floor(OC_HOR + (OC_CAM - h) * OC_F / z);
+        if (sy >= ymin) continue;
+        const fog = Math.min(1, (z - OC_Z0) / (OC_Z1 - OC_Z0) * 1.25), crest = Math.max(s3 * (1 - rog * 0.5), Math.pow(rog, 3) * 0.97); // Monsterwelle: unten dunkel, oben heller, weiße Krone
+        const cs = [mixC(OC_DEEP, OC_FOG, fog, light), mixC(OC_MID, OC_FOG, fog, light), mixC(OC_HI, OC_FOG, fog * 0.8, light), mixC(OC_FOAM, OC_FOG, fog * 0.6, light)];
+        const moon = mixC(OC_MOON, OC_FOG, fog * 0.5, light);
+        for (let y = Math.max(0, sy); y < ymin; y++) {
+          const b = BAY[(y & 3) * 4 + (x & 3)], c = crest - (y - sy) * 0.07 + b * 0.18; // Wellenflanke unter dem Kamm dunkler
+          let col = c > 0.9 ? cs[3] : c > 0.6 ? cs[2] : c > 0.26 ? cs[1] : cs[0];
+          if (c > 0.55 && b > 0.8 && Math.abs(x - moonX) < 1.5 + Math.max(0, y - OC_HOR) * 0.16) col = moon; // Mondglitzern (nur auf Kämmen)
+          buf[y * tw + x] = col; zb[y * tw + x] = z;
+        }
+        ymin = Math.max(0, sy);
+      }
+      for (let y = OC_HOR; y < ymin; y++) { buf[y * tw + x] = fogFill; zb[y * tw + x] = OC_Z1; } // Meer bis zum Horizont im Dunst
+    }
+    if (o.kraken && o.kraken.t >= 0) drawTentacles(buf, zb, tw, u0, o.kraken, light);
+    OC.x.putImageData(OC.img, 0, 0);
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(OC.c, 0, 0, tw, OC_H, 0, 122 - OC_HOR * 2, tw * sx, OC_H * 2);
+    ctx.restore();
+  }
+
   // ---------------- HDMA-Welle & Mosaik ----------------
   let wc = null;
   function wave(ctx, y0, h, w, amp, t, freq = 0.09) {
@@ -171,5 +247,5 @@ const Mode7 = (() => {
     ctx.restore();
   }
 
-  return { drawTunnel, drawMap, wave, mosaic, drawFire };
+  return { drawTunnel, drawMap, drawOcean, wave, mosaic, drawFire };
 })();

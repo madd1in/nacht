@@ -43,20 +43,49 @@ const Levels = (() => {
       // Turmglocke: schlägt regelmäßig, der ganze Turm schwankt (Mode-7-Drehung des Bildes)
       bell() { r.bell = true; return api; },
       chest(x, y, loot = 'rnd') { r.ents.push({ type: 'chest', x, y, loot }); return api; },
+      cargo(x, y) { r.ents.push({ type: 'cargo', x, y }); return api; },
       start(x, y) { r.start = { x, y }; return api; },
       exit(x) { r.exit = { x0: x, y0: 0, x1: w - 1, y1: h - 1 }; r.door = { x }; return api; },
       exitAt(x0, y0, x1, y1) { r.exit = { x0, y0, x1, y1 }; r.door = { x: x0 + 1 }; return api; },
       arena(boss) { r.arena = { boss }; return api; },
+      // Schiff: Masten (Kachel-x), Steuerrad, Anlegen (ab Spieler-x legt das Schiff an, Laufplanke x0..x1 in Reihe row)
+      masts(...xs) { r.masts = xs; return api; },
+      wheel(x, y) { r.wheel = { x, y }; return api; },
+      dock(x, x0, x1, row) { r.dock = { x, x0, x1, row }; return api; },
+      music(name) { r.music = name; return api; },
+      noDoor() { r.noDoor = true; return api; },
       done() {
         if (r.door) { // Tür auf dem ersten Boden unterhalb der Ausgangszone
           for (let y = r.exit.y0; y < h; y++) if ('#='.includes(r.grid[y][r.door.x])) { r.door.base = y; break; }
           if (r.door.base === undefined) r.door.base = h - 2;
         }
+        if (r.noDoor) r.door = null; // Ausgang ohne Burgtor (z. B. Mole)
         return r;
       },
     };
     return api;
   }
+
+  // ======================= STAGE 1: Ankunft per Schiff =======================
+  // Galeone im Sturm: Achterdeck mit Steuerrad, Hauptdeck (Fischmenschen springen aus dem Meer an Bord),
+  // Wanten hoch zur Rah, Back. Am Bug ruft der Ausguck „Land in Sicht!", das Schiff kracht an die Mole,
+  // die Laufplanke fällt – an Land geht es weiter zum Burghof.
+  const r10 = room(96, 'ship')
+    .ground(0, 73)
+    .fill(0, 8, 10, 10, '#').stair(13, 10, 3, -1)
+    .fill(17, 9, 18, 10, '=')
+    .stair(26, 10, 5, 1).fill(31, 6, 37, 6, '=')
+    .fill(47, 9, 48, 10, '=')
+    .stair(57, 10, 3, 1).fill(60, 8, 73, 10, '#')
+    .fill(81, 8, 95, 8, '#').fill(83, 9, 83, 12, '#').fill(88, 9, 88, 12, '#').fill(93, 9, 93, 12, '#')
+    .masts(21, 34.5, 66.5).wheel(6, 8)
+    .candle(4, 6).candle(8, 6, 'W').candle(15, 9, 'H').candle(23, 9).candle(32, 4, 'H').candle(36, 4, '1')
+    .candle(41, 9).candle(45, 9, '$').candle(53, 9, 'H').candle(63, 6).candle(70, 6, 'H').candle(86, 6).candle(91, 6, 'W')
+    .enemy('skel', 44, 10).enemy('skel', 69, 7).enemy('bat', 20, 3).enemy('bat', 52, 2).enemy('raven', 34, 5)
+    .cargo(51, 10) // Frachtkiste „UPEL“ – Gruß an Infernax
+    .zone('sea', 14, 56, { interval: 150, max: 2 })
+    .dock(62, 74, 80, 8).music('sea')
+    .start(3, 7).exit(94).noDoor().done();
 
   // ======================= STAGE 1: Der Burghof =======================
   const r11 = room(72, 'courtyard')
@@ -195,7 +224,7 @@ const Levels = (() => {
     .start(2, 10).arena('count').done();
 
   const STAGES = [
-    { name: 'DER BURGHOF', music: 'stage1', time: 400, rooms: [r11, v1, r12], boss: 'RIESENFLEDERMAUS' },
+    { name: 'DER BURGHOF', music: 'stage1', time: 520, rooms: [r10, r11, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
     { name: 'DER BERGFRIED', music: 'stage3', time: 640, rooms: [r31, v3, vx, r32], boss: 'GRAF NACHTMAHR' },
   ];

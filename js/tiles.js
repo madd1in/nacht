@@ -19,6 +19,7 @@ const Tiles = (() => {
     tower: { a: ['#c8c8c8', '#9a9a9a', '#6e6e6e', '#464646', '#141414'], b: ['#a4e4fc', '#3cbcfc', '#0078f8', '#0040a8', '#001038'] },
     throne: { a: ['#fce0a8', '#f8b800', '#a80020', '#680010', '#1c0008'], b: ['#e0d0fc', '#a088f8', '#6844fc', '#4428bc', '#120628'] },
     vortex: { a: ['#e8b8fc', '#a868d8', '#6c2c9c', '#401060', '#14041c'], b: ['#fca0cc', '#d84080', '#9c1c50', '#5c0c2c', '#1c0410'] },
+    ship: { a: ['#e8b070', '#b87c44', '#8a5428', '#5a3214', '#1e0c04'], b: ['#dcb47c', '#a8783c', '#7a4c20', '#4a2a0c', '#160802'] },
   };
 
   // ---------------- Kacheln ----------------
@@ -40,6 +41,41 @@ const Tiles = (() => {
       for (let i = 0; i < 8 && cy < 13; i++) { px(x, sh, cx, cy); px(x, lt, cx + 1, cy); cy++; cx += ri(-1, 1); }
     }
     if (opts.chip) { px(x, sh, 13, 0, 3, 2); px(x, sh, 15, 2, 1, 1); px(x, dk, 13, 2, 2, 1); }
+    return c;
+  }
+  // Schiffsplanken: waagrechte Bohlen mit Stoßfugen, Nägeln und Maserung; top = Deck (helle Kante), hull = Rumpf
+  function planks(p, opts = {}) {
+    const c = C(16, 16), x = c.getContext('2d');
+    const [hl, lt, md, dk, sh] = p;
+    px(x, sh, 0, 0, 16, 16);
+    for (let r = 0; r < 4; r++) {
+      const by = r * 4, joint = (ri(3, 12) + r * 5) % 16;
+      px(x, opts.hull ? (r % 2 ? dk : md) : (rand() < 0.2 ? dk : md), 0, by, 16, 3);
+      px(x, opts.hull ? md : lt, 0, by, 16, 1);
+      for (let i = 0; i < 4; i++) px(x, opts.hull ? sh : dk, ri(0, 15), by + 1 + ri(0, 1), ri(2, 4), 1); // Maserung
+      px(x, sh, joint, by, 1, 3); px(x, hl, (joint + 2) % 16, by + 1); // Fuge + Nagel
+    }
+    if (opts.top) { px(x, hl, 0, 0, 16, 1); px(x, lt, 0, 1, 16, 1); }
+    return c;
+  }
+  function crate(p) {
+    const c = C(16, 16), x = c.getContext('2d');
+    const [hl, lt, md, dk, sh] = p;
+    px(x, md, 0, 0, 16, 16);
+    for (let y = 3; y < 14; y += 3) px(x, dk, 2, y, 12, 1);
+    for (let i = 0; i < 12; i++) px(x, lt, 2 + i, 13 - i, 2, 1); // Diagonalstrebe
+    px(x, lt, 0, 0, 16, 2); px(x, lt, 0, 0, 2, 16); px(x, sh, 0, 14, 16, 2); px(x, sh, 14, 0, 2, 16);
+    px(x, hl, 0, 0, 16, 1); px(x, hl, 0, 0, 1, 15);
+    [[1, 1], [13, 1], [1, 13], [13, 13]].forEach(([X, Y]) => px(x, '#24242c', X, Y, 2, 2));
+    return c;
+  }
+  function beam(p) { // Rah / Laufplanke: kräftige Bohle mit Tau-Bund
+    const c = C(16, 16), x = c.getContext('2d');
+    const [hl, lt, md, dk, sh] = p;
+    px(x, md, 0, 1, 16, 9); px(x, hl, 0, 1, 16, 1); px(x, lt, 0, 2, 16, 1); px(x, dk, 0, 8, 16, 1); px(x, sh, 0, 9, 16, 1);
+    for (let i = 0; i < 3; i++) px(x, dk, ri(0, 13), ri(4, 6), ri(2, 4), 1);
+    x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(0, 10, 16, 3);
+    px(x, '#c8b088', 6, 1, 1, 9); px(x, '#8c7450', 8, 1, 1, 9);
     return c;
   }
   function bricks(p, opts = {}) {
@@ -129,6 +165,11 @@ const Tiles = (() => {
         const len = ri(1, v === 0 ? 9 : 5);
         px(x, m[0], X, 0, 1, len); if (rand() < 0.5) px(x, m[1], X, len - 1, 1, 1);
       }
+    } else if (theme === 'ship') { // Tauenden unter Rahen und Planken
+      if (v === 2) return null;
+      const X0 = v ? 11 : 4;
+      for (let y = 0; y < (v ? 6 : 9); y++) px(x, '#3c2814', X0 + (y > 5 ? 1 : 0), y);
+      px(x, '#5c4024', X0, 0, 1, 2); if (v) px(x, '#3c2814', X0 - 1, 6, 3, 2);
     } else if (theme === 'crypt' && v === 0) { // feine Spinnweben-Fäden
       x.fillStyle = 'rgba(0,0,0,0.45)'; x.fillRect(0, 0, 16, 2);
       x.fillStyle = 'rgba(200,200,232,0.45)';
@@ -369,6 +410,157 @@ const Tiles = (() => {
     }
   }
 
+  // ---------------- Schiff: Meer mit Linescroll, Küste mit Burg, Takelage ----------------
+  const SEA_Y = 122; // Horizont (Spielfeld-y)
+  let coastC = null, waveC = null;
+  const mastCache = {}, sailCache = {};
+  // Sturmsee als Mode-7-Ozean mit Höhenfeld (Monsterwellen); nach dem Anlegen beruhigt sich das Wasser im Hafen
+  function drawSea(ctx, cam, frame) {
+    Mode7.drawOcean(ctx, View.w, frame, { camX: cam.x, sail: W.sailX || 0, calm: W.sail, rogue: W.rogue ? W.rogue.v : 0, kraken: W.kraken, flash: FX.stormOn(W.storm) });
+  }
+  function buildCoast() {
+    const c = C(260, 132), x = c.getContext('2d'), rock = '#0a0614', edge = '#1e1430', wall = '#07030e';
+    for (let X = 0; X < 260; X++) { // Felsklippe
+      const t = X / 259, top = Math.round(132 - Math.pow(Math.sin(t * Math.PI), 0.7) * 78 - Math.sin(X * 0.21) * 3 - Math.sin(X * 0.07) * 5);
+      px(x, rock, X, top, 1, 132 - top); px(x, edge, X, top, 1, 1);
+      if (rand() < 0.25) px(x, edge, X, top + ri(4, 40), 1, ri(2, 6));
+    }
+    const tw = (tx, ty, w, roof) => {
+      px(x, wall, tx, ty, w, 132 - ty);
+      if (roof) {
+        for (let i = 0; i < w / 2 + 2; i++) px(x, wall, tx - 2 + i, ty - 1 - i * 2, Math.max(1, w + 4 - i * 2), 2);
+        const top = ty - (w / 2 + 2) * 2;
+        px(x, wall, tx + w / 2 - 1, top - 6, 1, 6); px(x, '#a80020', tx + w / 2, top - 6, 4, 2);
+      } else for (let i = 0; i < w; i += 4) px(x, wall, tx + i, ty - 3, 2, 3);
+      for (let i = 0; i < 3; i++) if (rand() < 0.8) { const wx = tx + 2 + ri(0, w - 5), wy = ty + 5 + ri(0, 30); px(x, '#f8b800', wx, wy, 1, 2); px(x, '#f87800', wx, wy + 2, 1, 1); }
+    };
+    px(x, wall, 70, 52, 120, 30);
+    for (let i = 0; i < 120; i += 6) px(x, wall, 70 + i, 48, 3, 4);
+    tw(66, 40, 14, true); tw(96, 30, 18, true); tw(128, 32, 22, true); tw(166, 36, 16, true); tw(188, 46, 12, false);
+    tw(14, 100, 8, false); // Leuchtturm an der Hafeneinfahrt
+    px(x, '#fce0a8', 16, 103, 4, 2);
+    return c;
+  }
+  // Die Burg auf der Klippe rückt näher, je weiter man zum Bug läuft
+  function drawCoast(ctx, cam) {
+    if (!coastC) coastC = buildCoast();
+    const end = Math.max(0, W.room.w * T - View.w);
+    const X = Math.round(View.w * 0.66 - 130 + (end - cam.x) * 0.16);
+    if (X < View.w && X > -270) ctx.drawImage(coastC, X, SEA_Y + 2 - 132);
+  }
+  // Mast mit zwei Rahen und Wanten (Seile mit Webeleinen); base = y des Decks unter dem Mast
+  function buildMast(base) {
+    const w = 140, c = C(w, base + 2), x = c.getContext('2d'), m = w >> 1;
+    const rope = '#24160c', pole = ['#6c4420', '#4c2c10', '#2c1806'];
+    for (let s = -1; s <= 1; s += 2) {
+      const tx = m + s * 54;
+      for (let k = 0; k < 2; k++) {
+        const x0 = m + s * (2 + k * 3), x1 = tx + s * k * 6;
+        for (let y = 60; y < base; y++) px(x, rope, Math.round(x0 + (x1 - x0) * (y - 60) / (base - 60)), y);
+      }
+      for (let y = 70; y < base - 4; y += 7) {
+        const t = (y - 60) / (base - 60), a = Math.round(m + s * 2 + (tx - m - s * 2) * t), b = Math.round(m + s * 5 + (tx + s * 6 - m - s * 5) * t);
+        px(x, rope, Math.min(a, b), y, Math.abs(b - a) + 1, 1);
+      }
+    }
+    px(x, pole[2], m - 3, 0, 7, base); px(x, pole[0], m - 2, 0, 2, base); px(x, pole[1], m, 0, 2, base);
+    [10, 56].forEach(yy => { px(x, pole[2], m - 46, yy, 92, 4); px(x, pole[0], m - 46, yy, 92, 1); px(x, pole[1], m - 46, yy + 1, 92, 2); });
+    if (base - 46 > 74) { const yy = base - 46; px(x, pole[2], m - 40, yy, 80, 3); px(x, pole[0], m - 40, yy, 80, 1); }
+    for (let i = 0; i < 6; i++) px(x, pole[2], m - 4 + (i % 2) * 6, 22 + i * 6, 2, 2);
+    return c;
+  }
+  // Zerschlissenes Segel, im Wind gebläht (6 Animationsphasen)
+  function buildSail(w, h, f) {
+    const c = C(w + 14, h), x = c.getContext('2d'), ph = f / 6 * Math.PI * 2;
+    const cols = ['#948c7c', '#7c7464', '#605a4c', '#423e34']; // im Mondlicht gedämpft
+    let s = 77 + w * 3 + h; const hr = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    const holes = Array.from({ length: Math.round(w * h / 2600) + 1 }, () => ({ x: hr() * w, y: 0.4 + hr() * 0.5, r: 3 + hr() * 5 }));
+    for (let y = 0; y < h; y++) {
+      const t = y / Math.max(1, h - 1), bul = Math.sin(t * Math.PI) * (5 + 2 * Math.sin(ph + t * 2));
+      const rw = Math.round(w * (0.9 + 0.1 * (1 - t))), x0 = Math.round((w - rw) / 2 + bul);
+      for (let X = 0; X < rw; X++) {
+        if (holes.some(o => Math.hypot(X + x0 - o.x + (t - o.y) * h * 0.8, (t - o.y) * h * 2.2) < o.r)) continue; // schräge Risse
+        const v = Math.abs(X / rw - 0.5) * 1.4 + t * 0.35 * Math.sin(t * Math.PI) + bay(X, y) * 0.35;
+        let i = v > 0.95 ? 2 : v > 0.55 ? 1 : 0;
+        if (y % 11 === 5) i = Math.min(3, i + 1); // Nähte
+        px(x, cols[i], x0 + X + 6, y);
+      }
+      px(x, cols[3], x0 + 6, y); px(x, cols[3], x0 + rw + 5, y);
+    }
+    return c;
+  }
+  function sail(w, h, frame) {
+    const key = w + 'x' + h, fr = sailCache[key] || (sailCache[key] = [0, 1, 2, 3, 4, 5].map(f => buildSail(w, h, f)));
+    return fr[Math.floor(frame / 10) % 6];
+  }
+  function mastBase(room, mx) {
+    const col = Math.floor(mx);
+    for (let cy = 0; cy < room.h; cy++) if (room.grid[cy][col] === '#') return cy * T;
+    return room.h * T;
+  }
+  function drawRig(ctx, cam, frame) {
+    const room = W.room, g = room.grid, ox = Math.round(cam.x), oy = Math.round(cam.y);
+    if (!room.rail) { // Reling hinter jeder freien Deck-Oberkante
+      room.rail = [];
+      for (let cx = 0; cx < room.w; cx++) for (let cy = 1; cy < room.h; cy++) if (g[cy][cx] === '#' && g[cy - 1][cx] === '.') room.rail.push([cx, cy]);
+    }
+    const c0 = Math.floor(cam.x / T) - 1, c1 = c0 + Math.ceil(View.w / T) + 2;
+    for (const [cx, cy] of room.rail) {
+      if (cx < c0 || cx > c1) continue;
+      const X = cx * T - ox, Y = cy * T - oy;
+      ctx.fillStyle = '#2c1808'; ctx.fillRect(X, Y - 13, 16, 3); ctx.fillRect(X + 3, Y - 11, 2, 11); ctx.fillRect(X + 11, Y - 11, 2, 11);
+      ctx.fillStyle = '#6c4420'; ctx.fillRect(X, Y - 13, 16, 1);
+    }
+    (room.masts || []).forEach((mx, i) => {
+      const X = Math.round(mx * T) - ox;
+      if (X < -90 || X > View.w + 90) return;
+      const base = mastBase(room, mx), top = -oy;
+      ctx.drawImage(mastCache[base] || (mastCache[base] = buildMast(base)), X - 70, top);
+      ctx.drawImage(sail(84, 42, frame + i * 17), X - 48, top + 13);
+      const h2 = base - 46 - 60;
+      if (h2 > 20) ctx.drawImage(sail(88, h2, frame + i * 29), X - 50, top + 59);
+      ctx.fillStyle = '#1c1008'; ctx.fillRect(X + 38, top + 62, 5, 8); // Laterne an der unteren Rah
+      ctx.fillStyle = (frame >> 3) % 5 ? '#f8b800' : '#fce0a8'; ctx.fillRect(X + 39, top + 64, 3, 4);
+    });
+    if (room.wheel) { // Steuerrad auf dem Achterdeck
+      const X = Math.round(room.wheel.x * T + 8) - ox, Y = room.wheel.y * T - 14 - oy, a = Math.sin(frame * 0.013) * 0.6;
+      ctx.fillStyle = '#3c2410'; ctx.fillRect(X - 1, Y, 3, 14);
+      for (let k = 0; k < 24; k++) { const an = k / 24 * Math.PI * 2; ctx.fillStyle = '#6c4420'; ctx.fillRect(Math.round(X + Math.cos(an) * 6), Math.round(Y + Math.sin(an) * 6), 1, 1); }
+      for (let k = 0; k < 8; k++) {
+        const an = a + k * Math.PI / 4;
+        for (let r = 1; r <= 9; r++) { ctx.fillStyle = r > 6 ? '#8c5c2c' : '#5c3818'; ctx.fillRect(Math.round(X + Math.cos(an) * r), Math.round(Y + Math.sin(an) * r), 1, 1); }
+      }
+      ctx.fillStyle = '#c8a040'; ctx.fillRect(X - 1, Y - 1, 3, 3);
+    }
+  }
+  // Lichter der Mast-Laternen (für FX.render)
+  function shipLights(L, cam) {
+    const room = W.room;
+    (room.masts || []).forEach(mx => {
+      const X = Math.round(mx * T - cam.x);
+      if (X > -60 && X < View.w + 60) L.push({ x: X + 40, y: 66 - cam.y, r: 30, c: [248, 160, 60], a: 0.5 });
+    });
+  }
+  // Brandung vor dem Rumpf (zwei Wellenreihen, fahren mit dem Schiff)
+  function buildWaves() {
+    const c = C(256, 20), x = c.getContext('2d');
+    for (let X = 0; X < 256; X++) {
+      const a = X / 256 * Math.PI * 2, top = Math.round(8 + Math.sin(a * 4) * 3 + Math.sin(a * 9 + 1) * 1.5);
+      px(x, '#060a1e', X, top, 1, 20 - top); px(x, '#2c3470', X, top, 1, 1);
+      if (Math.sin(a * 4) > 0.6 && bay(X, 0) > 0.4) px(x, '#a4b4e4', X, top - 1, 1, 1);
+    }
+    return c;
+  }
+  function drawShipFront(ctx, room, cam, frame) {
+    if (!waveC) waveC = buildWaves();
+    const sail = W.sailX || 0, base = room.h * T - Math.round(cam.y);
+    [[1.2, 1.6, 10, 0], [1.45, 2.3, 4, 2.1]].forEach(([par, sp, dy, ph]) => {
+      const off = ((Math.floor(cam.x * par + sail * sp + frame * 0.2) % 256) + 256) % 256;
+      const y = base - 20 + dy + Math.round(Math.sin(frame * 0.045 + ph) * 2);
+      for (let X = -off; X < View.w; X += 256) ctx.drawImage(waveC, X, y);
+    });
+  }
+
   // ---------------- Hintergründe ----------------
   function buildBg(theme) {
     seed = 7;
@@ -376,6 +568,36 @@ const Tiles = (() => {
     const add = (name, c, par, extra = {}) => L.push({ name, c, par, wrap: c.width >= 512, ...extra });
     if (theme === 'vortex') {
       L.push({ name: 'tunnel', tunnel: true, par: 0, c: C(1, 1) });
+    } else if (theme === 'ship') { // nachts auf See: Sturmhimmel, Blutmond, Burg auf der Klippe, Meer, Takelage
+      const sky = C(640, 208), x = sky.getContext('2d');
+      smooth(x, 640, 208, ['#000000', '#02020c', '#060818', '#0c0e26', '#141436', '#1e1a44', '#2a1e4c', '#3a2250', '#4a2450']);
+      for (let i = 0; i < 120; i++) { const b = rand(); px(x, b < 0.2 ? '#fcfcfc' : b < 0.6 ? '#9c9cbc' : '#5c5c7c', ri(0, 639), ri(0, 110)); }
+      add('sky', sky, 0, { wrap: false });
+      const mc = C(96, 96);
+      moon(mc.getContext('2d'), 48, 48, 22);
+      add('moon', mc, 0, { wrap: false, right: 92, y: 4 });
+      const sc = C(512, 208), sx2 = sc.getContext('2d');
+      for (let i = 0; i < 40; i++) {
+        const cx = ri(0, 511), cy = ri(-6, 40), rx = ri(14, 34), ry = ri(6, 14);
+        for (let y = -ry; y <= ry; y++) for (let X = -rx; X <= rx; X++) {
+          const q = (X * X) / (rx * rx) + (y * y) / (ry * ry);
+          if (q > 1 || bay(X + cx, y + cy) < (q - 0.7) * 3) continue;
+          px(sx2, y > ry * 0.45 ? '#241a46' : '#0e0a22', (cx + X + 512) % 512, cy + y);
+        }
+      }
+      add('storm', sc, 0.08, { drift: 0.1, sail: 0.35 });
+      const cl = C(512, 208), cx = cl.getContext('2d');
+      for (let i = 0; i < 8; i++) {
+        const y = ri(30, 96), x0 = ri(0, 511), len = ri(50, 140), th = ri(2, 4);
+        for (let X = 0; X < len; X++) {
+          const t = Math.sin(X / len * Math.PI), hh = Math.max(1, Math.round(th * t));
+          for (let k = 0; k < hh; k++) if (bay(X, k) < t * 0.9) px(cx, k === 0 ? '#34205a' : '#1e1440', (x0 + X) % 512, y + k);
+        }
+      }
+      add('clouds', cl, 0.04, { drift: 0.04, sail: 0.18 });
+      L.push({ name: 'coast', custom: drawCoast, par: 0, c: C(1, 1) });
+      L.push({ name: 'sea', custom: drawSea, par: 0, c: C(1, 1) });
+      L.push({ name: 'rig', custom: drawRig, par: 1, c: C(1, 1) });
     } else if (theme === 'courtyard') {
       const sky = C(640, 208), x = sky.getContext('2d');
       smooth(x, 640, 208, ['#000000', '#05010f', '#0c031c', '#160629', '#220a36', '#320e44', '#461250', '#5a1658', '#6c1c5c']);
@@ -574,16 +796,17 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o) }[theme];
+    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), ship: () => planks(p.a, { hull: true }) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
-    const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true })) : ground;
-    const alt = [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+    const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
+      : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true })) : ground;
+    const alt = theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
       spikes: spikes(), up: stairTile(p.b, 1), down: stairTile(p.b, -1),
       toppers: [0, 1, 2, 3].map(v => topper(theme, v)), hangers: [0, 1, 2].map(v => hanger(theme, v)),
-      bg: buildBg(theme),
+      bg: buildBg(theme), crate: theme === 'ship' ? crate(p.b) : null,
     };
     cache[theme] = t;
     return t;
@@ -593,10 +816,11 @@ const Tiles = (() => {
 
   function drawLayer(ctx, l, cam, frame, vt = false) {
     if (l.tunnel) { Mode7.drawTunnel(ctx, View.w, frame); return; }
+    if (l.custom) { l.custom(ctx, cam, frame); return; }
     const img = l.frames ? l.frames[Math.floor(frame / (60 / l.fps)) % l.frames.length] : l.c;
     if (l.right !== undefined) { ctx.drawImage(img, Math.round(View.w - l.right - img.width / 2), l.y || 0); return; }
     if (!l.wrap) { ctx.drawImage(img, 0, 0); return; }
-    const off = ((Math.floor(cam.x * l.par + (l.drift ? frame * l.drift : 0)) % img.width) + img.width) % img.width;
+    const off = ((Math.floor(cam.x * l.par + (l.drift ? frame * l.drift : 0) + (l.sail ? (W.sailX || 0) * l.sail : 0)) % img.width) + img.width) % img.width;
     const oy = vt && l.vtile ? ((Math.floor(cam.y * l.par) % img.height) + img.height) % img.height : 0;
     for (const yy of oy ? [-oy, img.height - oy] : [0]) {
       for (let x = -off; x < View.w; x += img.width) ctx.drawImage(img, x, yy);
@@ -639,6 +863,7 @@ const Tiles = (() => {
     return c;
   }
   function drawFront(ctx, room, cam) {
+    if (room.theme === 'ship') { drawShipFront(ctx, room, cam, W.frame); return; }
     const c = fronts[room.theme] || (fronts[room.theme] = buildFront(room.theme));
     const off = ((Math.floor(cam.x * 1.3) % 640) + 640) % 640;
     for (let x = -off; x < View.w; x += 640) ctx.drawImage(c, x, 0);
@@ -659,7 +884,7 @@ const Tiles = (() => {
       const above = out ? '#' : cy > 0 ? g[cy - 1][cx] : '.', below = out ? '#' : cy < room.h - 1 ? g[cy + 1][cx] : '#';
       let img = null;
       if (ch === '#') img = (above === '#' ? t.ground : t.groundTop)[v];
-      else if (ch === '=') img = t.alt[v % 3];
+      else if (ch === '=') img = t.crate && (above === '=' || below === '=') ? t.crate : t.alt[v % 3]; // Schiff: gestapelt = Kisten
       else if (ch === 'X') img = t.X;
       else if (ch === 'Y') img = t.Y;
       else if (ch === '^') img = t.spikes;
@@ -694,5 +919,5 @@ const Tiles = (() => {
     }
   }
 
-  return { build, drawBg, drawTiles, drawFront, layer, drawLayer };
+  return { build, drawBg, drawTiles, drawFront, layer, drawLayer, shipLights };
 })();

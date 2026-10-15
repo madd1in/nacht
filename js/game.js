@@ -148,7 +148,7 @@ const Game = {
     W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0;
     W.stats = { hits: 0, deaths: 0, combo: 0 };
     if (this.pendingView) this.applyView(this.pendingView);
-    W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1));
+    W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1)); this.shoutT = 0; this.noteT = 0;
     Audio8.stop();
     this.go('card');
     Voice.say('stage' + (s + 1));
@@ -231,11 +231,11 @@ const Game = {
     if (hero !== Options.character) { p.H = HEROES.get(hero); p.def = p.H.def; p.sword = p.def.weapon === 'sword'; } // ohne die Einstellung zu speichern
     W.stage = 0; W.time = Levels.STAGES[0].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0;
     W.stats = { hits: 0, deaths: 0, combo: 0 };
-    W.loadRoom(0, 0);
+    W.loadRoom(0, Math.max(0, Levels.STAGES[0].rooms.findIndex(r => r.theme === 'courtyard'))); // Demo spielt im Burghof
     this.demo = { t: 0, lastX: p.x, stuck: 0 };
     Input.setDemo(() => this.demoInput());
     this.go('demo'); this.readyT = 0; this.annT = 0; this.hurryT = 0; this.bossName = 0; this.bars = null;
-    Audio8.play(W.stageDef.music); Audio8.tempo(1); Audio8.setMusicVolume(0.25);
+    Audio8.play(W.songName()); Audio8.tempo(1); Audio8.setMusicVolume(0.25);
   },
   endDemo() {
     Input.setDemo(null); this.demo = null; W.score = 0;
@@ -289,6 +289,24 @@ const Game = {
     if (W.boss) trail(bv, B.b); else B.b = { v: bv, g: bv, d: 0 }; // ohne Boss kein Nachlauf (Arena-Start leert die Leiste)
   },
 
+  // kleine Nachricht oben im Bild (z. B. Gruß an Infernax)
+  note(key) { this.noteT = 240; this.noteKey = key; },
+  drawNote(ctx) {
+    const s = tr(this.noteKey), w = Font.width(s) + 12, x = Math.round(View.cx - w / 2), y = 48;
+    ctx.globalAlpha = this.noteT < 20 ? this.noteT / 20 : 1;
+    ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.fillRect(x, y, w, 13);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + 12, w, 1);
+    Font.draw(ctx, s, View.cx, y + 3, '#fce0a8', { align: 'center' });
+    ctx.globalAlpha = 1;
+  },
+  // großer Ausruf in der Bildmitte (z. B. „Land in Sicht!“)
+  shout(key) { this.shoutT = 100; this.shoutKey = key; Audio8.sfx('announce'); },
+  drawShout(ctx) {
+    const k = 100 - this.shoutT, sc = k < 6 ? 5 - Math.floor(k / 2) : 2;
+    ctx.globalAlpha = this.shoutT < 15 ? this.shoutT / 15 : 1;
+    this.big(ctx, tr(this.shoutKey), View.cx, 60 - (sc - 2) * 3, sc, ['#fcfcfc', '#d8f0fc', '#a4e4fc', '#3cbcfc', '#0078f8', '#0040a8', '#001038'], null, '#000');
+    ctx.globalAlpha = 1;
+  },
   announce(i) { this.annT = 72; this.annIdx = i; Audio8.sfx('announce'); },
 
   // Bestzeit pro Stage (getrennt für den Leicht-Modus), dauerhaft im Browser gespeichert
@@ -355,7 +373,7 @@ const Game = {
         else if ((this.t > 60 * 9 && !Voice.busy()) || this.t > 60 * 24) this.newGame(0); // Erzähler ausreden lassen
         break;
       case 'card':
-        if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
+        if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
         break;
       case 'play': this.updatePlay(P); break;
       case 'pause': // Pausenmenü: WEITER / ZUM TITEL
@@ -366,7 +384,7 @@ const Game = {
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('pause'); }
         break;
       case 'fade':
-        if (this.t === 18) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); }
+        if (this.t === 18) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); Audio8.play(W.songName()); } // eigener Song pro Raum möglich (Schiff)
         if (this.t > 30) this.state = 'play';
         break;
       case 'respawn':
@@ -374,7 +392,7 @@ const Game = {
           if (this.pendingView) this.applyView(this.pendingView);
           W.loadRoom(W.stage, W.roomIdx); W.applyCheckpoint(); W.time = W.stageDef.time;
         }
-        if (this.t > 44) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.hurryT = 0; this.readyT = 1; }
+        if (this.t > 44) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.hurryT = 0; this.readyT = 1; }
         break;
       case 'clear': this.updateClear(); break;
       case 'gameover': { // Arcade: CONTINUE? 9 … 0 – Taste drücken = sofort weiter in derselben Stage
@@ -427,6 +445,8 @@ const Game = {
       if (this.readyT > 80) this.readyT = 0;
     }
     if (this.annT > 0) this.annT--;
+    if (this.shoutT > 0) this.shoutT--;
+    if (this.noteT > 0) this.noteT--;
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; } // Zeitlupe
     W.update(); this.updateBars();
     if (!W.cleared) W.stageFrames++;
@@ -485,6 +505,8 @@ const Game = {
         if (this.state === 'play' && W.boss && this.bossName > 0 && this.bossName < 150) this.drawBossBanner(ctx);
         if (this.state === 'play' && this.readyT > 0) this.drawReady(ctx);
         if (this.state === 'play' && this.annT > 0) this.drawAnnounce(ctx);
+        if (this.state === 'play' && this.shoutT > 0) this.drawShout(ctx);
+        if (this.state === 'play' && this.noteT > 0) this.drawNote(ctx);
         if (this.state === 'clear') this.drawClear(ctx);
         if (this.state === 'demo') this.drawDemo(ctx);
     }
@@ -962,6 +984,7 @@ const Game = {
       ['', ''], [tr(Options.character === 'ragnor' ? 'endRagnor' : 'endHenrik'), '#f8b800'], [tr('endUntil'), '#f8b800'],
       ['', ''], ['', ''], ['NACHTMAHR', '#d82800'], [tr('subtitle'), '#bcbcbc'], ['', ''],
       [tr('credits'), '#7c7c7c'], [tr('madeWith'), '#bcbcbc'], [tr('voiceBy'), '#7c7c7c'], ['', ''],
+      [tr('inspired'), '#7c7c7c'], ['CASTLEVANIA - BLOODSTAINED - INFERNAX', '#bcbcbc'], ['', ''],
       [tr('finalScore', String(W.score).padStart(6, '0')), '#f8b800'], ['', ''], [tr('thanks'), '#fcfcfc'],
     ];
     if (t > 380) {

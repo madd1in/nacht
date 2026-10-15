@@ -8,6 +8,7 @@ const W = {
   camLock: false, camTarget: null, boss: null, arenaOn: false, arenaX: 0, arenaW: 0,
   freeze: 0, hitstop: 0, shake: 0, flash: 0, cleared: false, lightning: 0, lightningCD: 300,
   checkpoint: null, crash: null, exiting: false, storm: { cd: 100, flash: 0, bolt: null },
+  sail: 0, sailX: 0, roll: 0, docked: 0, dockT: 0, rogue: null, kraken: null,
   combo: { n: 0, t: 0, best: 0 }, look: 0, cinema: 0, slowmo: 0, bossEnraged: false, vortexBg: 0,
 
   get stageDef() { return Levels.STAGES[this.stage]; },
@@ -24,6 +25,7 @@ const W = {
     this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
     if (this.bloodT > 0) { this.bloodT = 0; Audio8.tempo(1); }
     this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200;
+    this.sail = def.dock ? 1 : 0; this.roll = 0; this.docked = 0; this.dockT = 0; this.rogue = null; this.kraken = null;
     this.spawners = def.zones.map(z => new Spawner(z));
     const torch = def.theme === 'courtyard';
     def.ents.forEach(d => {
@@ -38,6 +40,7 @@ const W = {
         case 'ring': this.spawn(new Ring(d)); break;
         case 'statue': this.spawn(new Statue(d)); break;
         case 'chest': this.spawn(new Chest(d)); break;
+        case 'cargo': this.spawn(new Cargo(d)); break;
         case 'platform': this.platforms.push(this.spawn(new Platform(d.x, d.x1, d.y))); break;
         case 'chandelier': this.platforms.push(this.spawn(new Chandelier(d))); break;
         case 'pendulum': this.spawn(new Pendulum(d)); break;
@@ -93,7 +96,7 @@ const W = {
 
   // SNES-Kamera: Drehung (Schwanken) und Zoom (Boss-Auftritt) des ganzen Spielfelds
   applyCamFx(ctx, vw) {
-    const rot = this.sway.a, zf = this.zoomFx;
+    const rot = this.sway.a + this.roll, zf = this.zoomFx;
     let z = 1, px = vw / 2, py = 104;
     if (zf) {
       z = 1 + zf.amp * Math.sin(Math.min(1, zf.t / zf.len) * Math.PI);
@@ -103,6 +106,58 @@ const W = {
     const cover = 1 + Math.abs(rot) * (vw / 208 + 0.3); // leicht vergrößern, damit keine Ecken frei werden
     ctx.translate(px, py); ctx.rotate(rot); ctx.scale(z * cover, z * cover); ctx.translate(-px, -py);
   },
+
+  // Schiff: Rollen im Seegang, Fahrt (Meer und Wolken ziehen vorbei), Gischt, Knarzen.
+  // Am Bug: „Land in Sicht!" – das Schiff bremst, kracht an die Mole, die Laufplanke fällt.
+  updateShip() {
+    const d = this.room.dock, p = this.player;
+    this.sailX += 0.55 * this.sail;
+    const amp = 0.0105 * (0.3 + 0.7 * this.sail);
+    this.roll = Math.sin(this.frame * 0.011) * amp + Math.sin(this.frame * 0.029 + 1) * amp * 0.25;
+    if (d && !this.docked && p.alive && p.cx > d.x * T) { this.docked = 1; this.dockT = 0; Game.shout('landHo'); Audio8.sfx('bell'); }
+    if (this.docked) {
+      this.dockT++;
+      this.sail = Math.max(0, 1 - this.dockT / 80);
+      if (this.dockT === 80) { // Aufprall an der Mole
+        this.shake = 20; this.sway.v += 0.005; this.zoomFx = { t: 0, len: 40, amp: 0.05, b: null };
+        Audio8.sfx('boom'); Audio8.sfx('wall'); Input.rumble(0.8, 0.6, 500);
+        for (let x = d.x0 - 1; x <= d.x1 + 1; x += 2) this.dust(x * T + 8, (d.row + 1) * T, 2);
+      }
+      if (this.dockT === 106) { // Laufplanke
+        for (let x = d.x0; x <= d.x1; x++) { this.room.grid[d.row][x] = '='; this.dust(x * T + 8, d.row * T, 3); }
+        this.shake = Math.max(this.shake, 6); Audio8.sfx('door');
+      }
+    }
+    if (this.frame % 89 === 0 && this.sail > 0.2) { // Gischt schlägt am Rumpf hoch (ohne Ton – sonst zu oft)
+      const x = this.cam.x + 20 + Math.random() * (View.w - 40), y = this.room.h * T - 6;
+      for (let i = 0; i < 8; i++) this.spawn(new Particle(x + rnd(-8, 8), y, rnd(-1, 1), rnd(-4.2, -1.8), i % 2 ? '#a4b4e4' : '#5c6cb0', 36, 2, 0.2));
+    }
+    if (Math.random() < 0.0025) Audio8.sfx('creak');
+    // Monsterwelle: baut sich am Horizont auf, rollt heran und bricht über die Reling
+    // Riesenkrake: drei Fangarme tauchen hinter dem Schiff auf, peitschen und schlagen aufs Wasser
+    const K = this.kraken || (this.kraken = { t: -1, cd: 300, arms: [] });
+    if (K.t >= 0) {
+      K.t++;
+      if (K.t === 1) { Audio8.sfx('roar'); Input.rumble(0.4, 0.3, 400); Game.shout('kraken'); }
+      if (K.t === 362) { this.shake = Math.max(this.shake, 10); Audio8.sfx('boom'); Audio8.sfx('splash'); this.sway.v += 0.003; }
+      if (K.t > 430) { K.t = -1; K.cd = 1500 + Math.random() * 900; }
+    } else if (this.sail > 0.6 && p.alive && !(this.rogue && this.rogue.v > 0) && --K.cd <= 0) {
+      K.t = 0; K.arms = [-1, 0, 1].map(k => ({ u: k * 34 + rnd(-8, 8), z: 70 + Math.random() * 40, len: 70 + Math.random() * 30, ph: Math.random() * 6 }));
+    }
+    const R = this.rogue || (this.rogue = { v: 0, cd: 900, warned: false });
+    if (R.v > 0) {
+      R.v -= 1.7;
+      if (!R.warned && R.v < 260) { R.warned = true; Game.shout('rogueWave'); Audio8.sfx('thunder'); }
+      if (R.v <= 24) { R.v = 0; R.cd = 1000 + Math.random() * 700; this.rogueHit(); }
+    } else if (this.sail > 0.6 && p.alive && K.t < 0 && --R.cd <= 0) { R.v = 430; R.warned = false; }
+  },
+  rogueHit() { // Schiff krängt, Gischt fegt übers Deck
+    this.shake = 16; this.sway.v += (Math.random() < 0.5 ? -1 : 1) * 0.006; Input.rumble(0.9, 0.7, 600);
+    Audio8.sfx('boom'); Audio8.sfx('splash');
+    const deckY = (this.room.h - 2) * T;
+    for (let i = 0; i < (View.lite ? 24 : 46); i++) this.spawn(new Particle(this.cam.x + Math.random() * View.w, deckY - Math.random() * 40, rnd(-2.6, -0.6), rnd(-5, -1.5), i % 3 ? '#a4b4e4' : '#fcfcfc', 50, 2, 0.18));
+  },
+  songName() { return (this.room && this.room.music) || this.stageDef.music; },
 
   // Blutmond (rote Kerze): 12 s doppelte Punkte, mehr Herzen, rote Nacht, Musik zieht an
   bloodMoon(x, y) {
@@ -305,6 +360,7 @@ const W = {
     if (this.stopT > 0) this.stopT--;
     if (this.bloodT > 0 && --this.bloodT === 0) Audio8.tempo(this.time <= 60 ? 1.12 : 1);
     if (this.room.bell && --this.bellCd <= 0) this.tollBell();
+    if (this.room.theme === 'ship') this.updateShip();
     const sw = this.sway; // gedämpfte Pendelbewegung des Bildes
     if (sw.a || sw.v) { sw.v = (sw.v - sw.a * 0.012) * 0.985; sw.a += sw.v; if (Math.abs(sw.a) < 0.0004 && Math.abs(sw.v) < 0.0001) { sw.a = 0; sw.v = 0; } }
     if (this.zoomFx && ++this.zoomFx.t > this.zoomFx.len) this.zoomFx = null;
@@ -335,7 +391,7 @@ const W = {
     }
 
     if (this.room.theme === 'courtyard') FX.updateFlock(View.w);
-    if (this.room.theme === 'courtyard') FX.updateStorm(this.storm, View.w, () => {
+    if (this.room.theme === 'courtyard' || this.room.theme === 'ship') FX.updateStorm(this.storm, View.w, () => {
       setTimeout(() => Audio8.sfx('thunder'), 150 + Math.random() * 700);
       Input.rumble(0.35, 0.15, 450); this.shake = Math.max(this.shake, 4);
     });
@@ -348,8 +404,8 @@ const W = {
     ctx.beginPath(); ctx.rect(0, 32, vw, 208); ctx.clip();
     ctx.translate(sx, 32 + sy);
     this.applyCamFx(ctx, vw);
-    const storm = theme === 'courtyard' ? this.storm : null;
-    Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); FX.drawFlock(c); } : null);
+    const storm = theme === 'courtyard' || theme === 'ship' ? this.storm : null;
+    Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); if (theme === 'courtyard') FX.drawFlock(c); } : null);
     this.drawDoor(ctx);
     Tiles.drawTiles(ctx, this.room, this.cam, this.frame);
     const order = ['prop', 'candle', 'platform', 'item', 'enemy', 'boss', 'sub', 'eproj', 'fx'];
@@ -358,7 +414,7 @@ const W = {
     FX.drawAmbient(ctx, this.cam);
     Tiles.drawFront(ctx, this.room, this.cam);
     FX.drawFog(ctx, theme, this.cam, this.frame, this.room.h * T - this.cam.y);
-    if (theme === 'courtyard') this.drawRain(ctx);
+    if (theme === 'courtyard' || theme === 'ship') this.drawRain(ctx);
     if (storm && FX.stormOn(storm)) { ctx.fillStyle = 'rgba(220,214,255,0.16)'; ctx.fillRect(0, 0, vw, 208); }
     FX.render(ctx, this.collectLights(), theme);
     Rays.draw(ctx, this.room, this.cam, this.frame);
@@ -443,7 +499,8 @@ const W = {
       else if (e instanceof Count && e.state === 'open') L.push({ x, y: y - 6, r: 34, c: [168, 0, 32], a: 0.45 });
       else if (e instanceof Pillar && e.openT > 0) L.push({ x, y, r: 22, c: [248, 120, 0], a: 0.5 });
     }
-    if (this.room.theme === 'courtyard' && FX.stormOn(this.storm)) L.push({ x: View.w / 2, y: 40, r: 420 });
+    if (this.room.theme === 'ship') Tiles.shipLights(L, this.cam);
+    if ((this.room.theme === 'courtyard' || this.room.theme === 'ship') && FX.stormOn(this.storm)) L.push({ x: View.w / 2, y: 40, r: 420 });
     return L;
   },
 
