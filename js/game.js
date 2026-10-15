@@ -41,7 +41,7 @@ const Game = {
     });
     document.addEventListener('pointerdown', (e) => { if (this.state === 'pause' && e.pointerType !== 'mouse' && e.clientX > window.innerWidth / 2) this.unpause = true; });
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.12); }
+      if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.3); Audio8.muffle(true); }
     });
     this.resize();
     const q = new URLSearchParams(location.search);
@@ -136,7 +136,7 @@ const Game = {
   },
 
   go(state) { this.state = state; this.t = 0; },
-  toTitle() { this.saveHi(); this.go('title'); Audio8.play('title'); Audio8.ambience(true); this.revealed = false; this.idleT = 0; Voice.stop(); },
+  toTitle() { this.saveHi(); this.go('title'); Audio8.muffle(false); this.bars = null; Audio8.play('title'); Audio8.ambience(true); this.revealed = false; this.idleT = 0; Voice.stop(); },
 
   newGame(stage = 0, room = 0) {
     W.score = 0; W.lives = 3; W.nextLife = 20000; this.runBest = 0;
@@ -234,7 +234,7 @@ const Game = {
     W.loadRoom(0, 0);
     this.demo = { t: 0, lastX: p.x, stuck: 0 };
     Input.setDemo(() => this.demoInput());
-    this.go('demo'); this.readyT = 0; this.annT = 0; this.hurryT = 0; this.bossName = 0;
+    this.go('demo'); this.readyT = 0; this.annT = 0; this.hurryT = 0; this.bossName = 0; this.bars = null;
     Audio8.play(W.stageDef.music); Audio8.tempo(1); Audio8.setMusicVolume(0.25);
   },
   endDemo() {
@@ -246,7 +246,7 @@ const Game = {
     this.demo.t++;
     if (this.annT > 0) this.annT--;
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; }
-    W.update();
+    W.update(); this.updateBars();
     if (this.demo.t > 60 * 22 || W.exiting) this.endDemo();
   },
   // „KI": läuft nach rechts, peitscht Gegner und Kerzen vor sich, springt regelmäßig mit Salto und über Hindernisse
@@ -266,6 +266,29 @@ const Game = {
   },
 
   // Combo-Ansager (Index in tr('hype'))
+  // HUD-Leisten: verlorene Segmente bleiben kurz weiß stehen und laufen dann nach;
+  // ein neuer Boss füllt seine Leiste Segment für Segment (mit Ticken) wie am Automaten
+  bossBarValue() {
+    if (W.boss) return Math.ceil((W.boss.hp / W.boss.maxHp) * 16);
+    return W.arenaOn ? 0 : 16;
+  },
+  updateBars() {
+    const p = W.player;
+    if (!this.bars) this.bars = { p: { v: 16, g: 16, d: 0 }, b: { v: 16, g: 16, d: 0 }, boss: W.boss, fill: 16 };
+    const B = this.bars;
+    if (W.boss !== B.boss) { B.boss = W.boss; B.fill = W.boss ? 0 : 16; B.b = { v: 0, g: 0, d: 0 }; }
+    if (B.fill < 16 && W.frame % 3 === 0) { B.fill++; Audio8.sfx('tick'); }
+    const trail = (v, s) => {
+      if (v < s.v) s.d = 26; // frischer Treffer: Rest kurz stehen lassen
+      s.v = v;
+      if (s.g < v) s.g = v; // Heilung/Auffüllen: sofort mitziehen
+      else if (s.g > v) { if (s.d > 0) s.d--; else s.g = Math.max(v, s.g - 0.34); }
+    };
+    trail(Math.ceil(Math.max(0, p.hp) / p.maxHp * 16), B.p);
+    const bv = Math.min(this.bossBarValue(), B.fill);
+    if (W.boss) trail(bv, B.b); else B.b = { v: bv, g: bv, d: 0 }; // ohne Boss kein Nachlauf (Arena-Start leert die Leiste)
+  },
+
   announce(i) { this.annT = 72; this.annIdx = i; Audio8.sfx('announce'); },
 
   // Bestzeit pro Stage (getrennt für den Leicht-Modus), dauerhaft im Browser gespeichert
@@ -338,9 +361,9 @@ const Game = {
       case 'pause': // Pausenmenü: WEITER / ZUM TITEL
         if (P.up || P.down) { this.pauseSel = 1 - (this.pauseSel || 0); Audio8.sfx('select'); }
         if ((P.jump || P.attack) && this.pauseSel === 1 && this.t > 10) {
-          this.unpause = false; Audio8.setMusicVolume(0.5); Audio8.sfx('select'); this.finishRun(false); // Score zählt trotzdem
+          this.unpause = false; Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('select'); this.finishRun(false); // Score zählt trotzdem
         } else if (P.start || this.unpause || ((P.jump || P.attack) && !this.pauseSel)) {
-          this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.sfx('pause'); }
+          this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('pause'); }
         break;
       case 'fade':
         if (this.t === 18) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); }
@@ -396,7 +419,7 @@ const Game = {
   },
 
   updatePlay(P) {
-    if (P.start && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.12); Audio8.sfx('pause'); return; }
+    if (P.start && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.3); Audio8.muffle(true); Audio8.sfx('pause'); return; }
     if (this.readyT > 0) { // READY? … GO! (das Spiel läuft dabei schon)
       this.readyT++;
       if (this.readyT === 3) Audio8.sfx('ready');
@@ -405,7 +428,7 @@ const Game = {
     }
     if (this.annT > 0) this.annT--;
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; } // Zeitlupe
-    W.update();
+    W.update(); this.updateBars();
     if (!W.cleared) W.stageFrames++;
     if (this.hurryT > 0) this.hurryT--;
     if (W.boss && this.bossName < 150) { if (this.bossName === 0) Voice.say('boss' + (W.stage + 1)); this.bossName++; }
@@ -659,18 +682,18 @@ const Game = {
     Font.draw(ctx, pad(W.stage + 1, 1) + '-' + (W.roomIdx + 1), Wd - 30, 3, val, { shadow: '#000' });
     Font.draw(ctx, tr('hudPlayer'), 6, 13, label);
     Font.draw(ctx, tr('hudEnemy'), 6, 22, label);
-    const bar = (y, v, cols) => {
+    const B = this.bars, ghostCols = ['#fcfcfc', '#f0d8c8', '#a88c80'];
+    const bar = (y, v, cols, ghost = 0) => {
       R('#000', 51, y - 1, 65, 8);
       for (let i = 0; i < 16; i++) {
-        const c = i < v ? cols : ['#2c1010', '#1c0808', '#120404'];
+        const c = i < v ? cols : i < ghost ? ghostCols : ['#2c1010', '#1c0808', '#120404'];
         R(c[1], 52 + i * 4, y, 3, 6); R(c[0], 52 + i * 4, y, 3, 1); R(c[2], 52 + i * 4, y + 5, 3, 1);
       }
     };
-    bar(13, Math.ceil(p.hp / p.maxHp * 16), p.hp <= p.maxHp / 4 && (W.frame & 16) ? ['#fcfcfc', '#fc7460', '#a80020'] : ['#fcbca0', '#e83c20', '#880c00']);
-    let bv = 16;
-    if (W.boss) bv = Math.ceil((W.boss.hp / W.boss.maxHp) * 16);
-    else if (W.arenaOn) bv = 0;
-    bar(22, bv, ['#fce0a8', '#f8b800', '#9c6400']);
+    bar(13, Math.ceil(Math.max(0, p.hp) / p.maxHp * 16), p.hp <= p.maxHp / 4 && (W.frame & 16) ? ['#fcfcfc', '#fc7460', '#a80020'] : ['#fcbca0', '#e83c20', '#880c00'], B ? Math.ceil(B.p.g) : 0);
+    let bv = this.bossBarValue();
+    if (B && B.boss === W.boss) bv = Math.min(bv, B.fill);
+    bar(22, bv, ['#fce0a8', '#f8b800', '#9c6400'], B ? Math.ceil(B.b.g) : 0);
     const bx = boxCx - 16;
     R('#c89020', bx, 10, 33, 21); R('#3c0810', bx + 1, 11, 31, 19); R('#120610', bx + 2, 12, 29, 17);
     if (p.chargeT > 0) { R(p.chargeT >= 50 && (W.frame & 4) ? '#fcfcfc' : '#f8b800', bx + 2, 28, Math.min(29, Math.round(p.chargeT / 50 * 29)), 2); }
@@ -682,7 +705,7 @@ const Game = {
     Font.draw(ctx, pad(p.hearts, 2), right + 11, 13, p.hearts >= 10 && p.sub ? '#f8b800' : val, { shadow: '#000' });
     const hd = p.def;
     hd.icon.forEach((row, y) => [...row].forEach((ch, x) => { if (hd.iconPal[ch]) R(hd.iconPal[ch], right + 1 + x, 22 + y, 1, 1); }));
-    Font.draw(ctx, pad(W.lives, 2), right + 11, 22, val, { shadow: '#000' });
+    Font.draw(ctx, pad(W.lives, 2), right + 11, 22, W.lifeT > 0 && (W.frame & 8) ? '#58f898' : val, { shadow: '#000' });
     Font.draw(ctx, tr(p.sword ? 'hudSword' : 'hudWhip'), Wd - 60, 13, label);
     for (let i = 0; i < 3; i++) {
       const on = i < p.whip, x = Wd - 54 + i * 12, y = 22;

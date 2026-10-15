@@ -2,9 +2,9 @@
 'use strict';
 
 const Audio8 = (() => {
-  let ac = null, master, comp, musicBus, melBus, sfxBus, duckBus, voiceBus, noiseBuf, pulseWaves = {};
+  let ac = null, master, comp, musicBus, melBus, sfxBus, duckBus, voiceBus, muffleF, noiseBuf, pulseWaves = {};
   let muted = false;
-  const MUSIC_VOL = 0.82;
+  const MUSIC_VOL = 0.28; // ≈ bisher gehörter Pegel: früher 0.82, aber ab der ersten Kick ungewollt × 0.3 (Sidechain rief duck(on) auf)
   let musicLevel = 1;
   const NOTE = { c: 0, 'c#': 1, d: 2, 'd#': 3, e: 4, f: 5, 'f#': 6, g: 7, 'g#': 8, a: 9, 'a#': 10, b: 11 };
 
@@ -31,7 +31,9 @@ const Audio8 = (() => {
     master.connect(rev); rev.connect(wet); wet.connect(comp);
     duckBus = ac.createGain(); duckBus.connect(master); // wird während der Sprachausgabe abgesenkt
     voiceBus = ac.createGain(); voiceBus.gain.value = 1.3; voiceBus.connect(master);
-    musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(duckBus);
+    // Pause: Musik klingt wie hinter einer Tür (Tiefpass, sonst ganz offen)
+    muffleF = ac.createBiquadFilter(); muffleF.type = 'lowpass'; muffleF.frequency.value = openFreq(); muffleF.Q.value = 0.8; muffleF.connect(duckBus);
+    musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(muffleF);
     melBus = ac.createGain(); melBus.connect(musicBus);
     sfxBus = ac.createGain(); sfxBus.gain.value = 0.7; sfxBus.connect(master);
     noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
@@ -334,7 +336,7 @@ const Audio8 = (() => {
   let cursors = [];
 
   // Sidechain: Melodie/Bass kurz absenken, wenn die Kick kommt
-  function duck(t) {
+  function sidechain(t) {
     melBus.gain.setValueAtTime(0.45, t);
     melBus.gain.linearRampToValueAtTime(1, t + 0.12);
   }
@@ -350,7 +352,7 @@ const Audio8 = (() => {
     if (n === 'r') { noise(0.06, 0.3, 'bandpass', 2000, 1100, t, musicBus); noise(0.06, 0.34, 'bandpass', 2000, 1100, t + dur / 2, musicBus); return; }
     if (n === 'z') noise(0.03, 0.1, 'highpass', 8000, null, t, musicBus);
     if (n === 'k' || n === 'x' || n === 'q' || n === 'z') {
-      duck(t);
+      sidechain(t);
       const o = osc('triangle'), g = ac.createGain();
       o.frequency.setValueAtTime(170, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.11);
       g.gain.setValueAtTime(0.85, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
@@ -453,7 +455,7 @@ const Audio8 = (() => {
       const old = musicBus;
       old.gain.setTargetAtTime(0, ac.currentTime, 0.02);
       setTimeout(() => old.disconnect(), 300);
-      musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(duckBus);
+      musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(muffleF);
       melBus = ac.createGain(); melBus.connect(musicBus);
     }
   }
@@ -559,8 +561,10 @@ const Audio8 = (() => {
   function setMusicLevel(l) { musicLevel = l; if (musicBus && ac) musicBus.gain.setTargetAtTime(MUSIC_VOL * l, ac.currentTime, 0.05); }
 
   function tempo(m) { tempoMul = m; }
-  function duck(on) { if (duckBus && ac) duckBus.gain.setTargetAtTime(on ? 0.3 : 1, ac.currentTime, on ? 0.06 : 0.5); }
+  const openFreq = () => Math.min(18000, ac.sampleRate / 2 - 100);
+  function muffle(on) { if (muffleF && ac) muffleF.frequency.setTargetAtTime(on ? 650 : openFreq(), ac.currentTime, on ? 0.04 : 0.12); }
+  function duck(on) { if (duckBus && ac) duckBus.gain.setTargetAtTime(on ? 0.45 : 1, ac.currentTime, on ? 0.06 : 0.5); }
 
-  return { init, sfx, play, stop, ambience, drip, toggleMute, setMusicVolume, setMusicLevel, ready, duck, tempo,
+  return { init, sfx, play, stop, ambience, drip, toggleMute, setMusicVolume, setMusicLevel, ready, duck, muffle, tempo,
     context: () => ac, voiceOut: () => voiceBus, get muted() { return muted; }, get current() { return songName; }, _songs: parsed };
 })();

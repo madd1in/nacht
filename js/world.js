@@ -4,7 +4,7 @@
 const W = {
   room: null, stage: 0, roomIdx: 0, ents: [], platforms: [], stairs: [], spawners: [],
   player: null, cam: { x: 0, y: 0 }, camYf: 0, frame: 0, atkId: 0,
-  score: 0, lives: 3, time: 300, timeSub: 0, nextLife: 20000, bloodT: 0, stageFrames: 0, stats: { hits: 0, deaths: 0, combo: 0 }, sway: { a: 0, v: 0 }, zoomFx: null, bellCd: 0,
+  score: 0, lives: 3, time: 300, timeSub: 0, nextLife: 20000, lifeT: 0, bloodT: 0, stageFrames: 0, stats: { hits: 0, deaths: 0, combo: 0 }, sway: { a: 0, v: 0 }, zoomFx: null, bellCd: 0,
   camLock: false, camTarget: null, boss: null, arenaOn: false, arenaX: 0, arenaW: 0,
   freeze: 0, hitstop: 0, shake: 0, flash: 0, cleared: false, lightning: 0, lightningCD: 300,
   checkpoint: null, crash: null, exiting: false, storm: { cd: 100, flash: 0, bolt: null },
@@ -216,7 +216,8 @@ const W = {
     if (x !== undefined) this.popup(x, y, String(n));
     while (this.score >= this.nextLife) {
       this.lives++; this.nextLife += this.nextLife < 50000 ? 30000 : 50000;
-      Audio8.sfx('oneUp');
+      Audio8.sfx('oneUp'); this.lifeT = 110; // Extraleben: HUD-Zähler blinkt grün
+      if (this.player) this.popup(this.player.cx, this.player.y - 14, '1UP', '#58f898');
     }
   },
 
@@ -293,6 +294,7 @@ const W = {
     if (this.hitstop > 0) { this.hitstop--; return; }
     if (this.shake > 0) this.shake--;
     if (this.flash > 0) this.flash--;
+    if (this.lifeT > 0) this.lifeT--;
     if (this.freeze > 0) { this.freeze--; this.player.powerT = Math.max(this.player.powerT - 1, 0); return; }
 
     this.platforms.forEach(p => p.update());
