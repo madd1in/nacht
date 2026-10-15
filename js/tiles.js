@@ -273,40 +273,47 @@ const Tiles = (() => {
     }
   }
 
-  // Glasturm: Rosetten in den Spitzbögen drehen sich (Mode-7-Rotation), im selben Parallax-Raster wie die Fenster
-  let groseC = null, groseA = 0, groseF = 0;
-  function drawGlassRoses(ctx, cam, frame) {
-    const R = 32;
-    if (!groseC) { groseC = C(R * 2 + 2, R * 2 + 2); roseGlass(groseC.getContext('2d'), R + 1, R + 1, R); }
-    const df = frame - groseF; groseF = frame;
-    if (df > 0 && df < 10) groseA += df * 0.006;
-    const offX = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512, offY = ((Math.floor(cam.y * 0.5) % 208) + 208) % 208, h = groseC.width / 2;
-    for (let X = -offX; X < View.w + 512; X += 512) for (const ty of [-offY, 208 - offY]) {
-      [[254, 42, 1], [50, 150, -1]].forEach(([rx, ry, dir]) => {
-        const cx = X + rx, cy = ty + ry;
-        if (cx < -60 || cx > View.w + 60 || cy < -60 || cy > 270) return;
-        ctx.save(); ctx.imageSmoothingEnabled = false;
-        ctx.fillStyle = '#463c54'; ctx.beginPath(); ctx.arc(cx, cy, R + 3, 0, Math.PI * 2); ctx.fill();
-        ctx.translate(cx, cy); ctx.rotate(groseA * dir); ctx.drawImage(groseC, -h, -h);
-        ctx.restore();
-      });
-    }
+  // Drehende Rosetten (Mode-7-Rotation) im Thronsaal – zusätzlich zur großen Rosette, gegenläufig, schneller wenn der Graf rast
+  const THRONE_ROSES = [[456, 56, 20, 1], [354, 132, 16, -1]];
+  const roseSetC = {};
+  let roseSetA = 0, roseSetF = 0;
+  function drawRoseSet(ctx, cam, frame, list) {
+    const df = frame - roseSetF; roseSetF = frame;
+    if (df > 0 && df < 10) roseSetA += df * (W.bossEnraged ? 0.03 : 0.006);
+    const off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512;
+    for (let X = -off; X < View.w + 512; X += 512) list.forEach(([rx, ry, R, dir]) => {
+      const cx = X + rx, cy = ry - Math.round(cam.y * 0.5);
+      if (cx < -40 || cx > View.w + 40) return;
+      const rc = roseSetC[R] || (roseSetC[R] = (() => { const k = C(R * 2 + 2, R * 2 + 2); roseGlass(k.getContext('2d'), R + 1, R + 1, R); return k; })());
+      ctx.save(); ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = '#5c5468'; ctx.fillRect(cx - R - 3, cy - 1, (R + 3) * 2, 2); // Steinkreuz hinter dem Glas
+      ctx.fillStyle = '#463c54'; ctx.beginPath(); ctx.arc(cx, cy, R + 3, 0, Math.PI * 2); ctx.fill();
+      ctx.translate(cx, cy); ctx.rotate(roseSetA * dir); ctx.drawImage(rc, -R - 1, -R - 1);
+      ctx.restore();
+    });
   }
 
   function archWindow(x, wx, wy, ww, wh, inner) {
-    const r = ww / 2;
-    px(x, '#3c3c3c', wx - 4, wy - 1, ww + 8, wh + 5);
-    for (let y = 0; y <= r + 3; y++) {
-      const half = Math.floor(Math.sqrt(Math.max(0, (r + 4) ** 2 - (r + 4 - y) ** 2)));
-      px(x, '#3c3c3c', wx + r - half, wy - r - 4 + y, half * 2, 1);
+    const r = ww / 2, cx = wx + r;
+    // Gewände: Keilsteine im Wechsel hell/dunkel, Fugen dazwischen, Schlussstein oben
+    for (let y = -r - 6; y <= 0; y++) for (let X = -r - 6; X <= r + 6; X++) {
+      const d = Math.hypot(X, y);
+      if (d <= r || d > r + 6) continue;
+      const ang = Math.atan2(-y, X), seg = Math.floor(ang / (Math.PI / 7));
+      const joint = Math.abs(ang / (Math.PI / 7) - Math.round(ang / (Math.PI / 7))) < 0.06;
+      px(x, joint ? '#1c1c24' : Math.abs(ang - Math.PI / 2) < 0.2 ? '#a8a8b4' : seg % 2 ? '#6c6c78' : '#8c8c98', cx + X, wy + y);
+    }
+    for (let y = 0; y < wh; y++) { // Gewändesteine seitlich
+      const blk = Math.floor(y / 7) % 2, joint = y % 7 === 0;
+      px(x, joint ? '#1c1c24' : blk ? '#6c6c78' : '#8c8c98', wx - 6, wy + y, 6, 1); px(x, joint ? '#1c1c24' : blk ? '#8c8c98' : '#6c6c78', wx + ww, wy + y, 6, 1);
     }
     inner(wx, wy - r, ww, wh + r, (X, Y) => { // Maske: im Fenster?
       if (Y >= wy) return X >= wx && X < wx + ww && Y < wy + wh;
       const dy = wy - Y, half = Math.sqrt(Math.max(0, r * r - dy * dy));
       return X >= wx + r - half && X < wx + r + half;
     });
-    px(x, '#7c7c7c', wx - 4, wy + wh, ww + 8, 2); px(x, '#5c5c5c', wx - 4, wy + wh + 2, ww + 8, 2);
-    px(x, '#5c5c5c', wx + r - 1, wy - r, 2, wh + r); px(x, '#5c5c5c', wx, wy + Math.floor(wh / 2), ww, 2);
+    px(x, '#9c9ca8', wx - 7, wy + wh, ww + 14, 2); px(x, '#5c5c68', wx - 7, wy + wh + 2, ww + 14, 2); px(x, '#1c1c24', wx - 5, wy + wh + 4, ww + 10, 2); // Sohlbank
+    px(x, '#5c5c68', wx + r - 1, wy - r, 2, wh + r); px(x, '#5c5c68', wx, wy + Math.floor(wh / 2), ww, 2); // Mittelpfosten und Kämpfer
   }
   function lightShaft(x, sx, sy, w, len, col, dens) {
     for (let i = 0; i < len; i++) for (let X = 0; X < w; X++) {
@@ -314,12 +321,23 @@ const Tiles = (() => {
       if (bay(sx + X + i, sy + i) < dens * fade) px(x, col, sx + X + Math.floor(i * 0.6), sy + i);
     }
   }
-  function pillar(x, cx, w, h) {
-    const tones = ['#1c1c1c', '#3c3c3c', '#5c5c5c', '#7c7c7c', '#9c9c9c', '#7c7c7c', '#5c5c5c', '#3c3c3c', '#2c2c2c', '#1c1c1c'];
-    for (let X = 0; X < w; X++) px(x, tones[Math.floor(X / w * tones.length)], cx + X, 0, 1, h);
-    [[18, 8], [h - 30, 8]].forEach(([y, hh]) => {
-      px(x, '#2c2c2c', cx - 4, y, w + 8, hh); px(x, '#8c8c8c', cx - 4, y, w + 8, 1); px(x, '#5c5c5c', cx - 4, y + 1, w + 8, 2);
-    });
+  function pillar(x, cx, w, h) { // Bündelpfeiler: drei runde Dienste, Blattkapitell und Sockel (wiederholt sich je Kachel)
+    const tones = ['#141418', '#2c2c34', '#4c4c58', '#6c6c78', '#8c8c98', '#9c9ca8', '#6c6c78', '#3c3c48'], n = 3, sw = w / n;
+    for (let X = 0; X < w; X++) {
+      const u = (X % sw) / sw;
+      px(x, tones[Math.min(tones.length - 1, Math.floor(u * tones.length))], cx + X, 0, 1, h);
+    }
+    // Kapitell mit Blattwerk
+    px(x, '#2c2c34', cx - 5, 14, w + 10, 12); px(x, '#9c9ca8', cx - 5, 14, w + 10, 1); px(x, '#6c6c78', cx - 5, 15, w + 10, 2);
+    for (let k = 0; k < Math.floor((w + 10) / 6); k++) { // Blätter
+      const lx = cx - 5 + k * 6;
+      px(x, '#5c6c4c', lx + 1, 18, 4, 6); px(x, '#8c9c6c', lx + 2, 18, 2, 3); px(x, '#3c4c2c', lx + 1, 23, 4, 1);
+    }
+    px(x, '#1c1c24', cx - 5, 25, w + 10, 1); px(x, '#8c8c98', cx - 2, 26, w + 4, 2); // Halsring
+    // Sockel
+    const by = h - 34;
+    px(x, '#8c8c98', cx - 2, by, w + 4, 2); px(x, '#2c2c34', cx - 5, by + 2, w + 10, 8); px(x, '#9c9ca8', cx - 5, by + 2, w + 10, 1);
+    px(x, '#3c3c48', cx - 7, by + 10, w + 14, 6); px(x, '#7c7c88', cx - 7, by + 10, w + 14, 1); px(x, '#141418', cx - 7, by + 15, w + 14, 1);
   }
   function banner(x, bx, by, w, h, cloth, trim, emblem) {
     px(x, cloth, bx, by, w, h); px(x, trim, bx, by, w, 2); px(x, trim, bx, by, 1, h); px(x, trim, bx + w - 1, by, 1, h);
@@ -615,6 +633,92 @@ const Tiles = (() => {
     });
   }
 
+  // ---------------- Glasfiguren: mit Pfaden gezeichnet, auf die Glaspalette quantisiert ----------------
+  // Jede Farbfläche bekommt beim Einsetzen ins Fenster automatisch Bleiruten an ihren Grenzen.
+  const FIG_W = 70, FIG_H = 130;
+  const FIG_PAL = [[176, 24, 40], [28, 56, 176], [216, 160, 32], [232, 228, 216], [236, 176, 140], [150, 156, 176],
+    [32, 132, 64], [240, 110, 24], [100, 56, 24], [110, 48, 170], [30, 24, 40], [248, 220, 72]];
+  const [RUBY, BLUE, GOLD, WHITE, SKIN, SILVER, GREEN, ORANGE, BROWN, PURPLE, DARK, YELLOW] = FIG_PAL.map(c => `rgb(${c})`);
+  const FIGS = {
+    king(g) {
+      g.circ(GOLD, 35, 34, 17); g.poly(RUBY, [[14, 54], [56, 54], [64, 126], [6, 126]]); g.rect(BLUE, 31, 58, 8, 62);
+      g.rect(WHITE, 6, 118, 58, 8); g.ell(WHITE, 35, 54, 22, 7); g.circ(SKIN, 35, 36, 10); g.poly(WHITE, [[26, 40], [44, 40], [35, 57]]);
+      g.rect(DARK, 30, 33, 3, 2); g.rect(DARK, 37, 33, 3, 2);
+      g.poly(GOLD, [[24, 30], [24, 19], [29, 25], [35, 15], [41, 25], [46, 19], [46, 30]]); g.rect(RUBY, 33, 22, 4, 4);
+      g.line(GOLD, 56, 50, 56, 114, 3); g.circ(GOLD, 56, 46, 5); g.rect(GOLD, 55, 35, 3, 7); g.rect(GOLD, 52, 37, 9, 2); g.circ(SKIN, 56, 74, 4);
+      g.rect(GREEN, 0, 124, 70, 6);
+    },
+    slayer(g) { // Drachentöter mit Lanze, stößt nach rechts unten – ins Nachbarfenster mit dem Drachen
+      g.circ(GOLD, 28, 28, 15); g.poly(RUBY, [[16, 44], [8, 122], [24, 122], [26, 48]]);
+      g.rect(SILVER, 19, 80, 8, 42); g.rect(SILVER, 31, 80, 8, 42); g.poly(SILVER, [[18, 42], [40, 42], [42, 82], [16, 82]]);
+      g.rect(WHITE, 21, 46, 18, 34); g.rect(RUBY, 28, 47, 4, 32); g.rect(RUBY, 22, 57, 16, 4);
+      g.circ(SILVER, 29, 31, 9); g.rect(DARK, 24, 30, 11, 2);
+      g.poly(BLUE, [[4, 50], [18, 50], [18, 68], [11, 82], [4, 68]]); g.rect(GOLD, 10, 54, 2, 22); g.rect(GOLD, 6, 60, 10, 2);
+      g.line(BROWN, 34, 38, 64, 108, 3); g.poly(SILVER, [[70, 122], [59, 108], [67, 103]]);
+      g.rect(GREEN, 0, 122, 70, 8);
+    },
+    dragon(g) { // speit Feuer nach links, dem Drachentöter entgegen
+      g.poly(ORANGE, [[16, 50], [0, 36], [0, 70]]); g.poly(YELLOW, [[16, 52], [2, 46], [2, 60]]);
+      g.poly(PURPLE, [[44, 74], [64, 26], [68, 62], [60, 62], [66, 80]]);
+      g.poly(GREEN, [[60, 92], [70, 100], [66, 122], [50, 128], [58, 110]]); g.poly(GREEN, [[26, 44], [36, 46], [48, 74], [36, 78]]);
+      g.ell(GREEN, 46, 88, 18, 14); g.ell(YELLOW, 44, 92, 12, 8);
+      g.rect(GREEN, 36, 96, 6, 22); g.rect(GREEN, 52, 96, 6, 22); g.rect(WHITE, 34, 116, 9, 3); g.rect(WHITE, 50, 116, 9, 3);
+      g.poly(GREEN, [[12, 46], [28, 40], [32, 54], [14, 58]]); g.poly(GREEN, [[26, 41], [30, 30], [33, 43]]);
+      g.poly(WHITE, [[15, 56], [20, 56], [17, 61]]); g.circ(RUBY, 24, 46, 2);
+      g.rect(BROWN, 0, 124, 70, 6);
+    },
+    horse(g) { // Schlachtross mit Schabracke, bäumt sich auf
+      g.poly(BROWN, [[60, 74], [70, 92], [64, 110]]); g.ell(WHITE, 42, 78, 22, 14);
+      g.poly(WHITE, [[22, 72], [24, 42], [16, 30], [8, 36], [14, 48], [14, 74]]); g.poly(BROWN, [[24, 42], [30, 40], [34, 68], [26, 70]]);
+      g.poly(WHITE, [[22, 86], [12, 70], [8, 74], [18, 92]]); g.poly(WHITE, [[30, 88], [22, 74], [18, 78], [26, 94]]);
+      g.rect(WHITE, 50, 88, 6, 34); g.rect(WHITE, 58, 88, 5, 32);
+      g.poly(BLUE, [[20, 70], [62, 70], [66, 96], [16, 96]]); g.rect(GOLD, 16, 94, 50, 3); g.rect(GOLD, 20, 70, 42, 2);
+      g.rect(GOLD, 38, 76, 3, 14); g.rect(GOLD, 33, 81, 13, 3);
+      g.rect(DARK, 50, 120, 6, 3); g.rect(DARK, 58, 118, 5, 3); g.circ(DARK, 13, 37, 1.6);
+      g.rect(GREEN, 0, 124, 70, 6);
+    },
+    knight(g) { // Ritter mit erhobenem Schwert und Wappenschild
+      g.poly(RUBY, [[34, 22], [50, 6], [46, 26]]); g.circ(SILVER, 35, 32, 10); g.rect(DARK, 29, 31, 12, 2);
+      g.poly(SILVER, [[22, 44], [48, 44], [50, 84], [20, 84]]); g.rect(BLUE, 25, 48, 20, 36);
+      g.poly(GOLD, [[30, 56], [40, 56], [42, 68], [35, 76], [28, 68]]);
+      g.rect(SILVER, 23, 84, 9, 38); g.rect(SILVER, 38, 84, 9, 38);
+      g.poly(RUBY, [[4, 52], [22, 52], [22, 74], [13, 90], [4, 74]]); g.poly(GOLD, [[6, 56], [13, 64], [20, 56], [20, 60], [13, 68], [6, 60]]);
+      g.rect(SILVER, 54, 8, 4, 50); g.rect(GOLD, 48, 56, 16, 3); g.rect(BROWN, 54, 59, 4, 9); g.circ(SKIN, 56, 70, 4);
+      g.rect(GREEN, 0, 122, 70, 8);
+    },
+    queen(g) {
+      g.circ(GOLD, 35, 32, 16); g.poly(BROWN, [[25, 30], [45, 30], [49, 60], [21, 60]]);
+      g.poly(BLUE, [[18, 50], [52, 50], [66, 126], [4, 126]]); g.poly(PURPLE, [[26, 52], [44, 52], [40, 126], [30, 126]]); g.rect(GOLD, 4, 120, 62, 6);
+      g.circ(SKIN, 35, 36, 9); g.rect(DARK, 31, 35, 2, 2); g.rect(DARK, 37, 35, 2, 2);
+      g.poly(GOLD, [[26, 28], [26, 20], [31, 25], [35, 17], [39, 25], [44, 20], [44, 28]]);
+      g.line(GREEN, 53, 60, 53, 100, 2); g.poly(WHITE, [[53, 58], [46, 50], [53, 45], [60, 50]]); g.circ(SKIN, 50, 80, 4);
+      g.rect(GREEN, 0, 124, 70, 6);
+    },
+  };
+  const figCache = {};
+  function glassFigure(name) { // 'name!' = gespiegelt; liefert Palettenindex+1 je Pixel (0 = kein Glas der Figur)
+    if (figCache[name]) return figCache[name];
+    const mirror = name.endsWith('!'), base = name.replace('!', '');
+    const c = C(FIG_W, FIG_H), x = c.getContext('2d');
+    if (mirror) { x.translate(FIG_W, 0); x.scale(-1, 1); }
+    const g = {
+      poly(col, pts) { x.fillStyle = col; x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.closePath(); x.fill(); },
+      circ(col, cx, cy, r) { x.fillStyle = col; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill(); },
+      ell(col, cx, cy, rx, ry) { x.fillStyle = col; x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); x.fill(); },
+      rect(col, a, b, w, h) { x.fillStyle = col; x.fillRect(a, b, w, h); },
+      line(col, x0, y0, x1, y1, w) { x.strokeStyle = col; x.lineWidth = w; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x1, y1); x.stroke(); },
+    };
+    FIGS[base](g);
+    const src = x.getImageData(0, 0, FIG_W, FIG_H).data, out = new Uint8Array(FIG_W * FIG_H);
+    for (let i = 0; i < out.length; i++) {
+      if (src[i * 4 + 3] < 128) continue;
+      let best = 0, bd = 1e9;
+      FIG_PAL.forEach((p, k) => { const dd = (p[0] - src[i * 4]) ** 2 + (p[1] - src[i * 4 + 1]) ** 2 + (p[2] - src[i * 4 + 2]) ** 2; if (dd < bd) { bd = dd; best = k; } });
+      out[i] = best + 1;
+    }
+    return (figCache[name] = out);
+  }
+
   // ---------------- Hintergründe ----------------
   function buildBg(theme) {
     seed = 7;
@@ -622,45 +726,48 @@ const Tiles = (() => {
     const add = (name, c, par, extra = {}) => L.push({ name, c, par, wrap: c.width >= 512, ...extra });
     if (theme === 'vortex') {
       L.push({ name: 'tunnel', tunnel: true, par: 0, c: C(1, 1) });
-    } else if (theme === 'glass') { // Glasturm: fast nur riesige Buntglasfenster zwischen schlanken Maßwerk-Pfeilern
-      const c = C(512, 208), x = c.getContext('2d'), img = x.createImageData(512, 208), d = img.data;
+    } else if (theme === 'glass') { // Glasturm: riesige Buntglasfenster mit Figuren – König, Drachentöter gegen Drachen, Schlachtross, Ritter, Königin
+      const c = C(512, 416), x = c.getContext('2d'), img = x.createImageData(512, 416), d = img.data;
       const put = (X, Y, col) => { const i = (Y * 512 + X) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255; };
-      for (let Y = 0; Y < 208; Y++) for (let X = 0; X < 512; X++) put(X, Y, [12, 6, 18]);
-      const SETS = [ // Grund, Randband, Medaillon-Stern, Akzent
+      for (let Y = 0; Y < 416; Y++) for (let X = 0; X < 512; X++) put(X, Y, [12, 6, 18]);
+      const SETS = [ // Grund, Randband, Rundfenster, Akzent
         [[24, 48, 160], [160, 24, 40], [200, 144, 24], [164, 200, 248]],
         [[150, 20, 40], [24, 48, 160], [200, 144, 24], [252, 200, 120]],
         [[92, 40, 160], [200, 144, 24], [24, 128, 76], [200, 160, 248]],
         [[24, 110, 70], [92, 40, 160], [160, 24, 40], [180, 248, 200]],
         [[24, 48, 160], [200, 144, 24], [150, 20, 40], [164, 200, 248]],
       ];
+      const MOTIFS = [['king', 'slayer', 'dragon', 'horse', 'knight'], ['queen', 'horse!', 'knight', 'king!', 'slayer']];
       const LEAD = [10, 6, 16], STONE = [70, 60, 84];
-      [6, 108, 210, 312, 414].forEach((wx, wi) => {
-        const w = 88, wy = 4, h = 200, a = Math.round(w * 0.866), S = SETS[wi], mcx = wx + w / 2, mcy = wy + h * 0.56, mr = w * 0.34;
+      MOTIFS.forEach((row, band) => [6, 108, 210, 312, 414].forEach((wx, wi) => {
+        const w = 88, wy = band * 208 + 4, h = 200, a = Math.round(w * 0.866), S = SETS[(wi + band * 2) % 5];
+        const fig = glassFigure(row[wi]), fx0 = wx + 9, fy0 = wy + 62;
         const inside = (X, Y) => Y >= wy && Y < wy + h && X >= wx && X < wx + w && (Y >= wy + a || ((X - wx - w) ** 2 + (Y - wy - a) ** 2 <= w * w && (X - wx) ** 2 + (Y - wy - a) ** 2 <= w * w)); // Spitzbogen
+        const figAt = (X, Y) => { const u = X - fx0, v = Y - fy0; return u >= 0 && u < FIG_W && v >= 0 && v < FIG_H ? fig[v * FIG_W + u] : 0; };
         for (let Y = wy; Y < wy + h; Y++) for (let X = wx; X < wx + w; X++) {
           if (!inside(X, Y)) continue;
-          const lx = X - wx, ly = Y - wy, row = Math.floor(ly / 12), gc = Math.floor((lx + (row % 2) * 4) / 8);
-          const md = Math.hypot(X - mcx, Y - mcy), tr = Math.hypot(X - mcx, Y - (wy + a * 0.62));
+          const lx = X - wx, ly = Y - wy, row2 = Math.floor(ly / 12), gc = Math.floor((lx + (row2 % 2) * 4) / 8);
+          const tr = Math.hypot(X - (wx + w / 2), Y - (wy + a * 0.62)), f = figAt(X, Y);
+          const inner = inside(X - 9, Y) && inside(X + 9, Y) && inside(X, Y - 9) && inside(X, Y + 9);
           let col;
           if (!inside(X - 2, Y) || !inside(X + 2, Y) || !inside(X, Y - 2) || !inside(X, Y + 2)) col = STONE;            // Steinrahmen
-          else if (!(inside(X - 9, Y) && inside(X + 9, Y) && inside(X, Y - 9) && inside(X, Y + 9))) col = ly % 10 === 0 ? LEAD : S[1]; // Randband
-          else if (Math.abs(md - mr) < 1.2 || Math.abs(tr - 9) < 1.2) col = LEAD;                                        // Bleiringe
-          else if (md < mr) { const an = Math.atan2(Y - mcy, X - mcx); col = md < 5 ? S[3] : Math.cos(an * 8) > 0.55 - (md / mr) * 0.4 ? S[2] : S[1]; } // Medaillon mit Stern
+          else if (!inner) col = ly % 10 === 0 ? LEAD : S[1];                                                           // Randband
+          else if (f) col = (figAt(X - 1, Y) !== f || figAt(X + 1, Y) !== f || figAt(X, Y - 1) !== f || figAt(X, Y + 1) !== f) ? LEAD : FIG_PAL[f - 1]; // Figur, Blei an jeder Farbgrenze
+          else if (Math.abs(tr - 9) < 1.2) col = LEAD;
           else if (tr < 9) col = S[2];                                                                                  // Rundfenster im Bogen
-          else if (ly % 12 === 0 || (lx + (row % 2) * 4) % 8 === 0) col = LEAD;                                         // Bleiruten
-          else { const hs = (row * 31 + gc * 17 + wi * 7) % 11; col = hs < 2 ? S[3] : hs < 4 ? S[1] : S[0]; }            // Scheiben
+          else if (ly % 12 === 0 || (lx + (row2 % 2) * 4) % 8 === 0) col = LEAD;                                        // Bleiruten
+          else { const hs = (row2 * 31 + gc * 17 + wi * 7 + band * 5) % 11; col = hs < 2 ? S[3] : hs < 4 ? S[1] : S[0]; } // Hintergrundscheiben
           if (col !== LEAD && col !== STONE) { // Mondlicht von hinten: Mitte hell, Ränder dunkler
             const k = 0.62 + 0.38 * Math.sin(Math.PI * lx / w) * (0.75 + 0.25 * Math.sin(Math.PI * ly / h)) + (bay(X, Y) - 0.5) * 0.16;
             col = [Math.min(255, col[0] * k), Math.min(255, col[1] * k), Math.min(255, col[2] * k)];
           }
           put(X, Y, col);
         }
-      });
+      }));
       x.putImageData(img, 0, 0);
-      [0, 100, 202, 304, 406, 508].forEach(cx => { px(x, '#1c1424', cx - 4, 0, 12, 208); px(x, '#3c3048', cx - 2, 0, 2, 208); px(x, '#080410', cx + 6, 0, 2, 208); }); // Pfeiler
-      px(x, '#2c2438', 0, 204, 512, 4); px(x, '#4c4058', 0, 204, 512, 1); // Gesims zwischen den Fensterreihen
+      [0, 100, 202, 304, 406, 508].forEach(cx => { px(x, '#1c1424', cx - 4, 0, 12, 416); px(x, '#3c3048', cx - 2, 0, 2, 416); px(x, '#080410', cx + 6, 0, 2, 416); }); // Pfeiler
+      [204, 412].forEach(gy => { px(x, '#2c2438', 0, gy, 512, 4); px(x, '#4c4058', 0, gy, 512, 1); }); // Gesimse zwischen den Fensterreihen
       add('wall', c, 0.5, { vtile: true });
-      L.push({ name: 'roses', custom: drawGlassRoses, par: 0.5, c: C(1, 1) });
     } else if (theme === 'ship') { // nachts auf See: Sturmhimmel, Blutmond, Burg auf der Klippe, Meer, Takelage
       const sky = C(640, 208), x = sky.getContext('2d');
       smooth(x, 640, 208, ['#000000', '#02020c', '#060818', '#0c0e26', '#141436', '#1e1a44', '#2a1e4c', '#3a2250', '#4a2450']);
@@ -781,7 +888,11 @@ const Tiles = (() => {
       if (theme === 'hall') {
         [64, 320].forEach((wx, wi) => {
           archWindow(x, wx, 56, 32, 72, (X0, Y0, w, h, inside) => {
-            for (let y = Y0; y < Y0 + h; y++) for (let X = X0; X < X0 + w; X++) if (inside(X, y)) px(x, (y - Y0) / h > bay(X, y) ? '#000060' : '#00002c', X, y);
+            for (let y = Y0; y < Y0 + h; y++) for (let X = X0; X < X0 + w; X++) { // Rautenscheiben, Bleiruten, bunter Randstreifen
+              if (!inside(X, y)) continue;
+              const edge = !inside(X - 3, y) || !inside(X + 3, y) || !inside(X, y - 3), lead = (X - X0 + y) % 7 === 0 || (X - X0 - y + 700) % 7 === 0;
+              px(x, edge ? (Math.floor((y + X) / 6) % 2 ? '#a80020' : '#c89018') : lead ? '#06061a' : (y - Y0) / h > bay(X, y) ? '#101878' : '#060a3c', X, y);
+            }
             if (wi === 0) moon(x, wx + 22, 66, 7);
             for (let i = 0; i < 6; i++) px(x, '#fcfcfc', wx + ri(2, 29), ri(46, 120));
           });
@@ -926,7 +1037,7 @@ const Tiles = (() => {
     build(room.theme).bg.forEach(l => {
       drawLayer(ctx, l, cam, frame, vt);
       if (onSky && l.name === 'clouds') onSky(ctx);
-      if (l.name === 'wall' && room.theme === 'throne') drawRose(ctx, cam, frame);
+      if (l.name === 'wall' && room.theme === 'throne') { drawRose(ctx, cam, frame); drawRoseSet(ctx, cam, frame, THRONE_ROSES); }
     });
     if (room.theme === 'tower') drawClockLive(ctx, room, cam, frame);
     if (room.theme === 'throne' && W.vortexBg > 0) Mode7.drawTunnel(ctx, View.w, frame, Math.min(1, W.vortexBg / 90)); // Graf Phase 2

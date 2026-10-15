@@ -984,7 +984,7 @@ const Game = {
       ['', ''], [tr(Options.character === 'ragnor' ? 'endRagnor' : 'endHenrik'), '#f8b800'], [tr('endUntil'), '#f8b800'],
       ['', ''], ['', ''], ['NACHTMAHR', '#d82800'], [tr('subtitle'), '#bcbcbc'], ['', ''],
       [tr('credits'), '#7c7c7c'], [tr('madeWith'), '#bcbcbc'], [tr('voiceBy'), '#7c7c7c'], ['', ''],
-      [tr('inspired'), '#7c7c7c'], ['CASTLEVANIA - BLOODSTAINED - INFERNAX', '#bcbcbc'], ['', ''],
+      [tr('inspired'), '#7c7c7c'], ['CASTLEVANIA - BLOODSTAINED - INFERNAX', '#bcbcbc'], ['MONKEY ISLAND', '#bcbcbc'], ['', ''],
       [tr('finalScore', String(W.score).padStart(6, '0')), '#f8b800'], ['', ''], [tr('thanks'), '#fcfcfc'],
     ];
     if (t > 380) {

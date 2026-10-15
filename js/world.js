@@ -42,6 +42,10 @@ const W = {
         case 'chest': this.spawn(new Chest(d)); break;
         case 'cargo': this.spawn(new Cargo(d)); break;
         case 'zip': this.spawn(new Zipline(d)); break;
+        case 'sign': this.spawn(new ShipSign(d)); break;
+        case 'grog': this.spawn(new Grog(d)); break;
+        case 'chicken': this.spawn(new RubberChicken(d)); break;
+        case 'monkey': this.spawn(new ThreeHeadedMonkey(d)); break;
         case 'platform': this.platforms.push(this.spawn(new Platform(d.x, d.x1, d.y))); break;
         case 'chandelier': this.platforms.push(this.spawn(new Chandelier(d))); break;
         case 'pendulum': this.spawn(new Pendulum(d)); break;
@@ -512,21 +516,69 @@ const W = {
       else if (e instanceof Pillar && e.openT > 0) L.push({ x, y, r: 22, c: [248, 120, 0], a: 0.5 });
     }
     if (this.room.theme === 'ship') Tiles.shipLights(L, this.cam);
+    this.doorLights(L);
     if ((this.room.theme === 'courtyard' || this.room.theme === 'ship') && FX.stormOn(this.storm)) L.push({ x: View.w / 2, y: 40, r: 420 });
     return L;
   },
 
+  // Ausgangstor: Steinportal mit Keilsteinbogen und Wappen-Schlussstein, hochgezogenes Fallgitter, offene
+  // Eichenflügel mit Eisenbändern, warmes Licht von drinnen und zwei flackernde Fackeln (statischer Teil zwischengespeichert)
+  doorArt() {
+    if (this.doorC) return this.doorC;
+    const c = Sprites.canvas(64, 86), x = c.getContext('2d'), P = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    const inDoor = (X, Y) => X >= 18 && X < 46 && (Y >= 44 || Math.hypot(X + 0.5 - 32, Y + 0.5 - 44) < 14);
+    for (let Y = 30; Y < 86; Y++) for (let X = 18; X < 46; X++) if (inDoor(X, Y)) { // Durchgang mit warmem Licht von drinnen
+      const k = Math.max(0, (Y - 50) / 36);
+      P(k > 0.66 ? '#5c2c0c' : k > 0.33 ? '#3c1808' : '#140808', X, Y);
+    }
+    for (let X = 20; X < 45; X += 4) for (let Y = 30; Y < 40; Y++) if (inDoor(X, Y)) { P('#3c3c44', X, Y); if (Y === 39) P('#8c8c98', X, Y); } // Fallgitter-Zähne
+    for (let Y = 39; Y < 41; Y++) for (let X = 19; X < 45; X++) if (inDoor(X, Y)) P('#2c2c34', X, Y);
+    [[18, 1], [45, -1]].forEach(([ex, dir]) => { // offene Torflügel, nach innen geschwenkt
+      for (let Y = 44; Y < 86; Y++) for (let k = 0; k < 6; k++) {
+        const X = ex + dir * k;
+        P(k === 5 ? '#2c1404' : Y % 9 === 0 ? '#3c2008' : k % 2 ? '#6c3c18' : '#7c4820', X, Y);
+      }
+      [52, 72].forEach(by => { for (let k = 0; k < 6; k++) P('#24242c', ex + dir * k, by, 1, 3); P('#9c9ca8', ex + dir * 2, by + 1); });
+    });
+    for (let Y = 44; Y < 86; Y++) { // Gewände aus Quadern
+      const blk = Math.floor((Y - 44) / 7) % 2, joint = (Y - 44) % 7 === 0;
+      P(joint ? '#1c1a24' : blk ? '#6c6478' : '#8c8498', 10, Y, 8, 1); P(joint ? '#1c1a24' : blk ? '#8c8498' : '#6c6478', 46, Y, 8, 1);
+      if (!joint) { P('#a8a0b4', blk ? 46 : 10, Y, 1, 1); }
+    }
+    for (let Y = 20; Y <= 44; Y++) for (let X = 10; X < 54; X++) { // Keilsteinbogen
+      const d = Math.hypot(X + 0.5 - 32, Y + 0.5 - 44);
+      if (d < 14 || d >= 22 || Y > 44) continue;
+      const ang = Math.atan2(44 - Y, X - 32), seg = Math.floor(ang / (Math.PI / 6)), joint = Math.abs(ang / (Math.PI / 6) - Math.round(ang / (Math.PI / 6))) < 0.07;
+      P(joint ? '#1c1a24' : seg % 2 ? '#6c6478' : '#8c8498', X, Y);
+    }
+    P('#a8a0b4', 27, 18, 10, 13); P('#c8c0d4', 27, 18, 10, 1); P('#5c5468', 27, 30, 10, 1); // Schlussstein
+    P('#a80020', 29, 21, 6, 5); P('#f8b800', 31, 22, 2, 3); P('#a80020', 30, 26, 4, 1); P('#a80020', 31, 27, 2, 1); // Wappen
+    P('#8c8498', 8, 84, 48, 2); P('#c8c0d4', 8, 84, 48, 1); // Schwelle
+    [5, 59].forEach(fx => { P('#24242c', fx - 1, 54, 3, 8); P('#3c3c44', fx - 3, 50, 7, 4); P('#6c6c78', fx - 3, 50, 7, 1); }); // Fackelhalter
+    return (this.doorC = c);
+  },
   drawDoor(ctx) {
     const d = this.room.door;
     if (!d) return;
     const x = Math.round(d.x * T - 12 - this.cam.x), y = d.base * T - 64 - this.cam.y;
-    if (x > View.w + 4 || x < -60 || y > 210 || y < -80) return;
-    ctx.fillStyle = '#4c4c4c'; ctx.fillRect(x, y - 8, 44, 72);
-    ctx.fillStyle = '#7c7c7c'; ctx.fillRect(x, y - 8, 44, 2); ctx.fillRect(x, y - 8, 2, 72);
-    ctx.fillStyle = '#000'; ctx.fillRect(x + 8, y + 8, 28, 56);
-    for (let i = 0; i < 14; i++) { const w = Math.floor(Math.sqrt(196 - (14 - i) * (14 - i))); ctx.fillRect(x + 22 - w, y + 8 - (14 - i), w * 2, 1); }
-    ctx.fillStyle = 'rgba(248,184,0,0.18)'; ctx.fillRect(x + 12, y + 30, 20, 34);
-    ctx.fillStyle = '#a80020'; ctx.fillRect(x + 20, y - 4, 4, 4);
+    if (x > View.w + 24 || x < -76 || y > 230 || y < -90) return;
+    const ox = x - 10, oy = y - 22, f = this.frame;
+    ctx.drawImage(this.doorArt(), ox, oy);
+    ctx.fillStyle = `rgba(248,160,48,${(0.14 + Math.sin(f * 0.07) * 0.04).toFixed(3)})`; ctx.fillRect(ox + 24, oy + 58, 16, 26); // Licht von drinnen
+    [5, 59].forEach((fx, i) => { // flackernde Fackeln
+      const fl = Math.sin(f * 0.4 + i * 2) + Math.sin(f * 0.23 + i);
+      ctx.fillStyle = '#d82800'; ctx.fillRect(ox + fx - 2, oy + 43 + (fl > 0.8 ? 1 : 0), 5, 7);
+      ctx.fillStyle = '#f87800'; ctx.fillRect(ox + fx - 1, oy + 41 + (fl > 0 ? 1 : 0), 3, 8);
+      ctx.fillStyle = '#fce0a8'; ctx.fillRect(ox + fx, oy + 45, 1, 3);
+    });
+  },
+  doorLights(L) { // Fackelschein am Tor
+    const d = this.room.door;
+    if (!d) return;
+    const x = Math.round(d.x * T - 12 - this.cam.x) - 10, y = d.base * T - 64 - this.cam.y - 22;
+    if (x > View.w + 60 || x < -120 || y > 260 || y < -120) return;
+    const fl = Math.sin(this.frame * 0.3) * 2;
+    L.push({ x: x + 5, y: y + 46, r: 30 + fl, c: [248, 140, 40], a: 0.55 }, { x: x + 59, y: y + 46, r: 30 - fl, c: [248, 140, 40], a: 0.55 });
   },
 
   drawRain(ctx) {

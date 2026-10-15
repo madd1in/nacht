@@ -44,6 +44,8 @@ const Levels = (() => {
       bell() { r.bell = true; return api; },
       chest(x, y, loot = 'rnd') { r.ents.push({ type: 'chest', x, y, loot }); return api; },
       cargo(x, y) { r.ents.push({ type: 'cargo', x, y }); return api; },
+      sign(x, y, w, text) { r.ents.push({ type: 'sign', x, y, w, text }); return api; },
+      prop(type, opts) { r.ents.push({ type, ...opts }); return api; },
       start(x, y) { r.start = { x, y }; return api; },
       exit(x) { r.exit = { x0: x, y0: 0, x1: w - 1, y1: h - 1 }; r.door = { x }; return api; },
       exitAt(x0, y0, x1, y1) { r.exit = { x0, y0, x1, y1 }; r.door = { x: x0 + 1 }; return api; },
@@ -97,6 +99,11 @@ const Levels = (() => {
     .enemy('skel', 44, 31).enemy('skel', 69, 28).enemy('bat', 28, 10).enemy('bat', 50, 6).enemy('bat', 30, 22)
     .enemy('raven', 17, 18).enemy('raven', 66, 22).enemy('ghost', 52, 14)
     .cargo(51, 31) // Frachtkiste „UPEL“ – Gruß an Infernax
+    // Grüße an Monkey Island: Schiffsname, Grogfass, Gummihuhn mit Rolle in der Mitte, dreiköpfiger Affe
+    .sign(1, 30, 6, 'SEA MONKEY')
+    .prop('grog', { x: 29, y: 31 })
+    .prop('chicken', { x: 41, y: 7 })
+    .prop('monkey', { x0: 20, x1: 23, row: 14 })
     .zone('sea', 14, 56, { interval: 150, max: 2 })
     .zone('eagle', 6, 72, { interval: 300, max: 1 })
     .dock(62, 74, 80, 29).music('sea')

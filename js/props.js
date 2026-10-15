@@ -209,6 +209,99 @@ class Zipline extends Ent {
   }
 }
 
+// ---------------- Monkey-Island-Grüße auf dem Schiff ----------------
+// Namensbrett am Heck: die „SEA MONKEY“
+class ShipSign extends Ent {
+  constructor(d) { super(d.x * T, d.y * T, d.w * T, 12); this.kind = 'prop'; this.text = d.text; }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y);
+    if (x > View.w + 4 || x + this.w < -4 || y > 214 || y < -16) return;
+    ctx.fillStyle = '#1c0c04'; ctx.fillRect(x, y, this.w, 12);
+    ctx.fillStyle = '#3c2010'; ctx.fillRect(x + 1, y + 1, this.w - 2, 10);
+    ctx.fillStyle = '#a87000'; ctx.fillRect(x + 1, y + 1, this.w - 2, 1); ctx.fillRect(x + 1, y + 10, this.w - 2, 1);
+    Font.draw(ctx, this.text, x + this.w / 2, y + 3, '#f8b800', { align: 'center' });
+  }
+}
+// Grogfass: ein Peitschenhieb – das Zeug frisst sich durch die Planken
+class Grog extends Ent {
+  constructor(d) { super(d.x * T - 5, (d.y + 1) * T - 22, 26, 22); this.kind = 'candle'; this.melt = 0; }
+  hit() {
+    if (this.melt) return;
+    this.melt = 1;
+    Audio8.sfx('splash', this.cx); Audio8.sfx('crumble', this.cx); W.shake = Math.max(W.shake, 3);
+    ['heartB', 'bag'].forEach((type, i) => { const it = W.spawn(new Item(type, this.cx, this.y)); it.vx = (i ? 1 : -1) * 0.8; it.vy = -2.6; });
+    Game.note('grogNote');
+  }
+  update() {
+    this.t++;
+    if (!this.melt) return;
+    this.melt++;
+    if (this.melt % 6 === 0) W.spawn(new Particle(this.cx + rnd(-10, 10), this.y + this.h - 2, rnd(-0.2, 0.2), rnd(-1.2, -0.4), Math.random() < 0.5 ? '#58f898' : '#b8f818', 26, 2, 0.02)); // Blubbern
+    if (this.melt % 40 === 1) Audio8.sfx('flameTick', this.cx);
+    if (this.melt > 300) this.dead = true;
+  }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    if (this.melt) { // grüne Lache, die sich ins Holz frisst
+      const k = Math.min(1, this.melt / 60);
+      R('#0c1c0c', 13 - 12 * k, 20, 24 * k + 2, 3); R('#38a838', 14 - 10 * k, 19, 20 * k + 1, 2); R('#b8f818', 12, 19, 2, 1);
+      if (this.melt < 40) { R('#5c3418', 3, 22 - 18 * (1 - this.melt / 40), 20, 18 * (1 - this.melt / 40)); } // Fass zerfließt
+      return;
+    }
+    R('#2c1404', 2, 0, 22, 22); R('#7c4820', 3, 1, 20, 20); R('#9c5c28', 5, 1, 4, 20); R('#5c3418', 17, 1, 4, 20);
+    [2, 10, 18].forEach(b => { R('#24242c', 2, b, 22, 2); R('#6c6c78', 3, b, 20, 1); });
+    R('#e8d8a8', 3, 5, 20, 5); Font.draw(ctx, 'GROG', x + 13, y + 4, '#1c0c04', { align: 'center' });
+  }
+}
+// Gummihuhn mit Rolle in der Mitte: macht die Seilrutsche schneller (und quietscht)
+class RubberChicken extends Ent {
+  constructor(d) { super(d.x * T + 3, (d.y + 1) * T - 12, 12, 12); this.kind = 'prop'; this.t = 0; }
+  update() {
+    this.t++;
+    const p = W.player;
+    if (p.alive && Phys.overlap(p, this)) {
+      this.dead = true; p.chicken = true;
+      Audio8.sfx('squeak', this.cx); W.sparks(this.cx, this.cy, 8); Game.note('chickenNote');
+    }
+  }
+  draw(ctx) { RubberChicken.paint(ctx, Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y) + (Math.floor(this.t / 20) % 2), false); }
+  static paint(ctx, x, y, flip) {
+    const R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(flip ? x + 12 - a - w : x + a, y + b, w, h); };
+    R('#8c8c98', 5, 0, 3, 3); R('#3c3c44', 6, 1, 1, 1);           // Rolle
+    R('#c89018', 1, 4, 10, 6); R('#f8d838', 2, 3, 8, 6);          // Leib
+    R('#f8d838', 8, 1, 3, 4); R('#d82800', 9, 0, 2, 1);           // Kopf, Kamm
+    R('#f87800', 11, 2, 1, 2); R('#1c1c1c', 9, 2, 1, 1);          // Schnabel, Auge
+    R('#f87800', 3, 10, 1, 2); R('#f87800', 7, 10, 1, 2);         // Füße
+  }
+}
+// „Schau hinter dich, ein dreiköpfiger Affe!“ – sitzt kurz auf der Rah, verschwindet, sobald man sich umdreht
+class ThreeHeadedMonkey extends Ent {
+  constructor(d) { super(d.x0 * T, d.row * T - 14, (d.x1 - d.x0 + 1) * T, 14); this.kind = 'prop'; this.zone = d; this.state = 'wait'; this.t = 0; }
+  update() {
+    this.t++;
+    const p = W.player, z = this.zone;
+    if (this.state === 'wait') {
+      if (p.alive && p.onGround && p.cx >= z.x0 * T && p.cx < (z.x1 + 1) * T && Math.abs(p.feet - z.row * T) < 4) {
+        this.state = 'show'; this.t = 0; this.side = -p.face;
+        this.mx = p.cx + this.side * 46; this.my = z.row * T - 15;
+        Game.note('monkeyNote'); Audio8.sfx('select');
+      }
+    } else if (this.state === 'show') {
+      if (this.t > 24 && Math.sign(this.mx - p.cx) === p.face) { this.state = 'gone'; W.puff(this.mx, this.my + 14); Audio8.sfx('teleport', this.mx); } // umgedreht – schon weg!
+      else if (this.t > 360) this.state = 'gone';
+    }
+  }
+  draw(ctx) {
+    if (this.state !== 'show') return;
+    const x = Math.round(this.mx - W.cam.x) - 8, y = Math.round(this.my - W.cam.y), b = Math.floor(this.t / 12) % 2;
+    const R = (c, a, bb, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + bb, w, h); };
+    R('#5c3418', 4, 7, 9, 7); R('#7c4820', 5, 8, 7, 5);                                  // Leib
+    R('#5c3418', 13, 9, 3, 1); R('#5c3418', 15, 6 + b, 1, 3);                            // Schwanz
+    [[1, 1 + b], [6, 0], [11, 1 - b]].forEach(([hx, hy]) => { R('#5c3418', hx, hy, 5, 5); R('#e8c8a0', hx + 1, hy + 2, 3, 2); R('#1c1c1c', hx + 1, hy + 1, 1, 1); R('#1c1c1c', hx + 3, hy + 1, 1, 1); }); // drei Köpfe
+    R('#5c3418', 5, 13, 2, 1); R('#5c3418', 10, 13, 2, 1);
+  }
+}
+
 // ---------------- Frachtkiste „UPEL“ – Gruß an Infernax (Alcedors Heimat) ----------------
 class Cargo extends Ent {
   constructor(d) { super(d.x * T - 6, (d.y + 1) * T - 22, 28, 22); this.kind = 'candle'; }

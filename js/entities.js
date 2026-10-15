@@ -486,7 +486,8 @@ class Player {
   // ---------- Seilrutsche: am Seil schräg hinab, immer schneller; Sprung = abspringen ----------
   updateZip(P) {
     const z = this.zip, L = z.line;
-    z.v = Math.min(z.v + 0.09 * L.slope + 0.02, 4.6);
+    z.v = Math.min(z.v + 0.09 * L.slope + 0.02, this.chicken ? 5.6 : 4.6); // Gummihuhn mit Rolle: schneller
+    if (this.chicken && W.frame % 24 === 0) Audio8.sfx('squeak', this.cx);
     z.s += z.v / L.len;
     const [hx, hy] = L.at(Math.min(1, z.s));
     this.x = hx - this.w / 2; this.y = hy + 34 - this.h; this.face = L.dir;
@@ -634,6 +635,7 @@ class Player {
     }
     ctx.globalAlpha = 1;
     this.drawScarf(ctx, cam);
+    if (this.state === 'zip' && this.chicken) RubberChicken.paint(ctx, Math.round(this.cx - cam.x) - 6, Math.round(this.feet - 41 - cam.y), this.face < 0); // Huhn als Griff
     if (this.state === 'swing' && this.ring) { // Seil/Peitsche zum Ankerring
       const hx = this.cx + this.face * 3 - cam.x, hy = this.feet - 34 - cam.y, rx = this.ring.cx - cam.x, ry = this.ring.cy - cam.y;
       const n = Math.ceil(Math.hypot(rx - hx, ry - hy) / 2);
