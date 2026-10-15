@@ -164,6 +164,25 @@ class Candle extends Ent {
 }
 
 // ---------------- Sub-Waffen ----------------
+// Wurfkreuz (Bumerang): 16 Drehstufen, pro Pixel gerendert – ein symmetrisches Kreuz in 90°-Schritten sähe starr aus
+const CROSS_SPIN = (() => {
+  const N = 16, S = 19, c0 = (S - 1) / 2, out = [];
+  const inside = (u, v) => (Math.abs(u) <= 2.1 && Math.abs(v) <= 6.6) || (Math.abs(v) <= 2.1 && Math.abs(u) <= 6.6);
+  for (let k = 0; k < N; k++) {
+    const a = k / N * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), c = Sprites.canvas(S, S), x = c.getContext('2d');
+    const uv = (X, Y) => { const dx = X - c0, dy = Y - c0; return [dx * ca + dy * sa, -dx * sa + dy * ca]; };
+    for (let Y = 0; Y < S; Y++) for (let X = 0; X < S; X++) {
+      const [u, v] = uv(X, Y);
+      if (!inside(u, v)) continue;
+      const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([ox, oy]) => { const [u2, v2] = uv(X + ox, Y + oy); return !inside(u2, v2); });
+      const lit = (X - c0) + (Y - c0) < -1; // Licht von links oben
+      x.fillStyle = edge ? '#7c4c00' : Math.abs(u) < 0.8 && Math.abs(v) < 0.8 ? '#fcfcfc' : lit ? '#fce0a8' : '#f8b800';
+      x.fillRect(X, Y, 1, 1);
+    }
+    out.push(c);
+  }
+  return out;
+})();
 class SubWeapon extends Ent {
   constructor(type, x, y, face) {
     const dims = { dagger: [14, 5], axe: [12, 12], holy: [8, 10], cross: [13, 13] }[type];
@@ -172,7 +191,7 @@ class SubWeapon extends Ent {
     if (type === 'dagger') { this.vx = face * 4.2; this.dmg = 2; this.cd = 999; }
     if (type === 'axe') { this.vx = face * 1.7; this.vy = -5.4; this.dmg = 3; this.cd = 20; }
     if (type === 'holy') { this.vx = face * 1.7; this.vy = -2; this.dmg = 1; this.cd = 12; this.burnT = -1; }
-    if (type === 'cross') { this.vx = face * 3.4; this.dmg = 2; this.cd = 20; this.back = false; }
+    if (type === 'cross') { this.vx = face * 3.4; this.dmg = 2; this.cd = 20; this.back = false; this.trail = []; }
   }
   update() {
     this.t++;
@@ -195,6 +214,8 @@ class SubWeapon extends Ent {
         if (this.burnT % 10 === 0) Audio8.sfx('flameTick', this.cx);
       }
     } else if (tp === 'cross') {
+      this.trail.unshift([this.cx, this.cy, this.t]); if (this.trail.length > 5) this.trail.pop(); // Nachbilder
+      if (this.t % 9 === 0) Audio8.sfx('spin', this.cx);
       this.vx -= this.face * 0.085;
       this.x += this.vx;
       if (Math.sign(this.vx) !== this.face) this.back = true;
@@ -209,11 +230,20 @@ class SubWeapon extends Ent {
     else if (this.type === 'holy') {
       if (this.burnT < 0) Sprites.draw(ctx, S.holy, x, y);
       else for (let i = 0; i < 3; i++) Sprites.draw(ctx, S.flame[(Math.floor(this.burnT / 4) + i) % 2], x + i * 8, y + 6 - ((i === 1) ? 2 : 0));
-    } else {
-      const s = this.type === 'axe' ? S.axe : S.cross;
+    } else if (this.type === 'cross') { // Bumerang: wirbelt sichtbar, zieht Nachbilder hinter sich her
+      const fr = (k) => CROSS_SPIN[(((Math.floor(k * 2.2) * this.face) % 16) + 16) % 16];
+      this.trail.forEach(([tx, ty, tt], i) => {
+        if (i === 0) return;
+        ctx.globalAlpha = 0.34 - i * 0.06;
+        ctx.drawImage(fr(tt), Math.round(tx - W.cam.x) - 9, Math.round(ty - W.cam.y) - 9);
+      });
+      ctx.globalAlpha = 1;
+      ctx.drawImage(fr(this.t), Math.round(this.cx - W.cam.x) - 9, Math.round(this.cy - W.cam.y) - 9);
+    } else { // Axt: dreht sich gleichmäßig statt in Viertelschritten
+      const s = S.axe;
       ctx.save();
       ctx.translate(x + this.w / 2, y + this.h / 2);
-      ctx.rotate((Math.floor(this.t / 4) % 4) * Math.PI / 2 * this.face);
+      ctx.rotate(Math.round(this.t * 0.42 / (Math.PI / 8)) * (Math.PI / 8) * this.face);
       ctx.drawImage(s.c, -Math.floor(s.w / 2) - s.pad, -Math.floor(s.h / 2) - s.pad);
       ctx.restore();
     }

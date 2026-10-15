@@ -2,7 +2,7 @@
 'use strict';
 
 const T = 16;
-const SOLID = new Set(['#', '=', 'X', 'Y', '^']);
+const SOLID = new Set(['#', '=', 'X', 'Y', '^', 'G']); // G: unsichtbar fest (Zugbrücke, Gittertor – die Grafik zeichnet das Torhaus)
 
 const Phys = {
   tile(cx, cy) {
@@ -208,6 +208,23 @@ class Player {
     return null;
   }
 
+  catchStair() {
+    const feet = this.feet, prev = feet - this.vy - 0.5;
+    for (const s of W.stairs) {
+      const pos = (this.cx - s.bx) * s.dir;
+      if (pos < 4 || pos > s.len - 2) continue; // an den Enden steht man ohnehin auf dem Boden
+      const surf = s.by - pos;
+      if (prev <= surf + 3 && feet >= surf - 1) {
+        this.state = 'stairs'; this.stair = s; this.stairPos = pos; this.atkT = 0;
+        this.vy = 0; this.vx = 0; this.onGround = false; this.jumping = false; this.canDouble = true; this.flipT = 0;
+        this.stairUpPose = this.face === s.dir;
+        this.placeOnStair(); this.landT = 5; W.dust(this.cx, this.feet, 3); Audio8.sfx('step', this.cx);
+        return true;
+      }
+    }
+    return false;
+  }
+
   placeOnStair() {
     const s = this.stair;
     this.x = s.bx + s.dir * this.stairPos - this.w / 2;
@@ -307,6 +324,8 @@ class Player {
     if (r !== 0) { this.vy = 0; }
     if (this.onGround) { this.jumping = false; this.canDouble = true; this.flipT = 0; this.flingT = 0; }
     this.checkPlatforms();
+    if (this.stairCool > 0) this.stairCool--;
+    else if (!this.onGround && this.vy > 0 && !Input.held.down && this.catchStair()) return; // im Fallen mitten auf der Treppe landen (Unten gedrückt: hindurchfallen)
     if (!this.onGround && wasGround && !this.jumping && this.vy > 0) this.vx = 0;
     this.clampRoom();
     this.hazards();
@@ -424,11 +443,19 @@ class Player {
     if (P.sub) this.tryAttack(true, true);
     else if (P.attack) this.tryAttack(false, false);
     if (this.atkT > 0) { this.tickAttack(); return; }
+    if (P.jump) { // mitten von der Treppe abspringen – in die gedrückte Richtung oder senkrecht
+      const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
+      this.state = 'normal'; this.stair = null; this.stairCool = 14;
+      this.vy = JUMP * 0.95; this.vx = mx * WALK; if (mx) this.face = mx;
+      this.onGround = false; this.jumping = true; this.canDouble = true; this.coyote = 0;
+      return;
+    }
     let m = 0;
     if (I.up || (s.dir > 0 ? I.right : I.left)) m = 1;
     else if (I.down || (s.dir > 0 ? I.left : I.right)) m = -1;
     if (m) {
       this.stairPos += m * 0.95;
+      if (W.room.theme === 'glass') W.tubeRot = (W.tubeRot || 0) + m * 2.6; // Röhre dreht sich mit: hinauf vorwärts, hinunter zurück
       this.face = m > 0 ? s.dir : -s.dir;
       this.stairUpPose = m > 0;
       if (this.stairPos >= s.len || this.stairPos <= 0) {

@@ -330,6 +330,7 @@ class Count extends Boss {
 // beide oben, spucken Tinte und ein dritter Arm bricht durch die Planken. Jeder Arm ist eine Gliederkette
 // (FABRIK, mit Ellbogenziel für die Hakenform) und wird pro Bild als schattierter, geditherter Schlauch in
 // einen Pixelpuffer gestempelt – ein einziges drawImage statt hunderter kleiner Bilder.
+// Verwundbar ist nur das leuchtende Auge jedes Arms; Treffer auf das zähe Fleisch prallen sichtbar ab.
 const Tent = (() => {
   const rgb = (h) => { const n = parseInt(h.slice(1), 16); return (0xff000000 | (n & 255) << 16 | (n >> 8 & 255) << 8 | n >> 16) | 0; }; // ABGR als int32
   const pal = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, rgb(v)]));
@@ -344,7 +345,8 @@ const Tent = (() => {
   function buffer(w, h) {
     if (!B.c || B.w !== w || B.h !== h) {
       B.c = Sprites.canvas(w, h); B.x = B.c.getContext('2d'); B.img = B.x.createImageData(w, h);
-      B.d = new Int32Array(B.img.data.buffer); // Int32: negative Farbwerte ohne Umwandlung speichern B.w = w; B.h = h; B.box = null;
+      B.d = new Int32Array(B.img.data.buffer); B.w = w; B.h = h; B.box = null; // Int32: negative Farbwerte ohne Umwandlung speichern
+      B.mk = new Int32Array(w * h); // Markierung: jedes Pixel eines Arms nur einmal schattieren
     }
     if (B.box) { const b = B.box; for (let y = b.y0; y <= b.y1; y++) B.d.fill(0, y * w + b.x0, y * w + b.x1 + 1); } // nur den zuletzt benutzten Bereich leeren
     B.box = { x0: w, y0: h, x1: -1, y1: -1 };
@@ -352,24 +354,33 @@ const Tent = (() => {
   }
   const grow = (x0, y0, x1, y1) => { const b = B.box; if (x0 < b.x0) b.x0 = x0; if (y0 < b.y0) b.y0 = y0; if (x1 > b.x1) b.x1 = x1; if (y1 > b.y1) b.y1 = y1; };
   // Scheibe mit fester Farbe (Umriss, Saugnäpfe)
-  function flat(cx, cy, R, col) {
+  function flat(cx, cy, R, col) { // direkte Schleife statt fill(): tausende kurze Spannen pro Bild
     const w = B.w, d = B.d, y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(B.h - 1, Math.ceil(cy + R));
+    let mnx = w, mxx = -1;
     for (let y = y0; y <= y1; y++) {
       const dy = y + 0.5 - cy, q = R * R - dy * dy;
       if (q < 0) continue;
       const hw = Math.sqrt(q), x0 = Math.max(0, Math.round(cx - hw)), x1 = Math.min(w - 1, Math.round(cx + hw) - 1);
       if (x1 < x0) continue;
-      d.fill(col, y * w + x0, y * w + x1 + 1); grow(x0, y, x1, y);
+      for (let i = y * w + x0, e = y * w + x1; i <= e; i++) d[i] = col;
+      if (x0 < mnx) mnx = x0;
+      if (x1 > mxx) mxx = x1;
     }
+    if (mxx >= 0) grow(mnx, y0, mxx, y1);
   }
   // Scheibe mit Rundung: Licht von oben entlang der Normalen (nx, ny), Bänder mit Bayer-Dither
-  function shade(cx, cy, R, nx, ny, P) {
+  let SID = 0;
+  const sid = () => ++SID;
+  function shade(cx, cy, R, nx, ny, P, id) {
     const w = B.w, d = B.d, iR = 1 / R, y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(B.h - 1, Math.ceil(cy + R));
     for (let y = y0; y <= y1; y++) {
       const dy = y + 0.5 - cy, q = R * R - dy * dy;
       if (q < 0) continue;
       const hw = Math.sqrt(q), x0 = Math.max(0, Math.round(cx - hw)), x1 = Math.min(w - 1, Math.round(cx + hw) - 1), row = y * w, by = (y & 3) * 4;
+      const mk = B.mk;
       for (let x = x0; x <= x1; x++) {
+        if (mk[row + x] === id) continue;
+        mk[row + x] = id;
         const v = ((x + 0.5 - cx) * nx + dy * ny) * iR + BAY[by + (x & 3)] * 0.22;
         d[row + x] = v > 0.84 ? P.s : v > 0.5 ? P.l : v > 0.02 ? P.m : v > -0.52 ? P.d : P.dd;
       }
@@ -394,7 +405,7 @@ const Tent = (() => {
     return W.room.h * T;
   }
   const pull = (a, b, L) => { const dx = a.x - b.x, dy = a.y - b.y, d = Math.hypot(dx, dy) || 1; a.x = b.x + dx / d * L; a.y = b.y + dy / d * L; };
-  return { M, PAL, buffer, flat, shade, blit, fdisc, floorAt, pull };
+  return { M, PAL, buffer, flat, shade, sid, blit, fdisc, floorAt, pull };
 })();
 
 class TentArm {
@@ -403,6 +414,7 @@ class TentArm {
     this.b = boss; this.side = side; this.n = n; this.L = len; this.r0 = r0; this.m = Math.round(n * 0.5);
     this.inward = side ? -side : 0;
     this.state = 'hidden'; this.t = 0; this.depth = 1; this.amp = 4; this.ease = 0.1; this.ph = Math.random() * 6; this.hole = 0;
+    this.eye = n - 3; this.blinkT = 0; this.hitT = 0; // Schwachpunkt: Auge kurz vor der Spitze – hängt in Reichweite der Peitsche
     this.bx = side < 0 ? boss.ax - 18 : side > 0 ? boss.ax + boss.aw + 18 : boss.ax + boss.aw / 2;
     this.place();
     this.pts = Array.from({ length: n }, (_, i) => ({ x: this.bx, y: this.by + i * 2 }));
@@ -421,7 +433,7 @@ class TentArm {
   idlePose() {
     const b = this.b, s = Math.sin(b.t * 0.03 + this.ph), c = Math.cos(b.t * 0.047 + this.ph), H = b.deckY;
     this.ex = this.bx + this.inward * (10 + s * 6); this.ey = H - 132 + c * 8;
-    this.tx = this.bx + this.inward * (66 + s * 16); this.ty = H - 70 + c * 14;
+    this.tx = this.bx + this.inward * (66 + s * 16); this.ty = H - 50 + c * 10; // Spitze mit Auge hängt auf Kopfhöhe
   }
   update(p) {
     const t = ++this.t, b = this.b, ph2 = b.ph2, H = b.deckY, top = W.cam.y + 12;
@@ -505,6 +517,8 @@ class TentArm {
         break;
     }
     if (this.hole > 0 && this.state === 'hidden') this.hole = Math.max(0, this.hole - 0.02);
+    if (this.hitT > 0) this.hitT--;
+    if (this.blinkT > 0) this.blinkT--; else if (this.state !== 'stuck' && Math.random() < 0.006) this.blinkT = 7;
     this.depth += (depthGoal - this.depth) * (this.state === 'burst' ? 0.3 : 0.06);
     this.place();
     this.tipX += (this.tx - this.tipX) * this.ease; this.tipY += (this.ty - this.tipY) * this.ease;
@@ -570,12 +584,45 @@ class TentArm {
     W.spawn(new InkBlob(q.x, q.y, vx, vy));
     Audio8.sfx('throw', q.x);
   }
-  hitBoxes(out) {
+  armorBoxes(out) { // zähes Fleisch: Treffer prallen ab
     if (!this.visible()) return;
-    const pad = this.state === 'stuck' ? 10 : 2; // der liegende Arm ist auch mit der waagrechten Peitsche zu treffen
     for (let i = 1; i < this.n; i += 2) {
       const q = this.q[i], r = this.radii[i];
-      if (q.up) out.push({ x: q.x - r - 2, y: q.y - r - pad, w: 2 * r + 4, h: 2 * r + pad + 2 });
+      if (q.up) out.push({ x: q.x - r - 2, y: q.y - r - 2, w: 2 * r + 4, h: 2 * r + 4 });
+    }
+  }
+  eyeR() { return Math.max(5, Math.round(this.radii[this.eye] * 0.8 + 1)); }
+  eyeAt() { const q = this.q[this.eye], r = this.eyeR(); return { x: q.x + q.nx * r * 0.3, y: q.y + q.ny * r * 0.3, r, up: q.up }; }
+  eyeBoxes(out) { // das Auge – liegt der Arm betäubt auf den Planken, auch mit der waagrechten Peitsche zu treffen
+    if (!this.visible()) return;
+    const e = this.eyeAt();
+    if (!e.up) return;
+    const pad = this.state === 'stuck' ? 12 : 4;
+    out.push({ x: e.x - e.r - 4, y: e.y - e.r - pad, w: 2 * e.r + 8, h: 2 * e.r + pad + 4, arm: this });
+  }
+  drawEye(ctx, t, rage) {
+    if (!this.visible()) return;
+    const e = this.eyeAt();
+    if (!e.up) return;
+    const x = Math.round(e.x - W.cam.x), y = Math.round(e.y - W.cam.y), r = e.r, stuck = this.state === 'stuck';
+    const pulse = 0.5 + 0.5 * Math.sin(t * (stuck ? 0.35 : 0.14) + this.ph), hit = this.hitT > 0 && (this.hitT & 2) > 0;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; // Leuchten: deutlich sichtbar, betäubt noch stärker
+    ctx.globalAlpha = (stuck ? 0.5 : 0.28) + 0.25 * pulse;
+    Tent.fdisc(ctx, x, y, r + 5 + Math.round(pulse * 2), stuck ? '#fcd040' : rage ? '#fc3c3c' : '#f87820');
+    ctx.restore();
+    Tent.fdisc(ctx, x, y, r + 1, '#2c0828');
+    if (this.blinkT > 0 && !hit) { Tent.fdisc(ctx, x, y, r, '#7c2c98'); ctx.fillStyle = '#16041e'; ctx.fillRect(x - r + 1, y, 2 * r - 1, 1); }
+    else {
+      const look = Math.sign(W.player.cx - e.x);
+      Tent.fdisc(ctx, x, y, r, hit ? '#fcfcfc' : '#fce8a8');                                                  // Augapfel
+      Tent.fdisc(ctx, x + look, y, Math.max(2, r - 2), hit ? '#fcfcfc' : stuck ? '#fcb800' : rage ? '#fc3c3c' : '#f88800'); // Iris
+      ctx.fillStyle = '#1c0410'; ctx.fillRect(x + look - (stuck ? 0 : 1), y - r + 2, stuck ? 1 : 2, 2 * r - 3); // Schlitzpupille
+      ctx.fillStyle = '#fcfcfc'; ctx.fillRect(x - r + 2, y - r + 2, 2, 2);
+    }
+    if (stuck) for (let k = 0; k < 4; k++) { // kreisende Funken: jetzt zuschlagen!
+      const a = t * 0.12 + k * Math.PI / 2;
+      ctx.fillStyle = k % 2 ? '#fcfcfc' : '#fcd040';
+      ctx.fillRect(Math.round(x + Math.cos(a) * (r + 8)) - 1, Math.round(y + Math.sin(a) * (r + 8)) - 1, 2, 2);
     }
   }
   touches(p) {
@@ -628,7 +675,8 @@ class TentArm {
     }
     const e = Q[n - 1]; S.push({ x: e.x - cx, y: e.y - cy, r: R[n - 1], nx: e.nx, ny: e.ny, i: n - 1 });
     for (const s of S) Tent.flat(s.x, s.y, s.r + 1, P.o);
-    for (const s of S) Tent.shade(s.x, s.y, s.r, s.nx, s.ny, P);
+    const id = Tent.sid(); // von der Spitze her: die Spitze liegt vorn, wenn sich der Arm überkreuzt
+    for (let k = S.length - 1; k >= 0; k--) { const s = S[k]; Tent.shade(s.x, s.y, s.r, s.nx, s.ny, P, id); }
     for (let i = 1; i < n - 1; i++) { // Saugnäpfe
       const q = Q[i], r = R[i];
       if (r < 3.5) continue;
@@ -661,9 +709,9 @@ class InkBlob extends EProj {
 
 class TentacleBoss extends Boss {
   constructor(ax, aw) {
-    super(ax + aw / 2 - 20, W.room.h * T - 90, 40, 40, 18, 2);
+    super(ax + aw / 2 - 20, W.room.h * T - 90, 40, 40, 14, 2);
     this.ax = ax; this.aw = aw; this.mini = true; this.sea = true; this.score = 5000;
-    this.nameKey = 'bossTentacle'; this.voice = 'tentacle';
+    this.nameKey = 'bossTentacle'; this.voice = 'tentacle'; this.music = 'kraken'; this.hinted = false; this.lastDeflect = 0;
     this.deckY = (W.room.h - 2) * T; // Hauptdeck: Bezug für Höhen, damit die Arme auch über der erhöhten Back im Bild bleiben
     this.arms = [new TentArm(this, -1, 28, 11, 14), new TentArm(this, 1, 28, 11, 14)];
     this.burst = new TentArm(this, 0, 15, 9, 9);
@@ -671,14 +719,25 @@ class TentacleBoss extends Boss {
     this.gap = 0; this.inkCd = 110; this.burstCd = 150; this.ph2 = false;
   }
   all() { return [this.arms[0], this.arms[1], this.burst]; }
-  vulnerable() { return this.all().some(a => a.visible() && a.q.some(q => q.up)); }
-  hurtBoxes() { const out = []; for (const a of this.all()) a.hitBoxes(out); return out; }
-  hit(dmg, id) { // Funken am getroffenen Glied (dem Peitschenende am nächsten)
+  vulnerable() { return this.hurtBoxes().length > 0; }
+  hurtBoxes() { const out = []; for (const a of this.all()) a.eyeBoxes(out); return out; }
+  armorBoxes() { const out = []; for (const a of this.all()) a.armorBoxes(out); return out; }
+  hit(dmg, id) { // Treffer aufs Auge: Funken dort, Auge blitzt
     const p = W.player, hx = p.cx + p.face * 26, hy = p.cy - 4;
     let best = null, bd = Infinity;
     for (const b of this.hurtBoxes()) { const d = Math.hypot(b.x + b.w / 2 - hx, b.y + b.h / 2 - hy); if (d < bd) { bd = d; best = b; } }
     if (best) { this.x = best.x + best.w / 2 - 20; this.y = best.y + best.h / 2 - 20; }
-    return super.hit(dmg, id);
+    const ok = super.hit(dmg, id);
+    if (ok && best) { best.arm.hitT = 14; best.arm.blinkT = 0; W.sparks(best.x + best.w / 2, best.y + best.h / 2, 10); }
+    return ok;
+  }
+  deflect(id, b) { // Treffer aufs Fleisch: prallt ab (Funken, heller Klang) – und der Tipp erscheint
+    if (this.dying || (id && this.lastDeflect === id)) return;
+    this.lastDeflect = id;
+    const x = b.x + b.w / 2, y = b.y + b.h / 2;
+    Audio8.sfx('tink', x); W.spawn(new Spark(x, y));
+    for (let i = 0; i < 5; i++) W.spawn(new Particle(x, y, rnd(-1.6, 1.6), rnd(-2, -0.4), i % 2 ? '#fcfcfc' : '#a8a8c8', 14, 1, 0.1));
+    if (!this.hinted) { this.hinted = true; Game.note('tentacleHint'); }
   }
   done(arm) { // Angriff vorbei → der andere Arm ist dran
     arm.go(this.ph2 ? 'idle' : 'retract');
@@ -707,6 +766,7 @@ class TentacleBoss extends Boss {
     }
     for (const a of this.all()) a.update(p);
     if (p.alive) for (const a of this.all()) { const q = a.touches(p); if (q) { p.hurt(this.dmg, q.x); break; } }
+    if (!this.hinted && this.t > 200) { this.hinted = true; Game.note('tentacleHint'); } // nach dem Namensbanner: wo man treffen muss
     this.track();
   }
   track() { // Mittelpunkt (Zoom, Lebensbalken, Abspann) folgt dem sichtbaren Teil des aktiven Arms
@@ -724,7 +784,7 @@ class TentacleBoss extends Boss {
       if (W.kraken && W.kraken.t >= 0) W.kraken.t = Math.max(W.kraken.t, 300); // der Krake im Hintergrund schlägt ein letztes Mal und versinkt
     }
     if (d % 7 === 0 && d < 70) {
-      const hb = this.hurtBoxes();
+      const hb = this.armorBoxes();
       if (hb.length) { const b = hb[Math.floor(Math.random() * hb.length)]; W.spawn(new Burst(b.x + b.w / 2, b.y + b.h / 2)); Audio8.sfx('explode', b.x); }
     }
     if (d === 70) for (const a of this.all()) if (a.visible()) a.go('retract');
@@ -739,6 +799,7 @@ class TentacleBoss extends Boss {
     Tent.buffer(View.w + 2 * Tent.M, 208 + 2 * Tent.M);
     this.burst.stamp(P); this.arms[1 - this.turn].stamp(P); this.arms[this.turn].stamp(P); // der angreifende Arm liegt vorn
     Tent.blit(ctx);
+    if (!this.dying || this.dying < 70) for (const a of this.all()) a.drawEye(ctx, this.t, this.ph2);
   }
 }
 

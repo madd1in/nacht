@@ -24,24 +24,53 @@ const Tiles = (() => {
   };
 
   // ---------------- Kacheln ----------------
+  const hn = (X, Y, s) => { let n = Math.imul(X * 374761393 + Y * 668265263 + s * 1442695041, 1274126177); n ^= n >>> 13; n = Math.imul(n, 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+  // Quader: weiches Steinkorn (grob + fein), Licht von links oben, Fase an allen Kanten, Poren
   function stone(p, opts = {}) {
     const c = C(16, 16), x = c.getContext('2d');
-    const [hl, lt, md, dk, sh] = p;
+    const [hl, lt, md, dk, sh] = p, cols = [sh, dk, md, lt, hl], sd = ri(0, 99999);
     for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
-      const v = ((15 - X) + (15 - y)) / 30;
-      let col = md;
-      if (v + bay(X, y) * 0.35 > 0.92) col = lt;
-      else if (v - bay(X, y) * 0.35 < 0.12) col = dk;
-      px(x, col, X, y);
+      const n = hn(X >> 2, y >> 2, sd) * 0.45 + hn(X >> 1, y >> 1, sd + 7) * 0.3 + hn(X, y, sd + 13) * 0.25;
+      let v = 2 + (n - 0.5) * 1.5 + ((15 - X) + (15 - y)) / 30 * 0.9 - 0.45 + (bay(X, y) - 0.5) * 0.45;
+      if (X === 0 || y === 0) v = 4; else if (X === 1 || y === 1) v = Math.max(v, 3.1);
+      if (X === 15 || y === 15) v = 0; else if (X === 14 || y === 14) v = Math.min(v, 1.1);
+      px(x, cols[Math.max(0, Math.min(4, Math.round(v)))], X, y);
     }
-    px(x, hl, 0, 0, 15, 1); px(x, lt, 1, 1, 13, 1); px(x, hl, 0, 0, 1, 15); px(x, lt, 1, 1, 1, 13);
-    px(x, dk, 1, 14, 15, 1); px(x, dk, 14, 1, 1, 14); px(x, sh, 0, 15, 16, 1); px(x, sh, 15, 0, 1, 16);
-    for (let i = 0; i < 7; i++) px(x, rand() < 0.6 ? dk : lt, ri(3, 12), ri(3, 12));
+    for (let i = 0; i < 4; i++) { const X = ri(3, 12), Y = ri(3, 12); px(x, dk, X, Y); px(x, lt, X + 1, Y + 1); } // Poren
     if (opts.crack) {
       let cx = ri(4, 11), cy = ri(2, 4);
       for (let i = 0; i < 8 && cy < 13; i++) { px(x, sh, cx, cy); px(x, lt, cx + 1, cy); cy++; cx += ri(-1, 1); }
     }
     if (opts.chip) { px(x, sh, 13, 0, 3, 2); px(x, sh, 15, 2, 1, 1); px(x, dk, 13, 2, 2, 1); }
+    return c;
+  }
+  // Glasturm: polierter Marmor mit Adern, Glanzlinie; inlay = goldene Einlage an der Oberkante
+  function marble(p, opts = {}) {
+    const c = C(16, 16), x = c.getContext('2d');
+    const [hl, lt, md, dk, sh] = p, cols = [sh, dk, md, lt, hl], sd = ri(0, 99999), ph = rand() * 6;
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
+      const n = hn(X >> 1, y >> 1, sd) * 0.6 + hn(X, y, sd + 3) * 0.4;
+      const vein = Math.abs(Math.sin((X * 0.55 + y * 0.32) + n * 2.6 + ph)) < 0.09;
+      let v = 2.3 + (n - 0.5) * 0.9 + (bay(X, y) - 0.5) * 0.35 - y / 30;
+      if (vein) v -= 1.3;
+      if (X === 0 || y === 0) v = 4; else if (X === 15 || y === 15) v = 0.4;
+      px(x, cols[Math.max(0, Math.min(4, Math.round(v)))], X, y);
+    }
+    px(x, 'rgba(255,255,255,0.18)', 1, 3, 14, 1); // Politur
+    if (opts.inlay) { px(x, '#a87000', 0, 1, 16, 1); px(x, '#fce0a8', 0, 2, 16, 1); px(x, '#d8a838', 0, 3, 16, 1); for (let X = 2; X < 16; X += 8) { px(x, '#a80020', X + 1, 1, 2, 3); px(x, '#fc3c64', X + 1, 1, 1, 1); } }
+    return c;
+  }
+  function balcony() { // Glasturm-Plattform: dunkler Marmor, Goldrand, Vierpass-Fries
+    const c = C(16, 16), x = c.getContext('2d');
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
+      const n = hn(X, y, 51), vein = Math.abs(Math.sin(X * 0.7 - y * 0.4 + n * 2)) < 0.1;
+      px(x, vein ? '#4c3c68' : n > 0.7 ? '#3a2c52' : '#2c2240', X, y);
+    }
+    px(x, '#fcf0c8', 0, 0, 16, 1); px(x, '#fce0a8', 0, 1, 16, 1); px(x, '#d8a838', 0, 2, 16, 1); px(x, '#684000', 0, 3, 16, 1);
+    px(x, '#d8a838', 0, 12, 16, 1); px(x, '#a87000', 0, 13, 16, 1); px(x, '#1c0c00', 0, 14, 16, 2);
+    for (let k = 0; k < 4; k++) { const [ox, oy] = [[0, -2], [2, 0], [0, 2], [-2, 0]][k]; // Vierpass in Gold
+      for (let a = 0; a < 12; a++) { const an = a / 12 * Math.PI * 2; px(x, '#d8a838', Math.round(8 + ox + Math.cos(an) * 1.7), Math.round(8 + oy + Math.sin(an) * 1.7)); } }
+    px(x, '#fce0a8', 8, 8); px(x, '#a80020', 0, 7, 1, 2); px(x, '#a80020', 15, 7, 1, 2);
     return c;
   }
   // Schiffsplanken: waagrechte Bohlen mit Stoßfugen, Nägeln und Maserung; top = Deck (helle Kante), hull = Rumpf
@@ -118,9 +147,9 @@ const Tiles = (() => {
     }
     return c;
   }
-  function stairTile(p, dir) {
+  function stairTile(p, dir, nose = null) {
     const c = C(16, 16), x = c.getContext('2d');
-    const [hl, lt, md, dk, sh] = p;
+    const [hl0, lt, md, dk, sh] = p, hl = nose || hl0;
     for (let X = 0; X < 16; X++) {
       const lx = dir > 0 ? X : 15 - X;
       const top = lx < 8 ? 8 : 0, bottom = Math.min(15, 15 - lx + 3);
@@ -636,10 +665,10 @@ const Tiles = (() => {
   // Glasturm: zwei Säulen ganz vorn an den Turmwänden – dunkel im Gegenlicht, mit farbigem Saum; ziehen schneller vorbei (Tiefe)
   let glassCol = null;
   function buildGlassColumn() {
-    const w = 24, h = 208, c = C(w, h), x = c.getContext('2d'), img = x.createImageData(w, h), d = img.data;
+    const w = 14, h = 208, c = C(w, h), x = c.getContext('2d'), img = x.createImageData(w, h), d = img.data; // schlanke Säule
     for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) {
       const n = (X + 0.5 - w / 2) / (w / 2), cap = Y < 16, ring = Y >= 120 && Y < 125;
-      const half = cap ? w / 2 : ring ? w / 2 - 1 : w / 2 - 3;
+      const half = cap ? w / 2 : ring ? w / 2 - 1 : w / 2 - 2;
       if (Math.abs(X + 0.5 - w / 2) > half) continue;
       let b = 0.08 + 0.2 * Math.sqrt(Math.max(0, 1 - n * n)) - 0.06 * n + (bay(X, Y) - 0.5) * 0.05;
       if (cap) b += Y < 3 ? 0.12 : ((X + (Y > 8 ? 3 : 0)) % 6 < 3 ? 0.07 : 0);  // Kapitell mit Blattwerk
@@ -655,9 +684,9 @@ const Tiles = (() => {
   function drawGlassFront(ctx, room, cam) {
     const c = glassCol || (glassCol = buildGlassColumn()), par = 1.25, rw = room.w * T;
     const mid = (rw - View.w) / 2, oy = ((Math.floor(cam.y * par) % 208) + 208) % 208;
-    for (const rx of [-12, rw - 12]) {
+    for (const rx of [-7, rw - 7]) {
       const sx = Math.round(rx - cam.x - (cam.x - mid) * (par - 1));
-      if (sx > View.w || sx + 24 < 0) continue;
+      if (sx > View.w || sx + 14 < 0) continue;
       for (let y = -oy; y < 208; y += 208) ctx.drawImage(c, sx, y);
     }
   }
@@ -669,6 +698,25 @@ const Tiles = (() => {
     [32, 132, 64], [240, 110, 24], [100, 56, 24], [110, 48, 170], [30, 24, 40], [248, 220, 72]];
   const [RUBY, BLUE, GOLD, WHITE, SKIN, SILVER, GREEN, ORANGE, BROWN, PURPLE, DARK, YELLOW] = FIG_PAL.map(c => `rgb(${c})`);
   const FIGS = {
+    tentacle(g) { // der lila Tentakel steigt aus den Wellen, ein glühendes Auge
+      [[44, 120, 11], [42, 108, 10.5], [38, 96, 10], [34, 84, 9.5], [31, 72, 9], [30, 60, 8.5], [31, 48, 8], [35, 37, 7.5], [41, 29, 7], [48, 25, 6], [54, 26, 5], [58, 30, 4.5], [59, 35, 4], [57, 39, 3.5]].forEach(([x, y, r]) => g.circ(PURPLE, x, y, r));
+      [[38, 100], [33, 88], [30, 76], [29, 64], [30, 52]].forEach(([x, y]) => g.circ(SKIN, x - 6, y + 2, 2.5)); // Saugnäpfe
+      g.circ(YELLOW, 36, 60, 6); g.rect(DARK, 35, 55, 2, 10);
+      g.poly(BLUE, [[0, 112], [10, 106], [22, 112], [34, 106], [46, 112], [58, 106], [70, 112], [70, 130], [0, 130]]);
+      g.poly(WHITE, [[0, 112], [10, 106], [22, 112], [18, 114], [10, 110], [2, 114]]); g.poly(WHITE, [[46, 112], [58, 106], [70, 112], [66, 114], [58, 110], [50, 114]]);
+    },
+    pirate(g) { // mächtiger Pirat mit Zopf, Rüschenhemd, Säbel und Gummihuhn am Gürtel
+      g.circ(YELLOW, 35, 25, 9); g.poly(YELLOW, [[27, 24], [20, 42], [25, 44], [31, 28]]);
+      g.circ(SKIN, 37, 29, 8);
+      g.poly(WHITE, [[24, 38], [48, 38], [51, 78], [21, 78]]); g.ell(WHITE, 20, 52, 6, 11);
+      g.poly(WHITE, [[44, 40], [57, 29], [62, 34], [50, 48]]); g.circ(SKIN, 60, 32, 3);
+      g.line(SILVER, 60, 30, 69, 4, 3); g.rect(GOLD, 56, 30, 8, 3);
+      g.rect(BROWN, 21, 76, 30, 4); g.rect(GOLD, 34, 76, 4, 4);
+      g.rect(BLUE, 23, 80, 11, 32); g.rect(BLUE, 38, 80, 11, 32);
+      g.rect(BROWN, 21, 110, 14, 12); g.rect(BROWN, 36, 110, 14, 12);
+      g.poly(YELLOW, [[12, 64], [20, 62], [22, 70], [16, 78]]); g.circ(YELLOW, 11, 64, 3); g.poly(ORANGE, [[7, 64], [9, 62], [9, 66]]); g.rect(SILVER, 17, 58, 3, 4);
+      g.rect(GREEN, 0, 122, 70, 8);
+    },
     king(g) {
       g.circ(GOLD, 35, 34, 17); g.poly(RUBY, [[14, 54], [56, 54], [64, 126], [6, 126]]); g.rect(BLUE, 31, 58, 8, 62);
       g.rect(WHITE, 6, 118, 58, 8); g.ell(WHITE, 35, 54, 22, 7); g.circ(SKIN, 35, 36, 10); g.poly(WHITE, [[26, 40], [44, 40], [35, 57]]);
@@ -735,6 +783,17 @@ const Tiles = (() => {
   };
   // Schwarzlot: Malerei auf dem Glas (Gesichter, Falten, Schuppen, Federn) – nur Abdunklung, keine Bleiruten
   const PAINT = {
+    tentacle(p) {
+      for (let k = 0; k < 9; k++) p.line(48 - k * 2, 116 - k * 10, 52 - k * 2, 112 - k * 10); // Ringe auf der Haut
+      p.circ(36, 60, 6); p.line(30, 52, 40, 54);
+      p.line(4, 120, 14, 118); p.line(26, 122, 38, 120); p.line(50, 120, 62, 118);
+    },
+    pirate(p) {
+      p.dot(35, 28); p.dot(40, 28); p.line(33, 25, 36, 25); p.line(39, 25, 42, 25); p.line(37, 30, 37, 32); p.line(35, 34, 39, 34);
+      p.line(28, 24, 24, 38); p.line(31, 22, 33, 18);
+      p.line(30, 44, 28, 76); p.line(36, 42, 36, 76); p.line(42, 44, 44, 76); p.line(20, 44, 18, 60); p.line(24, 46, 22, 58);
+      p.line(28, 84, 28, 108); p.line(43, 84, 43, 108); p.dot(10, 63); p.line(14, 70, 19, 66);
+    },
     king(p) {
       p.rays(35, 34, 12, 16, 20); p.circ(35, 34, 16);
       p.dot(31, 34); p.dot(32, 34); p.dot(38, 34); p.dot(39, 34); p.line(29, 31, 33, 31); p.line(37, 31, 41, 31); p.line(35, 35, 35, 38); p.line(34, 39, 36, 39);
@@ -833,11 +892,12 @@ const Tiles = (() => {
     if (theme === 'vortex') {
       L.push({ name: 'tunnel', tunnel: true, par: 0, c: C(1, 1) });
     } else if (theme === 'glass') { // Glasturm: riesige Buntglasfenster zwischen Bündelpfeilern – Figuren unter Baldachinen, Maßwerkrosette, Juwelenbordüre, Rautengrund
-      const c = C(512, 416), x = c.getContext('2d'), img = x.createImageData(512, 416), d = img.data;
-      const gc = C(512, 416), gx = gc.getContext('2d'), gimg = gx.createImageData(512, 416), gd = gimg.data; // Leuchtebene: nur das Glas
+      const GH0 = 624; // drei Fensterreihen à 208 px
+      const c = C(512, GH0), x = c.getContext('2d'), img = x.createImageData(512, GH0), d = img.data;
+      const gc = C(512, GH0), gx = gc.getContext('2d'), gimg = gx.createImageData(512, GH0), gd = gimg.data; // Leuchtebene: nur das Glas
       const put = (X, Y, col) => { const i = (Y * 512 + X) * 4; d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255; };
       const glowPut = (X, Y, col) => { const i = (Y * 512 + X) * 4; gd[i] = col[0]; gd[i + 1] = col[1]; gd[i + 2] = col[2]; gd[i + 3] = 255; };
-      for (let Y = 0; Y < 416; Y++) { // Quadermauerwerk, sehr dunkel, damit das Glas leuchtet
+      for (let Y = 0; Y < GH0; Y++) { // Quadermauerwerk, sehr dunkel, damit das Glas leuchtet
         const row = Math.floor(Y / 9), off = (row % 2) * 11;
         for (let X = 0; X < 512; X++) {
           const j = (X + off) % 22, blk = Math.floor((X + off) / 22);
@@ -852,9 +912,9 @@ const Tiles = (() => {
         [[22, 108, 70], [152, 22, 44], [216, 160, 32], [180, 248, 200]],
         [[96, 40, 168], [216, 160, 32], [168, 26, 44], [220, 170, 252]],
       ];
-      const MOTIFS = [['king', 'slayer', 'dragon', 'horse'], ['queen', 'knight', 'angel', 'king!']];
-      const SET_OF = [[0, 2, 1, 3], [2, 3, 1, 0]]; // Grundfarbe je Fenster: jede Figur hebt sich ab (grüner Drache auf rotem Grund)
-      const NAMES = { king: 'REX', slayer: 'GEORGIVS', dragon: 'DRACO', horse: 'EQVVS', knight: 'MILES', queen: 'REGINA', angel: 'ANGELVS' };
+      const MOTIFS = [['king', 'slayer', 'dragon', 'horse'], ['queen', 'knight', 'angel', 'king!'], ['tentacle', 'pirate!', 'knight!', 'queen!']];
+      const SET_OF = [[0, 2, 1, 3], [2, 3, 1, 0], [2, 1, 0, 3]]; // Grundfarbe je Fenster: jede Figur hebt sich ab (grüner Drache auf rotem Grund)
+      const NAMES = { king: 'REX', slayer: 'GEORGIVS', dragon: 'DRACO', horse: 'EQVVS', knight: 'MILES', queen: 'REGINA', angel: 'ANGELVS', tentacle: 'TENTACVLVS', pirate: 'GVYBRVSH' };
       const LEAD = [12, 6, 18], ST = [[50, 42, 62], [78, 68, 92], [112, 100, 128], [26, 20, 34]];
       const WHITE_G = FIG_PAL[3], YEL = FIG_PAL[11], GOLD_G = FIG_PAL[2];
       const hash = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n ^ (n >>> 12), 0x297a2d39); return ((n ^ (n >>> 15)) >>> 0) / 4294967296; };
@@ -931,15 +991,20 @@ const Tiles = (() => {
           k *= 1 + 0.07 * Math.sin(lx * (0.45 + h) + ly * (1.2 - h) * 0.6 + h * 40);              // Schlieren im mundgeblasenen Glas
           k += (bay(X, Y) - 0.5) * 0.12;
           if (hash(i * 31 + key * 977) < 0.005) k *= 1.4;                                           // Bläschen
+          const me = pid[i], nb = (dx, dy) => { const xx = lx + dx, yy = ly + dy; return xx < 0 || yy < 0 || xx >= W0 || yy >= H0 ? -1 : pid[yy * W0 + xx]; };
+          if (nb(1, 0) !== me || nb(0, 1) !== me) k *= 0.74;                                         // gemalter Kantenschatten (Mattierung), unten rechts kräftiger
+          else if (nb(2, 0) !== me || nb(0, 2) !== me || nb(-2, 0) !== me || nb(0, -2) !== me) k *= 0.88;
+          let glint = me >= 3000 && nb(-2, 0) !== me && nb(0, -2) !== me && nb(-1, 0) === me && nb(0, -1) === me && hash(me * 13 + key) < 0.55; // Lichtreflex in der Ecke der Scheibe
           let r = col[0] * k, g = col[1] * k, b = col[2] * k;
-          if (paint[i]) { r = r * 0.28 + 10; g = g * 0.24 + 5; b = b * 0.22 + 4; }                   // Schwarzlot
+          if (paint[i]) { r = r * 0.28 + 10; g = g * 0.24 + 5; b = b * 0.22 + 4; glint = false; }   // Schwarzlot
+          if (glint) { r = r * 0.4 + 150; g = g * 0.4 + 150; b = b * 0.4 + 150; }
           const out = [Math.min(255, r), Math.min(255, g), Math.min(255, b)];
           put(X, Y, out); glowPut(X, Y, out);
         }
         for (let ly = -12; ly < H0 + 12; ly++) for (let lx = -12; lx < W0 + 12; lx++) { // farbiger Lichtschein auf dem Mauerwerk rund ums Fenster
           if (insideW(lx, ly)) continue;
           const X = wx + lx, Y = wy + ly;
-          if (X < 0 || X >= 512 || Y < 0 || Y >= 416) continue;
+          if (X < 0 || X >= 512 || Y < 0 || Y >= GH0) continue;
           let dist;
           if (ly >= A0) { const ex = lx < 0 ? -lx : lx >= W0 ? lx - W0 + 1 : 0, ey = ly >= H0 ? ly - H0 + 1 : 0; dist = Math.hypot(ex, ey); }
           else dist = Math.max(Math.hypot(lx - W0, ly - A0), Math.hypot(lx, ly - A0)) - W0;
@@ -954,25 +1019,25 @@ const Tiles = (() => {
       const stone = (b, X, Y) => { const v = Math.max(0, Math.min(4.999, b * 5 + (bay(X, Y) - 0.5) * 0.7)), k = Math.floor(v); return STN[k]; };
       const tint = (col, g, a) => [col[0] * (1 - a) + Math.min(255, g[0] * 1.25) * a, col[1] * (1 - a) + Math.min(255, g[1] * 1.25) * a, col[2] * (1 - a) + Math.min(255, g[2] * 1.25) * a];
       const cyl = (n) => 0.25 + 0.55 * Math.sqrt(Math.max(0, 1 - n * n)) - 0.18 * n; // Licht leicht von links
-      for (let band = 0; band < 2; band++) for (let k = 0; k <= 4; k++) {
+      for (let band = 0; band < 3; band++) for (let k = 0; k <= 4; k++) {
         const cx = k * 128, y0 = band * 208, gl = glow[band * 4 + (k + 3) % 4], gr = glow[band * 4 + k % 4];
-        for (let ly = 0; ly < 204; ly++) for (let dx = -21; dx <= 21; dx++) {
+        for (let ly = 0; ly < 204; ly++) for (let dx = -12; dx <= 12; dx++) { // schlanker Bündelpfeiler
           const X = cx + dx, Y = y0 + ly;
           if (X < 0 || X >= 512) continue;
           const ax = Math.abs(dx);
           let col = null;
-          if (ly >= 70 && ly < 73) col = ax <= 21 ? (ly === 70 ? STN[5] : STN[3]) : null;                      // Deckplatte des Kapitells
+          if (ly >= 70 && ly < 73) col = ax <= 12 ? (ly === 70 ? STN[5] : STN[3]) : null;                      // Deckplatte des Kapitells
           else if (ly >= 73 && ly < 81) { // Kelch mit Blattwerk
-            if (ax <= 20 - (ly - 73) * 0.4) {
-              const leaf = ((dx + 42 + (ly < 77 ? 0 : 3)) % 6), curl = ly === 73 || ly === 74;
-              col = curl && leaf < 2 ? STN[5] : leaf < 3 ? STN[4 - (ly > 77 ? 1 : 0)] : STN[2];
+            if (ax <= 11.5 - (ly - 73) * 0.3) {
+              const leaf = ((dx + 40 + (ly < 77 ? 0 : 2)) % 4), curl = ly === 73 || ly === 74;
+              col = curl && leaf < 1 ? STN[5] : leaf < 2 ? STN[4 - (ly > 77 ? 1 : 0)] : STN[2];
             }
-          } else if (ly >= 81 && ly < 83) col = ax <= 18 ? (ly === 81 ? STN[4] : STN[1]) : null;               // Halsring
-          else if (ly >= 140 && ly < 143) col = ax <= 19 ? (ly === 140 ? STN[4] : STN[2]) : null;              // Schaftring
-          else if (ly >= 190 && ly < 194) col = ax <= 21 ? stone(cyl(dx / 22) * (ly === 190 ? 1.15 : 0.9), X, Y) : null; // Wulst der Basis
-          else if (ly >= 194) col = ax <= 21 ? (ly === 194 ? STN[4] : ly > 201 ? STN[0] : STN[2]) : null;    // Sockel
+          } else if (ly >= 81 && ly < 83) col = ax <= 10 ? (ly === 81 ? STN[4] : STN[1]) : null;               // Halsring
+          else if (ly >= 140 && ly < 143) col = ax <= 11 ? (ly === 140 ? STN[4] : STN[2]) : null;              // Schaftring
+          else if (ly >= 190 && ly < 194) col = ax <= 12 ? stone(cyl(dx / 13) * (ly === 190 ? 1.15 : 0.9), X, Y) : null; // Wulst der Basis
+          else if (ly >= 194) col = ax <= 12 ? (ly === 194 ? STN[4] : ly > 201 ? STN[0] : STN[2]) : null;    // Sockel
           if (!col) { // Schäfte
-            const sides = [[0, 8], [-14, 4], [14, 4]];
+            const sides = [[0, 5], [-9, 2], [9, 2]];
             for (const [sx, r] of sides) {
               const n = (dx - sx) / (r + 0.5);
               if (Math.abs(n) > 1) continue;
@@ -981,17 +1046,18 @@ const Tiles = (() => {
               else if (n > 0.6 && dx > 0) col = tint(col, gr, Math.min(0.85, (n - 0.6) * 2.1)); // … und vom rechten
               break;
             }
-            if (!col) col = ax <= 21 ? (ax >= 19 ? STN[1] : STN[0]) : null;         // Kehlen zwischen den Diensten
+            if (!col) col = ax <= 12 ? (ax >= 11 ? STN[1] : STN[0]) : null;         // Kehlen zwischen den Diensten
           }
           if (col) put(X, Y, col);
         }
       }
-      for (const gy of [204, 412]) for (let X = 0; X < 512; X++) { // Gesims mit Zahnschnitt zwischen den Fensterreihen
+      for (const gy of [204, 412, 620]) for (let X = 0; X < 512; X++) { // Gesims mit Zahnschnitt zwischen den Fensterreihen
         put(X, gy, [100, 90, 118]); put(X, gy + 1, [66, 56, 80]); put(X, gy + 2, X % 4 === 0 ? [14, 9, 20] : [54, 46, 68]); put(X, gy + 3, [14, 9, 20]);
       }
       x.putImageData(img, 0, 0); gx.putImageData(gimg, 0, 0);
-      add('wall', c, 0.5, { vtile: true });
-      add('glassGlow', gc, 0.5, { vtile: true, glow: true });
+      add('wall', c, 0.5, { vtile: true, hidden: true }); // Textur der Röhre (nicht direkt gezeichnet)
+      add('glassGlow', gc, 0.5, { vtile: true, glow: true, hidden: true });
+      L.push({ name: 'tube', custom: (ctx, cam, frame) => drawGlassTube(ctx, cam, frame, c, gc), par: 0.5, c: C(1, 1) });
     } else if (theme === 'ship') { // nachts auf See: Sturmhimmel, Blutmond, Burg auf der Klippe, Meer, Takelage
       const sky = C(640, 208), x = sky.getContext('2d');
       smooth(x, 640, 208, ['#000000', '#02020c', '#060818', '#0c0e26', '#141436', '#1e1a44', '#2a1e4c', '#3a2250', '#4a2450']);
@@ -1224,15 +1290,16 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => stone(p.a, o), ship: () => planks(p.a, { hull: true }) }[theme];
+    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), ship: () => planks(p.a, { hull: true }) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
-      : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true })) : ground;
-    const alt = theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+      : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true }))
+      : theme === 'glass' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true })) : ground;
+    const alt = theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
-      spikes: spikes(), up: theme === 'ship' ? ratline(1) : stairTile(p.b, 1), down: theme === 'ship' ? ratline(-1) : stairTile(p.b, -1),
+      spikes: spikes(), up: theme === 'ship' ? ratline(1) : theme === 'glass' ? stairTile(p.a, 1, '#fce0a8') : stairTile(p.b, 1), down: theme === 'ship' ? ratline(-1) : theme === 'glass' ? stairTile(p.a, -1, '#fce0a8') : stairTile(p.b, -1),
       toppers: [0, 1, 2, 3].map(v => topper(theme, v)), hangers: [0, 1, 2].map(v => hanger(theme, v)),
       bg: buildBg(theme), crate: theme === 'ship' ? crate(p.b) : null,
     };
@@ -1242,7 +1309,61 @@ const Tiles = (() => {
 
   function layer(theme, name) { return build(theme).bg.find(l => l.name === name); }
 
+  // ---------------- Glasturm als Röhre (Mode 7): senkrechte Achse, Blick von innen auf die Wand ----------------
+  // Jede Bildspalte ist ein Strahl von einem Punkt hinter der Achse auf die Zylinderwand: gegenüber liegt die
+  // ferne Wand (gestaucht), an den Rändern die nahe Wand (groß, gewölbt). Die Fenstertextur umläuft die Röhre
+  // zweimal. Auf der Treppe dreht sich die Röhre – hinauf vorwärts, hinunter zurück (wie eine Wendeltreppe).
+  let tubeTab = null;
+  function tubeTable(w) {
+    if (tubeTab && tubeTab.w === w) return tubeTab;
+    const CIRC = 1024, R = CIRC / (2 * Math.PI), dd = R * 0.3, f = (w / 2) / Math.tan(1.0);
+    const u = new Float32Array(w), s = new Float32Array(w), sh = new Float32Array(w);
+    let smin = 1e9, smax = 0;
+    for (let x = 0; x < w; x++) {
+      const ph = Math.atan((x + 0.5 - w / 2) / f), c = Math.cos(ph), sn = Math.sin(ph);
+      const t = dd * c + Math.sqrt(dd * dd * c * c - dd * dd + R * R), px = t * sn, py = -dd + t * c;
+      u[x] = Math.atan2(px, py) / (2 * Math.PI) * CIRC; s[x] = t * c / f;
+      smin = Math.min(smin, s[x]); smax = Math.max(smax, s[x]);
+    }
+    for (let x = 0; x < w; x++) sh[x] = (s[x] - smin) / (smax - smin); // 0 = nah (Rand), 1 = fern (Mitte)
+    const gr = Sprites.canvas(w, 1), gx = gr.getContext('2d');
+    for (let x = 0; x < w; x++) { gx.fillStyle = `rgba(6,2,12,${(0.08 + sh[x] * 0.42).toFixed(3)})`; gx.fillRect(x, 0, 1, 1); } // ferne Wand im Dunst
+    return (tubeTab = { w, u, s, sh, shade: gr });
+  }
+  let tubeTx = null, tubeOut = null;
+  function tubeTex(tex, glow) { // Textur in 5 Leuchtstufen (Glas + Leuchtebene × Stärke) – pro Bild nur nachschlagen
+    if (tubeTx && tubeTx.src === tex) return tubeTx;
+    const w = tex.width, h = tex.height, a = tex.getContext('2d').getImageData(0, 0, w, h).data, g = glow.getContext('2d').getImageData(0, 0, w, h).data;
+    const levels = [0.05, 0.12, 0.19, 0.26, 0.7].map(k => {
+      const out = new Int32Array(w * h);
+      for (let i = 0, j = 0; i < out.length; i++, j += 4) {
+        const r = Math.min(255, a[j] + g[j] * k), gg = Math.min(255, a[j + 1] + g[j + 1] * k), b = Math.min(255, a[j + 2] + g[j + 2] * k);
+        out[i] = (255 << 24) | (b << 16) | (gg << 8) | r;
+      }
+      return out;
+    });
+    return (tubeTx = { src: tex, w, h, levels });
+  }
+  function drawGlassTube(ctx, cam, frame, tex, glow) {
+    const w = View.w, H = 208, tb = tubeTable(w), TX = tubeTex(tex, glow), TW = TX.w, TH = TX.h;
+    if (!tubeOut || tubeOut.w !== w) { const c = Sprites.canvas(w, H), x = c.getContext('2d'), img = x.createImageData(w, H); tubeOut = { w, c, x, img, buf: new Int32Array(img.data.buffer) }; }
+    if (W.tubeRotS === undefined) W.tubeRotS = W.tubeRot || 0;
+    W.tubeRotS += ((W.tubeRot || 0) - W.tubeRotS) * 0.12;
+    const cloud = 0.5 + 0.3 * Math.sin(frame * 0.011) + 0.2 * Math.sin(frame * 0.0037 + 1.3); // Wolken ziehen am Mond vorbei
+    const src = TX.levels[FX.stormOn(W.storm) ? 4 : Math.max(0, Math.min(3, Math.round(cloud * 3)))];
+    const u0 = cam.x * 0.5 + W.tubeRotS + frame * 0.3, camV = cam.y * 0.5 + 104, out = tubeOut.buf; // dreht sich stetig, die Treppe gibt Schub vor und zurück
+    for (let x = 0; x < w; x++) {
+      const s = tb.s[x], su = ((Math.floor(u0 + tb.u[x]) % TW) + TW) % TW;
+      let v = (((camV - 104 * s) % TH) + TH) % TH;
+      for (let y = 0, o = x; y < H; y++, o += w) { out[o] = src[(v | 0) * TW + su]; v += s; if (v >= TH) v -= TH; }
+    }
+    tubeOut.x.putImageData(tubeOut.img, 0, 0);
+    ctx.drawImage(tubeOut.c, 0, 0);
+    ctx.drawImage(tb.shade, 0, 0, w, 1, 0, 0, w, H); // ferne Wand im Dunst
+  }
+
   function drawLayer(ctx, l, cam, frame, vt = false) {
+    if (l.hidden) return;
     if (l.tunnel) { Mode7.drawTunnel(ctx, View.w, frame); return; }
     if (l.custom) { l.custom(ctx, cam, frame); return; }
     const img = l.frames ? l.frames[Math.floor(frame / (60 / l.fps)) % l.frames.length] : l.c;

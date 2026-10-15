@@ -114,14 +114,16 @@ const Levels = (() => {
 
   // ======================= STAGE 1: Der Burghof =======================
   const r11 = room(72, 'courtyard')
-    .ground(0, 71)
+    .ground(0, 7).ground(16, 71).fill(8, 12, 15, 12, '~')              // Burggraben vor dem Torhaus
+    .prop('gate', { x0: 8, x1: 15, gx: 18, winch: 4, row: 11 })         // Zugbrücke, Fallgitter, Seilwinde
+    .prop('stake', { x: 1, y: 10 }).prop('stake', { x: 6, y: 10 })     // Schädel auf Pfählen am Ufer
     .fill(28, 9, 30, 10, '=')
     .fill(44, 10, 45, 10, '=')
-    .candle(5, 9).candle(11, 9, 'W').candle(17, 9).candle(23, 9, 'H').candle(29, 7)
+    .candle(3, 9).candle(11, 9, 'W').candle(31, 9).candle(33, 9, 'H').candle(29, 7)
     .candle(35, 9, '1').candle(41, 9).candle(47, 9, 'W').candle(53, 9, '$').candle(59, 9).candle(64, 9, 'H')
     .enemy('raven', 29, 8).enemy('raven', 45, 9)
     .chest(62, 10)
-    .zone('ghoul', 14, 60, { interval: 110, max: 3 })
+    .zone('ghoul', 29, 60, { interval: 110, max: 3 })
     .start(2, 10).exit(70).done();
 
   // Glockenturm: vertikaler Aufstieg (Treppen, Aufzug, Kronleuchter)
@@ -254,7 +256,7 @@ const Levels = (() => {
     .chest(22, 31, 'big')
     .enemy('knight', 14, 26).enemy('ghost', 16, 34).enemy('ghost', 20, 6).enemy('bat', 22, 24).enemy('bat', 6, 15)
     .zone('skull', 0, 27, { interval: 420, max: 1 })
-    .start(2, 41).exitAt(11, 0, 15, 2).done();
+    .start(2, 41).exitAt(11, 0, 15, 2).music('chapel').done();
 
   const r32 = room(88, 'throne')
     .ground(0, 15).ground(26, 87)

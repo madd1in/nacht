@@ -366,3 +366,289 @@ class Raven extends Enemy {
     this.ds(ctx, s, Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - (this.state === 'perch' ? 1 : 0) - W.cam.y), this.face < 0, this.flash);
   }
 }
+
+// ---------------- Torhaus mit Zugbrücke und Fallgitter (Burghof) ----------------
+// Ein riesiger Spitzbogen zwischen zwei Türmen, die bis über den Bildrand ragen. Die Zugbrücke ist
+// hochgezogen, ein Seil spannt sich über den Graben zur Seilwinde am diesseitigen Ufer. Peitscht man die
+// Winde, springt die Sperrklinke: die Brücke rauscht herab und kracht aufs Ufer, dann hebt sich das Fallgitter.
+// Der Held geht durch den Bogen ins Torhaus (der Torbau liegt dann vor ihm), kommt auf der Hofseite heraus –
+// und hinter ihm saust das Gitter herunter.
+// d: { x0, x1: Graben (Kacheln), gx: Spalte des Fallgitters, winch: Spalte der Winde, row: Bodenreihe }
+const GH = { L: 56, A: 80, R: 96, IN: 12, SPAN: 56, SPRING: 112 }; // Turm links, Torbau, Turm rechts, Laibung, Bogenweite, Kämpferhöhe
+class Gatehouse extends Ent {
+  constructor(d) {
+    const hx = (d.x1 + 1) * T;
+    super(hx - GH.L, 0, GH.L + GH.A + GH.R, d.row * T + T);
+    this.kind = 'prop'; this.d = d;
+    this.hx = hx; this.hy = d.row * T; this.len = (d.x1 - d.x0 + 1) * T;
+    this.ang = Math.PI / 2; this.state = 'up'; this.ft = 0;
+    this.gate = 'closed'; this.gy = 0; this.gv = 0; this.gt = 0; this.gmax = 108;
+    this.gx = d.gx; this.near = 0; this.wheel = 0; this.wv = 0;
+    const g = W.room.grid, c0 = Math.floor(hx / T), c1 = Math.floor((hx + GH.A + GH.R) / T);
+    for (let r = 0; r < 4; r++) for (let c = c0; c < c1; c++) g[r][c] = 'G'; // Decke des Torhauses
+    this.gateTiles('G');
+    this.winch = W.spawn(new Winch(this, d.winch * T + 8, this.hy));
+    this.demo = Game.state === 'demo';
+    if (this.demo) this.openAll(); // Vorführung: Tor steht offen
+  }
+  get archX() { return this.hx + GH.IN; }
+  get archCx() { return this.hx + GH.A / 2; }
+  bridgeTiles(ch) { const d = this.d; for (let x = d.x0; x <= d.x1; x++) W.room.grid[d.row][x] = ch; }
+  gateTiles(ch) { const d = this.d; for (let r = 4; r < d.row; r++) W.room.grid[r][this.gx] = ch; }
+  openAll() { this.ang = 0; this.state = 'down'; this.bridgeTiles('G'); this.gate = 'open'; this.gy = this.gmax; this.gateTiles('.'); }
+  inside() { const p = W.player; return p.cx > this.archCx && p.cx < this.hx + GH.A + GH.R + 12; }
+  release() {
+    if (this.state !== 'up') return;
+    this.state = 'falling'; this.ft = 0; this.wv = 0.7;
+    Audio8.sfx('latch', this.winch.cx); Audio8.sfx('whoosh', this.hx); Input.rumble(0.3, 0.3, 150);
+  }
+  land() {
+    const d = this.d;
+    this.state = 'bounce'; this.ang = 0; this.bridgeTiles('G');
+    W.shake = Math.max(W.shake, 18); Input.rumble(1, 0.8, 500);
+    Audio8.sfx('boom', this.hx); Audio8.sfx('wall', this.hx - this.len / 2);
+    for (let x = d.x0; x <= d.x1; x++) W.dust(x * T + 8, this.hy, 4);
+    for (let i = 0; i < 24; i++) W.spawn(new Particle(d.x0 * T + Math.random() * this.len, this.hy + T, rnd(-1.6, 1.6), rnd(-4.2, -1), i % 2 ? '#3cbcfc' : '#a4e4fc', 40, 2, 0.2)); // Wasser spritzt
+    for (let i = 0; i < 8; i++) W.spawn(new SwarmBat(this.hx - 28 + rnd(-6, 6), 70 + rnd(-6, 6))); // Fledermäuse aus dem Turm
+  }
+  update() {
+    this.t++;
+    const p = W.player, d = this.d;
+    if (this.demo) return;
+    if (this.state === 'falling') { // freier Fall, die Winde wirbelt, die Ketten rasseln
+      const k = Math.min(1, ++this.ft / 56);
+      this.ang = Math.PI / 2 * (1 - k * k);
+      this.wv = 0.6 + k * 0.5;
+      if (this.ft % 3 === 0) Audio8.sfx('cog', this.winch.cx);
+      if (this.ft % 8 === 0) Audio8.sfx('chain', this.hx);
+      if (this.ft === 56) this.land();
+    } else if (this.state === 'bounce') { // federt einmal nach
+      const u = (++this.ft - 56) / 16;
+      this.ang = u < 1 ? Math.sin(u * Math.PI) * 0.06 : 0;
+      if (u >= 1) { this.state = 'down'; this.gt = 0; }
+    }
+    this.wheel += this.wv; this.wv *= 0.97;
+    if (this.state === 'down' && this.gate === 'closed' && ++this.gt > 34) { this.gate = 'rising'; Audio8.sfx('creak', this.archCx); }
+    if (this.gate === 'rising') {
+      this.gy = Math.min(this.gmax, this.gy + 1);
+      if (this.t % 6 === 0) Audio8.sfx('cog', this.archCx);
+      if (this.t % 14 === 0) Audio8.sfx('chain', this.archCx);
+      if (this.gy >= 40 && W.room.grid[d.row - 1][this.gx] === 'G') this.gateTiles('.'); // hoch genug zum Durchgehen
+      if (this.gy >= this.gmax) { this.gate = 'open'; Audio8.sfx('latch', this.archCx); }
+    }
+    if (this.gate === 'open' && p.alive && p.cx > this.hx + GH.A + GH.R + 2) { this.gate = 'slam'; this.gv = 0; }
+    if (this.gate === 'slam') { // kracht hinter dem Helden herunter
+      this.gv += 1.1; this.gy = Math.max(0, this.gy - this.gv);
+      if (this.gy === 0) {
+        this.gate = 'shut'; this.gateTiles('G');
+        W.shake = Math.max(W.shake, 12); Input.rumble(0.8, 0.6, 350); Audio8.sfx('wall', this.archCx); Audio8.sfx('crack', this.archCx);
+        for (let i = 0; i < 8; i++) W.dust(this.archX + 4 + i * 7, this.hy, 2);
+        Game.note('gateNote');
+      }
+    }
+    if (this.state === 'up' && p.alive && p.cx > (d.winch - 2) * T && p.cx < d.x0 * T + 12 && ++this.near === 240) Game.note('winchNote'); // Hinweis für Ratlose
+  }
+  tip() { // Spitze der Brücke (Kettenöse)
+    const a = this.ang, L = this.len - 4;
+    return { x: this.hx - Math.cos(a) * L - Math.sin(a) * 7, y: this.hy - Math.sin(a) * L + Math.cos(a) * 7 };
+  }
+  lights(L, cx, cy, flick) {
+    const f = Math.sin(this.t * 0.3) * 2, eye = 0.35 + 0.2 * Math.sin(this.t * 0.07);
+    L.push({ x: this.hx + 6 - cx, y: 128 - cy, r: 34 + f + flick(this.hx), c: [248, 140, 40], a: 0.6 },
+      { x: this.hx + GH.A - 6 - cx, y: 128 - cy, r: 34 - f + flick(this.hx + 9), c: [248, 140, 40], a: 0.6 },
+      { x: this.archCx - cx, y: 50 - cy, r: 18, c: [252, 30, 30], a: eye },            // glühende Augen im Schädel
+      { x: this.hx - 28 - cx, y: 78 - cy, r: 18, c: [252, 40, 40], a: 0.4 },           // rote Turmfenster
+      { x: this.hx + GH.A + 34 - cx, y: 58 - cy, r: 16, c: [252, 40, 40], a: 0.4 });
+  }
+  draw(ctx) { // hinter dem Helden: linker Turm, Durchgang, Zugbrücke, Ketten, Seil – und der Torbau, solange der Held draußen ist
+    const cx = W.cam.x, cy = W.cam.y, fx = Math.round(this.x - cx);
+    if (fx > View.w + 40 || fx + this.w < -150) return;
+    const A = Gatehouse.art();
+    ctx.drawImage(A.back, fx, Math.round(-cy));
+    const tp = this.tip(); // Kette von der Mauer zur Brückenspitze
+    [[this.hx + 4, 74], [this.hx + 8, 82]].forEach(([kx, ky], j) => {
+      const n = Math.ceil(Math.hypot(tp.x - kx, tp.y - ky) / 3);
+      for (let i = 0; i <= n; i++) { ctx.fillStyle = (i + j) % 2 ? '#2c2c38' : '#8c8898'; ctx.fillRect(Math.round(kx + (tp.x - kx) * i / n - cx) - 1, Math.round(ky + (tp.y - ky) * i / n - cy) - 1, 3, 3); }
+    });
+    const w = this.winch, wx = w.cx + 3, wy = w.y + 9, slack = this.state === 'up' ? 4 : 22; // Seil zur Winde
+    ctx.fillStyle = '#a8784c';
+    for (let i = 0; i <= 60; i++) { const k = i / 60, sx = wx + (tp.x - wx) * k, sy = wy + (tp.y - wy) * k + Math.sin(k * Math.PI) * slack; ctx.fillRect(Math.round(sx - cx), Math.round(sy - cy), 1, 1); }
+    ctx.save(); // Zugbrücke: schwere Bohlen mit Eisenbändern, dreht um das Scharnier
+    ctx.translate(Math.round(this.hx - cx), Math.round(this.hy - cy)); ctx.rotate(this.ang);
+    ctx.drawImage(Gatehouse.plank(this.len), -this.len, 0);
+    ctx.restore();
+    if (!this.inside()) this.drawFrontParts(ctx);
+  }
+  drawFront(ctx) { if (this.inside()) this.drawFrontParts(ctx); } // Held im Torhaus: Torbau liegt vor ihm
+  drawFrontParts(ctx) {
+    const cx = W.cam.x, cy = W.cam.y, fx = Math.round(this.x - cx), A = Gatehouse.art();
+    // Fallgitter im Bogen: dicke Stäbe, Querbänder, lange Spitzen – wird in die Mauer gezogen
+    const ax = this.archX - cx, aw = GH.SPAN, bot = this.hy - cy - Math.round(this.gy);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(ax, this.hy - cy); ctx.lineTo(ax, GH.SPRING - cy);
+    ctx.arc(ax + aw, GH.SPRING - cy, aw, Math.PI, Math.PI * 4 / 3); ctx.arc(ax, GH.SPRING - cy, aw, Math.PI * 5 / 3, Math.PI * 2); // Spitzbogen: zwei Kreisbögen bis zum Scheitel
+    ctx.lineTo(ax + aw, this.hy - cy); ctx.closePath(); ctx.clip();
+    for (let y = bot - 8; y > bot - 190; y -= 13) { ctx.fillStyle = '#1c1824'; ctx.fillRect(ax, y - 3, aw, 4); ctx.fillStyle = '#6c6878'; ctx.fillRect(ax, y - 3, aw, 1); }
+    for (let x = ax + 3; x < ax + aw - 1; x += 8) {
+      ctx.fillStyle = '#16121c'; ctx.fillRect(x, bot - 190, 3, 184);
+      ctx.fillStyle = '#7c7888'; ctx.fillRect(x, bot - 190, 1, 184);
+      ctx.fillStyle = '#4c4858'; ctx.fillRect(x, bot - 6, 3, 2); ctx.fillRect(x + 1, bot - 4, 1, 4); // Spitzen
+      ctx.fillStyle = '#9c98a8'; ctx.fillRect(x + 1, bot - 1, 1, 1);
+    }
+    ctx.restore();
+    ctx.drawImage(A.front, fx, Math.round(-cy));
+    // glühende Augen im Totenkopf-Schlussstein
+    const ex = Math.round(this.archCx - cx), ey = Math.round(48 - cy), glow = 0.6 + 0.4 * Math.sin(this.t * 0.07);
+    ctx.fillStyle = `rgba(252,${Math.round(40 + 60 * glow)},40,1)`; ctx.fillRect(ex - 5, ey, 3, 3); ctx.fillRect(ex + 2, ey, 3, 3);
+    ctx.fillStyle = '#fce0a8'; ctx.fillRect(ex - 4, ey + 1, 1, 1); ctx.fillRect(ex + 3, ey + 1, 1, 1);
+    // rot glühende Turmfenster
+    ctx.fillStyle = (this.t >> 4) % 7 ? '#c81818' : '#fc4040';
+    ctx.fillRect(Math.round(this.hx - 30 - cx), Math.round(72 - cy), 4, 10); ctx.fillRect(Math.round(this.hx + GH.A + 32 - cx), Math.round(52 - cy), 4, 10); ctx.fillRect(Math.round(this.hx + GH.A + 62 - cx), Math.round(108 - cy), 4, 10);
+    // Fackeln links und rechts vom Bogen
+    [this.hx + 6, this.hx + GH.A - 6].forEach((tx, i) => {
+      const x = Math.round(tx - cx), y = Math.round(126 - cy), fl = ((this.t >> 2) + i) % 3;
+      ctx.fillStyle = '#3c2410'; ctx.fillRect(x - 1, y + 5, 3, 8); ctx.fillStyle = '#8c8898'; ctx.fillRect(x - 3, y + 5, 7, 2);
+      ctx.fillStyle = '#d82800'; ctx.fillRect(x - 2, y - 2 + (fl === 1 ? 1 : 0), 5, 7);
+      ctx.fillStyle = '#f87800'; ctx.fillRect(x - 1, y - 1 + (fl === 2 ? 1 : 0), 3, 5);
+      ctx.fillStyle = '#fcd040'; ctx.fillRect(x, y + 1, 1, 3);
+    });
+    // langes Banner am rechten Turm, flattert unten im Wind
+    const bx = Math.round(this.hx + GH.A + 50 - cx);
+    for (let c = 0; c < 22; c++) {
+      const len = 104 - Math.abs(c - 11) * 0.8;
+      for (let y = 0; y < len; y += 2) {
+        const o = Math.round(Math.sin(this.t * 0.09 - y * 0.05 + c * 0.2) * (y / len) * 3);
+        const u = Math.abs(c - 10.5), v = y - 44; // Wappen: goldene Fledermaus
+        const crest = (u < 1.6 && v > -7 && v < 9) || (u > 0.6 && u < 2.6 && v > -10 && v <= -6) || (u < 10 && v > -2 - u * 0.45 && v < 3 - u * 0.2 - ((Math.floor(u / 3.3) % 2) ? 0 : 2.5));
+        ctx.fillStyle = crest ? '#f8b800' : c === 0 || c === 21 ? '#5c0010' : (c + (y >> 3)) % 7 ? '#a80020' : '#880018';
+        ctx.fillRect(bx + c + o, Math.round(-cy) + 6 + y, 1, 2);
+      }
+    }
+    ctx.fillStyle = '#3c2410'; ctx.fillRect(bx - 2, Math.round(4 - cy), 26, 3); ctx.fillStyle = '#c89020'; ctx.fillRect(bx - 3, Math.round(4 - cy), 2, 3); ctx.fillRect(bx + 23, Math.round(4 - cy), 2, 3);
+    // Käfig mit Skelett, schwingt an einer Kette vom Turm
+    const sw = Math.sin(this.t * 0.03) * 0.12, kx = this.hx + GH.A + GH.R - 14, ky = 30;
+    ctx.save(); ctx.translate(Math.round(kx - cx), Math.round(ky - cy)); ctx.rotate(sw);
+    ctx.fillStyle = '#4c4858'; for (let y = 0; y < 22; y += 3) ctx.fillRect(0, y, 1, 2);
+    ctx.fillStyle = '#e8e4d8'; ctx.fillRect(-3, 26, 6, 5); ctx.fillStyle = '#16121c'; ctx.fillRect(-2, 28, 1, 1); ctx.fillRect(1, 28, 1, 1); // Schädel
+    ctx.fillStyle = '#c8c4b8'; ctx.fillRect(-1, 31, 2, 9); ctx.fillRect(-3, 33, 6, 1); ctx.fillRect(-3, 36, 6, 1); ctx.fillRect(-2, 40, 1, 6); ctx.fillRect(1, 40, 1, 6);
+    ctx.fillStyle = '#26222e'; for (let x = -7; x <= 7; x += 3) ctx.fillRect(x, 22, 1, 28); ctx.fillRect(-7, 22, 15, 2); ctx.fillRect(-7, 48, 15, 2); ctx.fillRect(-3, 20, 7, 2);
+    ctx.restore();
+  }
+  static plank(len) {
+    if (Gatehouse.pl && Gatehouse.pl.width === len) return Gatehouse.pl;
+    const c = Sprites.canvas(len, 14), x = c.getContext('2d');
+    x.fillStyle = '#1c0e04'; x.fillRect(0, 0, len, 14);
+    for (let i = 0; i < len; i += 8) { x.fillStyle = (i / 8) % 2 ? '#6c4020' : '#7c4c24'; x.fillRect(i + 1, 1, 7, 11); x.fillStyle = '#a07040'; x.fillRect(i + 1, 1, 7, 1); x.fillStyle = '#3c2410'; x.fillRect(i + 1, 10, 7, 2); }
+    for (let i = 4; i < len; i += 24) { x.fillStyle = '#2c2c38'; x.fillRect(i, 0, 4, 14); x.fillStyle = '#8c8898'; x.fillRect(i, 1, 1, 12); x.fillStyle = '#c8c4d0'; x.fillRect(i + 2, 3, 1, 1); x.fillRect(i + 2, 10, 1, 1); }
+    x.fillStyle = '#4c4858'; x.fillRect(0, 4, 4, 6); x.fillStyle = '#9c98a8'; x.fillRect(0, 5, 1, 4); // Kettenöse
+    return (Gatehouse.pl = c);
+  }
+  static art() { // zwei Ebenen: hinten (linker Turm im Graben, dunkler Durchgang), vorn (Torbau mit Bogen, rechter Turm)
+    if (Gatehouse.A) return Gatehouse.A;
+    const W0 = GH.L + GH.A + GH.R, H0 = 192, hx = GH.L;
+    const mk = () => { const c = Sprites.canvas(W0, H0), x = c.getContext('2d'); return { c, x, img: x.createImageData(W0, H0) }; };
+    const B = mk(), F = mk();
+    const BAYG = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const put = (L, X, Y, r, g, b) => { if (X < 0 || Y < 0 || X >= W0 || Y >= H0) return; const i = (Y * W0 + X) * 4, d = L.img.data; d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255; };
+    const arch = (X, Y, grow = 0) => { // Spitzbogen (gleichseitig) im Torbau
+      const a0 = hx + GH.IN - grow, a1 = hx + GH.IN + GH.SPAN + grow, R = GH.SPAN + grow;
+      if (X < a0 || X >= a1 || Y >= 176) return false;
+      return Y >= GH.SPRING || ((X + 0.5 - a1) ** 2 + (Y + 0.5 - GH.SPRING) ** 2 <= R * R && (X + 0.5 - a0) ** 2 + (Y + 0.5 - GH.SPRING) ** 2 <= R * R);
+    };
+    const stone = (X, Y, round, x0, w, bright) => { // Quader; runde Türme mit Zylinderschattierung
+      const row = Math.floor(Y / 9), off = (row % 2) * 7, bx = Math.floor((X + off) / 14);
+      const mortar = Y % 9 === 0 || (X + off) % 14 === 0;
+      let k = 0.85 + ((row * 7 + bx * 13) % 5) * 0.05 + (BAYG[(Y & 3) * 4 + (X & 3)] / 16 - 0.5) * 0.08;
+      if (round) { const n = ((X - x0) / w) * 2 - 1; k *= 0.55 + 0.6 * Math.sqrt(Math.max(0, 1 - n * n)) - 0.15 * n; }
+      k *= bright;
+      if (mortar) k *= 0.5;
+      return [48 * k, 42 * k, 60 * k];
+    };
+    for (let Y = 0; Y < H0; Y++) for (let X = 0; X < W0; X++) {
+      if (X < hx) { // linker Turm (hinten), steht im Graben, Algen am Wasser
+        if (Y >= H0) continue;
+        let [r, g, b] = stone(X, Y, true, 0, hx, 1);
+        if (Y > 168) { g += (Y - 168) * 1.2; r *= 0.8; }
+        put(B, X, Y, r, g, b);
+      } else if (X < hx + GH.A) { // Torbau
+        if (Y >= 176) continue;
+        if (Y < 9 && ((X - hx) % 16) >= 10) continue; // Zinnen
+        if (arch(X, Y)) { // Durchgang: dunkle Rückwand, unten etwas Licht
+          const k = 0.25 + Math.max(0, (Y - 100) / 76) * 0.35, row = Math.floor(Y / 9), m = Y % 9 === 0 || (X + (row % 2) * 7) % 14 === 0;
+          put(B, X, Y, 26 * k * (m ? 0.5 : 1), 20 * k * (m ? 0.5 : 1), 34 * k * (m ? 0.5 : 1));
+          continue;
+        }
+        let [r, g, b] = stone(X, Y, false, 0, 0, 1.05);
+        if (arch(X, Y, 10)) { // Bogensteine: helle und dunkle Keile im Wechsel
+          const a = Math.atan2(Y + 0.5 - GH.SPRING, X + 0.5 - (hx + GH.IN + GH.SPAN / 2)), v = Math.floor((a + Math.PI) / 0.16) % 2;
+          const edge = !arch(X, Y, 9);
+          const k = edge ? 0.45 : v ? 1.35 : 1.15; r = 50 * k; g = 44 * k; b = 64 * k;
+        }
+        if (Y >= 14 && Y < 26) { const kk = (X - hx) % 10; if (Y >= 20 && kk > 1 && kk < 8) { r = 10; g = 6; b = 14; } else if (Y === 14) { r *= 1.4; g *= 1.4; b *= 1.4; } } // Pechnasen
+        if (X - hx < 2 || X - hx > GH.A - 3) { r *= 0.6; g *= 0.6; b *= 0.6; }
+        put(F, X, Y, r, g, b);
+      } else { // rechter Turm (vorn), rund, ragt über den Bildrand
+        if (Y >= 176) continue;
+        let [r, g, b] = stone(X, Y, true, hx + GH.A, GH.R, 1.1);
+        if ((Y >= 20 && Y < 26) || (Y >= 96 && Y < 100)) { r *= 1.35; g *= 1.35; b *= 1.35; } // Gesimse
+        put(F, X, Y, r, g, b);
+      }
+    }
+    // Schießscharten
+    [[hx - 30, 110], [hx + GH.A + 20, 120], [hx + GH.A + 74, 60], [hx + GH.A + 46, 140]].forEach(([sx, sy]) => {
+      const L = sx < hx ? B : F;
+      for (let Y = sy; Y < sy + 14; Y++) { put(L, sx, Y, 8, 4, 12); put(L, sx + 1, Y, 8, 4, 12); }
+      for (let X = sx - 2; X < sx + 4; X++) put(L, X, sy + 6, 8, 4, 12);
+    });
+    // Totenkopf als Schlussstein über dem Bogen
+    const sk = ['..wwwwwww..', '.wwwwwwwww.', 'wwwwwwwwwww', 'wkkkwwwkkkw', 'wkkkwwwkkkw', 'wwwwwkwwwww', '.wwwkkkwww.', '..wkwkwkw..', '..wwwwwww..', '...wkwkw...'];
+    sk.forEach((rowS, y) => [...rowS].forEach((ch, x) => { if (ch === '.') return; const X = hx + GH.A / 2 - 5 + x, Y = 44 + y; if (ch === 'k') put(F, X, Y, 16, 8, 14); else put(F, X, Y, 216 - y * 6, 208 - y * 6, 190 - y * 6); }));
+    // Fenster der Türme (glühen live)
+    [[hx - 32, 70], [hx + GH.A + 30, 50], [hx + GH.A + 60, 106]].forEach(([wx, wy]) => {
+      const L = wx < hx ? B : F;
+      for (let Y = wy - 2; Y < wy + 14; Y++) for (let X = wx - 2; X < wx + 8; X++) if (Y >= wy || Math.abs(X - wx - 2.5) < 4 - (wy - Y)) put(L, X, Y, 20, 12, 22);
+    });
+    // Wasserspeier am rechten Turm
+    const gg = ['....kkk.', '..kkggkk', '.kgggggk', 'kggkgggk', 'kgggggkk', '.kgkgk..', '..k.k...'];
+    gg.forEach((rowS, y) => [...rowS].forEach((ch, x) => { if (ch === '.') return; put(F, hx + GH.A + 2 + x, 30 + y, ch === 'k' ? 18 : 92, ch === 'k' ? 14 : 86, ch === 'k' ? 24 : 104); }));
+    [B, F].forEach(L => L.x.putImageData(L.img, 0, 0));
+    return (Gatehouse.A = { back: B.c, front: F.c });
+  }
+}
+
+// Seilwinde: Peitsche (oder Wurfwaffe) löst die Sperrklinke
+class Winch extends Ent {
+  constructor(gh, x, feet) { super(x - 10, feet - 24, 20, 24); this.kind = 'candle'; this.gh = gh; }
+  hit() { this.gh.release(); }
+  update() { this.t++; }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#2c1808', 2, 6, 3, 18); R('#2c1808', 15, 6, 3, 18); R('#6c4424', 3, 6, 1, 18); R('#6c4424', 16, 6, 1, 18); // Gestell
+    R('#2c1808', 0, 22, 20, 2); R('#5a3214', 4, 7, 12, 6); R('#8a5428', 4, 7, 12, 2); // Trommel mit Seil
+    for (let k = 4; k < 16; k += 3) R('#c8a070', k, 9, 1, 3);
+    const a = this.gh.wheel; // Kurbelrad dreht sich mit
+    ctx.fillStyle = '#3c2410';
+    for (let s = 0; s < 4; s++) { const an = a + s * Math.PI / 4; for (let r = -6; r <= 6; r++) ctx.fillRect(Math.round(x + 10 + Math.cos(an) * r), Math.round(y + 10 + Math.sin(an) * r), 1, 1); }
+    for (let k = 0; k < 24; k++) { const an = k / 24 * Math.PI * 2; ctx.fillStyle = k % 2 ? '#8a5428' : '#5a3214'; ctx.fillRect(Math.round(x + 10 + Math.cos(an) * 7), Math.round(y + 10 + Math.sin(an) * 7), 1, 1); }
+    R('#9c98a8', 9, 9, 3, 3);
+    if (this.gh.state === 'up') { // Sperrklinke und Glitzern: hier peitschen!
+      R('#6c6878', 17, 2, 2, 6); R('#c8c4d0', 17, 2, 1, 2);
+      const g = this.t % 90;
+      if (g < 12) { const s = g < 6 ? g : 12 - g; ctx.fillStyle = '#fcfcfc'; ctx.fillRect(x + 18 - s, y + 2, s * 2 + 1, 1); ctx.fillRect(x + 18, y + 2 - s, 1, s * 2 + 1); }
+    }
+  }
+}
+
+// Schädel auf einem Pfahl am Grabenufer – Warnung an alle, die das Tor stürmen wollen
+class SkullStake extends Ent {
+  constructor(d) { super(d.x * T + 6, (d.y + 1) * T - 34, 4, 34); this.kind = 'prop'; this.flip = !!d.flip; }
+  update() { this.t++; }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#2c1808', 1, 8, 3, 26); R('#6c4424', 1, 8, 1, 26); R('#2c1808', 2, 2, 1, 6);
+    R('#d8d4c8', -3, 0, 10, 8); R('#e8e4d8', -2, 0, 7, 2); R('#16121c', -1, 3, 2, 2); R('#16121c', 3, 3, 2, 2); R('#16121c', 1, 6, 2, 1);
+    R('#b8b4a8', -2, 8, 8, 2); R('#16121c', -1, 8, 1, 1); R('#16121c', 1, 8, 1, 1); R('#16121c', 3, 8, 1, 1);
+    if ((this.t >> 5) % 3 === 0) R('#6c0010', -1, 4, 1, 1);
+  }
+}

@@ -160,6 +160,9 @@ const Audio8 = (() => {
     announce: () => { if (!ac) return; const t = ac.currentTime; ['c5', 'e5', 'g5', 'c6'].forEach(n => tone('pulse', freq(n), freq(n), 0.32, 0.07, 0.25, t)); tone('pulse', freq('c6'), freq('c6') * 1.01, 0.4, 0.09, 0.125, t + 0.09); noise(0.2, 0.18, 'highpass', 5000, 2000); },
     stamp: () => { tone('triangle', 110, 40, 0.35, 0.55); noise(0.3, 0.45, 'lowpass', 2200, 120); arp(['c6', 'g6', 'c7'], 0.05, 'pulse', 0.13, 0.125); },
     step: () => { noise(0.045, 0.07, 'lowpass', 1100, 250); tone('triangle', 120, 70, 0.04, 0.05); },
+    chain: () => { if (!ac) return; const t = ac.currentTime; for (let i = 0; i < 4; i++) { noise(0.03, 0.1, 'bandpass', 3400 - i * 200, 2200, t + i * 0.05); tone('square', 1900 - i * 120, 1500, 0.02, 0.025, null, t + i * 0.05); } }, // Kettenrasseln
+    spin: () => noise(0.09, 0.07, 'bandpass', 1400, 2600), // wirbelndes Wurfkreuz
+    tink: () => { tone('square', 2600, 2100, 0.05, 0.07); tone('pulse', 3400, 3000, 0.07, 0.05, 0.125); noise(0.05, 0.12, 'highpass', 6000); }, // abgeprallt
     stepWet: () => { noise(0.07, 0.06, 'bandpass', 2600, 900); noise(0.04, 0.05, 'lowpass', 900, 250); },
   };
   // x (optional): Weltposition der Quelle → Stereo-Position relativ zur Bildmitte
@@ -223,6 +226,16 @@ const Audio8 = (() => {
   const S3 = { Em: ['e4', 'g4', 'b4'], C: ['c4', 'e4', 'g4'], D: ['d4', 'f#4', 'a4'], B: ['b3', 'd#4', 'f#4'], Am: ['a3', 'c4', 'e4'] };
   const S3B = { Em: ['e2', 'e3'], C: ['c2', 'c3'], D: ['d2', 'd3'], B: ['b1', 'b2'], Am: ['a1', 'a2'] };
   const S3C = ['Em', 'Em', 'C', 'D', 'Em', 'Em', 'B', 'B', 'Am', 'Am', 'Em', 'Em', 'C', 'D', 'B', 'B'];
+
+  // Krakenkampf – Seemannslied als Bosslied (d-Moll, 6/8, 12 Schritte pro Takt): Galopp im Bass, Tritonus-Schatten
+  const KR = { Dm: ['d4', 'f4', 'a4'], Bb: ['a#3', 'd4', 'f4'], A: ['a3', 'c#4', 'e4'], Gm: ['g3', 'a#3', 'd4'], C: ['c4', 'e4', 'g4'] };
+  const KR_B = { Dm: ['d2', 'd3'], Bb: ['a#1', 'a#2'], A: ['a1', 'a2'], Gm: ['g1', 'g2'], C: ['c2', 'c3'] };
+  const KR_C = ['Dm', 'Dm', 'Bb', 'A', 'Dm', 'Dm', 'Gm', 'A', 'Bb', 'C', 'Dm', 'Dm', 'Gm', 'Gm', 'A', 'A'];
+  // Glasturm – Orgel-Toccata (e-Moll): rauschende 16tel, Choralmelodie, Pedalbass, Pauken
+  const CH = { Em: ['e4', 'g4', 'b4'], Am: ['a3', 'c4', 'e4'], B: ['b3', 'd#4', 'f#4'], C: ['c4', 'e4', 'g4'], G: ['g3', 'b3', 'd4'], D: ['d4', 'f#4', 'a4'] };
+  const CH_B = { Em: 'e2', Am: 'a1', B: 'b1', C: 'c2', G: 'g1', D: 'd2' };
+  const CH_C = ['Em', 'Em', 'Am', 'B', 'Em', 'C', 'Am', 'B', 'G', 'D', 'Em', 'C', 'Am', 'B', 'Em', 'B'];
+  const toccata = (a, b, c) => { const up = (n) => n.replace(/\d/, d => +d + 1); return `${a}:1 ${b}:1 ${c}:1 ${b}:1 ${a}:1 ${b}:1 ${c}:1 ${up(a)}:1 ${c}:1 ${up(a)}:1 ${up(b)}:1 ${up(a)}:1 ${c}:1 ${b}:1 ${a}:1 ${b}:1`; };
 
   const SONGS = {
     title: {
@@ -302,6 +315,39 @@ const Audio8 = (() => {
       pad: SEA_C.map(c => SEA[c].join('+') + ':12').join(' '),
       dr: SEA_C.map((c, i) => i % 4 === 3 ? 'k:2 h:2 k:2 s:2 h:2 t:1 u:1' : 'k:2 h:2 h:2 s:2 h:2 h:2').join(' '),
     },
+    // Miniboss auf dem Schiff: der lila Tentakel
+    kraken: {
+      bpm: 172, loop: true, echo: { delay: 3, vol: 0.3 },
+      p1: ['d5:3 a4:3 d5:2 e5:1 f5:3', 'e5:3 d5:3 c#5:3 a4:3', 'd5:3 f5:3 a#5:2 a5:1 g5:3', 'f5:3 e5:3 c#5:6',
+        'd5:2 d5:1 a5:3 a5:2 g5:1 f5:3', 'g5:3 f5:3 e5:3 d5:3', 'g5:3 a#5:3 d6:3 a#5:3', 'a5:3 g#5:3 a5:6',
+        'a#5:3 f5:3 d5:2 f5:1 a#5:3', 'c6:3 g5:3 e5:2 g5:1 c6:3', 'd6:3 c6:3 a5:3 f5:3', 'e5:3 f5:3 d5:6',
+        'd5:3 g5:3 a#5:2 a5:1 g5:3', 'a#5:3 a5:3 g5:3 d5:3', 'c#6:3 a5:3 e5:3 g5:3', 'a5:3 e5:3 c#5:3 a4:3'].join(' '),
+      p2: KR_C.map(c => { const [a, b, d] = KR[c]; return rep(`${a}:1 ${b}:1 ${d}:1`, 4); }).join(' '),
+      tri: KR_C.map(c => { const [lo, hi] = KR_B[c]; return `${lo}:2 ${lo}:1 ${hi}:2 ${lo}:1 ${lo}:2 ${lo}:1 ${hi}:2 ${lo}:1`; }).join(' '),
+      pad: KR_C.map(c => KR[c].join('+') + ':12').join(' '),
+      dr: KR_C.map((c, i) => i % 4 === 3 ? 'k:2 h:1 s:2 h:1 t:1 t:1 u:1 s:1 u:1 q:1' : (i % 8 === 0 ? 'x:2 h:1 s:2 h:1 k:2 k:1 s:2 h:1' : 'k:2 h:1 s:2 h:1 k:2 k:1 s:2 h:1')).join(' '),
+    },
+    // Siegesfanfare nach dem Miniboss, danach geht die Musik des Raums weiter
+    fanfare: {
+      bpm: 150, loop: false,
+      p1: 'a4:2 d5:2 f#5:2 a5:4 f#5:2 a5:2 d6:10 -:8',
+      p2: 'f#4:2 a4:2 d5:2 f#5:4 d5:2 f#5:2 a5:10 -:8',
+      tri: 'd3:6 a2:6 d2:12 -:8',
+      pad: 'd3+f#3+a3:16 d3+f#3+a3+d4:16',
+      dr: 'k:2 s:2 k:2 s:4 k:2 k:2 c:10 -:8',
+    },
+    // Glasturm: Orgel-Toccata zwischen den Buntglasfenstern
+    chapel: {
+      bpm: 116, loop: true, echo: { delay: 6, vol: 0.34 },
+      p1: ['b4:8 e5:4 g5:4', 'f#5:4 e5:4 d#5:4 e5:4', 'c5:8 e5:4 a5:4', 'g5:4 f#5:4 d#5:8',
+        'e5:8 b5:4 g5:4', 'e5:4 g5:4 c6:8', 'b5:4 a5:4 g5:4 e5:4', 'f#5:12 -:4',
+        'd5:8 g5:4 b5:4', 'a5:4 f#5:4 d5:8', 'e5:4 g5:4 b5:4 e6:4', 'd6:4 c6:4 b5:4 g5:4',
+        'a5:8 c6:4 e6:4', 'd#6:4 c6:4 b5:4 a5:4', 'g5:4 f#5:4 e5:8', 'd#5:8 f#5:4 b4:4'].join(' '),
+      p2: CH_C.map(c => toccata(...CH[c])).join(' '),
+      tri: CH_C.map(c => `${CH_B[c]}:12 ${CH_B[c].replace(/\d/, d => +d + 1)}:4`).join(' '),
+      pad: CH_C.map(c => CH[c].join('+') + ':16').join(' '),
+      dr: CH_C.map((c, i) => i % 4 === 3 ? 'p:4 -:4 p:2 p:2 p:4' : i % 2 ? '-:16' : 'p:16').join(' '),
+    },
     clear: {
       bpm: 150, loop: false,
       p1: 'd5:2 f5:2 a5:2 d6:6 c6:2 a#5:2 a5:2 c#6:2 d6:8',
@@ -350,7 +396,7 @@ const Audio8 = (() => {
     parsed[k] = { bpm: s.bpm, loop: s.loop, echo: s.echo, tracks, steps: lens[0] };
   }
 
-  let song = null, songName = null, pending = null, timer = null, tempoMul = 1;
+  let song = null, songName = null, pending = null, timer = null, tempoMul = 1, nextSong = null;
   let cursors = [];
 
   // Sidechain: Melodie/Bass kurz absenken, wenn die Kick kommt
@@ -383,6 +429,7 @@ const Audio8 = (() => {
     else if (n === 'o') noise(0.12, 0.13, 'highpass', 7000, null, t, musicBus);
     else if (n === 't') tone2('triangle', 300, 120, 0.12, 0.45, t);
     else if (n === 'u') tone2('triangle', 200, 70, 0.15, 0.5, t);
+    else if (n === 'p') { tone2('triangle', 120, 82, 0.55, 0.55, t); noise(0.18, 0.12, 'lowpass', 500, 120, t, musicBus); } // Pauke
   }
   function tone2(type, f0, f1, dur, vol, t) {
     const o = osc(type), g = ac.createGain();
@@ -453,14 +500,15 @@ const Audio8 = (() => {
       }
       if (!c.done) allDone = false;
     });
-    if (allDone && !song.loop) stop();
+    if (allDone && !song.loop) { const nx = nextSong; stop(); if (nx) play(nx); } // Jingle zu Ende → weiter mit dem nächsten Lied
   }
 
-  function play(name) {
-    if (!ac) { pending = name; return; }
+  function play(name, then = null) {
+    if (!ac) { pending = then || name; return; }
     if (songName === name && song) return;
+    if (!parsed[name]) return;
     stop();
-    song = parsed[name]; songName = name;
+    song = parsed[name]; songName = name; nextSong = then;
     const t0 = ac.currentTime + 0.05;
     cursors = song.tracks.map(() => ({ i: 0, t: t0, done: false }));
     schedule();
@@ -468,7 +516,7 @@ const Audio8 = (() => {
   }
   function stop() {
     if (timer) clearInterval(timer);
-    timer = null; song = null; songName = null; pending = null;
+    timer = null; song = null; songName = null; pending = null; nextSong = null;
     if (musicBus && ac) { // laufende Noten weich abschneiden
       const old = musicBus;
       old.gain.setTargetAtTime(0, ac.currentTime, 0.02);

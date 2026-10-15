@@ -24,7 +24,7 @@ const W = {
     this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0; this.arenaBoss = null; this.camEase = 0;
     this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
     if (this.bloodT > 0) { this.bloodT = 0; Audio8.tempo(1); }
-    this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200;
+    this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200; this.tubeRot = 0; this.tubeRotS = 0;
     this.sail = def.dock ? 1 : 0; this.roll = 0; this.rollAmp = 0; this.heave = 0; this.docked = 0; this.dockT = 0; this.rogue = null; this.kraken = null; this.gust = 0;
     this.spawners = def.zones.map(z => new Spawner(z));
     const torch = def.theme === 'courtyard';
@@ -41,6 +41,8 @@ const W = {
         case 'statue': this.spawn(new Statue(d)); break;
         case 'chest': this.spawn(new Chest(d)); break;
         case 'cargo': this.spawn(new Cargo(d)); break;
+        case 'gate': this.spawn(new Gatehouse(d)); break;
+        case 'stake': this.spawn(new SkullStake(d)); break;
         case 'zip': this.spawn(new Zipline(d)); break;
         case 'sign': this.spawn(new ShipSign(d)); break;
         case 'grog': this.spawn(new Grog(d)); break;
@@ -223,7 +225,9 @@ const W = {
       if (e.kind === 'candle') { if (hits(e)) e.hit(); }
       else if (e.kind === 'enemy' || e.kind === 'boss') {
         if (e.kind === 'enemy' && e.rise !== undefined && e.rise < 12) continue;
-        if ((e.hurtBoxes ? e.hurtBoxes().some(hits) : hits(e.hurtBox ? e.hurtBox() : e)) && e.hit(dmg, id)) Input.rumble(0.15, 0.35, 60);
+        const vul = e.hurtBoxes ? e.hurtBoxes().some(hits) : hits(e.hurtBox ? e.hurtBox() : e);
+        if (vul) { if (e.hit(dmg, id)) Input.rumble(0.15, 0.35, 60); }
+        else if (e.armorBoxes) { const ab = e.armorBoxes().find(hits); if (ab) e.deflect(id, ab); } // Panzerung: prallt ab
       } else if (e.kind === 'eproj' && !e.reflected && hits(e)) { // Konter: Geschosse zerschlagen bzw. zurückschleudern
         if (e.type === 'fire') {
           const p = this.player;
@@ -248,7 +252,11 @@ const W = {
       if (e.kind === 'candle') { if (Phys.overlap(sub, e)) e.hit(); continue; }
       if (e.kind !== 'enemy' && e.kind !== 'boss') continue;
       if (e.rise !== undefined && e.rise < 12) continue;
-      if (!Phys.hitsEnt(sub, e)) continue;
+      if (!Phys.hitsEnt(sub, e)) {
+        const ab = e.armorBoxes && e.armorBoxes().find(b => Phys.overlap(sub, b));
+        if (ab) { const l = sub.hits.get(e); if (l === undefined || this.frame - l >= sub.cd) { sub.hits.set(e, this.frame); e.deflect(0, ab); if (sub.type === 'dagger') { sub.dead = true; return; } } }
+        continue;
+      }
       const last = sub.hits.get(e);
       if (last !== undefined && this.frame - last < sub.cd) continue;
       sub.hits.set(e, this.frame);
@@ -332,7 +340,7 @@ const W = {
       this.camLock = false; this.arenaOn = false; this.arenaW = 0; this.camEase = 1; Game.bossName = 0;
       const x = this.arenaX + 40;
       ['roast', 'bagBig', 'heartB'].forEach((t, i) => this.spawn(new Item(t, x + i * 22, Tent.floorAt(x + i * 22) - 40)));
-      Audio8.tempo(1); Audio8.play(this.songName()); Game.note(b.nameKey + 'Note');
+      Audio8.tempo(1); Audio8.play('fanfare', this.songName()); Game.note(b.nameKey + 'Note');
       return;
     }
     this.spawn(new Item('orb', clamp(b.cx, this.cam.x + 24, this.cam.x + View.w - 24), Math.min(b.cy, 140)));
@@ -363,7 +371,7 @@ const W = {
       if (Math.abs(d) < 0.5) {
         this.cam.x = this.camTarget; this.camTarget = null;
         this.boss = this.spawn(new BOSSES[this.arenaBoss](this.arenaX, this.arenaW));
-        Audio8.play('boss'); Audio8.sfx('roar'); Input.rumble(0.8, 0.5, 700);
+        Audio8.play(this.boss.music || 'boss'); Audio8.sfx('roar'); Input.rumble(0.8, 0.5, 700);
         this.zoomFx = { t: 0, len: 84, amp: 0.16, b: this.boss }; // Kamera fährt auf den Boss zu
         this.cinema = 110; this.flash = 8; this.shake = 26;
         this.spawn(new Shock(this.boss.cx, this.boss.cy, 120, '#d82800', 5));
@@ -449,6 +457,7 @@ const W = {
     Tiles.drawTiles(ctx, this.room, this.cam, this.frame);
     const order = ['prop', 'candle', 'platform', 'item', 'enemy', 'boss', 'sub', 'eproj', 'fx'];
     order.forEach(k => { for (const e of this.ents) if (e.kind === k) e.draw(ctx); if (k === 'boss') this.player.draw(ctx, this.cam); });
+    for (const e of this.ents) if (e.drawFront && !e.dead) e.drawFront(ctx); // Bauwerke, die vor dem Helden liegen (Torhaus beim Durchgehen)
     this.drawReflections(ctx, sx, sy);
     FX.drawAmbient(ctx, this.cam);
     Tiles.drawFront(ctx, this.room, this.cam);
@@ -524,6 +533,7 @@ const W = {
       if (x < -48 || x > View.w + 48 || y < -60 || y > 270) continue;
       if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + (e.blood ? 10 + Math.sin(f * 0.15) * 4 : 0) + flick(e.x), c: e.blood ? [232, 24, 48] : [248, 140, 40], a: e.blood ? 0.65 : 0.5 });
       else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
+      else if (e instanceof Gatehouse) e.lights(L, this.cam.x, this.cam.y, flick);
       else if (e instanceof Chandelier) L.push({ x, y: e.y - cy - 6, r: 42 + flick(e.px), c: [248, 160, 60], a: 0.55 });
       else if (e instanceof Statue && e.active) L.push({ x, y: y - 8, r: 30, c: [60, 188, 252], a: 0.45 });
       else if (e instanceof Chest && e.opened) L.push({ x, y, r: 20, c: [248, 184, 0], a: 0.4 });
