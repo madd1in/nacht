@@ -51,7 +51,7 @@ const Mode7 = (() => {
     if (!tex) makeTex();
     if (!shadeC || shadeW !== w) makeShade(w);
     const camX = (typeof W !== 'undefined' && W.cam) ? W.cam.x : 0;
-    const rot = t * 0.9, step = MOBILE_RENDER ? 2 : 1;
+    const rot = t * 0.9, step = MOBILE_RENDER || View.lite ? 2 : 1;
     const mid = (((camX * 0.35) % TW) + TW) % TW + 384; // Bildmitte in der (4x breiten) Textur
     ctx.save();
     ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false;
@@ -123,7 +123,7 @@ const Mode7 = (() => {
     if (!wc || wc.width !== w || wc.height !== h) wc = Sprites.canvas(w, h);
     const wx = wc.getContext('2d');
     wx.clearRect(0, 0, w, h); wx.drawImage(ctx.canvas, 0, y0, w, h, 0, 0, w, h);
-    const band = MOBILE_RENDER ? 4 : 2;
+    const band = MOBILE_RENDER || View.lite ? 4 : 2;
     for (let y = 0; y < h; y += band) {
       const rows = Math.min(band, h - y);
       const off = Math.round(Math.sin((y + rows / 2) * freq + t * 0.12) * amp);

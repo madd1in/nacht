@@ -3,6 +3,8 @@
 
 const View = {
   w: 256, h: 240, fh: 208, scale: 1, min: 256, max: 640,
+  // Spar-Modus: sofort auf Xbox und Touch-Geräten, sonst automatisch, wenn Frames dauerhaft zu lange brauchen (game.js)
+  lite: /xbox/i.test(navigator.userAgent) || (!!window.matchMedia && window.matchMedia('(pointer: coarse)').matches),
   // Tatsächlich sichtbarer Bereich: innerHeight kann in Chrome (Adressleiste, Leisten) größer sein als sichtbar.
   // Zusätzlich: sichere Bereiche (Navigationsleiste, Notch) abziehen und Messfehler nachträglich korrigieren.
   trim: 0,

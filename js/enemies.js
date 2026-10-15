@@ -131,7 +131,7 @@ class Candle extends Ent {
   update() {
     this.t++;
     if (!this.onScreen(8)) return;
-    if (this.t % (this.torch ? 7 : 11) === 0) // Rauchfaden über der Flamme
+    if (this.t % ((this.torch ? 7 : 11) * (View.lite ? 2 : 1)) === 0) // Rauchfaden über der Flamme (Spar-Modus: halb so oft)
       W.spawn(new Particle(this.cx + rnd(-0.5, 0.5), this.y - 1, rnd(-0.08, 0.08), -rnd(0.25, 0.45),
         this.blood ? 'rgba(252,60,60,0.55)' : 'rgba(150,146,160,0.45)', 46, 1, -0.003));
     if (this.blood && this.t % 13 === 0) W.spawn(new Particle(this.cx + rnd(-5, 5), this.y + rnd(2, 12), 0, -rnd(0.3, 0.6), '#fc3c3c', 30, 1, -0.004));

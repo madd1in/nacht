@@ -372,7 +372,7 @@ const W = {
     const k = Math.min(1, this.bloodT / 60, (720 - this.bloodT) / 20); // ein-/ausblenden
     ctx.fillStyle = `rgba(150,0,24,${((0.19 + Math.sin(this.frame * 0.09) * 0.05) * k).toFixed(3)})`;
     ctx.fillRect(0, 0, vw, 208);
-    if (this.bloodT > 120 || (this.frame & 8)) Font.draw(ctx, tr('bloodMoon') + ' X2  ' + Math.ceil(this.bloodT / 60), vw / 2, 4, '#fc3c3c', { align: 'center', shadow: '#000' });
+    if (this.bloodT > 120 || (this.frame & 8)) Font.draw(ctx, tr('bloodMoon') + ' X2  ' + Math.ceil(this.bloodT / 60), vw - 6, 4, '#fc3c3c', { align: 'right', shadow: '#000' }); // rechts: links steht der Combo-Zähler
   },
 
   // Gespiegelte, wellige Szene auf Wasseroberflächen
@@ -396,13 +396,22 @@ const W = {
     if (X < 0) { Wd += X; X = 0; }
     if (X + Wd > View.w) Wd = View.w - X;
     if (Wd <= 0) return;
-    const canvas = ctx.canvas;
+    // Den gespiegelten Streifen EINMAL in einen Puffer kopieren und die 14 Wellenzeilen daraus zeichnen.
+    // (Vorher zeichnete jede Zeile direkt aus der Leinwand auf sich selbst – der Browser kopierte dafür jedes Mal
+    // die ganze Leinwand; das kostete in den Katakomben rund drei Viertel der Zeichenzeit.)
+    const bandBot = 32 + sy + S, bandTop = Math.max(32, bandBot - 28), bandH = bandBot - bandTop;
+    if (bandH <= 0) return;
+    const rc = this.reflCanvas && this.reflCanvas.width >= Wd && this.reflCanvas.height >= bandH ? this.reflCanvas
+      : (this.reflCanvas = Sprites.canvas(Math.max(Wd, 640), 32));
+    const rx = rc.getContext('2d');
+    rx.clearRect(0, 0, Wd, bandH);
+    rx.drawImage(ctx.canvas, X + sx, bandTop, Wd, bandH, 0, 0, Wd, bandH);
     for (let i = 0; i < 28; i += 2) {
-      const srcY = 32 + sy + S - 2 - i;
-      if (srcY < 32 || S + 2 + i > View.fh) break;
+      const srcY = bandBot - 2 - i;
+      if (srcY < bandTop || S + 2 + i > View.fh) break;
       const off = Math.round(Math.sin(this.frame * 0.09 + i * 0.6) * 1.5);
       ctx.globalAlpha = 0.32 * (1 - i / 28);
-      ctx.drawImage(canvas, X + sx, srcY, Wd, 2, X + off, S + 2 + i, Wd, 2);
+      ctx.drawImage(rc, 0, srcY - bandTop, Wd, 2, X + off, S + 2 + i, Wd, 2);
     }
     ctx.globalAlpha = 1;
   },
@@ -452,13 +461,13 @@ const W = {
   drawRain(ctx) {
     const w = View.w, f = this.frame, gust = Math.sin(f * 0.011) * 0.9 + Math.sin(f * 0.037) * 0.4;
     ctx.fillStyle = 'rgba(130,130,196,0.38)'; // ferner Regen
-    const n1 = Math.round(90 * w / 256);
+    const n1 = Math.round(90 * w / 256 * (View.lite ? 0.6 : 1));
     for (let i = 0; i < n1; i++) {
       const x = ((i * 73 + Math.floor(f * (2.5 + gust * 1.5))) % (w + 60) + w + 60) % (w + 60) - 30, y = ((i * 131 + f * 7) % 240) - 20;
       ctx.fillRect(x, y, 1, 3);
     }
     ctx.fillStyle = 'rgba(190,190,245,0.6)'; // naher Schlagregen
-    const n2 = Math.round(38 * w / 256), sl = 0.45 + gust * 0.35;
+    const n2 = Math.round(38 * w / 256 * (View.lite ? 0.6 : 1)), sl = 0.45 + gust * 0.35;
     for (let i = 0; i < n2; i++) {
       const x = ((i * 97 + Math.floor(f * (4 + gust * 3))) % (w + 80) + w + 80) % (w + 80) - 40, y = ((i * 53 + f * 11) % 250) - 30;
       for (let k = 0; k < 7; k++) ctx.fillRect(Math.round(x - k * sl), y + k, 1, 1);

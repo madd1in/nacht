@@ -257,8 +257,14 @@ const HEROES = (() => {
     return spr;
   }
   // Schwerpunkt der deckenden Pixel (Drehpunkt für den Salto)
+  let readC = null; // eigene Lese-Leinwand: wiederholtes getImageData auf Sprite-Leinwänden löst Browser-Warnungen aus
   function pivot(spr) {
-    const c = spr.c, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const c = spr.c;
+    if (!readC) readC = document.createElement('canvas');
+    readC.width = c.width; readC.height = c.height;
+    const rx = readC.getContext('2d', { willReadFrequently: true });
+    rx.clearRect(0, 0, c.width, c.height); rx.drawImage(c, 0, 0);
+    const d = rx.getImageData(0, 0, c.width, c.height).data;
     let sx = 0, sy = 0, n = 0;
     for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 0) { sx += x; sy += y; n++; }
     spr.pv = [Math.round(sx / n), Math.round(sy / n)];

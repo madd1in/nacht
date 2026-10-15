@@ -39,9 +39,9 @@ const Game = {
       this.fsActive = !!document.fullscreenElement;
       settle();
     });
-    document.addEventListener('pointerdown', (e) => { if (this.state === 'pause' && e.pointerType !== 'mouse') this.unpause = true; });
+    document.addEventListener('pointerdown', (e) => { if (this.state === 'pause' && e.pointerType !== 'mouse' && e.clientX > window.innerWidth / 2) this.unpause = true; });
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); }
+      if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.12); }
     });
     this.resize();
     const q = new URLSearchParams(location.search);
@@ -54,12 +54,18 @@ const Game = {
       requestAnimationFrame(loop); // zuerst neu anmelden: ein Fehler darf die Schleife nicht beenden
       acc += Math.min(100, now - last); last = now;
       let n = 0;
+      const t0 = performance.now();
       try {
         while (acc >= 1000 / 60 && n < 4) { acc -= 1000 / 60; n++; this.step(); }
         this.render();
       } catch (e) { // jeden Fehler nur einmal melden, Spiel läuft weiter statt einzufrieren
         const key = String(e && e.message);
         if (!seen.has(key)) { seen.add(key); console.error('[NACHTMAHR]', e); }
+      }
+      // Leistung beobachten: braucht ein Frame ~2 s lang im Schnitt über 11 ms → Spar-Modus (einmalig)
+      if (!View.lite && n > 0) {
+        this.perfAvg = (this.perfAvg || 0) * 0.97 + (performance.now() - t0) / n * 0.03;
+        if (this.perfAvg > 11) { if (++this.slowT > 120) { View.lite = true; console.info('[NACHTMAHR] Spar-Modus aktiv'); } } else this.slowT = 0;
       }
     };
     requestAnimationFrame(loop);
@@ -329,8 +335,11 @@ const Game = {
         if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.stageDef.music); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
         break;
       case 'play': this.updatePlay(P); break;
-      case 'pause':
-        if (P.start || this.unpause) {
+      case 'pause': // Pausenmenü: WEITER / ZUM TITEL
+        if (P.up || P.down) { this.pauseSel = 1 - (this.pauseSel || 0); Audio8.sfx('select'); }
+        if ((P.jump || P.attack) && this.pauseSel === 1 && this.t > 10) {
+          this.unpause = false; Audio8.setMusicVolume(0.5); Audio8.sfx('select'); this.finishRun(false); // Score zählt trotzdem
+        } else if (P.start || this.unpause || ((P.jump || P.attack) && !this.pauseSel)) {
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.sfx('pause'); }
         break;
       case 'fade':
@@ -387,7 +396,7 @@ const Game = {
   },
 
   updatePlay(P) {
-    if (P.start && W.player.alive) { this.go('pause'); Audio8.setMusicVolume(0.12); Audio8.sfx('pause'); return; }
+    if (P.start && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.12); Audio8.sfx('pause'); return; }
     if (this.readyT > 0) { // READY? … GO! (das Spiel läuft dabei schon)
       this.readyT++;
       if (this.readyT === 3) Audio8.sfx('ready');
@@ -446,7 +455,7 @@ const Game = {
         if (W.cinema > 0) this.drawCinema(ctx);
         this.drawCombo(ctx);
         this.drawHud(ctx);
-        if (this.state === 'pause') this.panel(ctx, tr('pause'), tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey'));
+        if (this.state === 'pause') this.drawPause(ctx);
         if (this.state === 'fade') this.mosaicFade(ctx, this.t < 18 ? this.t / 16 : 1 - (this.t - 18) / 12);
         if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 30 ? this.t / 28 : 1 - (this.t - 30) / 14);
         if (this.hurryT > 0 && this.state === 'play') this.drawHurry(ctx);
@@ -572,6 +581,22 @@ const Game = {
     for (let by = 0; by < 26; by++) for (let bx = 0; bx < Math.ceil(View.w / 8); bx++) {
       if (a * 16 > BAY4[(by & 3) * 4 + (bx & 3)] + ((bx + by) % 3) * 0.3) ctx.fillRect(bx * 8, 32 + by * 8, 8, 8);
     }
+  },
+
+  drawPause(ctx) {
+    const cx = View.cx, items = [tr('resume'), tr('toTitle')];
+    const hint = tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey');
+    const pw = Math.min(View.w - 8, Math.max(140, Font.width(hint) + 16, ...items.map(s => Font.width(s) + 64)));
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - pw / 2, 96, pw, 70);
+    ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - pw / 2 + 0.5, 96.5, pw - 1, 69);
+    Font.draw(ctx, tr('pause'), cx, 104, '#fcfcfc', { align: 'center' });
+    items.forEach((s, i) => {
+      const on = (this.pauseSel || 0) === i;
+      Font.draw(ctx, s, cx - 30, 120 + i * 12, on ? '#fcfcfc' : '#8c8c8c');
+      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 44, 119 + i * 12);
+    });
+    Font.draw(ctx, hint, cx, 152, '#7c7c7c', { align: 'center' });
+    if (!Audio8.ready()) Font.draw(ctx, tr('soundShort'), cx, 172, '#7c7c7c', { align: 'center' });
   },
 
   panel(ctx, title, sub) {
@@ -812,7 +837,7 @@ const Game = {
     const pad = Input.padName;
     const foot = !Audio8.ready() && this.t > 90 ? tr('soundOn') : pad ? tr('padReady', pad) : '© 1691  NACHTMAHR';
     Font.draw(ctx, foot, cx, 226, pad && Audio8.ready() ? '#3cbcfc' : '#4c4c4c', { align: 'center' });
-    if (window.BUILD) Font.draw(ctx, 'V' + window.BUILD, View.w - 4, 232, '#2c2c3c', { align: 'right' });
+    if (window.BUILD && View.w >= 320) Font.draw(ctx, 'V' + window.BUILD, View.w - 4, 232, '#2c2c3c', { align: 'right' }); // schmal: würde den Fußtext überdecken
   },
 
   drawOptions(ctx) {

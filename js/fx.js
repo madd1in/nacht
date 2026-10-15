@@ -191,7 +191,7 @@ const FX = (() => {
   function resetAmbient() { amb = []; }
   function updateAmbient(theme, cam) {
     const cfg = CFG[theme];
-    if (cfg && amb.length < cfg.max && Math.random() < cfg.rate) {
+    if (cfg && amb.length < cfg.max * (View.lite ? 0.5 : 1) && Math.random() < cfg.rate) {
       const p = cfg.make(cam); p.t = 0; p.seed = Math.random() * 6.28; amb.push(p);
     }
     for (const p of amb) {

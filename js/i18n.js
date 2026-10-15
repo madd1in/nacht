@@ -111,6 +111,7 @@ const I18N = (() => {
     hudSword: { de: 'SCHWERT', en: 'SWORD', fr: 'ÉPÉE', es: 'ESPADA', ja: 'SWORD', zh: 'SWORD' },
     scoreX: { de: 'PUNKTE X{0}', en: 'SCORE X{0}', fr: 'SCORE X{0}', es: 'PUNTOS X{0}', ja: 'スコア X{0}', zh: '得分 X{0}' },
     pause: { de: 'PAUSE', en: 'PAUSE', fr: 'PAUSE', es: 'PAUSA', ja: 'ポーズ', zh: '暂停' },
+    resume: { de: 'WEITER', en: 'CONTINUE', fr: 'REPRENDRE', es: 'CONTINUAR', ja: '再開', zh: '继续' },
     pausePad: { de: 'MENÜ-TASTE DRÜCKEN', en: 'PRESS MENU', fr: 'APPUIE SUR MENU', es: 'PULSA MENÚ', ja: 'MENUで再開', zh: '按MENU继续' },
     pauseTouch: { de: 'TIPPEN = WEITER', en: 'TAP TO CONTINUE', fr: 'TOUCHE = REPRENDRE', es: 'TOCA = SEGUIR', ja: 'タップで再開', zh: '点击继续' },
     pauseKey: { de: 'START DRÜCKEN', en: 'PRESS START', fr: 'APPUIE SUR START', es: 'PULSA START', ja: 'STARTで再開', zh: '按START继续' },
