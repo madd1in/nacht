@@ -27,6 +27,7 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 - **6 Sprachen**: Deutsch, Englisch, Französisch, Spanisch, Japanisch, Chinesisch (Optionen → Sprache)
 - **Sprachausgabe**: Erzähler, Stage-Ansagen, Boss-Auftritte und Spott des Grafen – Studioaufnahmen (ElevenLabs) für EN/FR/ES/JA/ZH, Deutsch über die Browser-Stimme
 - **Arcade-Flow**: BEREIT?/LOS! beim Start, hochrollender Score, Combo-Ansager mit Zeitbalken, Rang S–D mit Bonus, Bestzeit pro Stage
+- **Bestenliste & Attract-Modus**: TOP 10 mit 3-Buchstaben-Initialen (Tastatur, Controller, Touch; getrennt für den Leicht-Modus); nach 20 s im Titel wechseln Bestenliste und eine Demo, in der die KI spielt
 - **Blutmond-Kerzen**: eine rote Kerze pro Stage – 12 Sekunden doppelte Punkte, mehr Herzen, rote Nacht
 - **Raumklang**: Stereo-Effekte nach Position, eigenes Ambiente pro Gebiet (Regen, Turmwind, Uhrwerk, Tropfen, Ketten, Orgel), Schritte
 - **SNES-Effekte**: schwankender Glockenturm beim Glockenschlag, Kamera-Zoom beim Boss-Auftritt, drehende Rosette im Thronsaal, drehende HDMA-Walze, XXL-Kronleuchter mit Mode-7-Drehung, Mode-7-Weltkarte, Mosaik-Übergänge, animierte Lichtstrahlen und weiche Farbsäume

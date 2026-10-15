@@ -130,10 +130,10 @@ const Game = {
   },
 
   go(state) { this.state = state; this.t = 0; },
-  toTitle() { this.saveHi(); this.go('title'); Audio8.play('title'); Audio8.ambience(true); this.revealed = false; Voice.stop(); },
+  toTitle() { this.saveHi(); this.go('title'); Audio8.play('title'); Audio8.ambience(true); this.revealed = false; this.idleT = 0; Voice.stop(); },
 
   newGame(stage = 0, room = 0) {
-    W.score = 0; W.lives = 3; W.nextLife = 20000;
+    W.score = 0; W.lives = 3; W.nextLife = 20000; this.runBest = 0;
     W.player = new Player();
     this.startStage(stage, room);
   },
@@ -176,6 +176,89 @@ const Game = {
     this.rankT = 0;
   },
 
+  // ---------------- Bestenliste, Namenseingabe, Attract-Modus ----------------
+  // Lauf beendet: reicht der beste Score des Laufs (auch vor einem Continue) für die TOP 10 → Initialen eingeben
+  finishRun(allClear) {
+    const sc = Math.max(this.runBest || 0, W.score);
+    this.runBest = 0; this.saveHi();
+    const rank = Scores.place(sc);
+    if (rank < 0) { this.toTitle(); return; }
+    const init = Scores.lastInit();
+    this.entry = { s: sc, st: allClear ? 4 : W.stage + 1, c: Options.character, rank, chars: [...init].map(ch => Math.max(0, Scores.ALPHA.indexOf(ch))), pos: 0, rep: 0, done: false };
+    W.score = 0; // nicht noch einmal über toTitle()/saveHi() werten
+    this.go('entry'); Voice.stop(); Audio8.play('names'); Audio8.sfx('oneUp');
+  },
+  updateEntry(P) {
+    const e = this.entry, A = Scores.ALPHA, I = Input.held;
+    if (e.done) { if (this.t - e.doneT > 50) this.startScores(false, e.place); return; }
+    const dir = I.up ? 1 : I.down ? -1 : 0; // gehalten: nach kurzer Pause automatisch weiterblättern
+    if (dir) {
+      e.rep++;
+      if (e.rep === 1 || (e.rep > 18 && e.rep % 4 === 0)) { e.chars[e.pos] = (e.chars[e.pos] + dir + A.length) % A.length; Audio8.sfx('select'); }
+    } else e.rep = 0;
+    if (P.left && e.pos > 0) { e.pos--; Audio8.sfx('select'); }
+    const ok = P.jump || P.attack || P.right;
+    if (P.start || (ok && e.pos === 2) || this.t > 60 * 30) { this.commitEntry(); return; } // Start oder 30 s: sofort speichern
+    if (ok) { e.pos++; Audio8.sfx('item'); }
+  },
+  commitEntry() {
+    const e = this.entry, name = e.chars.map(i => Scores.ALPHA[i]).join('');
+    e.place = Scores.add({ n: name, s: e.s, st: e.st, c: e.c });
+    Scores.saveInit(name);
+    if (e.s > this.hi) { this.hi = e.s; try { localStorage.setItem('nachtmahr.hi', String(this.hi)); } catch (err) { /* privat */ } }
+    e.done = true; e.doneT = this.t; Audio8.sfx('bigItem'); Input.rumble(0.4, 0.4, 200);
+  },
+  startScores(attract, highlight = -1) {
+    this.go('scores'); this.attract = attract; this.hiLight = highlight;
+    if (!attract && Audio8.current !== 'names' && Audio8.current !== 'title') Audio8.play('title');
+  },
+  updateScores() {
+    if (Input.realHit && this.t > 20) { this.toTitle(); return; }
+    if (this.t > 60 * (this.attract ? 8 : 10)) { if (this.attract) this.startDemo(); else this.toTitle(); }
+  },
+  // Demo: die KI spielt den Burghof (abwechselnd mit beiden Helden), jede echte Taste beendet sie
+  startDemo() {
+    this.demoN = (this.demoN || 0) + 1;
+    const other = Options.character === 'henrik' ? 'ragnor' : 'henrik', hero = this.demoN % 2 ? Options.character : other;
+    W.score = 0; W.lives = 3; W.nextLife = 20000;
+    const p = W.player = new Player();
+    if (hero !== Options.character) { p.H = HEROES.get(hero); p.def = p.H.def; p.sword = p.def.weapon === 'sword'; } // ohne die Einstellung zu speichern
+    W.stage = 0; W.time = Levels.STAGES[0].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0;
+    W.stats = { hits: 0, deaths: 0, combo: 0 };
+    W.loadRoom(0, 0);
+    this.demo = { t: 0, lastX: p.x, stuck: 0 };
+    Input.setDemo(() => this.demoInput());
+    this.go('demo'); this.readyT = 0; this.annT = 0; this.hurryT = 0; this.bossName = 0;
+    Audio8.play(W.stageDef.music); Audio8.tempo(1); Audio8.setMusicVolume(0.25);
+  },
+  endDemo() {
+    Input.setDemo(null); this.demo = null; W.score = 0;
+    Audio8.setMusicVolume(0.5); this.toTitle();
+  },
+  updateDemo() {
+    if (Input.realHit) { this.endDemo(); return; }
+    this.demo.t++;
+    if (this.annT > 0) this.annT--;
+    if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; }
+    W.update();
+    if (this.demo.t > 60 * 22 || W.exiting) this.endDemo();
+  },
+  // „KI": läuft nach rechts, peitscht Gegner und Kerzen vor sich, springt regelmäßig mit Salto und über Hindernisse
+  demoInput() {
+    const d = this.demo, p = W.player, t = d.t, out = { right: true };
+    for (const e of W.ents) {
+      if (e.dead || (e.kind !== 'enemy' && e.kind !== 'candle')) continue;
+      const dx = e.cx - p.cx, dy = e.cy - p.cy;
+      if (dx > -8 && dx < 54 && Math.abs(dy) < 36) { out.attack = t % 26 < 10; if (dx < 26) out.right = false; break; }
+    }
+    const ph = t % 200;
+    if (ph < 7 || (ph > 20 && ph < 27)) out.jump = true; // Doppelsprung mit Salto
+    if (p.onGround && Math.abs(p.x - d.lastX) < 0.05 && out.right && t > 30) { if (++d.stuck > 12) out.jump = t % 16 < 8; } else d.stuck = 0;
+    d.lastX = p.x;
+    if (p.sub && p.hearts >= 1 && t % 300 === 150) out.sub = true;
+    return out;
+  },
+
   // Combo-Ansager (Index in tr('hype'))
   announce(i) { this.annT = 72; this.annIdx = i; Audio8.sfx('announce'); },
 
@@ -194,6 +277,7 @@ const Game = {
     Input.update();
     const P = Input.pressed;
     this.t++;
+    this.idleT = Input.realHit ? 0 : (this.idleT || 0) + 1; // Leerlauf (für den Attract-Modus)
     // Arcade-Zählwerk: angezeigter Score rollt zum echten hoch
     if (this.dispScore === undefined || W.score < this.dispScore) this.dispScore = W.score;
     else if (this.dispScore < W.score) this.dispScore += Math.max(1, Math.ceil((W.score - this.dispScore) / 6));
@@ -206,20 +290,25 @@ const Game = {
     }
     if (this.revealed && this.revealT !== undefined) this.revealT++;
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
-    const titleish = this.state === 'title' || this.state === 'options' || this.state === 'charsel' || this.state === 'intro';
-    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause') && W.room ? W.room.theme : null);
-    if (this.state === 'title' || this.state === 'options' || this.state === 'charsel' || this.state === 'intro') {
+    const titleish = ['title', 'options', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
+    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'demo') && W.room ? W.room.theme : null);
+    if (titleish) {
       FX.updateStorm(this.tStorm, View.w, () => { if (Audio8.ready()) setTimeout(() => Audio8.sfx('thunder'), 250 + Math.random() * 600); });
     }
     switch (this.state) {
       case 'title':
-        if (P.up || P.down) { this.menu = 1 - this.menu; Audio8.sfx('select'); }
+        if (this.revealed && this.idleT > 60 * 20) { this.startScores(true); break; } // Attract-Modus
+        if (P.up || P.down) { this.menu = (this.menu + (P.down ? 1 : 2)) % 3; Audio8.sfx('select'); }
         if (P.start || P.jump || P.attack) {
           Audio8.init(); Audio8.sfx('select');
           if (this.menu === 1) { this.go('options'); this.optSel = 0; break; }
+          if (this.menu === 2) { this.startScores(false); break; }
           this.go('charsel');
         }
         break;
+      case 'entry': this.updateEntry(P); break;
+      case 'scores': this.updateScores(); break;
+      case 'demo': this.updateDemo(); break;
       case 'options': this.updateOptions(P); break;
       case 'charsel': {
         if (P.left || P.right) {
@@ -260,14 +349,15 @@ const Game = {
         const left = 9 - Math.floor(this.t / 60);
         if (left >= 0 && this.t % 60 === 0) Audio8.sfx('tick');
         if (left >= 0 && (P.start || P.jump || P.attack) && this.t > 30) {
+          this.runBest = Math.max(this.runBest || 0, W.score); // Score vor dem Continue zählt für die Bestenliste
           Audio8.sfx('bigItem'); W.score = 0; W.lives = 3; W.nextLife = 20000; W.player = new Player(); this.startStage(W.stage);
-        } else if (left < 0 && (this.t > 60 * 10 + 120 || ((P.start || P.jump) && this.t > 60 * 10 + 20))) this.toTitle();
+        } else if (left < 0 && (this.t > 60 * 10 + 120 || ((P.start || P.jump) && this.t > 60 * 10 + 20))) this.finishRun(false);
         break;
       }
       case 'ending':
         if (this.t % 50 === 0 && this.t < 330) { Audio8.sfx('wall'); Input.rumble(0.3, 0.5, 200); }
         if (this.t === 380) Voice.say('ending');
-        if (this.t > 60 * 30 && (P.start || P.jump || P.attack)) this.toTitle();
+        if (this.t > 60 * 30 && (P.start || P.jump || P.attack)) this.finishRun(true);
         break;
     }
   },
@@ -348,6 +438,8 @@ const Game = {
       case 'card': this.drawHud(ctx); this.drawCard(ctx); break;
       case 'gameover': this.drawGameOver(ctx); break;
       case 'ending': this.drawEnding(ctx); break;
+      case 'scores': this.drawScores(ctx); break;
+      case 'entry': this.drawEntry(ctx); break;
       default:
         W.draw(ctx);
         Mode7.wave(ctx, 32, 208, View.w, W.waveAmp(), W.frame);
@@ -362,6 +454,7 @@ const Game = {
         if (this.state === 'play' && this.readyT > 0) this.drawReady(ctx);
         if (this.state === 'play' && this.annT > 0) this.drawAnnounce(ctx);
         if (this.state === 'clear') this.drawClear(ctx);
+        if (this.state === 'demo') this.drawDemo(ctx);
     }
     this.drawToast(ctx);
   },
@@ -392,6 +485,64 @@ const Game = {
     ctx.fillStyle = c.t < 45 && (W.frame & 4) ? '#fc7460' : '#f8b800'; ctx.fillRect(10, 54, Math.round(42 * c.t / 150), 2);
     if (mul > 1) Font.draw(ctx, tr('scoreX', mul), 10, 59, '#fce0a8', { shadow: '#000' });
     ctx.globalAlpha = 1;
+  },
+
+  drawScores(ctx) {
+    const cx = View.cx;
+    this.drawSkyScene(ctx);
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(cx - 120, 36, 240, 178);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 120, 36, 240, 1); ctx.fillRect(cx - 120, 213, 240, 1); ctx.fillRect(cx - 114, 70, 228, 1);
+    this.big(ctx, tr('hiTitle'), cx, 42, 2, LOGO, null, '#000');
+    if (Options.easy) Font.draw(ctx, tr('tagEasy'), cx + 114, 40, '#58f898', { align: 'right' });
+    Font.draw(ctx, tr('nameCol'), cx - 76, 61, '#7c7c7c'); Font.draw(ctx, tr('hudScore'), cx + 34, 61, '#7c7c7c', { align: 'right' });
+    Font.draw(ctx, tr('hudStage'), cx + 66, 61, '#7c7c7c', { align: 'center' });
+    const ROWC = ['#f8b800', '#e4e4e4', '#e09060'];
+    Scores.list().forEach((e, i) => {
+      if (this.t < i * 5) return; // Zeilen erscheinen nacheinander
+      const y = 76 + i * 13, hl = i === this.hiLight;
+      if (hl && (this.t >> 3) % 2) { ctx.fillStyle = 'rgba(200,144,32,0.28)'; ctx.fillRect(cx - 114, y - 3, 228, 12); }
+      const c = hl ? '#fcfcfc' : ROWC[i] || '#a0a0a0';
+      Font.draw(ctx, (i < 9 ? ' ' : '') + (i + 1) + '.', cx - 110, y, c);
+      Font.draw(ctx, e.n, cx - 76, y, c);
+      Font.draw(ctx, String(e.s).padStart(6, '0'), cx + 34, y, c, { align: 'right' });
+      Font.draw(ctx, e.st >= 4 ? tr('allClear') : String(e.st), cx + 66, y, c, { align: 'center' });
+      const hd = HEROES.get(e.c === 'ragnor' ? 'ragnor' : 'henrik').def; // Kopf-Symbol des Helden
+      hd.icon.forEach((row, yy) => [...row].forEach((ch, xx) => { if (hd.iconPal[ch]) { ctx.fillStyle = hd.iconPal[ch]; ctx.fillRect(cx + 94 + xx, y + yy, 1, 1); } }));
+    });
+    if ((this.t >> 5) % 2) Font.draw(ctx, tr('pressStart'), cx, 224, '#bcbcbc', { align: 'center', shadow: '#000' });
+  },
+
+  drawEntry(ctx) {
+    const cx = View.cx, e = this.entry, A = Scores.ALPHA;
+    this.drawSkyScene(ctx);
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(cx - 120, 40, 240, 156);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 120, 40, 240, 1); ctx.fillRect(cx - 120, 195, 240, 1);
+    const pop = this.t < 10 ? Math.round((10 - this.t) / 3) : 0;
+    this.big(ctx, tr('newHi'), cx, 48 - pop * 3, 2 + (pop > 1 ? 1 : 0), ['#fcfcfc', '#fce0a8', '#f8b800', '#f8b800', '#f87800', '#d82800', '#881400'], '#200000', '#000');
+    Font.draw(ctx, tr('placeN', e.rank + 1) + '   ' + String(e.s).padStart(6, '0'), cx, 72, '#fcfcfc', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('enterName'), cx, 88, '#a4e4fc', { align: 'center' });
+    for (let i = 0; i < 3; i++) {
+      const x = cx - 36 + i * 36, on = i === e.pos && !e.done;
+      ctx.fillStyle = on ? '#c89020' : '#3c2008'; ctx.fillRect(x - 14, 103, 28, 36);
+      ctx.fillStyle = on ? '#3c0810' : '#120610'; ctx.fillRect(x - 13, 104, 26, 34);
+      if (!on || (this.t >> 3) % 4 !== 3) this.big(ctx, A[e.chars[i]], x, 110, 3, on ? ['#fcfcfc', '#fce0a8', '#f8b800', '#f8b800', '#f87800', '#d82800', '#881400'] : ['#fcfcfc', '#d8d8d8', '#bcbcbc', '#a0a0a0', '#8c8c8c', '#7c7c7c', '#5c5c5c'], null, '#000');
+      if (on) { // Pfeile: Buchstabe wählen
+        ctx.fillStyle = (this.t >> 4) % 2 ? '#fce0a8' : '#f8b800';
+        ctx.fillRect(x, 96, 1, 1); ctx.fillRect(x - 1, 97, 3, 1); ctx.fillRect(x - 2, 98, 5, 1);
+        ctx.fillRect(x - 2, 144, 5, 1); ctx.fillRect(x - 1, 145, 3, 1); ctx.fillRect(x, 146, 1, 1);
+      }
+    }
+    if (e.done) { if ((this.t >> 2) % 2) Font.draw(ctx, 'OK!', cx, 160, '#58f898', { align: 'center' }); }
+    else {
+      Font.draw(ctx, tr('entryHelp'), cx, 160, '#7c7c7c', { align: 'center' });
+      const left = Math.max(0, 30 - Math.floor(this.t / 60));
+      Font.draw(ctx, String(left).padStart(2, '0'), cx, 176, left <= 5 && (this.t & 8) ? '#fc7460' : '#bcbcbc', { align: 'center' });
+    }
+  },
+
+  drawDemo(ctx) {
+    if ((this.t >> 5) % 2 === 0) this.big(ctx, tr('demo'), View.cx, 40, 2, ['#fcfcfc', '#e4e4fc', '#a4e4fc', '#3cbcfc', '#0078f8', '#0058f8', '#00288c'], null, '#000');
+    if ((this.t >> 4) % 2) Font.draw(ctx, tr('pressStart'), View.cx, 196, '#fcfcfc', { align: 'center', shadow: '#000' });
   },
 
   drawReady(ctx) {
@@ -645,19 +796,19 @@ const Game = {
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     for (let k = 0; k < 4; k++) ctx.fillRect(r.x + sh + k, 30, 2, 28);
     Font.draw(ctx, tr('subtitle'), cx, 66, (this.t >> 2) % 40 === 0 ? '#fcfcfc' : '#bcbcbc', { align: 'center', shadow: '#000' });
-    [tr('start'), tr('options')].forEach((m, i) => {
+    [tr('start'), tr('options'), tr('hiTitle')].forEach((m, i) => {
       const on = this.menu === i;
-      Font.draw(ctx, m, cx - 30, 104 + i * 12, on ? '#fcfcfc' : '#8c8c8c', { shadow: '#000' });
-      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 44, 103 + i * 12);
+      Font.draw(ctx, m, cx - 30, 97 + i * 11, on ? '#fcfcfc' : '#8c8c8c', { shadow: '#000' });
+      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 44, 96 + i * 11);
     });
     const tags = [Options.easy && tr('tagEasy'), Options.maxWhip && tr('tagWhip'), Options.infHearts && tr('tagHearts')].filter(Boolean);
-    if (tags.length) Font.draw(ctx, tags.join(' + '), cx, 128, '#58f898', { align: 'center', shadow: '#000' });
+    if (tags.length) Font.draw(ctx, tags.join(' + '), cx, 84, '#58f898', { align: 'center', shadow: '#000' });
     const lines = this.controlLines(), lh = I18N.cjk ? 12 : 10;
     const bh = lines.length * lh + 6;
     ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(cx - 116, 136, 232, bh);
     ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 116, 136, 232, 1); ctx.fillRect(cx - 116, 136 + bh - 1, 232, 1);
     lines.forEach(([l, c], i) => Font.draw(ctx, l, cx - 110, 141 + i * lh + (I18N.cjk ? 2 : 0), c));
-    Font.draw(ctx, 'HI-SCORE ' + String(this.hi).padStart(6, '0'), cx, 214, '#7c7c7c', { align: 'center' });
+    Font.draw(ctx, 'HI-SCORE ' + String(Math.max(this.hi, Scores.top())).padStart(6, '0'), cx, 214, '#7c7c7c', { align: 'center' });
     const pad = Input.padName;
     const foot = !Audio8.ready() && this.t > 90 ? tr('soundOn') : pad ? tr('padReady', pad) : '© 1691  NACHTMAHR';
     Font.draw(ctx, foot, cx, 226, pad && Audio8.ready() ? '#3cbcfc' : '#4c4c4c', { align: 'center' });

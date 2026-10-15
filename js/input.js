@@ -11,7 +11,8 @@ const Input = (() => {
     Enter: 'start', Escape: 'start', KeyP: 'start',
   };
   const ACTIONS = ['left', 'right', 'up', 'down', 'jump', 'attack', 'sub', 'start'];
-  const kb = {}, touch = {}, held = {}, prev = {}, pressed = {}, latch = {};
+  const kb = {}, touch = {}, held = {}, prev = {}, pressed = {}, latch = {}, prevReal = {};
+  let demoFn = null, realHit = false, tapHit = false; // Demo-Modus: Eingaben kommen aus einer Funktion, echte Tasten beenden ihn
   let anyListener = null, lastDevice = 'keys', padName = null, padIndex = -1, prevPadBack = false;
   let toast = null;
 
@@ -33,7 +34,7 @@ const Input = (() => {
     if (a) { kb[a] = false; e.preventDefault(); }
   });
   window.addEventListener('blur', () => ACTIONS.forEach(a => { kb[a] = false; touch[a] = false; }));
-  window.addEventListener('pointerdown', () => { if (anyListener) anyListener(); Game.autoFullscreen(); });
+  window.addEventListener('pointerdown', () => { tapHit = true; if (anyListener) anyListener(); Game.autoFullscreen(); });
   window.addEventListener('pointerup', () => Game.autoFullscreen());
   window.addEventListener('touchend', () => Game.autoFullscreen());
 
@@ -154,11 +155,15 @@ const Input = (() => {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupTouch); else setupTouch();
 
   function update() {
-    const pad = pollPad();
+    const pad = pollPad(), demo = demoFn ? demoFn() : null;
+    realHit = tapHit; tapHit = false;
     ACTIONS.forEach(a => {
+      const real = !!(kb[a] || touch[a] || pad[a] || latch[a]);
+      if (real && (!prevReal[a] || latch[a])) realHit = true; // echte, frisch gedrückte Taste
+      prevReal[a] = real;
       prev[a] = held[a];
-      held[a] = !!(kb[a] || touch[a] || pad[a] || latch[a]);
-      pressed[a] = (held[a] && !prev[a]) || !!latch[a];
+      held[a] = demo ? !!demo[a] : real;
+      pressed[a] = (held[a] && !prev[a]) || (!demo && !!latch[a]);
       latch[a] = false;
     });
     if (toast && --toast.t <= 0) toast = null;
@@ -169,6 +174,7 @@ const Input = (() => {
 
   return {
     held, pressed, update, onAny, clear, rumble,
+    setDemo(fn) { demoFn = fn; }, get realHit() { return realHit; },
     get device() { return lastDevice; }, get padName() { return padIndex >= 0 ? padName : null; }, get toast() { return toast; },
   };
 })();

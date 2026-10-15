@@ -172,7 +172,7 @@ class Player {
   }
 
   hurt(dmg, srcX) {
-    if (this.inv > 0 || !this.alive || W.cleared) return;
+    if (this.inv > 0 || !this.alive || W.cleared || Game.state === 'demo') return; // Demo: unverwundbar
     this.dangle = false; W.combo.n = 0; W.combo.t = 0; W.stats.hits++;
     if (this.state === 'swing') { this.state = 'normal'; this.ring = null; }
     this.hp -= dmg;

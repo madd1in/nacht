@@ -289,6 +289,13 @@ const Audio8 = (() => {
       tri: 'd3:12 a2:8 d3:8',
       dr: 'k:2 s:2 k:2 s:6 k:2 k:2 k:2 s:2 c:8',
     },
+    names: { // Namenseingabe der Bestenliste: kurze, flotte Arcade-Schleife in D-Dur
+      bpm: 132, loop: true, echo: { delay: 3, vol: 0.28 },
+      p1: 'd5:2 f#5:2 a5:2 f#5:2 d5:2 f#5:2 a5:4 b5:2 a5:2 g5:2 e5:2 c#5:2 e5:2 g5:4 a5:2 g5:2 f#5:2 d5:2 a4:2 d5:2 f#5:4 e5:2 f#5:2 g5:2 e5:2 c#5:4 d5:4',
+      p2: [arp4('d4', 'f#4', 'a4'), arp4('g3', 'b3', 'd4'), arp4('a3', 'c#4', 'e4'), arp4('d4', 'f#4', 'a4')].join(' '),
+      tri: [drive('d2', 'd3'), drive('g1', 'g2'), drive('a1', 'a2'), drive('d2', 'd3')].join(' '),
+      dr: rep('k:2 h:2 s:2 h:2', 8),
+    },
     over: {
       bpm: 90, loop: false,
       p1: 'a4:4 g4:4 f4:4 e4:4 d4:12',
