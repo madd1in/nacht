@@ -664,6 +664,25 @@ const Game = {
   },
 
   // Großschrift mit Zeilen-Farbverlauf, optionaler Kontur und Schatten
+  // PS1-Schrift: der Schriftzug als Körper – nach hinten unten extrudiert (dunkle Flanken, je nach Winkel zur Seite) und
+  // langsam um die Hochachse gedreht (seitlich gestaucht); zoom > 1 lässt ihn aus der Tiefe heranfliegen
+  big3d(ctx, text, cx, y, scale, colors, ang, depth = 6, zoom = 1) {
+    const b = this.bigCanvas, bx = b.getContext('2d'), fbk = Font.hasFB(text), top = fbk ? 3 : 0, H = fbk ? 12 : 7;
+    const w = Math.min(b.width, Font.width(text) + 1), mid = y + (H * scale) / 2, ca = Math.cos(ang), sa = Math.sin(ang);
+    const paint = (col) => { bx.clearRect(0, 0, b.width, b.height); for (let r = 0; r < H; r++) { bx.save(); bx.beginPath(); bx.rect(0, r, b.width, 1); bx.clip(); Font.draw(bx, text, 0, top, Array.isArray(col) ? col[Math.min(6, Math.floor(r * 7 / H))] : col); bx.restore(); } };
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.translate(cx, mid); ctx.scale(ca * zoom, zoom); ctx.translate(-cx, -mid);
+    const dx = Math.round(cx - (w * scale) / 2), dy = y - top * scale, step = Math.max(1, scale / 2);
+    paint('#000'); for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(b, 0, 0, w, H, dx + ox, dy + oy, w * scale, H * scale);
+    const side = ['#2c0008', '#480010', '#640418', '#7c0820'];
+    for (let k = depth; k >= 1; k--) { // Flanken von hinten nach vorn, vorne heller
+      paint(side[Math.min(3, Math.floor((depth - k) / depth * 4))]);
+      ctx.drawImage(b, 0, 0, w, H, Math.round(dx + k * step * (0.35 + sa * 1.4)), Math.round(dy + k * step * 0.8), w * scale, H * scale);
+    }
+    paint(colors); ctx.drawImage(b, 0, 0, w, H, dx, dy, w * scale, H * scale);
+    ctx.restore();
+    return { x: Math.round(cx - (w * scale * ca * zoom) / 2), w: w * scale * ca * zoom };
+  },
   big(ctx, text, cx, y, scale, colors, shadow, outline) {
     const b = this.bigCanvas, bx = b.getContext('2d');
     const fbk = Font.hasFB(text), top = fbk ? 3 : 0, H = fbk ? 12 : 7; // CJK-Glyphen sind höher
@@ -752,7 +771,8 @@ const Game = {
     const st = W.stageDef;
     Font.draw(ctx, tr('stageNo', W.stage + 1), cx, 86, '#d0c0a0', { align: 'center', shadow: '#000' });
     const nm = tr('stage' + (W.stage + 1));
-    this.big(ctx, nm, cx, 102, Font.width(nm) * 3 > View.w - 16 ? 2 : 3, LOGO, '#300000', '#000');
+    const z = Math.max(1, 3 - this.t / 8); // fliegt aus der Tiefe heran, dreht sich dann langsam
+    this.big3d(ctx, nm, cx, 100, Font.width(nm) * 3 > View.w - 16 ? 2 : 3, LOGO, Math.sin(this.t * 0.035) * 0.28 + (z > 1 ? (z - 1) * 0.6 : 0), 5, 1 / z);
     const n = Levels.STAGES.length;
     for (let i = 0; i < n; i++) {
       const x = cx - 56 + i * 48;
@@ -856,7 +876,7 @@ const Game = {
     const lw = (Font.width('NACHTMAHR') + 1) * 4;
     Mode7.drawFire(ctx, cx - lw / 2 - 16, 6, lw + 32, 60, rv < 30 ? 1.3 : 0.9);
     if (rv < 20) { ctx.save(); ctx.translate(Math.round((Math.random() - 0.5) * slam * 3), Math.round((Math.random() - 0.5) * slam * 2)); }
-    const r = this.big(ctx, 'NACHTMAHR', cx, 30 - slam * 2, 4 + Math.min(2, slam > 3 ? 1 : 0), LOGO, '#200000', '#000');
+    const r = this.big3d(ctx, 'NACHTMAHR', cx, 28 - slam * 2, 4 + Math.min(2, slam > 3 ? 1 : 0), LOGO, Math.sin(this.t * 0.011) * 0.2, 6); // PS1-Logo: extrudiert, dreht sich langsam
     if (rv < 20) ctx.restore();
     if (rv < 8) { ctx.fillStyle = `rgba(255,240,220,${0.6 - rv * 0.07})`; ctx.fillRect(0, 32, View.w, 176); }
     for (let i = 0; i < 9; i++) { // Blutstropfen

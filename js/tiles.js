@@ -2477,11 +2477,51 @@ const Tiles = (() => {
   }
 
   const DECO_SOLID = new Set(['#', '=', 'X', 'Y']);
+  // PS1-Look: frei liegende Blöcke bekommen Oberseite und Seitenflächen, die zum Fluchtpunkt laufen – affin texturiert mit
+  // der Kachel selbst (wie die PS1: leicht wabernde Texturen), Oberseiten aufgehellt, Seiten abgedunkelt. Vorn liegen die
+  // Kachelflächen wie bisher. In den Mode-7-Röhren (Strudel, Glasturm) bleibt es flach.
+  const SOLID3D = new Set(['#', '=', 'X', 'Y', 'B']), FLAT3D = new Set(['vortex', 'glass']);
+  function draw3DFaces(ctx, room, cam, t, x0, x1, y0, y1, ox, oy) {
+    const g = room.grid, VX = View.w / 2, VY = 60, K = 0.9;
+    const solid = (cx, cy) => { if (cx < 0 || cx >= room.w) return true; if (cy < 0 || cy >= room.h) return false; return SOLID3D.has(g[cy][cx]); };
+    const imgOf = (ch, above, v) => ch === '#' ? (above === '#' ? t.ground : t.groundTop)[v] : ch === '=' ? (t.crate || t.alt[v % 3]) : ch === 'B' ? (t.B ? t.B[v] : t.ground[v]) : ch === 'X' ? t.X : ch === 'Y' ? t.Y : t.ground[v];
+    const M = ctx.getTransform(), A = M.a, B = M.b, Cc = M.c, D = M.d, E = M.e, F = M.f;
+    const face = (img, X0, Y0, ux, uy, vx2, vy2, tone) => { // Kachel affin auf das Viereck (X0,Y0)+(u,v) legen (Matrix direkt verrechnet)
+      const a = ux / 16, b = uy / 16, c = vx2 / 16, d = vy2 / 16;
+      ctx.setTransform(A * a + Cc * b, B * a + D * b, A * c + Cc * d, B * c + D * d, A * X0 + Cc * Y0 + E, B * X0 + D * Y0 + F);
+      ctx.drawImage(toned(img, tone), 0, 0);
+    };
+    for (let pass = 0; pass < 2; pass++) for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+      if (cx < 0 || cx >= room.w || !SOLID3D.has(g[cy][cx])) continue;
+      const ch = g[cy][cx], X = cx * T + ox, Y = cy * T + oy, v = ((cx * 7 + cy * 3) % 4 + 4) % 4, img = imgOf(ch, cy > 0 ? g[cy - 1][cx] : '.', v);
+      if (pass === 0) { // Seitenflächen
+        if (!solid(cx - 1, cy) && X > VX) face(img, X, Y, 0, 16, (VX - X) * (1 - K), (VY - Y) * (1 - K), 1);
+        if (!solid(cx + 1, cy) && X + 16 < VX) face(img, X + 16, Y, 0, 16, (VX - X - 16) * (1 - K), (VY - Y) * (1 - K), 1);
+      } else { // Ober- und Unterseiten
+        if (!solid(cx, cy - 1) && Y > VY) face(img, X, Y, 16, 0, (VX - X) * (1 - K), (VY - Y) * (1 - K), 0);
+        if (!solid(cx, cy + 1) && Y + 16 < VY) face(img, X, Y + 16, 16, 0, (VX - X) * (1 - K), (VY - Y - 16) * (1 - K), 2);
+      }
+    }
+    ctx.setTransform(M);
+  }
+  // getönte Kopien der Kacheln (0 = Oberseite aufgehellt, 1 = Seite, 2 = Unterseite), einmal erzeugt
+  const tonedC = new Map();
+  function toned(img, tone) {
+    let arr = tonedC.get(img);
+    if (!arr) {
+      arr = [['rgba(255,240,220,0.14)', 'source-atop'], ['rgba(0,0,0,0.5)', 'source-atop'], ['rgba(0,0,0,0.58)', 'source-atop']].map(([col, op]) => {
+        const c = C(16, 16), x = c.getContext('2d'); x.drawImage(img, 0, 0); x.globalCompositeOperation = op; x.fillStyle = col; x.fillRect(0, 0, 16, 16); return c;
+      });
+      tonedC.set(img, arr);
+    }
+    return arr[tone];
+  }
   function drawTiles(ctx, room, cam, frame) {
     const t = build(room.theme), g = room.grid;
     const x0 = Math.floor(cam.x / T), x1 = x0 + Math.ceil(View.w / T) + 1;
     const y0 = Math.max(0, Math.floor(cam.y / T)), y1 = Math.min(room.h - 1, y0 + 14);
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
+    if (!FLAT3D.has(room.theme) && !View.lite && !View.lite3d) draw3DFaces(ctx, room, cam, t, x0 - 2, x1 + 2, y0, y1, ox, oy);
     const deco = [];
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       const out = cx < 0 || cx >= room.w; // außerhalb schmaler Räume: Mauer (Bibliothek: Bücherwand)
