@@ -21,6 +21,8 @@ const Tiles = (() => {
     vortex: { a: ['#e8b8fc', '#a868d8', '#6c2c9c', '#401060', '#14041c'], b: ['#fca0cc', '#d84080', '#9c1c50', '#5c0c2c', '#1c0410'] },
     glass: { a: ['#d0c8e0', '#a098b8', '#706888', '#484060', '#16101e'], b: ['#fce0a8', '#d8a838', '#a87000', '#684000', '#1c0c00'] },
     foyer: { a: ['#e8e4dc', '#b8b0a8', '#7c7480', '#3c3444', '#120e18'], b: ['#c89058', '#8c5428', '#5c3014', '#3c1c08', '#140804'] },
+    gallery: { a: ['#fcf8f8', '#e0d4dc', '#bcacbc', '#8c7c94', '#3c2c44'], b: ['#fce0a8', '#d8a838', '#a87000', '#684000', '#1c0c00'] },
+    bridge: { a: ['#d4cce4', '#9c94b4', '#6c6488', '#40385c', '#120e1c'], b: ['#c8c0d8', '#948cac', '#645c80', '#3c3454', '#100c18'], moss: ['#1c4c34', '#2c7448', '#58a868'] },
     library: { a: ['#e8b070', '#a86c34', '#7c4820', '#4c2810', '#180a04'], b: ['#c8884c', '#8c5428', '#5c3014', '#3c1c08', '#140804'] },
     ship: { a: ['#e8b070', '#b87c44', '#8a5428', '#5a3214', '#1e0c04'], b: ['#dcb47c', '#a8783c', '#7a4c20', '#4a2a0c', '#160802'] },
   };
@@ -113,6 +115,63 @@ const Tiles = (() => {
       px(x, col, X, y);
     }
     if (opts.top) { px(x, '#e8b070', 0, 0, 16, 1); px(x, '#b07c44', 0, 1, 16, 1); px(x, 'rgba(255,230,180,0.14)', 0, 2, 16, 2); }
+    return c;
+  }
+  // Brückendeck: oben ausgetretenes Pflaster, darunter Quadermauerwerk mit versetzten Fugen, Moos in den Ritzen
+  function bridgeDeck() {
+    const c = C(16, 16), x = c.getContext('2d'), p = PALS.bridge.a, m = PALS.bridge.moss, sd = ri(0, 99999);
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
+      let k;
+      if (y < 4) k = y === 0 ? 0 : y === 3 ? 4 : (X + (y === 2 ? 3 : 0)) % 7 === 0 ? 3 : 1 + (hn(X >> 1, y, sd) > 0.6 ? 1 : 0);
+      else {
+        const row = (y - 4) >> 2, off = row % 2 ? 5 : 1, ly = (y - 4) & 3;
+        if (ly === 3 || (X + off) % 8 === 0) k = 4; // Fugen
+        else k = ly === 0 ? 2 : 2 + (hn((X + off) >> 3, row, sd + 3) > 0.5 ? 1 : 0) + (bay(X, y) > 0.8 ? 1 : 0);
+      }
+      px(x, p[Math.min(4, k)], X, y);
+    }
+    for (let i = 0; i < 3; i++) px(x, m[ri(0, 2)], ri(0, 15), ri(5, 14)); // Moos
+    if (rand() < 0.5) { const X = ri(3, 12); for (let k = 0; k < 5; k++) px(x, p[4], X + (k >> 1), 4 + k); } // Riss
+    return c;
+  }
+  // Thronsaal-Sims: schwarzroter Marmor, oben vergoldete Kante, unten eine geschnitzte Konsole
+  function goldLedge() {
+    const c = C(16, 16), x = c.getContext('2d');
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
+      let col = y < 2 ? (y ? '#c89020' : '#fce0a8') : y < 9 ? (Math.abs(Math.sin(X * 0.7 + y * 0.9)) < 0.12 ? '#6c2838' : (X + y) % 9 === 0 ? '#3c0c18' : '#22060f') : null;
+      if (y === 9) col = '#f8b800'; else if (y === 10) col = '#5c3c08';
+      if (y > 10 && Math.abs(X - 7.5) < (16 - y) * 1.3) col = y === 15 ? '#2c1c04' : X < 7 ? '#8c6414' : '#5c3c08'; // Konsole
+      if (col) px(x, col, X, y);
+    }
+    return c;
+  }
+  // Bücherwand ('B', massiv): ein Regalfach pro Kachel – Buchrücken verschiedener Höhe mit Goldbünden, mal ein
+  // schräg gelehntes Buch, ein Schädel oder eine Kerze; top = geschnitztes Kranzgesims mit Goldleiste
+  function bookcase(top) {
+    const c = C(16, 16), x = c.getContext('2d');
+    const BK = [['#4c0c14', '#7c1c28', '#a43c40'], ['#101c48', '#203470', '#3c54a0'], ['#0c3416', '#1c5428', '#347c40'], ['#3c2008', '#6c3c14', '#96602c'], ['#3c0c40', '#642068', '#8c3c90'], ['#3c3008', '#6c5814', '#9c8028'], ['#1c1416', '#34282c', '#54464c']];
+    px(x, '#0a0402', 0, 0, 16, 16);
+    const y0 = top ? 6 : 1;
+    for (let X = 0; X < 16;) {
+      const w = Math.min(16 - X, ri(1, 3)), h = ri(8, 12 - (top ? 4 : 0)), [d, m, l] = BK[ri(0, BK.length - 1)], r = rand();
+      if (r < 0.06 && 16 - X >= 5) { // Schädel im Regal
+        px(x, '#b8ac90', X, 9, 4, 4); px(x, '#e8e0c8', X, 9, 3, 1); px(x, '#1c1410', X + 1, 10, 1, 1); px(x, '#1c1410', X + 3, 10, 1, 1); px(x, '#8c8068', X, 13, 4, 1);
+        X += 5; continue;
+      }
+      if (r < 0.14) { X += w; continue; } // Lücke
+      const by = 14 - Math.min(h, 14 - y0);
+      px(x, m, X, by, w, 14 - by); px(x, l, X, by, 1, 14 - by); if (w > 1) px(x, d, X + w - 1, by, 1, 14 - by);
+      px(x, '#c8982c', X, by + 2, w, 1); px(x, '#c8982c', X, 11, w, 1); if (h > 9) px(x, '#fce0a8', X, by + 2, 1, 1); // Goldbünde
+      X += w;
+    }
+    if (rand() < 0.3) { const X = ri(3, 12); for (let k = 0; k < 9; k++) px(x, '#5c2c10', X + (k >> 1), 13 - k, 2, 1); } // schräg gelehntes Buch
+    px(x, '#9c6430', 0, 14, 16, 1); px(x, '#140802', 0, 15, 16, 1); // Regalboden
+    px(x, 'rgba(0,0,0,0.35)', 0, y0, 16, 2); // Schatten des Fachs darüber
+    if (top) { // Kranzgesims
+      px(x, '#2c1406', 0, 0, 16, 5); px(x, '#fce0a8', 0, 0, 16, 1); px(x, '#c8982c', 0, 1, 16, 1); px(x, '#6c3c18', 0, 2, 16, 1);
+      for (let X = 1; X < 16; X += 4) { px(x, '#8c5c2c', X, 3, 2, 2); px(x, '#140802', X + 2, 3, 1, 2); } // Zahnschnitt
+      px(x, '#0a0402', 0, 5, 16, 1);
+    }
     return c;
   }
   function shelfWalk() { // Galerie der Bibliothek: Laufsteg auf einem Bücherregal – Messingkante, darunter eine Reihe Buchrücken
@@ -282,6 +341,11 @@ const Tiles = (() => {
       x.fillStyle = 'rgba(210,210,232,0.4)';
       for (let k = 0; k < 8; k++) { x.fillRect(v ? 15 - k : k, k, 1, 1); x.fillRect(v ? 15 - k * 2 : k * 2, 0, 1, 1); }
       x.fillRect(v ? 9 : 4, 3, 3, 1);
+    } else if (theme === 'bridge') { // Gewölbeunterseite: Schatten, lose Steine und Moosbärte
+      const p = PALS.bridge.a, m = PALS.bridge.moss;
+      x.fillStyle = 'rgba(8,4,16,0.55)'; x.fillRect(0, 0, 16, 3);
+      if (v !== 2) { const X = v ? 9 : 3; px(x, p[3], X, 0, 4, 3); px(x, p[2], X, 0, 3, 1); px(x, p[4], X, 3, 4, 1); }
+      for (let X = 0; X < 16; X++) if (rand() < 0.3) { const len = ri(1, v === 1 ? 8 : 4); px(x, m[0], X, 0, 1, len); if (rand() < 0.5) px(x, m[1], X, 0, 1, 1); }
     } else if (theme === 'crypt' && v === 0) { // feine Spinnweben-Fäden
       x.fillStyle = 'rgba(0,0,0,0.45)'; x.fillRect(0, 0, 16, 2);
       x.fillStyle = 'rgba(200,200,232,0.45)';
@@ -432,6 +496,20 @@ const Tiles = (() => {
       const fade = 1 - i / len;
       if (bay(sx + X + i, sy + i) < dens * fade) px(x, col, sx + X + Math.floor(i * 0.6), sy + i);
     }
+  }
+  // Thronsaal: Säule aus blutrotem Marmor mit Goldkanneluren, vergoldetem Akanthus-Kapitell und Sockel
+  function goldPillar(x, cx, w, h) {
+    const tones = ['#1c0408', '#3c0810', '#5c1020', '#7c1c2c', '#9c2c3c', '#7c1c2c', '#4c0c18', '#2c060c'];
+    for (let X = 0; X < w; X++) for (let Y = 0; Y < h; Y++) {
+      const u = X / w, vein = Math.abs(Math.sin(Y * 0.11 + X * 0.6 + hn(X >> 2, Y >> 3, 17) * 5)) < 0.06;
+      px(x, (X % 6 === 5) ? '#c89020' : vein ? '#c86070' : tones[Math.min(tones.length - 1, Math.floor(u * tones.length))], cx + X, Y);
+    }
+    px(x, '#5c3c08', cx - 6, 12, w + 12, 16); px(x, '#fce0a8', cx - 6, 12, w + 12, 1); px(x, '#f8b800', cx - 6, 13, w + 12, 2); // Kapitell
+    for (let k = 0; k < Math.floor((w + 12) / 6); k++) { const lx = cx - 6 + k * 6; px(x, '#c89020', lx + 1, 16, 4, 8); px(x, '#fce0a8', lx + 2, 16, 2, 3); px(x, '#8c6414', lx + 1, 23, 4, 1); }
+    px(x, '#fce0a8', cx - 7, 13, 3, 3); px(x, '#fce0a8', cx + w + 4, 13, 3, 3); // Voluten
+    px(x, '#3c2804', cx - 6, 27, w + 12, 1); px(x, '#f8b800', cx - 3, 28, w + 6, 2);
+    const by = h - 58; // Sockel über der Vertäfelung
+    px(x, '#f8b800', cx - 3, by, w + 6, 2); px(x, '#5c3c08', cx - 5, by + 2, w + 10, 6); px(x, '#c89020', cx - 5, by + 2, w + 10, 1); px(x, '#3c2804', cx - 6, by + 8, w + 12, 3);
   }
   function pillar(x, cx, w, h) { // Bündelpfeiler: drei runde Dienste, Blattkapitell und Sockel (wiederholt sich je Kachel)
     const tones = ['#141418', '#2c2c34', '#4c4c58', '#6c6c78', '#8c8c98', '#9c9ca8', '#6c6c78', '#3c3c48'], n = 3, sw = w / n;
@@ -1378,7 +1456,7 @@ const Tiles = (() => {
       // Spinnweben in den oberen Ecken einiger Buchten
       [[10, 14, 1], [246, 14, -1], [394, 158, 1], [118, 158, -1]].forEach(([X, Y, d]) => { for (let k = 0; k < 12; k++) { px(x, 'rgba(210,210,230,0.32)', X + d * k, Y + 1, 1, 1); px(x, 'rgba(210,210,230,0.32)', X, Y + 1 + k, 1, 1); px(x, 'rgba(210,210,230,0.28)', X + d * k, Y + 12 - k, 1, 1); } });
       shade(x, 512, H, '#060201', 0, 50);
-      x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(10,4,6,0.42)'; x.fillRect(0, 0, 512, H); x.globalCompositeOperation = 'source-over'; // Hintergrund zurücknehmen, damit die begehbaren Regale vorn klar lesbar bleiben
+      x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(8,3,10,0.6)'; x.fillRect(0, 0, 512, H); x.globalCompositeOperation = 'source-over'; // Hintergrund zurücknehmen, damit die begehbaren Regale vorn klar lesbar bleiben
       add('wall', c, 0.5, { vtile: true });
       L.push({ name: 'books', custom: drawBookFlock, par: 0.7, c: C(1, 1) }); // in der Ferne kreisen Bücherschwärme
     } else if (theme === 'courtyard') {
@@ -1602,7 +1680,7 @@ const Tiles = (() => {
           px(x, '#c89020', X, sag, 1, 1); if (X % 2 === 0) px(x, '#f8b800', X, sag + 1, 1, 2);
         } });
       }
-      (theme === 'throne' ? [0, 128, 256, 384] : [0, 236, 488]).forEach(cx => pillar(x, cx, 22, 208));
+      if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); else [0, 236, 488].forEach(cx => pillar(x, cx, 22, 208));
       add('wall', c, 0.5, { vtile });
       if (theme === 'throne') { // Kronleuchter vorne
         const n = C(512, 208), x2 = n.getContext('2d');
@@ -1683,6 +1761,36 @@ const Tiles = (() => {
       }
       for (let i = 0; i < 5; i++) { const cx = ri(0, 500), len = ri(20, 60); for (let y = 0; y < len; y += 3) px(x, y % 6 ? '#3c3c4c' : '#6c6c7c', cx, y, 2, 2); }
       add('wall', c, 0.5, { vtile: true });
+    } else if (theme === 'gallery') { // Marmorgalerie: alles im Säulengang wird live in Perspektive gezeichnet
+      L.push({ name: 'colonnade', custom: drawColonnade, par: 1, c: C(1, 1) });
+    } else if (theme === 'bridge') { // Brücke zum Bergfried: Sturmhimmel mit Blutmond, der Bergfried mit erleuchteten Fenstern,
+      // davor der Mode-7-Wolkenstrom im Zeitraffer, darunter die Pfeiler der Brücke, die im Wolkenmeer versinken
+      const sky = C(640, 208), xs = sky.getContext('2d');
+      smooth(xs, 640, 208, ['#020008', '#05021a', '#0c0428', '#160834', '#220c40', '#301046', '#461446', '#641c40', '#842c3c']);
+      for (let i = 0; i < 80; i++) px(xs, rand() < 0.3 ? '#fcfcfc' : '#8c84ac', ri(0, 639), ri(0, 64));
+      for (let y = -34; y <= 34; y++) for (let X = -34; X <= 34; X++) { // Blutmond mit Hof
+        const d = Math.hypot(X, y);
+        if (d > 34) continue;
+        if (d > 22) { if (bay(X, y) < (34 - d) / 12 * 0.5) px(xs, '#5c1428', 112 + X, 52 + y); continue; }
+        const n = hn((X + 40) >> 2, (y + 40) >> 2, 5);
+        px(xs, d > 20 ? '#a82820' : n > 0.72 ? '#c83c2c' : n > 0.3 ? '#e85c3c' : '#f88c5c', 112 + X, 52 + y);
+      }
+      add('sky', sky, 0, { wrap: false });
+      const kp = C(512, 208), xk = kp.getContext('2d'), K = '#0a0614', KL = '#1c1430';
+      const tower = (X0, w, top, roof) => {
+        px(xk, K, X0, top, w, 208 - top); px(xk, KL, X0, top, 1, 208 - top);
+        for (let X = X0; X < X0 + w; X += 4) px(xk, K, X, top - 3, 2, 3); // Zinnen
+        for (let k = 0; k < roof; k++) { const half = (roof - k) * w / (2 * roof) + 1; px(xk, K, Math.round(X0 + w / 2 - half), top - 3 - k, Math.round(half * 2), 1); } // Spitzhelm
+        for (let Y = top + 10; Y < 180; Y += 18) for (let X = X0 + 3; X < X0 + w - 4; X += 7) if (rand() < 0.45) { // Fenster
+          px(xk, '#f8b800', X, Y, 2, 4); px(xk, '#fce0a8', X, Y + 1, 1, 2); px(xk, '#a85000', X, Y + 4, 2, 1);
+        }
+      };
+      tower(300, 30, 96, 24); tower(326, 52, 64, 34); tower(372, 28, 104, 20); tower(394, 40, 82, 30); tower(430, 22, 120, 14);
+      px(xk, K, 288, 150, 170, 58); for (let X = 288; X < 458; X += 5) px(xk, K, X, 146, 3, 4); // Ringmauer
+      for (let X = 352; X < 360; X++) for (let Y = 70; Y < 92; Y++) if ((X - 356) ** 2 / 16 + (Y - 82) ** 2 / 144 < 1) px(xk, '#fc3c3c', X, Y); // Fenster des Grafen
+      add('keep', kp, 0.08);
+      L.push({ name: 'clouds', custom: drawCloudStream, par: 0, c: C(1, 1) });
+      L.push({ name: 'piers', custom: drawBridgePiers, par: 1, c: C(1, 1) });
     } else if (theme === 'tower') {
       const c = C(512, 208), x = c.getContext('2d');
       wallBricks(x, 512, 208, ['#34343c', '#202028', '#08080c']);
@@ -1711,20 +1819,21 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }) }[theme];
+    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
       : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true }))
-      : theme === 'glass' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true }))
+      : theme === 'glass' || theme === 'gallery' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true }))
       : theme === 'library' ? [0, 1, 2, 3].map(() => parquet({ top: true }))
       : theme === 'foyer' ? [checker({ top: true }), checker({ top: true, crack: true }), checker({ top: true }), checker({ top: true })] : ground;
-    const alt = theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+    const alt = theme === 'gallery' ? [balcony(), balcony(), balcony()] : theme === 'throne' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
       spikes: spikes(), up: theme === 'library' ? stairTile(p.b, 1, '#e8c070') : theme === 'foyer' ? carpetStair(1) : theme === 'ship' ? ratline(1) : theme === 'glass' ? stairTile(p.a, 1, '#fce0a8') : stairTile(p.b, 1), down: theme === 'library' ? stairTile(p.b, -1, '#e8c070') : theme === 'foyer' ? carpetStair(-1) : theme === 'ship' ? ratline(-1) : theme === 'glass' ? stairTile(p.a, -1, '#fce0a8') : stairTile(p.b, -1),
       toppers: [0, 1, 2, 3].map(v => topper(theme, v)), hangers: [0, 1, 2].map(v => hanger(theme, v)),
       bg: buildBg(theme), crate: theme === 'ship' ? crate(p.b) : null,
+      B: theme === 'library' ? [0, 1, 2, 3].map(() => bookcase(false)) : null, Btop: theme === 'library' ? [0, 1, 2, 3].map(() => bookcase(true)) : null,
     };
     cache[theme] = t;
     return t;
@@ -1805,6 +1914,211 @@ const Tiles = (() => {
       if (X0 > View.w || X0 + 16 < 0) continue;
       for (let i = 0; i < 22; i++) { const y = (((i * 37 + frame * 3.2 - oy) % 208) + 208) % 208, len = 5 + (i % 4) * 3; ctx.fillRect(X0 + (i * 5) % 16, Math.round(y), 1, len); }
     }
+  }
+
+  // ---------------- Marmorgalerie: Säulengang in echter Perspektive (PS1-Look) ----------------
+  // Drei Säulenreihen in verschiedenen Tiefen z. Jede Säule ist ein Zylinder aus senkrechten Lichtstreifen: Mondlicht aus den
+  // hohen Fenstern der Rückwand streift die Kanten (Gegenlicht), Kerzen vorn hellen die Fronten auf, ein Glanzlicht wandert
+  // mit dem Blickwinkel. Dazu Schachbrett-Marmorboden und Kassettendecke in Mode-7-Perspektive, Lichtbahnen und Lichtpfützen;
+  // Wolken vor dem Mond lassen das Licht atmen. Jede Ebene verschiebt sich mit 1/z – echte Parallaxe statt Kulissen.
+  const GAL = { hz: 82, zBack: 3.4, rows: [{ z: 2.6, sp: 104, off: 30, r: 15 }, { z: 1.8, sp: 116, off: 0, r: 17 }, { z: 1.28, sp: 156, off: 70, r: 18 }] };
+  let galBuf = null, galVein = null, galPools = null, galWin = null, galStrip = null;
+  const galColC = new Map(), galCol = (r, g, b) => { // Farbstrings zwischenspeichern (auf 4 Stufen je Kanal gerundet)
+    const k = (Math.min(255, r) >> 2) << 12 | (Math.min(255, g) >> 2) << 6 | (Math.min(255, b) >> 2);
+    let s = galColC.get(k); if (!s) { s = `rgb(${(k >> 12) << 2},${((k >> 6) & 63) << 2},${(k & 63) << 2})`; galColC.set(k, s); }
+    return s;
+  };
+  const moonI = (k, frame) => 0.45 + 0.55 * Math.max(0, Math.sin(frame * 0.007 + k * 1.9) * 0.6 + Math.sin(frame * 0.0031 + k * 0.7) * 0.5);
+  function drawColonnade(ctx, cam, frame) {
+    const w = View.w, vx = w / 2, hz = GAL.hz, floorY = 11 * T - cam.y, ceilY = -70 - cam.y, ZB = GAL.zBack;
+    const proj = (wx, z) => vx + (wx - cam.x - vx) / z, fyz = z => hz + (floorY - hz) / z, cyz = z => hz + (ceilY - hz) / z;
+    const W2 = Math.ceil(w / 2);
+    if (!galBuf || galBuf.w !== W2) { const c = C(W2, 104), x = c.getContext('2d'), img = x.createImageData(W2, 104); galBuf = { w: W2, c, x, img, d: new Int32Array(img.data.buffer) }; }
+    if (!galVein) { galVein = C(16, 96); const x = galVein.getContext('2d'); for (let k = 0; k < 4; k++) { let X = 2 + k * 4; for (let y = 0; y < 96; y++) { X += Math.sin(y * 0.15 + k * 2) * 0.6; px(x, 'rgba(60,40,70,0.55)', Math.round(X) & 15, y); } } }
+    // Fensterlicht der Rückwand: Fenster alle 220 Welt-px; Lichtpfützen am Boden davor
+    const k0 = Math.floor((cam.x - 600) / 220), k1 = Math.ceil((cam.x + w + 600) / 220);
+    const wins = []; for (let k = k0; k <= k1; k++) wins.push({ x: k * 220 + 110, i: moonI(k, frame) });
+    const cands = []; for (let k = Math.floor((cam.x - 400) / 260); k <= Math.ceil((cam.x + w + 400) / 260); k++) cands.push({ x: k * 260 + 40, i: 0.75 + 0.25 * Math.sin(frame * 0.3 + k * 2.1) * Math.sin(frame * 0.13 + k) });
+    // Boden und Decke (Mode 7, halbe Auflösung): Zeile für Zeile in Läufen gleicher Farbe gefüllt (Schachbrett, Kassetten)
+    const d = galBuf.d, yb = fyz(ZB), yt = cyz(ZB), base = cam.x + vx;
+    const pack = (r, g, b) => (255 << 24) | (Math.min(255, b | 0) << 16) | (Math.min(255, g | 0) << 8) | Math.min(255, r | 0);
+    for (let j = 0; j < 104; j++) {
+      const y = j * 2 + 1, row = j * W2;
+      if (y > yt && y < yb) { d.fill(0, row, row + W2); continue; }
+      const floor = y >= yb, z = floor ? (floorY - hz) / (y - hz) : (ceilY - hz) / (y - hz), dz = z * 110, f = Math.min(1, (z - 0.8) / (ZB - 0.8)) * 0.75;
+      const fogC = (r, g, b) => pack(r * (1 - f) + 12 * f, g * (1 - f) + 8 * f, b * (1 - f) + 26 * f);
+      const cell = floor ? 48 : 64, cv = Math.floor(dz / cell), cvm = ((dz % 64) + 64) % 64;
+      let cA, cB, cC; // Farben der Felder dieser Zeile
+      if (floor) { cA = fogC(214 * 0.34, 202 * 0.34, 210 * 0.37); cB = fogC(58 * 0.34, 22 * 0.34, 34 * 0.37); }
+      else { const ribRow = cvm < 6; cA = fogC(72, 52, 18); cB = ribRow ? cA : fogC(20, 11, 13); cC = ribRow ? cA : fogC(54, 18, 24); }
+      let i = 0;
+      while (i < W2) {
+        const wx = base + (i * 2 + 1 - vx) * z, cu = Math.floor(wx / cell);
+        let col;
+        if (floor) col = ((cu + cv) & 1) ? cB : cA;
+        else { const m = ((wx % 64) + 64) % 64; col = m < 6 ? cA : (m > 24 && m < 40 && cvm > 24 && cvm < 40) ? cC : cB; }
+        let edge = floor ? (cu + 1) * cell : wx - (((wx % 64) + 64) % 64) + ([6, 24, 40, 64].find(e => e > (((wx % 64) + 64) % 64)));
+        let ie = Math.ceil(((edge - base) / z + vx - 1) / 2); if (ie <= i) ie = i + 1;
+        d.fill(col, row + i, row + Math.min(ie, W2)); i = ie;
+      }
+    }
+    galBuf.x.putImageData(galBuf.img, 0, 0);
+    ctx.drawImage(galBuf.c, 0, 0, W2, 104, 0, 0, W2 * 2, 208);
+    // Lichtpfützen auf dem Marmor: Mondlicht vor den Fenstern, Kerzenschein – perspektivisch gestauchte Lichtflecken
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    if (!galPools) galPools = ['150,170,255', '255,150,70'].map(col => { const c = C(64, 64), x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, `rgba(${col},1)`); g.addColorStop(1, `rgba(${col},0)`); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return c; });
+    const pool = (wx, z, rad, img, a) => {
+      const X = proj(wx, z), Y = fyz(z), rx = rad / z, ry = Math.max(2, (fyz(z - 0.45) - fyz(z + 0.45)) / 2);
+      if (X + rx < 0 || X - rx > w || a <= 0.01) return;
+      ctx.globalAlpha = Math.min(1, a); ctx.drawImage(img, X - rx, Y - ry, rx * 2, ry * 2);
+    };
+    for (const W0 of wins) pool(W0.x + 70, 1.45, 70, galPools[0], 0.42 * W0.i);
+    for (const C0 of cands) pool(C0.x, 1.15, 60, galPools[1], 0.3 * C0.i);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    // Rückwand: dunkler Marmor mit hohen Bogenfenstern, hinter denen der Mond scheint
+    ctx.fillStyle = '#1a1020'; ctx.fillRect(0, Math.floor(yt), w, Math.ceil(yb - yt));
+    for (const W0 of wins) {
+      const x0 = proj(W0.x - 34, ZB), x1 = proj(W0.x + 34, ZB), top = yt + (yb - yt) * 0.18, bot = yb - (yb - yt) * 0.12, ww = x1 - x0;
+      if (x1 < 0 || x0 > w) continue;
+      if (!galWin) { // Bogenfenster mit Mondlichtverlauf und Fensterkreuz (einmal gemalt, dann skaliert)
+        galWin = C(24, 48); const x = galWin.getContext('2d');
+        for (let y = 0; y < 48; y++) for (let X = 0; X < 24; X++) {
+          if (y < 12 && (X - 11.5) ** 2 + (y - 12) ** 2 > 144) continue;
+          const t = y / 48, frameP = X < 2 || X > 21 || (y < 14 && (X - 11.5) ** 2 + (y - 12) ** 2 > 100) || y > 45;
+          px(x, frameP ? '#0c0814' : (X === 11 || X === 12 || y === 26) ? '#0c0814' : `rgb(${Math.round(170 - t * 120)},${Math.round(190 - t * 130)},${Math.round(250 - t * 120)})`, X, y);
+        }
+      }
+      ctx.fillStyle = '#0c0814'; ctx.fillRect(Math.round(x0 - 1), Math.round(top), Math.round(ww + 2), Math.round(bot - top));
+      ctx.globalAlpha = 0.35 + 0.65 * W0.i; ctx.drawImage(galWin, Math.round(x0), Math.round(top), Math.round(ww), Math.round(bot - top)); ctx.globalAlpha = 1;
+    }
+    // Säulenreihen von hinten nach vorn
+    const camWX = cam.x + vx;
+    for (const R of GAL.rows) {
+      const z = R.z, top = cyz(z), bot = fyz(z), cw = Math.max(4, Math.round(R.r * 2 / z)), fog = Math.min(0.8, (z - 1) / (ZB - 0.6));
+      const kA = Math.floor((cam.x - 300 - R.off) / R.sp), kB = Math.ceil((cam.x + w + 300 - R.off) / R.sp);
+      const xs = [];
+      for (let k = kA; k <= kB; k++) xs.push(R.off + k * R.sp);
+      // Bögen zwischen den Säulen (hinter den Schäften)
+      ctx.lineWidth = Math.max(2, 9 / z); ctx.strokeStyle = `rgb(${Math.round(150 * (1 - fog) + 20 * fog)},${Math.round(132 * (1 - fog) + 14 * fog)},${Math.round(150 * (1 - fog) + 40 * fog)})`;
+      const archY = top + (bot - top) * 0.2;
+      for (let n = 0; n < xs.length - 1; n++) { const a = proj(xs[n], z), b = proj(xs[n + 1], z); if (b < -40 || a > w + 40) continue; ctx.beginPath(); ctx.arc((a + b) / 2, archY, (b - a) / 2, Math.PI, 0); ctx.stroke(); }
+      // Schattierung jeder Säule als eine Pixelzeile in einen Streifenpuffer, dann senkrecht gestreckt gezeichnet
+      if (!galStrip) { const c = C(64, 48), x = c.getContext('2d'), img = x.createImageData(64, 48); galStrip = { c, x, img, d: new Int32Array(img.data.buffer) }; }
+      const SD = galStrip.d, cols = [];
+      for (const wx of xs) {
+        const sx = proj(wx, z), x0 = Math.round(sx - cw / 2);
+        if (x0 > w || x0 + cw < 0 || cols.length >= 48) continue;
+        const vdx = camWX - wx, vdz = -z * 110, vl = Math.hypot(vdx, vdz), Vx = vdx / vl, Vz = vdz / vl;
+        const Ls = []; // die nächsten Lichter: Fenster hinten (kühl, Gegenlicht), Kerzen vorn (warm)
+        for (const W0 of wins) { const lx = W0.x - wx, lz = (ZB - 0.15 - z) * 110, ll = Math.hypot(lx, lz); if (ll < 520) Ls.push([lx / ll, lz / ll, W0.i * (1 - ll / 520), 0.75, 0.85, 1.15]); }
+        for (const C0 of cands) { const lx = C0.x - wx, lz = (0.95 - z) * 110, ll = Math.hypot(lx, lz); if (ll < 380) Ls.push([lx / ll, lz / ll, C0.i * (1 - ll / 380), 0.95, 0.55, 0.25]); }
+        const rowOff = cols.length * 64;
+        for (let i = 0; i < cw && i < 64; i++) {
+          const u = (i + 0.5) / cw * 2 - 1, nx = u, nz = -Math.sqrt(Math.max(0, 1 - u * u));
+          let lr = 0.16, lg = 0.14, lb = 0.2, spec = 0;
+          for (const [Lx, Lz, fall, cr, cg, cb] of Ls) {
+            const lam = nx * Lx + nz * Lz; if (lam <= 0) continue;
+            lr += lam * cr * fall; lg += lam * cg * fall; lb += lam * cb * fall;
+            const hx = Lx + Vx, hz2 = Lz + Vz, hl = Math.hypot(hx, hz2) || 1; let sp = (nx * hx + nz * hz2) / hl;
+            if (sp > 0.8) { sp *= sp; sp *= sp; sp *= sp; sp *= sp; sp *= sp; spec += sp * fall; } // ^32
+          }
+          const r = (228 * lr + 255 * spec) * (1 - fog) + 14 * fog, g = (218 * lg + 240 * spec) * (1 - fog) + 10 * fog, b = (226 * lb + 220 * spec) * (1 - fog) + 30 * fog;
+          SD[rowOff + i] = (255 << 24) | (Math.min(255, b | 0) << 16) | (Math.min(255, g | 0) << 8) | Math.min(255, r | 0);
+        }
+        cols.push([sx, x0]);
+      }
+      if (cols.length) galStrip.x.putImageData(galStrip.img, 0, 0, 0, 0, 64, cols.length);
+      const gk = 1 - fog * 0.85, capH = Math.max(3, Math.round(14 / z)), capW = Math.round(cw * 1.5), capY = Math.round(archY + (bot - top) * 0.02);
+      const baseH = Math.max(2, Math.round(10 / z)), baseW = Math.round(cw * 1.35), colTop = Math.floor(top), colH = Math.ceil(bot - top);
+      const gold = galCol(200 * gk, 144 * gk, 32 * gk), goldHi = galCol(252 * gk, 224 * gk, 168 * gk), goldLo = galCol(110 * gk, 76 * gk, 16 * gk), plinth = galCol(150 * gk, 136 * gk, 150 * gk);
+      cols.forEach(([sx, x0], n) => {
+        ctx.drawImage(galStrip.c, 0, n, Math.min(64, cw), 1, x0, colTop, cw, colH);
+        if (z < 2 && !View.lite) { ctx.globalAlpha = 0.5 * (1 - fog); ctx.drawImage(galVein, x0, colTop, cw, colH); ctx.globalAlpha = 1; } // Marmoradern (nur vorn sichtbar)
+        const cx0 = Math.round(sx - capW / 2), bx0 = Math.round(sx - baseW / 2), by = Math.round(bot - baseH);
+        ctx.fillStyle = gold; ctx.fillRect(cx0, capY, capW, capH); ctx.fillRect(bx0, by, baseW, 1);
+        ctx.fillStyle = goldHi; ctx.fillRect(cx0, capY, capW, 1);
+        ctx.fillStyle = goldLo; ctx.fillRect(cx0, capY + capH - 1, capW, 1);
+        ctx.fillStyle = plinth; ctx.fillRect(bx0, by + 1, baseW, baseH - 1);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(bx0 - 2, Math.round(bot), baseW + 4, Math.max(1, Math.round(3 / z))); // Schatten am Boden
+      });
+    }
+    // Lichtbahnen: Mondlicht fällt schräg durch die Fenster bis nach vorn
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const btop = yt + (yb - yt) * 0.25, bbot = fyz(1.15);
+    const gr = ctx.createLinearGradient(0, btop, 0, bbot); gr.addColorStop(0, 'rgba(120,140,255,0.13)'); gr.addColorStop(1, 'rgba(120,140,255,0)');
+    ctx.fillStyle = gr;
+    for (const W0 of wins) {
+      const a0 = proj(W0.x - 30, ZB), a1 = proj(W0.x + 30, ZB), b0 = proj(W0.x - 30 + 260, 1.15), b1 = proj(W0.x + 30 + 260, 1.15);
+      if (Math.max(a1, b1) < 0 || Math.min(a0, b0) > w) continue;
+      ctx.globalAlpha = W0.i; ctx.beginPath(); ctx.moveTo(a0, btop); ctx.lineTo(a1, btop); ctx.lineTo(b1, bbot); ctx.lineTo(b0, bbot); ctx.closePath(); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Staub in den Lichtbahnen
+    ctx.fillStyle = 'rgba(200,210,255,0.5)';
+    for (let i = 0; i < (View.lite ? 14 : 30); i++) { const X = ((i * 97 + frame * 0.2 - cam.x * 0.6) % (w + 40) + w + 40) % (w + 40) - 20, Y = 40 + ((i * 53 + frame * 0.15) % 130); ctx.fillRect(Math.round(X), Math.round(Y), 1, 1); }
+    ctx.restore();
+  }
+
+  // Brücke: Mode-7-Wolkenstrom im Zeitraffer – ein Wolkenmeer unter dem Horizont und eine Wolkendecke darüber rasen
+  // perspektivisch verjüngt auf den Betrachter zu, halb durchsichtig; der Bergfried scheint hindurch, Blitze hellen sie auf
+  let streamTex = null, streamBuf = null;
+  function drawCloudStream(ctx, cam, frame) {
+    if (!streamTex) {
+      streamTex = new Uint8Array(128 * 128);
+      for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+        let v = 0;
+        for (const [s, w] of [[32, 0.5], [16, 0.27], [8, 0.15], [4, 0.08]]) {
+          const n = 128 / s, gx = x / s, gy = y / s, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+          const a = hn(x0 % n, y0 % n, 59), b = hn((x0 + 1) % n, y0 % n, 59), c = hn(x0 % n, (y0 + 1) % n, 59), d = hn((x0 + 1) % n, (y0 + 1) % n, 59);
+          v += w * (a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy);
+        }
+        streamTex[y * 128 + x] = Math.max(0, Math.min(255, (v - 0.36) * 2.8 * 255));
+      }
+    }
+    const HZ = 122, w = Math.ceil(View.w / 2), h = 104;
+    if (!streamBuf || streamBuf.w !== w) { const c = C(w, h), x = c.getContext('2d'), img = x.createImageData(w, h); streamBuf = { w, c, x, img, d: new Int32Array(img.data.buffer) }; }
+    const d = streamBuf.d, flash = FX.stormOn(W.storm) ? 1 : 0, step = View.lite ? 2 : 1;
+    if (step > 1) d.fill(0);
+    for (let j = 0; j < h; j += step) {
+      const y = j * 2 + 1, below = y > HZ, yy = Math.abs(y - HZ), row = j * w;
+      if (yy < 2) { d.fill(0, row, row + w); continue; }
+      const dist = (below ? 900 : 2200) / (yy + 3), sc = dist / 240, du = 2 * sc;
+      const fade = Math.min(1, (yy - 1) / 26);
+      const v = ((dist + frame * 3.2 + (below ? 0 : 57)) & 127) * 128; // Zeitraffer: die Wolken stürzen auf den Betrachter zu
+      let u = (-View.w / 2) * sc + cam.x * 0.02 + frame * 0.05 + (below ? 4096 : 4133);
+      const rimRow = below ? 0 : Math.max(0, 1 - yy / 90); // Wolkenränder nahe am Horizont glühen im Mondlicht
+      for (let i = 0; i < w; i++, u += du) {
+        const n = streamTex[v + ((u | 0) & 127)];
+        if (n < 64) { d[row + i] = 0; continue; }
+        const k = (n - 64) / 191, k2 = k * k, a = (Math.min(1, k * 2.2) * (below ? 200 : 170) * fade) | 0;
+        let r, g, b;
+        if (below) { r = 40 + 200 * k2; g = 22 + 120 * k2; b = 70 + 150 * k2; } // Wolkenmeer: dunkle Täler, helle Kuppen
+        else { r = 26 + 120 * k2 + rimRow * 90 * k; g = 14 + 70 * k2 + rimRow * 30 * k; b = 48 + 110 * k2 + rimRow * 40 * k; } // Wolkendecke: dunkle Unterseiten
+        d[row + i] = (a << 24) | (Math.min(255, b + flash * 70) << 16) | (Math.min(255, g + flash * 80) << 8) | Math.min(255, r + flash * 70);
+      }
+    }
+    streamBuf.x.putImageData(streamBuf.img, 0, 0);
+    ctx.drawImage(streamBuf.c, 0, 0, w, h, 0, 0, w * 2, h * 2);
+  }
+  // Brückenpfeiler unter dem Deck (Parallaxe 1): wuchtige Pfeiler mit Gewölbeansätzen, nach unten im Dunst verschwindend
+  let pierImg = null;
+  function drawBridgePiers(ctx, cam) {
+    if (!pierImg) {
+      const c = C(128, 84), x = c.getContext('2d'), p = PALS.bridge.a;
+      for (let Y = 0; Y < 84; Y++) for (let X = 0; X < 128; X++) {
+        const ax = Math.abs(X - 64), core = ax < 16;
+        const archBottom = 6 + Math.sqrt(Math.max(0, 48 * 48 - (64 - ax) * (64 - ax))) * 0.62; // Unterkante der Bögen zu beiden Seiten
+        if (!core && Y > (ax > 60 ? 6 : 64 - archBottom)) continue;
+        const joint = (Y % 6 === 5) || ((X + ((Y / 6 | 0) % 2) * 4) % 9 === 0);
+        px(x, joint ? p[4] : core ? (X < 54 ? p[2] : X > 72 ? p[3] : p[2]) : p[3], X, Y);
+      }
+      for (let Y = 0; Y < 84; Y++) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = `rgba(14,8,28,${Math.min(0.9, 0.15 + Y / 80)})`; x.fillRect(0, Y, 128, 1); }
+      x.globalCompositeOperation = 'source-over';
+      pierImg = c;
+    }
+    const top = 10 * T - Math.round(cam.y);
+    for (let k = Math.floor(cam.x / 224) - 1; k <= Math.floor((cam.x + View.w) / 224) + 1; k++) ctx.drawImage(pierImg, k * 224 + 48 - Math.round(cam.x), top);
   }
 
   // Titelbild: Mode-7-Wolkendecke – eine perspektivische Wolkenebene über der Burg, halb durchsichtig (der Mond scheint hindurch),
@@ -1937,6 +2251,15 @@ const Tiles = (() => {
   function buildFront(theme) {
     seed = 913;
     const c = C(640, 208), x = c.getContext('2d'), dark = '#05020a';
+    if (theme === 'gallery') { // Säulen ganz vorn: dunkle Silhouetten mit Mondlicht-Saum, laufen schneller vorbei als die Spielebene
+      x.globalAlpha = 0.72;
+      [120, 440].forEach(cx => {
+        px(x, '#06040c', cx - 15, 0, 30, 208); px(x, '#4c4c7c', cx - 15, 0, 1, 208); px(x, '#24243c', cx - 14, 0, 2, 208); px(x, '#14101c', cx + 12, 0, 3, 208);
+        px(x, '#1c140c', cx - 21, 22, 42, 10); px(x, '#6c5420', cx - 21, 22, 42, 1); px(x, '#06040c', cx - 19, 194, 38, 14); px(x, '#4c4c7c', cx - 19, 194, 38, 1);
+      });
+      x.globalAlpha = 1;
+      return c;
+    }
     if (theme === 'courtyard') {
       for (let X = 0; X < 640; X++) { const h = 3 + Math.round(Math.abs(Math.sin(X * 0.21) * 4 + Math.sin(X * 0.07) * 3)); px(x, dark, X, 208 - h, 1, h); }
       [60, 300, 520].forEach(bx => { for (let i = 0; i < 26; i++) px(x, dark, bx + i, 190 + Math.abs(13 - i) / 2, 1, 18); });
@@ -1981,13 +2304,21 @@ const Tiles = (() => {
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
     const deco = [];
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
-      const out = cx < 0 || cx >= room.w; // außerhalb schmaler Räume: Mauer
-      const ch = out ? '#' : g[cy][cx];
+      const out = cx < 0 || cx >= room.w; // außerhalb schmaler Räume: Mauer (Bibliothek: Bücherwand)
+      const wallCh = t.B ? 'B' : '#', ch = out ? wallCh : g[cy][cx];
       if (ch === '.') continue;
       const X = cx * T + ox, Y = cy * T + oy, v = ((cx * 7 + cy * 3) % 4 + 4) % 4;
-      const above = out ? '#' : cy > 0 ? g[cy - 1][cx] : '.', below = out ? '#' : cy < room.h - 1 ? g[cy + 1][cx] : '#';
+      const above = out ? wallCh : cy > 0 ? g[cy - 1][cx] : '.', below = out ? wallCh : cy < room.h - 1 ? g[cy + 1][cx] : '#';
       let img = null;
       if (ch === '#') img = (above === '#' ? t.ground : t.groundTop)[v];
+      else if (ch === 'B') img = t.B ? (above === 'B' || above === '#' ? t.B : t.Btop)[v] : t.ground[v];
+      if (ch === 'B' && img) { // Bücherwand: geschnitzte Seitenwangen, wo sie an Luft grenzt – damit sich begehbare Regale vom Hintergrund abheben
+        ctx.drawImage(img, X, Y); img = null;
+        const left = out || cx === 0 ? 'B' : g[cy][cx - 1], right = out || cx === room.w - 1 ? 'B' : g[cy][cx + 1];
+        if (left === '.') { ctx.fillStyle = '#5c3414'; ctx.fillRect(X, Y, 3, 16); ctx.fillStyle = '#d8a058'; ctx.fillRect(X, Y, 1, 16); ctx.fillStyle = '#9c6430'; ctx.fillRect(X + 1, Y, 1, 16); }
+        if (right === '.') { ctx.fillStyle = '#3c1c08'; ctx.fillRect(X + 13, Y, 3, 16); ctx.fillStyle = '#7c4c20'; ctx.fillRect(X + 13, Y, 1, 16); ctx.fillStyle = '#0a0402'; ctx.fillRect(X + 15, Y, 1, 16); }
+        if (below === '.') { ctx.fillStyle = '#5c3414'; ctx.fillRect(X, Y + 13, 16, 3); ctx.fillStyle = '#c8982c'; ctx.fillRect(X, Y + 13, 16, 1); }
+      }
       else if (ch === '=') img = t.crate && (above === '=' || below === '=') ? t.crate : t.alt[v % 3]; // Schiff: gestapelt = Kisten
       else if (ch === 'X') img = t.X;
       else if (ch === 'Y') img = t.Y;

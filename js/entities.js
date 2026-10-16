@@ -2,7 +2,7 @@
 'use strict';
 
 const T = 16;
-const SOLID = new Set(['#', '=', 'X', 'Y', '^', 'G']); // G: unsichtbar fest (Zugbrücke, Gittertor – die Grafik zeichnet das Torhaus)
+const SOLID = new Set(['#', '=', 'X', 'Y', '^', 'G', 'B']); // G: unsichtbar fest (Zugbrücke, Gittertor – die Grafik zeichnet das Torhaus), B: Bücherwand
 
 const Phys = {
   tile(cx, cy) {
@@ -66,6 +66,7 @@ const WHIP_DIRS = {
   downd: { hx: 18, hy: 15, a: Math.PI / 4 }, down: { hx: 13, hy: 17, a: Math.PI / 2 },
 };
 const FLIP_LEN = 26; // Salto-Dauer in Frames
+const DASH_LEN = 20, AIRDASH_LEN = 15, DASH_V = 3.7, DASH_AIR = 2.5; // Dash am Boden / in der Luft, Schwung danach
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 class Player {
@@ -85,6 +86,8 @@ class Player {
     this.canDouble = true; this.flipT = 0; this.scarf = null; this.hidden = false; this.coyote = 0; this.jumpBuf = 0; this.rageT = 0; this.sunk = false;
     this.chargeT = 0; this.crashT = 0; this.landT = 0; this.lastSafe = { cx: fx, feet: fy };
     this.atkDir = 'fwd'; this.slideT = 0; this.flingT = 0; this.trail = []; this.dangle = false; this.ring = null;
+    this.ledge = null; this.ledgeCool = 0; this.ledgeT = 0; this.climbT = 0; this.wallSlide = 0;
+    this.dashT = 0; this.dashCool = 0; this.airDash = false; this.canAirDash = true; this.dashCarry = false; this.tapDir = 0; this.tapT = 0; this.wallT = 0; this.wallLast = 0;
   }
   get cx() { return this.x + this.w / 2; }
   get cy() { return this.y + this.h / 2; }
@@ -181,6 +184,8 @@ class Player {
     this.dangle = false; W.combo.n = 0; W.combo.t = 0; W.stats.hits++;
     if (this.state === 'swing') { this.state = 'normal'; this.ring = null; }
     if (this.state === 'zip') { this.zip.line.cool = 40; this.state = 'normal'; this.zip = null; }
+    if (this.state === 'ledge' || this.state === 'climb') { this.state = 'normal'; this.ledge = null; this.ledgeCool = 30; }
+    this.wallSlide = 0; this.dashT = 0; this.dashCarry = false;
     this.hp -= dmg;
     Audio8.sfx('hurt'); Input.rumble(0.45, 0.7, 200);
     if (this.hp <= 0) { this.hp = 0; this.die(); return; }
@@ -246,6 +251,9 @@ class Player {
     if (this.state === 'zip') return this.updateZip(P);
     if (this.state === 'stairs') return this.updateStairs(I, P);
     if (this.state === 'toStair') return this.updateToStair(I);
+    if (this.ledgeCool > 0) this.ledgeCool--;
+    if (this.state === 'ledge') return this.updateLedge(I, P);
+    if (this.state === 'climb') return this.updateClimb();
 
     if (this.plat) { // Mitnahme; drehende Plattformen liefern die Bewegung des Standpunkts
       const [cdx, cdy] = this.plat.carryAt ? this.plat.carryAt(this.cx) : [this.plat.dx, this.plat.dy || 0];
@@ -264,6 +272,15 @@ class Player {
     }
 
     if (this.slideT > 0) return this.updateSlide(I);
+
+    // Dash: Dash-Taste (oder am Boden zweimal in Laufrichtung tippen); in der Luft einmal pro Sprung
+    if (this.dashCool > 0) this.dashCool--;
+    if (this.tapT > 0) this.tapT--;
+    const tap = P.left ? -1 : P.right ? 1 : 0;
+    let dashReq = P.dash;
+    if (tap) { if (this.onGround && tap === this.tapDir && this.tapT > 0) dashReq = true; this.tapDir = tap; this.tapT = 12; }
+    if (dashReq && this.dashT === 0 && this.dashCool === 0 && this.atkT === 0 && !this.dangle && (this.onGround || this.canAirDash)) this.startDash(tap || (I.right ? 1 : 0) - (I.left ? 1 : 0));
+    if (this.dashT > 0) return this.updateDash(I, P);
 
     // Angriff
     if (P.sub) this.tryAttack(true, true);
@@ -299,37 +316,155 @@ class Player {
       }
     } else {
       if (this.flingT > 0) { this.flingT--; this.vx += (mx * WALK - this.vx) * 0.05; } // Schwung nach dem Pendeln
-      else this.vx = mx * WALK;
+      else this.vx = mx * (this.dashCarry ? DASH_AIR : WALK); // nach einem Dash bleibt der Schwung bis zur Landung
       if (mx && this.atkT === 0) this.face = mx;
       if (this.coyote > 0) this.coyote--;
       if (this.jumpBuf > 0) this.jumpBuf--;
+      const wall = this.wallDir();
+      if (wall) { this.wallLast = wall; this.wallT = 6; } else if (this.wallT > 0) this.wallT--;
       if (P.jump && this.coyote > 0 && !this.jumping) { // Coyote-Time: kurz nach der Kante zählt noch als Bodensprung
         this.coyote = 0; this.vy = JUMP; this.jumping = true;
-      } else if (P.jump && !this.canDouble) this.jumpBuf = 8; // Sprungpuffer: kurz vor der Landung gedrückt
+      } else if ((P.jump || this.jumpBuf > 0) && wall && this.atkT === 0 && (mx === wall || this.wallSlide)) this.wallJump(wall); // Wandsprung (auch kurz vor dem Wandkontakt gedrückt)
+      else if (P.jump && !wall && this.wallT > 0 && this.atkT === 0) this.wallJump(this.wallLast); // knapp von der Wand gelöst: zählt noch
+      else if (P.jump && !this.canDouble) this.jumpBuf = 8; // Sprungpuffer: kurz vor der Landung (oder der Wand) gedrückt
       else if (P.jump && this.canDouble) { // Doppelsprung (einmal pro Luftphase)
         this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true;
         if (this.atkT === 0) this.flipT = FLIP_LEN;
         Audio8.sfx('djump'); W.puff(this.cx, this.feet);
       }
       if (!I.jump && this.vy < -1.6) this.vy = -1.6;
+      // An der Wand rutschen: zur Wand drücken bremst den Fall, der Held schaut von der Wand weg
+      const w2 = this.wallDir();
+      this.wallSlide = w2 && mx === w2 && this.vy > 0.4 && this.atkT === 0 && this.flingT <= 0 ? w2 : 0;
+      if (this.wallSlide) { this.face = -w2; if (W.frame % 6 === 0) W.dust(this.cx + w2 * 6, this.y + 6, 1); }
     }
     if (this.vx !== 0 && this.onGround) { this.walkT++; if (this.walkT % 20 === 1) { W.dust(this.cx - this.face * 4, this.feet, 1); this.footstep(); } } else if (this.onGround) this.walkT = 0;
 
-    this.vy = Math.min(this.vy + GRAV, MAXFALL);
+    this.vy = Math.min(this.vy + GRAV, this.wallSlide ? 1.25 : MAXFALL);
     Phys.moveX(this, this.vx);
     const wasGround = this.onGround;
     const r = Phys.moveY(this, this.vy);
     this.onGround = r === 1;
     if (this.onGround && !wasGround && this.vy > 2.4) { this.landT = 7; W.dust(this.cx, this.feet, 5); }
     if (r !== 0) { this.vy = 0; }
-    if (this.onGround) { this.jumping = false; this.canDouble = true; this.flipT = 0; this.flingT = 0; }
+    if (this.onGround) { this.jumping = false; this.canDouble = true; this.flipT = 0; this.flingT = 0; this.wallSlide = 0; this.canAirDash = true; this.dashCarry = false; }
     this.checkPlatforms();
+    if (this.onGround) this.wallSlide = 0;
     if (this.stairCool > 0) this.stairCool--;
     else if (!this.onGround && this.vy > 0 && !Input.held.down && this.catchStair()) return; // im Fallen mitten auf der Treppe landen (Unten gedrückt: hindurchfallen)
+    if (!this.onGround && this.tryLedge(mx)) return; // an der Kante festhalten
     if (!this.onGround && wasGround && !this.jumping && this.vy > 0) this.vx = 0;
     this.clampRoom();
     this.hazards();
     this.trackSafe();
+  }
+
+  // ---------- Dash und Luft-Dash ----------
+  startDash(dir) {
+    if (dir) this.face = dir;
+    this.airDash = !this.onGround; if (this.airDash) { this.canAirDash = false; this.vy = 0; }
+    this.dashT = this.airDash ? AIRDASH_LEN : DASH_LEN;
+    this.setCrouch(false); this.flipT = 0; this.wallSlide = 0; this.flingT = 0;
+    Audio8.sfx('whoosh'); W.dust(this.cx - this.face * 4, this.feet - (this.airDash ? 12 : 0), 3); Input.rumble(0.2, 0.3, 80);
+  }
+  updateDash(I, P) {
+    this.dashT--;
+    const len = this.airDash ? AIRDASH_LEN : DASH_LEN, k = this.dashT / len;
+    this.vx = this.face * (DASH_AIR + (DASH_V - DASH_AIR) * Math.min(1, k * 1.5));
+    if (P.sub) this.tryAttack(true, true);
+    else if (P.attack) this.tryAttack(false, false);
+    this.tickAttack();
+    if (this.state !== 'normal') { this.dashT = 0; return; }
+    const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
+    if (P.jump) { // Sprung aus dem Dash: der Schwung bleibt bis zur Landung
+      this.dashT = 0; this.dashCool = 6; this.dashCarry = true;
+      if (this.onGround) { this.vy = JUMP; this.onGround = false; this.jumping = true; return; }
+      const wall = this.wallDir();
+      if (wall) return this.wallJump(wall);
+      if (this.canDouble) { this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true; this.flipT = FLIP_LEN; Audio8.sfx('djump'); W.puff(this.cx, this.feet); }
+      return;
+    }
+    if (mx === -this.face) this.dashT = 0; // Gegenrichtung bricht ab
+    this.vy = this.airDash ? 0 : Math.min(this.vy + GRAV, MAXFALL);
+    if (Phys.moveX(this, this.vx)) this.dashT = 0;
+    const was = this.onGround, r = Phys.moveY(this, this.vy);
+    this.onGround = r === 1; if (r) this.vy = 0;
+    this.checkPlatforms();
+    if (was && !this.onGround) this.dashCarry = true; // über die Kante gedasht
+    if (this.onGround) { this.canAirDash = true; this.canDouble = true; this.jumping = false; if (W.frame % 3 === 0) W.dust(this.cx - this.face * 5, this.feet, 1); }
+    if (this.dashT === 0) { this.dashCool = 8; this.dashCarry = !this.onGround; }
+    this.clampRoom(); this.hazards(); this.trackSafe();
+  }
+
+  // ---------- Wandsprung, Kantengriff, Hochziehen ----------
+  // Echte Wand direkt neben dem Helden (mindestens zwei Kacheln hoch, ganze Körperhöhe) – dünne Simse zählen nicht,
+  // sonst würde ein Doppelsprung an einer Plattformkante zum Wandsprung. Raumränder zählen ebenfalls nicht.
+  wallDir() {
+    const r0 = Math.floor((this.y + 3) / T), r1 = Math.floor((this.y + this.h - 4) / T);
+    if (r1 - r0 < 1) return 0;
+    for (const d of [1, -1]) {
+      const c = d > 0 ? Math.floor((this.x + this.w + 1.5) / T) : Math.floor((this.x - 1.5) / T);
+      if (c < 0 || c >= W.room.w) continue;
+      let ok = true;
+      for (let r = r0; r <= r1 && ok; r++) ok = Phys.solidTile(c, r) && Phys.tile(c, r) !== '^';
+      if (ok) return d;
+    }
+    return 0;
+  }
+  wallJump(wall) {
+    this.vy = JUMP; this.vx = -wall * 2.1; this.flingT = 10; this.face = -wall; this.wallT = 0; this.jumpBuf = 0;
+    this.jumping = true; this.canDouble = true; this.wallSlide = 0; this.flipT = 0; this.ledgeCool = 8; this.coyote = 0; this.canAirDash = true; this.dashCarry = false; this.dashT = 0;
+    Audio8.sfx('djump'); W.dust(this.cx + wall * 6, this.feet - 8, 4);
+  }
+  // Im Fallen mit Richtung zur Wand: liegt eine freie Kante auf Kopfhöhe, greift der Held zu
+  tryLedge(mx) {
+    if (!mx || this.ledgeCool > 0 || this.atkT || this.vy < -0.4 || this.h !== 28 || this.dangle || this.state !== 'normal') return false;
+    const c = mx > 0 ? Math.floor((this.x + this.w + 1.5) / T) : Math.floor((this.x - 1.5) / T);
+    if (c < 0 || c >= W.room.w) return false;
+    const edgeX = mx > 0 ? c * T : (c + 1) * T;
+    if (Math.abs((mx > 0 ? this.x + this.w : this.x) - edgeX) > 2) return false;
+    for (let r = Math.floor((this.y - 8) / T); r <= Math.floor((this.y + 10) / T); r++) {
+      const top = r * T;
+      if (this.y < top - 8 || this.y > top + 10) continue;
+      if (!Phys.solidTile(c, r) || Phys.tile(c, r) === '^' || Phys.solidTile(c, r - 1) || Phys.solidTile(c, r - 2)) continue;
+      if (Phys.rectSolid(this.x, top - 29, this.w, 29)) continue; // über dem Kopf muss Platz zum Hochziehen sein
+      const hs = this.H.hang;
+      this.state = 'ledge'; this.ledge = { c, r, dir: mx, top }; this.ledgeT = 0; this.face = mx;
+      this.vx = 0; this.vy = 0; this.jumping = false; this.canDouble = true; this.flipT = 0; this.flingT = 0; this.wallSlide = 0; this.plat = null;
+      this.canAirDash = true; this.dashCarry = false;
+      this.x = mx > 0 ? edgeX - this.w : edgeX;
+      this.y = top + (hs.h - hs.hand[1]) - 1 - this.h;
+      Audio8.sfx('step', this.cx); W.dust(edgeX, top, 2);
+      return true;
+    }
+    return false;
+  }
+  updateLedge(I, P) {
+    const L = this.ledge, mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
+    this.ledgeT++;
+    if (!Phys.solidTile(L.c, L.r)) return this.dropLedge(); // Kante zerbrochen
+    if (this.ledgeT < 5) return; // kurz festhalten, damit ein gehaltener Sprung nicht sofort auslöst
+    if (P.jump && mx === -L.dir) { this.state = 'normal'; this.ledge = null; return this.wallJump(L.dir); } // von der Wand abstoßen
+    if (P.jump || P.up || (I.up && this.ledgeT > 10) || (mx === L.dir && this.ledgeT > 16)) { // hochziehen
+      this.state = 'climb'; this.climbT = 0; this.climbFeet = this.feet; this.climbX = this.x;
+      Audio8.sfx('whoosh'); return;
+    }
+    if (P.down || (I.down && this.ledgeT > 8)) this.dropLedge();
+  }
+  dropLedge() {
+    this.state = 'normal'; this.ledge = null; this.vy = 0.6; this.onGround = false; this.ledgeCool = 18; this.jumping = true;
+  }
+  updateClimb() {
+    const L = this.ledge, k = ++this.climbT, N1 = 10, N2 = 8;
+    if (k <= N1) { const e = k / N1; this.y = this.climbFeet + (L.top - this.climbFeet) * (1 - (1 - e) * (1 - e)) - this.h; }
+    else {
+      const e = (k - N1) / N2, x1 = L.dir > 0 ? L.c * T + 3 : (L.c + 1) * T - 3 - this.w;
+      this.x = this.climbX + (x1 - this.climbX) * e; this.y = L.top - this.h;
+    }
+    if (k >= N1 + N2) {
+      this.state = 'normal'; this.ledge = null; this.onGround = true; this.vy = 0; this.vx = 0; this.landT = 4; this.ledgeCool = 10;
+      W.dust(this.cx, this.feet, 2); Audio8.sfx('step', this.cx); this.trackSafe();
+    }
   }
 
   checkPlatforms() {
@@ -344,7 +479,8 @@ class Player {
       if (inX && prevFeet <= top + 3 + slack && this.feet >= top - up && this.feet <= top + 10 + slack) {
         if (p.onStand) p.onStand();
         this.ridePlat = p;
-        this.y = top - this.h; this.vy = 0; this.onGround = true; this.jumping = false; this.canDouble = true; this.flipT = 0;
+        this.y = top - this.h; this.vy = 0; this.onGround = true; this.jumping = false; this.canDouble = true; this.flipT = 0; this.canAirDash = true;
+        if (this.dashT === 0) this.dashCarry = false;
         if (this.state === 'hurt') { this.state = 'normal'; this.vx = 0; }
         this.plat = p;
       }
@@ -373,6 +509,7 @@ class Player {
 
   fallPenalty(dmg) {
     if (!this.alive || W.cleared) return;
+    this.fellAt = W.frame; // Brücke: Einsturz zurücksetzen
     if (this.hp <= dmg) { this.hp = 0; this.die(true); return; }
     this.hp -= dmg;
     Audio8.sfx('hurt'); Input.rumble(0.5, 0.8, 250);
@@ -386,7 +523,7 @@ class Player {
   trackSafe() {
     if (!this.onGround || this.plat || this.state !== 'normal') return;
     const row = Math.floor((this.feet + 1) / T);
-    const ok = (c) => { const ch = Phys.tile(c, row); return ch === '#' || ch === '='; };
+    const ok = (c) => { const ch = Phys.tile(c, row); return ch === '#' || ch === '=' || ch === 'B'; };
     if (ok(Math.floor((this.x - 3) / T)) && ok(Math.floor((this.x + this.w + 3) / T))) this.lastSafe = { cx: this.cx, feet: this.feet };
   }
 
@@ -612,7 +749,7 @@ class Player {
   recordTrail() {
     this.trail.forEach(t => t.life--);
     this.trail = this.trail.filter(t => t.life > 0);
-    const fast = this.flipT > 0 || this.crashT > 0 || this.slideT > 0 || this.state === 'swing' || this.state === 'zip' || this.flingT > 25;
+    const fast = this.flipT > 0 || this.crashT > 0 || this.slideT > 0 || this.dashT > 0 || this.state === 'swing' || this.state === 'zip' || this.flingT > 25;
     if (!fast || W.frame % 2) return;
     if (this.flipT > 0 && !this.atkT && this.state === 'normal' && !this.onGround) {
       this.trail.push({ tuck: true, rot: this.saltoAngle(), x: this.cx, y: this.feet - 15, flip: this.face < 0, life: 10 });
@@ -630,11 +767,14 @@ class Player {
     if (this.state === 'dead') return this.onGround ? H.dead : H.hurt;
     if (this.state === 'hurt') return H.hurt;
     if (this.state === 'swing' || this.state === 'zip') return H.swing;
+    if (this.state === 'ledge') return H.hang;
+    if (this.state === 'climb') return this.climbT <= 10 ? H.climb : H.crouch;
     if (this.slideT > 0) return H.crouch;
     if (this.state === 'stairs') {
       if (this.atkT) return (this.stairUpPose ? H.satkUp : H.satkDown)[p];
       return (this.stairUpPose ? H.stairUp : H.stairDown)[Math.floor(this.stairPos / 8) % 2];
     }
+    if (this.dashT > 0 && !this.atkT) return this.airDash ? H.adash : H.dash;
     if (this.crashT > 0) return H.atk[2];
     if (this.atkT) {
       if (this.crouchAtk) return H.catk[p];
@@ -642,6 +782,7 @@ class Player {
     }
     if (this.dangle && this.vx === 0 && this.onGround) return H.atk[2];
     if (this.state === 'toStair') return H.walk[Math.floor(this.walkT / 5) % 8];
+    if (this.wallSlide && !this.onGround) return H.wall;
     if (!this.onGround) return this.vy < -1.2 ? H.jumpUp : this.vy < 1.3 ? H.jumpApex : H.jumpFall;
     if (this.crouch) return H.crouch;
     if (this.landT > 0) return H.land;

@@ -266,13 +266,116 @@ class GiantSkeleton extends Boss {
   }
 }
 
+// ---------------- Graf Nachtmahr, von Hand gemalt (100×88) ----------------
+// Hageres, bleiches Gesicht mit Witwenspitze, spitzen Ohren, roten Augen und Fangzähnen; hoher Stehkragen mit rotem Futter,
+// Frack, rote Weste mit Goldknöpfen, Jabot und Blutstein-Medaillon. Der Umhang ist geschlossen eine dunkle Säule, geöffnet
+// spannt er sich wie Fledermausflügel mit Knochenrippen und gezacktem Saum, beim Zaubern reißt der Graf ihn über den Kopf.
+const COUNT_ART = (() => {
+  const W = 100, H = 88, cx = 50;
+  const OUT = ['#08050e', '#120a1c', '#1e122c', '#2c1c40', '#3c2a54'], LIN = ['#3c000c', '#640816', '#901022', '#b81c30', '#e03848'];
+  const SUIT = ['#06050a', '#100e16', '#1c1824', '#2c2838'], SK = ['#4c4460', '#857c9c', '#b8b0cc', '#e4e0f4'], GOLD = ['#6c4c08', '#c89020', '#f8d878'];
+  function paint(pose) {
+    const c = Sprites.canvas(W, H), x = c.getContext('2d');
+    const R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(Math.round(a), Math.round(b), w, h); };
+    const poly = (pts, col) => { x.fillStyle = col; x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) x.lineTo(p[0], p[1]); x.closePath(); x.fill(); };
+    const line = (x0, y0, x1, y1, col) => { const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))); for (let k = 0; k <= n; k++) R(col, x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n); };
+    const ell = (ex, ey, rx, ry, f) => { for (let y = Math.floor(ey - ry); y <= ey + ry; y++) for (let X = Math.floor(ex - rx); X <= ex + rx; X++) { const q = ((X + 0.5 - ex) / rx) ** 2 + ((y + 0.5 - ey) / ry) ** 2; if (q <= 1) f(X, y, q); } };
+    const claw = (hx, hy, dir, up) => { // bleiche Hand mit langen Krallen
+      ell(hx, hy, 2.4, 2.2, (X, y, q) => R(q < 0.4 ? SK[3] : SK[2], X, y));
+      for (let k = -1; k <= 2; k++) { const fx = hx + dir * (1 + k * 0.4), fy = hy + (up ? -1 : 1) * 1; line(fx, fy, fx + dir * (2 + (k === 1 ? 1 : 0)) + k * 0.6, fy + (up ? -4 : 4), k === 1 ? SK[2] : SK[1]); R('#e8e0d0', fx + dir * (2.5 + (k === 1 ? 1 : 0)) + k * 0.6, fy + (up ? -4.5 : 4.5)); }
+    };
+    // ---------- Umhang hinten ----------
+    if (pose === 'closed') {
+      poly([[cx - 15, 29], [cx + 15, 29], [cx + 24, 87], [cx - 24, 87]], OUT[1]);
+      for (let X = cx - 24; X <= cx + 24; X++) for (let y = 30; y < 88; y++) { // Falten, Licht von links
+        const half = 15 + (y - 29) / 58 * 9; if (Math.abs(X - cx) > half) continue;
+        const u = (X - cx) / half, fold = Math.sin(u * 7 + y * 0.03) > 0.55;
+        R(fold ? OUT[3] : u < -0.4 ? OUT[2] : u > 0.5 ? OUT[0] : OUT[1], X, y);
+      }
+      poly([[cx - 2, 36], [cx + 2, 36], [cx + 6, 87], [cx - 6, 87]], LIN[1]); line(cx - 2, 36, cx - 6, 87, LIN[3]); line(cx + 2, 36, cx + 6, 87, LIN[0]); // Spalt mit rotem Futter
+      for (let k = 0; k < 9; k++) { R(OUT[4], cx - 24 + k * 1.2, 86 - (k % 2) * 2, 2, 1); R(OUT[4], cx + 16 + k, 86 - (k % 2) * 2, 2, 1); } // Saum
+    } else {
+      const lift = pose === 'cast';
+      for (const s of [-1, 1]) { // Flügel: Schulter → Hand → gezackter Saum bis zum Boden
+        const sh = [cx + s * 10, 30], hand = lift ? [cx + s * 15, 3] : [cx + s * 39, 22], tip = [cx + s * (lift ? 47 : 46), lift ? 70 : 64];
+        const scal = []; const n = 4;
+        for (let k = 0; k <= n; k++) { const t = k / n, bx = tip[0] + (cx + s * 13 - tip[0]) * t, by = tip[1] + (87 - tip[1]) * t; scal.push([bx, by]); if (k < n) scal.push([bx + (cx + s * 13 - tip[0]) / n * 0.5 - s * 2, by + (87 - tip[1]) / n * 0.5 - 6]); }
+        poly([sh, hand, tip, ...scal, [cx + s * 12, 87], [cx + s * 9, 40]], OUT[1]); // Außenrand
+        const inner = [[sh[0] + s * 1, sh[1] + 2], [hand[0] - s * 1, hand[1] + 2], [tip[0] - s * 2, tip[1] - 1], ...scal.map(([a, b]) => [a - s * 2, b - 2]), [cx + s * 12, 85], [cx + s * 9, 41]];
+        poly(inner, LIN[2]); // rotes Futter
+        for (const [a, b] of scal.filter((_, i) => i % 2 === 0)) { line(hand[0], hand[1] + 1, a - s * 1, b - 2, LIN[0]); line(hand[0] - s, hand[1] + 2, a - s * 2, b - 3, LIN[3]); } // Knochenrippen mit Glanz
+        for (let k = 0; k < 40; k++) { const t = k / 40; R(LIN[4], sh[0] + (hand[0] - sh[0]) * t, sh[1] + 2 + (hand[1] - sh[1]) * t, 1, 1); } // Glanzkante oben
+        // Arm im Ärmel entlang der Oberkante, Hand mit Krallen
+        line(sh[0], sh[1], hand[0], hand[1], SUIT[2]); line(sh[0], sh[1] + 1, hand[0], hand[1] + 1, SUIT[1]); line(sh[0], sh[1] - 1, hand[0], hand[1] - 1, SUIT[3]);
+        R('#e8e4dc', hand[0] - s * 2, hand[1] - 1, 2, 3); // Manschette
+        claw(hand[0] + s * 1, hand[1] - (lift ? 2 : 0), s, lift);
+      }
+    }
+    // ---------- Beine, Stiefel ----------
+    for (const s of [-1, 1]) { R(SUIT[1], cx + s * 4 - 2.5, 62, 5, 22); R(SUIT[2], cx + s * 4 - 2.5, 62, 1, 22); R(SUIT[0], cx + s * 4 - 3.5, 83, 7, 4); R(SUIT[3], cx + s * 4 - 2.5, 83, 3, 1); }
+    // ---------- Rumpf: Frack, Weste, Goldknöpfe, Jabot, Medaillon ----------
+    poly([[cx - 11, 30], [cx + 11, 30], [cx + 8, 63], [cx - 8, 63]], SUIT[1]);
+    poly([[cx - 11, 30], [cx - 6, 30], [cx - 5, 63], [cx - 8, 63]], SUIT[2]);
+    poly([[cx - 4, 33], [cx + 4, 33], [cx + 3, 58], [cx - 3, 58]], '#6c0c1c'); line(cx - 4, 33, cx - 3, 58, '#9c1c2c');
+    for (let k = 0; k < 4; k++) R(GOLD[2], cx, 40 + k * 5, 1, 1);
+    for (let y = 28; y < 37; y++) { const wd = 3 + (y % 3 === 0 ? 1 : 0); R(y % 2 ? '#f0ece4' : '#c8c4bc', cx - wd / 2, y, wd, 1); } // Jabot
+    line(cx - 5, 33, cx, 39, GOLD[1]); line(cx + 5, 33, cx, 39, GOLD[1]); ell(cx, 41, 2.2, 2.4, (X, y, q) => R(q < 0.35 ? '#fc6c6c' : q < 0.7 ? '#d81c1c' : GOLD[1], X, y)); // Medaillon
+    R(SUIT[0], cx - 11, 30, 22, 1);
+    if (pose === 'closed') { // der Umhang umhüllt den Körper vorn bis auf einen Spalt; eine Hand hält ihn zu
+      for (const sd of [-1, 1]) for (let y = 31; y < 88; y++) {
+        const outer = 15 + (y - 29) / 58 * 9, inner = 2 + (y - 31) / 56 * 3 + (sd > 0 && y > 40 && y < 50 ? 2 : 0);
+        for (let X = Math.round(cx + sd * inner); sd > 0 ? X <= cx + outer : X >= cx - outer; X += sd) {
+          const u = (X - cx) / outer, fold = Math.sin(u * 8 + y * 0.04) > 0.6;
+          R(fold ? OUT[3] : u < -0.45 ? OUT[2] : u > 0.55 ? OUT[0] : OUT[1], X, y);
+        }
+        R(sd < 0 ? OUT[4] : OUT[2], cx + sd * inner, y, 1, 1); // Kante des Umhangs
+      }
+      claw(cx + 4, 46, -1, false); R(SUIT[2], cx + 5, 44, 4, 3);
+    }
+    // ---------- Stehkragen hinter dem Kopf ----------
+    for (const s of [-1, 1]) {
+      poly([[cx + s * 6, 30], [cx + s * 9, 30], [cx + s * 17, 2], [cx + s * 13, 6], [cx + s * 6, 22]], OUT[1]);
+      poly([[cx + s * 7, 28], [cx + s * 9, 28], [cx + s * 15, 6], [cx + s * 12, 9], [cx + s * 7, 21]], LIN[s < 0 ? 3 : 2]);
+      line(cx + s * 9, 30, cx + s * 17, 2, GOLD[1]);
+    }
+    // ---------- Kopf ----------
+    R(SK[1], cx - 3, 24, 6, 6); R(SK[0], cx + 1, 24, 2, 6); // Hals
+    ell(cx, 16, 7.2, 10, (X, y, q) => { // hageres Gesicht, Licht von links oben, eingefallene Wangen
+      let l = -(X - cx) / 7 * 0.5 - (y - 16) / 10 * 0.3 + (1 - q) * 0.7;
+      if (Math.abs(X - cx) > 3 && y > 17 && y < 23) l -= 0.4;
+      if (y > 23 && Math.abs(X - cx) > 2) l -= 0.2;
+      R(l > 0.95 ? SK[3] : l > 0.55 ? SK[2] : l > 0.15 ? SK[1] : SK[0], X, y);
+    });
+    for (const s of [-1, 1]) { line(cx + s * 7, 13, cx + s * 11, 9, SK[1]); line(cx + s * 7, 15, cx + s * 10, 10, SK[0]); R(SK[2], cx + s * 7.5, 13, 1, 2); } // spitze Ohren
+    for (let X = cx - 8; X <= cx + 8; X++) { // Haar zurückgekämmt, Witwenspitze
+      const top = 6 + Math.abs(X - cx) * 0.05, peak = 12 - Math.abs(X - cx) * 0.9;
+      for (let y = Math.floor(top); y < Math.max(top + 2, Math.min(15, peak)); y++) if (((X - cx) / 8.5) ** 2 + ((y - 13) / 8) ** 2 < 1) R((X + y) % 4 ? '#06040a' : '#24203a', X, y);
+    }
+    R('#3c3858', cx - 4, 7, 3, 1); // Glanz im Haar
+    for (const s of [-1, 1]) { line(cx + s * 2, 13, cx + s * 6, 11, '#06040a'); R('#06040a', cx + s * 2, 14, 1, 1); } // böse Brauen
+    for (const s of [-1, 1]) { R('#1c0c18', cx + s * 3.5 - 1.5, 15, 3, 2); R('#fc1c1c', cx + s * 3 - (s > 0 ? 0 : 1), 15, 2, 1); R('#fca0a0', cx + s * 3 - (s > 0 ? 0 : 1), 15, 1, 1); } // tiefe Augenhöhlen, rote Augen
+    R(SK[0], cx, 17, 1, 4); R(SK[3], cx - 1, 17, 1, 3); // Nase
+    R('#3c0818', cx - 3, 23, 6, 1); R('#7c1028', cx - 2, 24, 4, 1); R('#fcfcf0', cx - 2, 24, 1, 2); R('#fcfcf0', cx + 1, 24, 1, 2); // Mund mit Fängen
+    R(SK[0], cx - 1, 25, 3, 1);
+    // Pixel-Look: weiche Kanten der Flächen weg (Alpha hart)
+    const img = x.getImageData(0, 0, W, H), d = img.data;
+    for (let i = 3; i < d.length; i += 4) d[i] = d[i] < 110 ? 0 : 255;
+    x.putImageData(img, 0, 0);
+    return Sprites.fromCanvas(c);
+  }
+  let art = null;
+  return { get: () => art || (art = { closed: paint('closed'), open: paint('open'), cast: paint('cast') }) };
+})();
+
 class Count extends Boss {
+  // Graf Nachtmahr: mehr als doppelt so groß wie der Held, umhüllt von dunklem Nebel, mit glühenden Augen. Er zerfällt
+  // in Fledermäuse und setzt sich an anderer Stelle wieder zusammen; ab der Hälfte schwebt er, lässt Blut regnen.
   constructor(ax, aw) {
-    super(ax + aw - 80, 176 - 36, 16, 36, 24, 3);
-    this.ax = ax; this.aw = aw; this.state = 'appear'; this.timer = 0; this.cycle = 0; this.score = 10000;
+    super(ax + aw - 96, 176 - 80, 24, 80, 28, 4);
+    this.ax = ax; this.aw = aw; this.state = 'appear'; this.timer = 0; this.cycle = 0; this.score = 10000; this.hover = 0;
   }
   vulnerable() { return this.state === 'open'; }
-  hurtBox() { return { x: this.x - 3, y: this.y, w: this.w + 6, h: 26 }; }
+  hurtBox() { return { x: this.x - 6, y: this.y + 2 + this.hover, w: this.w + 12, h: 54 }; }
   update() {
     this.tick();
     if (this.dying) {
@@ -280,28 +383,41 @@ class Count extends Boss {
       return this.updateDeath(170);
     }
     const p = W.player, phase2 = this.hp <= this.maxHp / 2;
+    this.hover = phase2 ? -6 + Math.sin(this.t * 0.07) * 4 : 0;
+    if (this.t % 5 === 0 && this.state !== 'vanish') { // dunkler Nebel steigt aus dem Umhang
+      W.spawn(new Particle(this.cx + rnd(-16, 16), this.y + this.h - rnd(0, 10), rnd(-0.3, 0.3), -rnd(0.3, 0.8), Math.random() < 0.5 ? '#2c0c3c' : '#140418', 46, 3, -0.004));
+    }
     switch (this.state) {
       case 'appear':
-        if (this.timer === 1) Audio8.sfx('teleport');
+        if (this.timer === 1) { Audio8.sfx('teleport'); this.bats(6, true); }
         if (this.timer > 36) { this.state = 'closed'; this.timer = 0; }
         break;
       case 'closed':
-        if (this.timer > (phase2 ? 14 : 22)) { this.state = 'open'; this.timer = 0; }
+        if (this.timer > (phase2 ? 14 : 22)) { this.state = 'open'; this.timer = 0; if (this.cycle % 3 === 0) Audio8.sfx('growl', this.cx); }
         break;
       case 'open':
-        if (this.timer === 10) this.aimFire(phase2 ? 4 : 3, 0.28, phase2 ? 1.7 : 1.45);
+        if (this.timer === 10) this.aimFire(phase2 ? 5 : 3, 0.26, phase2 ? 1.75 : 1.5);
         if (phase2 && this.timer === 30 && this.cycle % 2 === 1) this.summonBats();
-        if (this.timer > (phase2 ? 80 : 100)) { this.state = 'vanish'; this.timer = 0; Audio8.sfx('teleport'); }
+        if (phase2 && this.timer === 34 && this.cycle % 2 === 0) this.bloodRain();
+        if (this.timer > (phase2 ? 84 : 100)) { this.state = 'vanish'; this.timer = 0; Audio8.sfx('teleport'); this.bats(10, false); }
         break;
       case 'vanish':
         if (this.timer > 28) {
           let nx, tries = 0;
-          do { nx = this.ax + rnd(24, this.aw - 40); } while (Math.abs(nx + 8 - p.cx) < 64 && ++tries < 20);
+          do { nx = this.ax + rnd(24, this.aw - 56); } while (Math.abs(nx + 12 - p.cx) < 72 && ++tries < 20);
           this.x = nx; this.state = 'appear'; this.timer = 0; this.cycle++;
         }
         break;
     }
     if (this.state === 'closed' || this.state === 'open') this.touch();
+  }
+  bats(n, inward) { // zerfällt in Fledermäuse bzw. setzt sich aus ihnen zusammen
+    for (let i = 0; i < n; i++) { const b = new SwarmBat(this.cx + rnd(-14, 14), this.y + rnd(8, 50)); if (inward) { b.x -= b.vx * 25; b.y -= b.vy * 25; b.t = 125; } W.spawn(b); } // hinein: von außen auf den Körper zu
+  }
+  bloodRain() { // Arme hoch: aus der Decke regnet brennendes Blut, mit einer Lücke beim Helden
+    const p = W.player, gap = Math.floor(rnd(-1, 2));
+    for (let k = -4; k <= 4; k++) if (k !== gap && k !== gap + 1) W.spawn(new EProj('fire', p.cx + k * 26 + rnd(-4, 4), W.cam.y - 6 - Math.abs(k) * 6, 0, 1.4, 0.05));
+    Audio8.sfx('roar', this.cx); W.shake = Math.max(W.shake, 6);
   }
   summonBats() {
     [-1, 1].forEach(side => {
@@ -313,15 +429,27 @@ class Count extends Boss {
   }
   draw(ctx) {
     if (this.dying && (this.dying & 2)) return;
-    const C = Sprites.S.count;
-    if ((this.state === 'appear' || this.state === 'vanish') && (this.t & 2)) return;
-    const s = this.state === 'open' ? C.open : C.closed;
-    this.spr(ctx, s, W.player.cx < this.cx, 0, 0, this.flash);
-    if (this.state === 'open' && this.timer < 10) { // Augenblitz
-      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.7;
-      ctx.drawImage(FX.disc(8, [252, 40, 40], [0.7, 0.4, 0.15]), Math.round(this.cx - 8 - W.cam.x), Math.round(this.y - 2 - W.cam.y));
-      ctx.restore();
-    }
+    const C = COUNT_ART.get(), phase2 = this.hp <= this.maxHp / 2;
+    const fading = this.state === 'appear' ? 1 - this.timer / 36 : this.state === 'vanish' ? this.timer / 28 : 0;
+    const X = Math.round(this.cx - W.cam.x), Y = Math.round(this.y + this.h - W.cam.y);
+    // dunkle Aura am Boden und um den Umhang
+    ctx.save(); ctx.globalAlpha = 0.55 * (1 - fading);
+    const g = ctx.createRadialGradient(X, Y - 36, 4, X, Y - 36, 56); g.addColorStop(0, 'rgba(40,0,50,0.7)'); g.addColorStop(1, 'rgba(20,0,30,0)');
+    ctx.fillStyle = g; ctx.fillRect(X - 58, Y - 96, 116, 106);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(X, Y, 22, 4, 0, 0, Math.PI * 2); ctx.fill(); // Schatten
+    ctx.restore();
+    if (fading > 0.02 && (this.t & 1)) return; // flackernd beim Zerfallen
+    const cast = this.state === 'open' && phase2 && this.timer > 24 && this.timer < 48;
+    const s = this.state === 'open' ? (cast ? C.cast : C.open) : C.closed;
+    if (fading > 0) ctx.globalAlpha = Math.max(0.2, 1 - fading);
+    this.spr(ctx, s, W.player.cx < this.cx, 0, this.hover, this.flash);
+    ctx.globalAlpha = 1;
+    // glühende Augen mit Lichthof; beim Öffnen ein Augenblitz
+    const ex = X, ey = Math.round(this.y + 7 + this.hover - W.cam.y);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = this.state === 'open' && this.timer < 12 ? 0.85 : 0.35 + 0.15 * Math.sin(this.t * 0.2);
+    ctx.drawImage(FX.disc(this.state === 'open' && this.timer < 12 ? 12 : 6, [252, 30, 30], [0.8, 0.45, 0.15]), ex - (this.state === 'open' && this.timer < 12 ? 12 : 6), ey - (this.state === 'open' && this.timer < 12 ? 12 : 6));
+    ctx.restore();
   }
 }
 

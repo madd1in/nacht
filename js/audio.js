@@ -243,10 +243,13 @@ const Audio8 = (() => {
   const CH = { Em: ['e4', 'g4', 'b4'], Am: ['a3', 'c4', 'e4'], B: ['b3', 'd#4', 'f#4'], C: ['c4', 'e4', 'g4'], G: ['g3', 'b3', 'd4'], D: ['d4', 'f#4', 'a4'] };
   const CH_B = { Em: 'e2', Am: 'a1', B: 'b1', C: 'c2', G: 'g1', D: 'd2' };
   const CH_C = ['Em', 'Em', 'Am', 'B', 'Em', 'C', 'Am', 'B', 'G', 'D', 'Em', 'C', 'Am', 'B', 'Em', 'B'];
-  // Bibliothek – Cembalo-Menuett als Totentanz (a-Moll, 3/4, 12 Schritte pro Takt)
+  // Bibliothek & Uhrturm – Cembalo-Toccata als Totentanz (a-Moll, 172 BPM): rauschende Cembalo-16tel, Oktavbass, Four-on-the-floor
   const LB = { Am: ['a3', 'c4', 'e4'], E: ['g#3', 'b3', 'e4'], Dm: ['d4', 'f4', 'a4'], G: ['g3', 'b3', 'd4'], C: ['c4', 'e4', 'g4'], F: ['f3', 'a3', 'c4'] };
-  const LB_B = { Am: ['a1', 'a2'], E: ['e1', 'e2'], Dm: ['d2', 'd3'], G: ['g1', 'g2'], C: ['c2', 'c3'], F: ['f1', 'f2'] };
-  const LB_C = ['Am', 'E', 'Am', 'Dm', 'G', 'C', 'F', 'E', 'Am', 'Dm', 'G', 'C', 'F', 'Dm', 'E', 'Am'];
+  const LB_B = { Am: ['a1', 'a2'], E: ['e2', 'e3'], Dm: ['d2', 'd3'], G: ['g1', 'g2'], C: ['c2', 'c3'], F: ['f1', 'f2'] };
+  const LB_C = ['Am', 'E', 'Am', 'G', 'F', 'C', 'Dm', 'E', 'Am', 'Dm', 'G', 'C', 'F', 'Dm', 'E', 'E'];
+  // Pauken auf der Eins und ein Paukenwirbel als Fill (Glasturm)
+  const PFOUR = 'p:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
+  const FILLP = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 p:1 h:1 p:1 h:1 p:1 p:1 p:1 p:1';
   const toccata = (a, b, c) => { const up = (n) => n.replace(/\d/, d => +d + 1); return `${a}:1 ${b}:1 ${c}:1 ${b}:1 ${a}:1 ${b}:1 ${c}:1 ${up(a)}:1 ${c}:1 ${up(a)}:1 ${up(b)}:1 ${up(a)}:1 ${c}:1 ${b}:1 ${a}:1 ${b}:1`; };
 
   const SONGS = {
@@ -348,29 +351,38 @@ const Audio8 = (() => {
       pad: 'd3+f#3+a3:16 d3+f#3+a3+d4:16',
       dr: 'k:2 s:2 k:2 s:4 k:2 k:2 c:10 -:8',
     },
-    // Glasturm: Orgel-Toccata zwischen den Buntglasfenstern
+    // Glasturm, Brücke und Thronsaal: Orgel-Toccata (e-Moll, 152 BPM) – Choral über rauschenden 16teln, dann ein
+    // rhythmischer B-Teil mit 32tel-Arpeggien; Pedalbass in treibenden 16teln, Pauken auf der Eins
     chapel: {
-      bpm: 126, loop: true, echo: { delay: 6, vol: 0.34 },
+      bpm: 152, loop: true, echo: { delay: 3, vol: 0.32 },
       p1: ['b4:8 e5:4 g5:4', 'f#5:4 e5:4 d#5:4 e5:4', 'c5:8 e5:4 a5:4', 'g5:4 f#5:4 d#5:8',
         'e5:8 b5:4 g5:4', 'e5:4 g5:4 c6:8', 'b5:4 a5:4 g5:4 e5:4', 'f#5:12 -:4',
         'd5:8 g5:4 b5:4', 'a5:4 f#5:4 d5:8', 'e5:4 g5:4 b5:4 e6:4', 'd6:4 c6:4 b5:4 g5:4',
-        'a5:8 c6:4 e6:4', 'd#6:4 c6:4 b5:4 a5:4', 'g5:4 f#5:4 e5:8', 'd#5:8 f#5:4 b4:4'].join(' '),
-      p2: CH_C.map(c => toccata(...CH[c])).join(' '),
-      tri: CH_C.map(c => { const lo = CH_B[c], hi = lo.replace(/\d/, d => +d + 1); return `${lo}:2 ${lo}:2 ${hi}:2 ${lo}:2 ${lo}:2 ${hi}:2 ${lo}:2 ${hi}:2`; }).join(' '), // Orgelpedal in Achteln
-      pad: CH_C.map(c => CH[c].join('+') + ':16').join(' '),
-      dr: CH_C.map((c, i) => i % 4 === 3 ? 'p:2 h:2 s:2 h:2 p:1 p:1 s:2 t:2 u:2' : i % 4 === 0 ? 'p:2 h:2 s:2 h:2 k:2 h:2 s:2 h:2' : 'k:2 h:2 s:2 h:2 k:2 k:2 s:2 o:2').join(' '),
+        'a5:8 c6:4 e6:4', 'd#6:4 c6:4 b5:4 a5:4', 'g5:4 f#5:4 e5:8', 'd#5:8 f#5:4 b4:4',
+        'e5:2 g5:2 b5:2 e6:4 d6:2 b5:2 g5:2', 'f#5:2 g5:2 a5:2 b5:2 g5:2 e5:2 b4:4', 'c6:2 b5:2 a5:2 e5:2 a5:2 c6:2 e6:4', 'd#6:2 c6:2 b5:2 f#5:2 d#5:4 b4:4',
+        'g5:2 b5:2 e6:4 g6:4 f#6:2 e6:2', 'e6:2 g6:2 c6:2 e6:2 g5:2 c6:2 e5:4', 'a5:2 c6:2 e6:2 a6:4 g6:2 f#6:2 e6:2', 'f#6:4 d#6:4 b5:4 a5:4',
+        'g5:2 b5:2 d6:4 b5:2 d6:2 g6:4', 'f#6:2 e6:2 d6:2 a5:2 f#5:2 a5:2 d6:4', 'e6:3 f#6:1 g6:4 f#6:2 e6:2 d#6:2 e6:2', 'c6:2 e6:2 g6:4 e6:2 c6:2 g5:4',
+        'a5:2 c6:2 e6:2 c6:2 a5:2 e5:2 c5:4', 'b4:2 d#5:2 f#5:2 b5:4 a5:2 g5:2 f#5:2', 'g5:4 f#5:2 e5:2 b5:4 e6:4', 'd#6:4 b5:4 f#5:4 d#5:4'].join(' '),
+      p2: CH_C.map(c => toccata(...CH[c])).join(' ') + ' ' + CH_C.map(c => arp3f(...CH[c])).join(' '),
+      tri: rep(CH_C.map(c => { const lo = CH_B[c]; return drive(lo, lo.replace(/\d/, d => +d + 1)); }).join(' '), 2), // Orgelpedal in 16teln
+      pad: rep(CH_C.map(c => CH[c].join('+') + ':16').join(' '), 2),
+      dr: rep([PFOUR, FOUR, FOUR, FILLS, PFOUR, FOUR, FOUR, FILLP].join(' '), 2) + ' ' + sectionB(),
     },
-    // Bibliothek: gebrochene Cembalo-Akkorde, Generalbass, Walzer-Schlag
+    // Bibliothek und Uhrturm: Cembalo-Toccata mit Ohrwurm-Melodie, im B-Teil 32tel-Arpeggien und galoppierende Kick
     library: {
-      bpm: 138, loop: true, echo: { delay: 3, vol: 0.3 },
-      p1: ['e5:4 a4:2 b4:2 c5:2 d5:2', 'e5:4 g#4:4 b4:4', 'c5:4 d5:2 c5:2 b4:2 a4:2', 'f5:4 a4:4 d5:4',
-        'd5:4 g5:2 f5:2 e5:2 d5:2', 'e5:4 c5:4 g4:4', 'a4:2 c5:2 f5:4 e5:2 d5:2', 'b4:6 g#4:2 e4:4',
-        'a4:2 c5:2 e5:2 a5:2 g5:2 f5:2', 'f5:4 d5:2 e5:2 f5:2 a5:2', 'g5:4 b4:2 c5:2 d5:2 g5:2', 'e5:6 d5:2 c5:4',
-        'c5:2 a4:2 f5:4 e5:2 d5:2', 'd5:2 f5:2 a5:4 g#5:2 f5:2', 'e5:2 g#5:2 b5:4 a5:2 g#5:2', 'a5:8 -:4'].join(' '),
-      p2: LB_C.map(c => { const [a, b, d] = LB[c]; return `${a}:2 ${b}:2 ${d}:2 ${a.replace(/\d/, n => +n + 1)}:2 ${d}:2 ${b}:2`; }).join(' '),
-      tri: LB_C.map(c => { const [lo, hi] = LB_B[c]; return `${lo}:4 ${hi}:2 ${lo}:2 ${hi}:4`; }).join(' '),
-      pad: LB_C.map(c => LB[c].join('+') + ':12').join(' '),
-      dr: LB_C.map((c, i) => i % 4 === 3 ? 'k:4 s:2 s:2 t:2 u:2' : 'k:4 h:4 h:4').join(' '),
+      bpm: 172, loop: true, echo: { delay: 3, vol: 0.3 },
+      p1: contrastLead(LB_C, LB, [
+        'a5:2 e5:1 a5:1 c6:2 b5:2 a5:2 e5:2 c5:2 e5:2', 'g#5:2 e5:1 g#5:1 b5:2 a5:2 g#5:2 e5:2 b4:2 e5:2',
+        'a5:2 c6:2 e6:3 d6:1 c6:2 b5:2 a5:2 g#5:2', 'b5:2 g5:2 d5:2 g5:2 b5:4 a5:2 g5:2',
+        'a5:2 f5:1 a5:1 c6:2 a5:2 f6:4 e6:2 d6:2', 'e6:3 d6:1 c6:2 g5:2 e5:2 g5:2 c6:4',
+        'd6:2 c6:2 a5:2 f5:2 d5:2 f5:2 a5:2 d6:2', 'b5:4 g#5:4 e5:4 g#5:2 b5:2',
+        'c6:2 b5:2 a5:2 e5:2 a5:3 b5:1 c6:4', 'd6:2 c6:2 a5:2 f5:2 d6:3 e6:1 f6:4',
+        'g6:2 f6:2 d6:2 b5:2 g5:2 b5:2 d6:4', 'e6:2 d6:2 c6:2 g5:2 e5:4 c6:4',
+        'a5:2 c6:2 f6:4 e6:2 d6:2 c6:2 a5:2', 'f6:2 e6:2 d6:2 a5:2 f5:2 a5:2 d6:4',
+        'e6:2 d6:2 b5:2 g#5:2 e6:2 g#6:2 b6:4', 'g#6:4 e6:2 b5:2 g#5:4 e5:4',
+      ]),
+      p2: LB_C.map(c => toccata(...LB[c])).join(' ') + ' ' + LB_C.map(c => arp3f(...LB[c])).join(' '),
+      tri: chordBass(LB_C, LB_B, drive), pad: chordPad(LB_C, LB), dr: section() + ' ' + sectionB(),
     },
     clear: {
       bpm: 150, loop: false,
@@ -527,25 +539,27 @@ const Audio8 = (() => {
     if (allDone && !song.loop) { const nx = nextSong; stop(); if (nx) play(nx); } // Jingle zu Ende → weiter mit dem nächsten Lied
   }
 
-  function play(name, then = null) {
+  // fade (s): beim Raumwechsel blendet das alte Lied aus und das neue weich ein, statt hart zu schneiden
+  function play(name, then = null, fade = 0) {
     if (!ac) { pending = then || name; return; }
     if (songName === name && song) return;
     if (!parsed[name]) return;
-    stop();
+    stop(song ? fade : 0);
     song = parsed[name]; songName = name; nextSong = then;
-    const t0 = ac.currentTime + 0.05;
+    const t0 = ac.currentTime + 0.05 + (fade ? fade * 2 : 0);
     cursors = song.tracks.map(() => ({ i: 0, t: t0, done: false }));
     schedule();
     timer = setInterval(schedule, 40);
   }
-  function stop() {
+  function stop(fade = 0) {
     if (timer) clearInterval(timer);
     timer = null; song = null; songName = null; pending = null; nextSong = null;
     if (musicBus && ac) { // laufende Noten weich abschneiden
-      const old = musicBus;
-      old.gain.setTargetAtTime(0, ac.currentTime, 0.02);
-      setTimeout(() => old.disconnect(), 300);
-      musicBus = ac.createGain(); musicBus.gain.value = MUSIC_VOL * musicLevel; musicBus.connect(muffleF);
+      const old = musicBus, t = ac.currentTime, level = MUSIC_VOL * musicLevel;
+      old.gain.setTargetAtTime(0, t, fade || 0.02);
+      setTimeout(() => old.disconnect(), fade ? fade * 9000 : 300);
+      musicBus = ac.createGain(); musicBus.connect(muffleF);
+      if (fade) { musicBus.gain.setValueAtTime(0.0001, t); musicBus.gain.linearRampToValueAtTime(level, t + fade * 5); } else musicBus.gain.value = level;
       melBus = ac.createGain(); melBus.connect(musicBus);
     }
   }
@@ -571,10 +585,11 @@ const Audio8 = (() => {
     const nodes = [], out = ac.createGain(), t = ac.currentTime;
     out.gain.value = 0; out.connect(master);
     let level = 0.024;
-    if (theme === 'courtyard') { // Regen + Windböen
+    if (theme === 'courtyard' || theme === 'bridge') { // Regen + Windböen (auf der Brücke zusätzlich heulender Sturm)
       const hp = ambNoise(nodes, out, 'highpass', 700), lp = ac.createBiquadFilter();
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 5200; hp.connect(lp); lp.connect(out);
       ambLfo(nodes, out.gain, 0.13, 0.01);
+      if (theme === 'bridge') { const bp = ambNoise(nodes, out, 'bandpass', 380, 5); ambLfo(nodes, bp.frequency, 0.09, 240); level = 0.034; }
     } else if (theme === 'foyer') { // Eingangshalle: Regen an den hohen Fenstern, Wind heult durch zerbrochene Scheiben
       const hp = ambNoise(nodes, out, 'highpass', 900), lp = ac.createBiquadFilter();
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 4200; hp.connect(lp); lp.connect(out);
@@ -602,7 +617,7 @@ const Audio8 = (() => {
       ambDrone(nodes, out, 'triangle', 73.4, 0.5); ambDrone(nodes, out, 'triangle', 110, 0.35); ambDrone(nodes, out, 'sine', 146.8, 0.2);
       ambLfo(nodes, out.gain, 0.05, 0.01);
       level = 0.022;
-    } else if (theme === 'glass') { // Glasturm: ferner Chor (A-Dur-Klang), schwebend
+    } else if (theme === 'glass' || theme === 'gallery') { // Glasturm, Marmorgalerie: ferner Chor (A-Dur-Klang), schwebend
       ambDrone(nodes, out, 'sine', 220, 0.5); ambDrone(nodes, out, 'sine', 277.2, 0.35); ambDrone(nodes, out, 'sine', 329.6, 0.3); ambDrone(nodes, out, 'triangle', 110, 0.3);
       ambLfo(nodes, out.gain, 0.07, 0.008);
       level = 0.018;

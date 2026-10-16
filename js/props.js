@@ -933,86 +933,152 @@ class Candelabra extends Ent {
 }
 
 // ---------------- Riesige Ahnenbilder: die Augen folgen dem Helden ----------------
-// Vorgerendert: prunkvoller Goldrahmen mit Eckrosetten und Namensschild, dunkler Firnis-Hintergrund mit Vignette,
-// Brustbild (Ahnherr, Gräfin, der Graf selbst). Nur Augäpfel und Pupillen werden live gezeichnet.
+// Vorgerendert (96×132): barocker Goldrahmen mit Perlstab, Akanthus-Ecken und einer Kartusche mit geflügeltem Schädel,
+// dunkler Firnis mit Craquelé, dahinter je ein Motiv: der Ahnherr mit Eisenkrone und weißem Haar vor Gewitterburg,
+// die Gräfin vor weinrotem Samt, der Graf selbst vor blutrotem Schein. Live gezeichnet: Augäpfel und Pupillen, die dem
+// Helden folgen – steht er davor, glühen die Augen rot, Bluttränen rinnen und der Mund verzieht sich zum Fanggrinsen.
 const PORTRAITS = (() => {
-  const FW = 64, FH = 84;
+  const FW = 96, FH = 132, cx = 48, fy = 54; // Gesichtsmitte
   const mk = (v) => {
     const c = Sprites.canvas(FW, FH), x = c.getContext('2d'), R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(Math.round(a), Math.round(b), w, h); };
-    const ell = (cx, cy, rx, ry, f) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let X = Math.floor(cx - rx); X <= cx + rx; X++) { const q = ((X + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2; if (q <= 1) f(X, y, q); } };
-    // Firnis-Hintergrund mit Vignette und Craquelé
-    for (let y = 6; y < FH - 6; y++) for (let X = 6; X < FW - 6; X++) {
-      const d = Math.hypot((X - FW / 2) / 26, (y - 34) / 34), base = v === 2 ? [40, 8, 14] : v === 1 ? [16, 24, 30] : [26, 20, 12], k = Math.max(0.25, 1.15 - d * 0.75);
-      const cr = ((X * 7 + y * 3) % 23 === 0) ? 0.7 : 1;
-      R(`rgb(${base.map(b => Math.round(b * k * cr)).join(',')})`, X, y);
+    const ell = (ex, ey, rx, ry, f) => { for (let y = Math.floor(ey - ry); y <= ey + ry; y++) for (let X = Math.floor(ex - rx); X <= ex + rx; X++) { const q = ((X + 0.5 - ex) / rx) ** 2 + ((y + 0.5 - ey) / ry) ** 2; if (q <= 1) f(X, y, q); } };
+    const rgb = (a, k) => `rgb(${a.map(b => Math.max(0, Math.min(255, Math.round(b * k)))).join(',')})`;
+    // Hintergrund
+    for (let y = 9; y < FH - 9; y++) for (let X = 9; X < FW - 9; X++) {
+      const d = Math.hypot((X - cx) / 40, (y - 52) / 56), k = Math.max(0.2, 1.2 - d * 0.85), cr = ((X * 7 + y * 3) % 29 === 0 || (X * 3 + y * 11) % 37 === 0) ? 0.6 : 1;
+      let base = v === 2 ? [60, 6, 12] : v === 1 ? [70, 10, 26] : [18, 22, 34];
+      if (v === 1 && Math.sin(X * 0.45 + Math.sin(y * 0.05) * 3) > 0.3) base = [104, 18, 40]; // Samtfalten
+      if (v === 2) { const h = Math.hypot(X - cx, y - 46); if (h < 34) base = base.map((b, i) => b + (34 - h) * [3.2, 0.5, 0.4][i]); } // blutroter Schein hinter dem Kopf
+      R(rgb(base, k * cr), X, y);
     }
-    const SK = v === 2 ? ['#9c8c94', '#c8b8bc', '#e8dce0'] : ['#a07860', '#d0a888', '#ecc8a8']; // Haut: der Graf leichenblass
-    const cx = 32;
+    if (v === 0) { // Gewitterburg in der Ferne, Blitz
+      for (let X = 10; X < 40; X++) { const h = 62 + Math.round(Math.abs(Math.sin(X * 0.7)) * 3) - (X > 16 && X < 22 ? 14 : 0) - (X > 28 && X < 32 ? 9 : 0); R('#0a0c14', X, h, 1, 80 - h); }
+      for (let k = 0; k < 14; k++) R('#c8d8fc', 74 + Math.round(Math.sin(k * 1.7) * 2) - (k >> 2), 12 + k * 2, 1, 2);
+      R('#f8d878', 19, 66, 1, 2); R('#f8d878', 30, 68, 1, 1);
+    }
+    const SK = v === 2 ? ['#6c5c6c', '#a898a8', '#d4c8d4', '#f0e8f0'] : v === 1 ? ['#8c6c6c', '#c8a8a0', '#e8d0c8', '#fcf0e8'] : ['#6c5c50', '#a08c78', '#c8b49c', '#e4d4bc'];
     // Kleidung / Schultern
-    if (v === 1) { ell(cx, 74, 22, 16, (X, y, q) => R(q > 0.85 ? '#1c0410' : ((X + y) % 4 ? '#5c0c24' : '#7c1434'), X, y)); for (let k = -6; k <= 6; k += 3) R('#e8e0d0', cx + k, 58 + Math.abs(k) / 3, 2, 2); } // Gräfin: Samtkleid, Perlenkette
-    else { ell(cx, 76, 24, 18, (X, y, q) => R(q > 0.85 ? '#060408' : X < cx ? '#141018' : '#1c1820', X, y)); R(v === 2 ? '#a80020' : '#c89020', cx - 22, 60, 6, 20); R(v === 2 ? '#a80020' : '#c89020', cx + 16, 60, 6, 20); // Umhang mit Futter
-      R('#e8e4dc', cx - 4, 56, 8, 8); R('#c8c4bc', cx - 1, 56, 2, 8); if (v === 0) R('#c89020', cx - 2, 64, 4, 4); else R('#a80020', cx - 2, 62, 4, 3); } // Halstuch, Brosche
-    R(SK[0], cx - 4, 48, 8, 9); R(SK[1], cx - 3, 48, 6, 8); // Hals
-    // Gesicht: Oval mit Licht von links
-    ell(cx, 36, 11, 14, (X, y, q) => { const l = -(X - cx) / 11 * 0.6 - (y - 36) / 14 * 0.3 + (1 - q) * 0.7; R(l > 0.75 ? SK[2] : l > 0.25 ? SK[1] : SK[0], X, y); });
+    if (v === 0) { // Rüstkragen und Pelz
+      ell(cx, 112, 36, 26, (X, y, q) => R(q > 0.88 ? '#08080c' : (X + (y >> 1)) % 6 === 0 ? '#5c5c6c' : X < cx ? '#2c2c38' : '#3c3c4c', X, y));
+      ell(cx, 88, 24, 8, (X, y) => R((X * 3 + y) % 4 ? '#a8a090' : '#e0d8c8', X, y)); // Hermelin
+      for (let k = -16; k <= 16; k += 8) R('#08080c', cx + k, 86, 2, 3);
+    } else if (v === 1) { // Samtkleid, schwarze Spitze, Rubin-Halsband
+      ell(cx, 116, 34, 24, (X, y, q) => R(q > 0.86 ? '#1c0410' : (X + y) % 5 ? '#4c0818' : '#6c1428', X, y));
+      ell(cx, 96, 16, 10, (X, y, q) => { if (y > 90) R(q > 0.7 ? SK[0] : SK[1], X, y); });
+      for (let X = cx - 22; X <= cx + 22; X++) { const yy = 92 + Math.round(Math.abs(X - cx) * 0.25); R((X % 3) ? '#0c0408' : '#2c1420', X, yy, 1, 3); }
+      R('#0c0408', cx - 7, 78, 14, 2); R('#d81c34', cx - 2, 79, 4, 3); R('#fc8c9c', cx - 1, 79, 1, 1); // Halsband mit Rubin
+    } else { // Graf: hoher Stehkragen mit rotem Futter, Umhang, Brosche
+      ell(cx, 116, 38, 26, (X, y, q) => R(q > 0.88 ? '#040206' : X < cx ? '#0c0a10' : '#16121c', X, y));
+      for (let y = 62; y < 96; y++) { const w = Math.round((96 - y) * 0.35); R('#a80020', cx - 26 + (96 - y) * 0.12, y, w, 1); R('#d82848', cx - 26 + (96 - y) * 0.12, y, 1, 1); R('#a80020', cx + 26 - (96 - y) * 0.12 - w, y, w, 1); R('#5c0010', cx + 25 - (96 - y) * 0.12, y, 1, 1); }
+      R('#f0ece4', cx - 6, 80, 12, 10); R('#c8c4bc', cx - 1, 80, 2, 10); R('#a80020', cx - 3, 88, 6, 4); R('#fc5c5c', cx - 2, 88, 2, 1); // Halstuch, Blutstein
+    }
+    R(SK[0], cx - 6, 70, 12, 12); R(SK[1], cx - 5, 70, 9, 10); // Hals
+    // Gesicht: hageres Oval, Licht von links oben, tiefe Wangen
+    ell(cx, fy, 15, 20, (X, y, q) => {
+      let l = -(X - cx) / 15 * 0.55 - (y - fy) / 20 * 0.35 + (1 - q) * 0.65;
+      if (Math.abs(X - cx) > 7 && y > fy + 2 && y < fy + 12) l -= 0.35; // eingefallene Wangen
+      R(l > 0.95 ? SK[3] : l > 0.6 ? SK[2] : l > 0.2 ? SK[1] : SK[0], X, y);
+    });
+    if (v !== 1) { R(SK[1], cx - 17, fy - 4, 3, 7); R(SK[0], cx - 18, fy - 7, 2, 4); R(SK[1], cx + 15, fy - 4, 3, 7); R(SK[0], cx + 17, fy - 7, 2, 4); } // spitze Ohren
     // Haare
-    if (v === 1) { ell(cx, 25, 13, 9, (X, y, q) => { if (y < 30 || Math.abs(X - cx) > 9) R((X + y) % 3 ? '#1c0c08' : '#3c2010', X, y); }); ell(cx, 16, 7, 6, (X, y) => R((X * y) % 5 ? '#2c140c' : '#4c2814', X, y)); R('#e8e0d0', cx - 1, 11, 2, 2); } // Hochsteckfrisur mit Perle
-    else ell(cx, 27, 12.5, 9, (X, y, q) => { if (y < 30 || Math.abs(X - cx) > 10) R(v === 2 ? ((X + y) % 4 ? '#08060c' : '#1c1828') : ((X + y) % 3 ? '#3c3434' : '#5c5450'), X, y); }); // Haar (Graf: Witwenspitze)
-    if (v === 2) { R('#08060c', cx - 1, 26, 2, 4); }
-    // Augenbrauen, Nase, Mund
-    R(v === 2 ? '#08060c' : '#3c2418', cx - 8, 31, 5, 1); R(v === 2 ? '#08060c' : '#3c2418', cx + 3, 31, 5, 1);
-    if (v === 2) { R('#08060c', cx - 8, 30, 2, 1); R('#08060c', cx + 6, 30, 2, 1); } // böse geschwungene Brauen
-    R(SK[0], cx, 36, 1, 5); R(SK[2], cx - 1, 37, 1, 3); R(SK[0], cx - 1, 41, 3, 1);
-    R(v === 1 ? '#a01c34' : v === 2 ? '#5c0818' : '#7c4038', cx - 3, 45, 6, 1); if (v === 2) { R('#fcfcfc', cx - 2, 46, 1, 1); R('#fcfcfc', cx + 1, 46, 1, 1); } // Mund (Graf: Fangzähne)
-    if (v === 0) { R('#4c3c34', cx - 5, 47, 10, 3); R('#3c2c24', cx - 3, 49, 6, 2); } // Bart des Ahnherrn
-    // Augenhöhlen (Augäpfel werden live gezeichnet)
-    R(SK[0], cx - 8, 33, 6, 4); R(SK[0], cx + 2, 33, 6, 4);
-    // Goldrahmen mit Profil, Eckrosetten und Namensschild
-    for (let k = 0; k < 6; k++) { const col = ['#3c2804', '#8c6414', '#f8d878', '#c89020', '#8c6414', '#2c1c04'][k]; x.fillStyle = col; x.fillRect(k, k, FW - k * 2, 1); x.fillRect(k, FH - 1 - k, FW - k * 2, 1); x.fillRect(k, k, 1, FH - k * 2); x.fillRect(FW - 1 - k, k, 1, FH - k * 2); }
-    for (let X = 8; X < FW - 8; X += 4) { R('#f8d878', X, 2, 2, 1); R('#f8d878', X, FH - 3, 2, 1); }
-    for (let y = 8; y < FH - 8; y += 4) { R('#f8d878', 2, y, 1, 2); R('#f8d878', FW - 3, y, 1, 2); }
-    [[3, 3], [FW - 9, 3], [3, FH - 9], [FW - 9, FH - 9]].forEach(([a, b]) => { ell(a + 3, b + 3, 4, 4, (X, y, q) => R(q < 0.3 ? '#fce0a8' : q < 0.65 ? '#c89020' : '#5c4010', X, y)); });
-    R('#5c4010', cx - 10, FH - 12, 20, 5); R('#c89020', cx - 9, FH - 11, 18, 3); for (let k = -7; k <= 6; k += 2) R('#5c4010', cx + k, FH - 10, 1, 1); // Namensschild
-    if (v === 0) { for (let y = 0; y < 30; y++) R('#08040a', 14 + y * 0.6, 52 + y * 0.5, 1, 1); } // Riss in der Leinwand
+    if (v === 0) { // langes weißes Haar, Eisenkrone mit Zacken
+      ell(cx, fy - 13, 16, 9, (X, y, q) => { if (y < fy - 10 || Math.abs(X - cx) > 12) R((X * 2 + y) % 5 < 2 ? '#3c3a44' : (X + y) % 3 ? '#8c8894' : '#b8b4c0', X, y); });
+      for (let s = 0; s < 7; s++) for (let y = fy - 8; y < fy + 34 - s * 2; y++) { // lange eisengraue Strähnen links und rechts
+        const sway = Math.sin(y * 0.18 + s) * 1.2, col = (y + s) % 4 === 0 ? '#3c3a44' : s % 2 ? '#8c8894' : '#a8a4b0';
+        R(col, cx - 14 - s * 0.9 - (y - fy) * 0.12 + sway, y, 1, 1); R(col, cx + 13 + s * 0.9 + (y - fy) * 0.12 - sway, y, 1, 1);
+      }
+      R('#2c2c34', cx - 15, fy - 20, 30, 4); R('#6c6c7c', cx - 15, fy - 20, 30, 1);
+      for (let k = -12; k <= 12; k += 6) { for (let h = 0; h < 7 - Math.abs(k) / 4; h++) R(h ? '#2c2c34' : '#8c8c9c', cx + k - 1 + (h >> 2), fy - 21 - h, 3 - (h >> 2), 1); }
+      R('#a80020', cx - 1, fy - 19, 2, 2); // Rubin in der Krone
+      // spitzer weißer Bart
+      for (let k = 0; k < 7; k++) { R('#6c6874', cx - 7 + k * 0.4, fy + 12 + k * 0.6, 3, 1); R('#6c6874', cx + 4 - k * 0.4, fy + 12 + k * 0.6, 3, 1); } // Schnurrbart hängt herab
+      for (let y = fy + 16; y < fy + 28; y++) { const w = Math.max(1, Math.round((fy + 28 - y) * 0.35)), split = y > fy + 22 ? 1 : 0; // kurzer gegabelter Bart
+        R((y % 2) ? '#8c8894' : '#6c6874', cx - w - split, y, w, 1); R((y % 2) ? '#a8a4b0' : '#7c7884', cx + split, y, w, 1); }
+    } else if (v === 1) { // schwarzes Haar, hochgesteckt mit Perlen und Feder
+      ell(cx, fy - 12, 18, 13, (X, y, q) => { if (y < fy - 8 || Math.abs(X - cx) > 13) R((X + y) % 4 ? '#0c0608' : '#2c1c24', X, y); });
+      ell(cx, fy - 28, 11, 9, (X, y) => R((X * y) % 6 ? '#140a0c' : '#34202a', X, y));
+      [[-6, -32], [3, -35], [9, -27]].forEach(([a, b]) => { R('#f0ece4', cx + a, fy + b, 2, 2); R('#fcfcfc', cx + a, fy + b, 1, 1); });
+      for (let k = 0; k < 16; k++) R(k % 3 ? '#2c0c18' : '#5c1c34', cx + 10 + k, fy - 34 - k * 0.8, 2, 1); // Feder
+      for (let y = fy - 6; y < fy + 20; y++) R('#0c0608', cx + 14 + Math.sin(y * 0.4), y, 3, 1); // Locke
+    } else { // Graf: schwarzes Haar mit spitzer Witwenspitze, glatt zurückgekämmt
+      ell(cx, fy - 13, 16, 11, (X, y, q) => { if (y < fy - 8 - Math.max(0, 6 - Math.abs(X - cx) * 0.9) || Math.abs(X - cx) > 13) R((X + y) % 5 ? '#06040a' : '#1c1828', X, y); });
+      for (let y = fy - 8; y < fy - 1; y++) R('#06040a', cx - Math.max(0, (fy - 2 - y) * 0.2), y, 1 + Math.round(Math.max(0, (fy - 2 - y) * 0.4)), 1);
+    }
+    // Augenbrauen (böse geschwungen), Augenhöhlen (Augäpfel live), Nase, Mund
+    const br = v === 0 ? '#e0dcd4' : '#06040a';
+    for (let k = 0; k < 7; k++) { R(br, cx - 12 + k, fy - 6 + (k < 4 ? -Math.floor(k / 2) : k - 5), 1, 2); R(br, cx + 5 + k, fy - 8 + (k > 3 ? Math.floor((k - 3) / 2) : 3 - k), 1, 2); }
+    R(SK[0], cx - 12, fy - 3, 8, 6); R(SK[0], cx + 4, fy - 3, 8, 6); // tiefe Augenhöhlen
+    R('#1c1018', cx - 12, fy - 3, 8, 1); R('#1c1018', cx + 4, fy - 3, 8, 1);
+    for (let y = fy; y < fy + 10; y++) R(SK[0], cx + 1, y, 1, 1); R(SK[3], cx - 1, fy + 2, 1, 6); R(SK[0], cx - 2, fy + 10, 5, 1); // Nase
+    R(v === 1 ? '#a8102c' : v === 2 ? '#4c0614' : '#4c2c28', cx - 5, fy + 14, 10, 1); // Mund (bei Nähe: Fanggrinsen, live)
+    if (v === 1) { R('#d82848', cx - 4, fy + 15, 8, 1); R('#a8102c', cx + 2, fy + 16, 1, 2); } // rote Lippen, ein Blutstropfen
+    if (v === 2) { R('#fcfcfc', cx - 3, fy + 15, 1, 2); R('#fcfcfc', cx + 2, fy + 15, 1, 2); } // Fangzähne
+    // Goldrahmen: Profil, Perlstab, Akanthus-Ecken, Kartusche mit geflügeltem Schädel, Namensschild
+    const prof = ['#2c1c04', '#5c4010', '#8c6414', '#c89020', '#f8d878', '#fce0a8', '#c89020', '#8c6414', '#3c2804'];
+    prof.forEach((col, k) => { x.fillStyle = col; x.fillRect(k, k, FW - k * 2, 1); x.fillRect(k, FH - 1 - k, FW - k * 2, 1); x.fillRect(k, k, 1, FH - k * 2); x.fillRect(FW - 1 - k, k, 1, FH - k * 2); });
+    for (let X = 12; X < FW - 12; X += 5) { R('#fce0a8', X, 2, 2, 2); R('#5c4010', X + 1, 3, 1, 1); R('#fce0a8', X, FH - 4, 2, 2); R('#5c4010', X + 1, FH - 3, 1, 1); }
+    for (let y = 12; y < FH - 12; y += 5) { R('#fce0a8', 2, y, 2, 2); R('#5c4010', 3, y + 1, 1, 1); R('#fce0a8', FW - 4, y, 2, 2); R('#5c4010', FW - 3, y + 1, 1, 1); }
+    [[0, 0, 1, 1], [FW - 1, 0, -1, 1], [0, FH - 1, 1, -1], [FW - 1, FH - 1, -1, -1]].forEach(([a, b, sx, sy]) => { // Akanthus-Ecken
+      ell(a + sx * 7, b + sy * 7, 6, 6, (X, y, q) => R(q < 0.25 ? '#fce0a8' : q < 0.6 ? '#c89020' : '#5c4010', X, y));
+      for (let k = 0; k < 9; k++) { R('#f8d878', a + sx * (12 + k), b + sy * (3 + Math.round(Math.sin(k * 0.8) * 2)), 1, 1); R('#f8d878', a + sx * (3 + Math.round(Math.sin(k * 0.8) * 2)), b + sy * (12 + k), 1, 1); }
+    });
+    // Kartusche oben: Schädel mit Fledermausflügeln
+    for (let k = 0; k < 16; k++) { const h = Math.round(Math.sin(k / 15 * Math.PI) * 5); R('#3c2804', cx - 9 - k, 2 + (k >> 2), 1, 4 + h); R('#c89020', cx - 9 - k, 2 + (k >> 2), 1, 1); R('#3c2804', cx + 8 + k, 2 + (k >> 2), 1, 4 + h); R('#c89020', cx + 8 + k, 2 + (k >> 2), 1, 1); }
+    ell(cx, 7, 8, 7, (X, y, q) => R(q < 0.4 ? '#fce0a8' : q < 0.8 ? '#e0c060' : '#5c4010', X, y));
+    R('#2c1c04', cx - 4, 6, 3, 3); R('#2c1c04', cx + 1, 6, 3, 3); R('#a80020', cx - 3, 7, 1, 1); R('#a80020', cx + 2, 7, 1, 1); R('#2c1c04', cx - 1, 10, 2, 1); for (let k = -3; k <= 3; k += 2) R('#2c1c04', cx + k, 12, 1, 2);
+    // Namensschild unten
+    R('#3c2804', cx - 16, FH - 15, 32, 8); R('#c89020', cx - 15, FH - 14, 30, 6); R('#f8d878', cx - 15, FH - 14, 30, 1);
+    for (let k = -12; k <= 11; k += 2) R('#5c4010', cx + k, FH - 12 + (k % 4 ? 0 : 1), 1, 2);
+    if (v === 0) for (let y = 0; y < 44; y++) R('#06040a', 18 + y * 0.55, 74 + y * 0.6, 1, 1); // Riss in der Leinwand
     return c;
   };
-  return { FW, FH, art: [mk(0), mk(1), mk(2)], eyes: [[24, 33], [34, 33]] };
+  // Augen: linke obere Ecke der Augäpfel (6×4), Mund: Mitte und Höhe
+  return { FW, FH, art: [mk(0), mk(1), mk(2)], eyes: [[cx - 11, fy - 2], [cx + 5, fy - 2]], mouth: [cx, fy + 14] };
 })();
 class Portrait extends Ent {
   // d: wx, wy = Lage in der Wandebene (Parallaxe 0.5, wiederholt sich alle 512 px wie Fenster und Vorhänge), v = erstes Motiv;
-  // jede Wiederholung zeigt den nächsten Ahnen. Die Pupillen folgen dem Helden, steht er direkt davor, glühen die Augen rot.
-  constructor(d) { super(0, 0, 1, 1); this.kind = 'prop'; this.wx = d.wx; this.wy = d.wy; this.v = d.v || 0; this.glow = 0; this.rects = []; }
+  // jede Wiederholung zeigt den nächsten Ahnen. Die Pupillen folgen dem Helden; steht er davor, erwacht das Bild.
+  constructor(d) { super(0, 0, 1, 1); this.kind = 'prop'; this.wx = d.wx; this.wy = d.wy; this.v = d.v || 0; this.once = !!d.once; this.glow = 0; this.rects = []; this.tear = 0; }
   place() {
-    const L = Tiles.layer(W.room.theme, 'wall'), cam = W.cam, out = [];
+    const L = Tiles.layer(W.room.theme, 'wall'), cam = W.cam, out = [], P = PORTRAITS;
     if (!L) return out;
     const Hc = L.c.height, off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512, base = Math.floor(Math.floor(cam.x * 0.5) / 512);
     const oy = L.vtile && W.room.h > 13 ? ((Math.floor(cam.y * 0.5) % Hc) + Hc) % Hc : 0;
     for (let k = -1; k <= Math.ceil(View.w / 512) + 1; k++) for (const ty of oy ? [-oy, Hc - oy] : [0]) {
       const X = this.wx - off + k * 512, Y = this.wy + ty;
-      if (X > View.w || X + 64 < 0 || Y > 208 || Y + 84 < 0) continue;
+      if (X > View.w || X + P.FW < 0 || Y > 208 || Y + P.FH < 0 || (this.once && base + k !== 0)) continue;
       out.push([X, Y, (((this.v + base + k) % 3) + 3) % 3]);
     }
     return out;
   }
   update() {
     this.t++; this.rects = this.place();
-    const px = W.player.cx - W.cam.x, near = this.rects.some(([X]) => Math.abs(px - (X + 32)) < 30);
-    this.glow = near ? Math.min(30, this.glow + 1) : Math.max(0, this.glow - 1);
+    const px = W.player.cx - W.cam.x, near = this.rects.some(([X]) => Math.abs(px - (X + PORTRAITS.FW / 2)) < 46);
+    this.glow = near ? Math.min(40, this.glow + 1) : Math.max(0, this.glow - 1);
+    this.tear = this.glow > 24 ? Math.min(14, this.tear + 0.12) : Math.max(0, this.tear - 0.3);
+    if (this.glow === 25 && near) Audio8.sfx('growl', W.player.cx);
   }
   lights(L) { // die Augen schimmern im Dunkeln
-    for (const [X, Y, v] of this.rects) { const red = v === 2 || this.glow > 20; for (const [ex, ey] of PORTRAITS.eyes) L.push({ x: X + ex + 3, y: Y + ey + 1, r: red ? 12 : 9, c: red ? [232, 30, 30] : [210, 200, 180], a: red ? 0.45 : 0.3 }); }
+    for (const [X, Y, v] of this.rects) { const red = v === 2 || this.glow > 20; for (const [ex, ey] of PORTRAITS.eyes) L.push({ x: X + ex + 3, y: Y + ey + 2, r: red ? 16 : 10, c: red ? [232, 30, 30] : [210, 200, 180], a: red ? 0.5 : 0.3 }); }
   }
   draw() {}
   drawBack(ctx) {
-    const px = W.player.cx - W.cam.x, py = W.player.cy - 8 - W.cam.y;
+    const P = PORTRAITS, px = W.player.cx - W.cam.x, py = W.player.cy - 8 - W.cam.y, red = this.glow > 20;
     for (const [X, Y, v] of this.rects) {
-      ctx.drawImage(PORTRAITS.art[v], X, Y);
-      for (const [ex, ey] of PORTRAITS.eyes) { // Augäpfel mit Pupillen, die dem Helden folgen
-        const dx = px - (X + ex + 3), dy = py - (Y + ey + 2), l = Math.hypot(dx, dy) || 1, ox = Math.round(dx / l * 1.6), oy = Math.round(dy / l * 0.9);
-        ctx.fillStyle = v === 2 ? '#e8d0d0' : '#ece8dc'; ctx.fillRect(X + ex + 1, Y + ey, 4, 3); ctx.fillRect(X + ex, Y + ey + 1, 6, 1);
-        const red = v === 2 || this.glow > 20;
-        ctx.fillStyle = red ? '#d81c1c' : '#2c1c14'; ctx.fillRect(X + ex + 2 + ox, Y + ey + oy + (oy < 0 ? 1 : 0), 2, 2);
-        ctx.fillStyle = red ? '#fc8c8c' : '#000'; ctx.fillRect(X + ex + 2 + ox + (ox > 0 ? 1 : 0), Y + ey + 1 + Math.max(0, oy), 1, 1);
+      ctx.drawImage(P.art[v], X, Y);
+      const hot = red || v === 2;
+      for (const [ex, ey] of P.eyes) { // Augäpfel mit Pupillen, die dem Helden folgen
+        const dx = px - (X + ex + 3), dy = py - (Y + ey + 2), l = Math.hypot(dx, dy) || 1, ox = Math.round(dx / l * 2), oy = Math.round(dy / l * 1);
+        ctx.fillStyle = hot ? '#e8c8c0' : '#ece8dc'; ctx.fillRect(X + ex + 1, Y + ey, 4, 4); ctx.fillRect(X + ex, Y + ey + 1, 6, 2);
+        ctx.fillStyle = hot ? '#d81c1c' : '#2c1c14'; ctx.fillRect(X + ex + 2 + ox, Y + ey + 1 + oy, 2, 2);
+        ctx.fillStyle = hot ? '#fcd0a0' : '#000'; ctx.fillRect(X + ex + 2 + ox + (red ? 0 : 1), Y + ey + 1 + oy, 1, red ? 2 : 1); // Schlitzpupille, wenn das Bild erwacht
+        if (this.tear > 0.5) { ctx.fillStyle = '#8c0010'; ctx.fillRect(X + ex + 1, Y + ey + 4, 1, Math.round(this.tear)); ctx.fillStyle = '#d81c1c'; ctx.fillRect(X + ex + 1, Y + ey + 3 + Math.round(this.tear), 1, 1); } // Bluttränen
+      }
+      if (red) { // Fanggrinsen
+        const [mx, my] = P.mouth, k = Math.min(1, (this.glow - 20) / 12);
+        ctx.fillStyle = '#1c0408'; ctx.fillRect(X + mx - 6, Y + my - 1, 12, 1 + Math.round(k * 3)); ctx.fillRect(X + mx - 7, Y + my - 2, 2, 1); ctx.fillRect(X + mx + 5, Y + my - 2, 2, 1);
+        ctx.fillStyle = '#fcfcf0'; ctx.fillRect(X + mx - 4, Y + my - 1, 1, 1 + Math.round(k * 2)); ctx.fillRect(X + mx + 3, Y + my - 1, 1, 1 + Math.round(k * 2));
+        ctx.fillStyle = '#a80020'; ctx.fillRect(X + mx - 3, Y + my + Math.round(k * 2), 6, 1);
       }
     }
   }
@@ -1136,6 +1202,116 @@ class Waterfall extends Ent {
       const ph = (this.t * 0.55 + k * 23) % 64, r = 6 + ph * 0.35, cx = X + this.w / 2 + Math.sin(k * 2.1 + this.t * 0.01) * (this.w * 0.5 + ph * 0.5), cy = B - 4 - ph * 0.8;
       ctx.fillStyle = `rgba(200,226,250,${(0.2 * (1 - ph / 64)).toFixed(3)})`;
       ctx.beginPath(); ctx.ellipse(cx, cy, r * 1.5, r, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+// Hinweistafel: betritt der Held den Bereich, erscheint einmal ein kurzer Tipp (Wandsprung, Kante, Dash)
+class Hint extends Ent {
+  constructor(d) { super(d.x * T, d.y * T, (d.w || 2) * T, (d.h || 3) * T); this.kind = 'prop'; this.key = d.key; this.done = false; }
+  update() { if (!this.done && W.player.alive && Phys.overlap(W.player, this)) { this.done = true; Game.note(this.key); } }
+  draw() {}
+}
+
+// ---------------- Brücke zum Bergfried: Einsturz und Fledermausschwarm ----------------
+// Sobald der Held die Brücke betritt, bricht sie hinter ihm Stein für Stein weg; die Front folgt ihm (nie mehr als
+// 150 px zurück), ein Fledermausschwarm reitet auf ihr. Wer stürzt, landet am letzten Kontrollpunkt, die Brücke
+// davor steht wieder. Am Torhaus des Bergfrieds stürzt der Rest in die Tiefe, der Schwarm stiebt davon.
+class BridgeRun extends Ent {
+  constructor(d) {
+    super(0, 0, 1, 1); this.kind = 'prop';
+    this.row = d.row; this.x0 = d.x0; this.x1 = d.x1; this.end = d.end * T;
+    this.safes = d.safe.map(([c, r]) => ({ cx: c * T, feet: r * T }));
+    this.saved = W.room.grid[d.row].slice(); this.on = false; this.over = false; this.fx = d.x0 * T - 40; this.safe = this.safes[0];
+    this.swarm = null; this.fell = undefined; this.speed = 1.2;
+  }
+  update() {
+    const p = W.player; this.t++;
+    if (!this.on) { if (p.alive && p.cx > (this.x0 + 2) * T) this.begin(); return; }
+    for (const s of this.safes) if (s.cx > this.safe.cx && p.cx > s.cx + 20 && p.onGround) this.safe = s; // Kontrollpunkt erreicht
+    if (!this.over) p.lastSafe = { cx: this.safe.cx, feet: this.safe.feet };
+    if (p.fellAt !== this.fell) { this.fell = p.fellAt; this.reset(); } // abgestürzt: zurück zum Kontrollpunkt
+    if (this.wait && (p.cx > this.safe.cx + 24 || this.over)) this.wait = false; // nach einem Absturz geht es erst weiter, wenn der Held losläuft
+    if (p.alive && !this.wait) this.fx += this.over ? 5 : this.speed;
+    if (!this.over && p.alive && this.fx < p.cx - 150) this.fx = p.cx - 150;
+    const g = W.room.grid[this.row];
+    for (let c = this.x0; c <= this.x1; c++) if (g[c] === '=' && (c + 1) * T < this.fx) {
+      g[c] = '.'; W.platforms.push(W.spawn(new BridgeBlock(c, this.row)));
+      if (c % 2 === 0) Audio8.sfx('crumble', c * T);
+    }
+    if (this.t % 60 === 0) W.platforms = W.platforms.filter(pl => !pl.dead);
+    if (!this.over && p.cx > this.end) { this.over = true; if (this.swarm) this.swarm.leave = true; W.shake = 10; Audio8.sfx('boom'); Input.rumble(0.7, 0.5, 600); }
+  }
+  begin() {
+    this.on = true; this.fell = W.player.fellAt;
+    Game.shout('bridgeFalls'); Audio8.sfx('boom'); Input.rumble(0.8, 0.6, 700); W.shake = 12;
+    this.swarm = W.spawn(new BatSwarm(this));
+  }
+  reset() { // zurück zum Kontrollpunkt: Brücke ab dort wieder ganz, Front und Schwarm dahinter
+    const g = W.room.grid[this.row];
+    for (let c = this.x0; c <= this.x1; c++) if (c * T >= this.safe.cx - 40) g[c] = this.saved[c];
+    for (const e of W.ents) if (e instanceof BridgeBlock) e.dead = true;
+    W.platforms = W.platforms.filter(pl => !(pl instanceof BridgeBlock));
+    this.fx = this.safe.cx - 90; this.wait = true;
+    if (this.swarm) this.swarm.x = this.fx - 40;
+  }
+  draw() {}
+}
+
+class BridgeBlock extends Ent {
+  constructor(c, r) {
+    super(c * T, r * T, T, T); this.kind = 'platform'; this.state = 'shake'; this.timer = 12 + (c % 3) * 4;
+    this.vy = 0; this.rot = 0; this.spin = (Math.random() - 0.5) * 0.14; this.dx = 0; this.dy = 0; this.img = Tiles.build('bridge').alt[c % 3];
+  }
+  get solid() { return this.state === 'shake'; }
+  update() {
+    this.t++;
+    if (this.state === 'shake') { if (--this.timer <= 0) { this.state = 'fall'; W.debris(this.cx, this.y + 4, '#6c6488', 4); } }
+    else { this.vy = Math.min(this.vy + 0.28, 6); this.y += this.vy; this.rot += this.spin; if (this.y > W.room.h * T + 40) this.dead = true; }
+  }
+  draw(ctx) {
+    const sh = this.state === 'shake' ? ((this.t >> 1) % 2 ? 1 : -1) : 0, X = Math.round(this.x - W.cam.x) + sh, Y = Math.round(this.y - W.cam.y);
+    if (X < -24 || X > View.w + 24) return;
+    if (!this.rot) { ctx.drawImage(this.img, X, Y); return; }
+    ctx.save(); ctx.translate(X + 8, Y + 8); ctx.rotate(this.rot); ctx.drawImage(this.img, -8, -8); ctx.restore();
+  }
+}
+
+// Fledermausschwarm: Dutzende kleine Fledermäuse kreisen um einen dunklen Kern, der auf der Einsturzfront reitet.
+// Berührt der Kern den Helden, kostet das Leben; immer wieder löst sich eine Fledermaus und stößt herab.
+class BatSwarm extends Ent {
+  constructor(run) {
+    super(run.fx - 60, 0, 1, 1); this.kind = 'fx'; this.run = run; this.leave = false; this.cy0 = 9 * T - 44; this.relT = 120;
+    this.bats = Array.from({ length: View.lite ? 30 : 56 }, () => ({ a: Math.random() * 6.28, r: 6 + Math.random() * 34, s: 0.05 + Math.random() * 0.07, ph: Math.random() * 6.28, dy: (Math.random() - 0.5) * 40, big: Math.random() < 0.3 }));
+  }
+  update() {
+    this.t++;
+    const p = W.player;
+    if (this.leave) { this.cy0 -= 2.4; this.x += 1.6; if (this.cy0 < W.cam.y - 140) this.dead = true; return; }
+    this.x += (this.run.fx + 6 - this.x) * 0.08;
+    this.cy0 += (9 * T - 42 + Math.sin(this.t * 0.05) * 14 + clamp(p.cy - 9 * T + 40, -24, 24) * 0.6 - this.cy0) * 0.1;
+    if (p.alive && Phys.overlap(p, { x: this.x - 24, y: this.cy0 - 22, w: 44, h: 42 })) p.hurt(2, this.x - 40);
+    if (--this.relT <= 0 && p.alive) { // eine Fledermaus löst sich
+      this.relT = 100 + Math.random() * 80;
+      const b = new Bat(this.x / T, (this.cy0 - 8) / T); b.state = 'fly'; b.dir = 1; b.face = 1; b.baseY = b.y; b.t = 0;
+      W.spawn(b); Audio8.sfx('bat', this.x);
+    }
+    if (this.t % 14 === 0) Audio8.sfx('flap', this.x);
+  }
+  draw(ctx) {
+    const ox = Math.round(this.x - W.cam.x), oy = Math.round(this.cy0 - W.cam.y);
+    if (ox < -80 || ox > View.w + 80) return;
+    ctx.fillStyle = 'rgba(14,0,22,0.42)'; ctx.beginPath(); ctx.ellipse(ox, oy, 34, 24, 0, 0, Math.PI * 2); ctx.fill(); // dunkler Kern
+    ctx.fillStyle = 'rgba(14,0,22,0.3)'; ctx.beginPath(); ctx.ellipse(ox - 10, oy + 2, 48, 30, 0, 0, Math.PI * 2); ctx.fill();
+    for (const b of this.bats) {
+      b.a += b.s;
+      const x = Math.round(ox + Math.cos(b.a) * b.r * 1.4), y = Math.round(oy + Math.sin(b.a * 1.7 + b.ph) * b.r * 0.6 + b.dy * 0.45);
+      const up = Math.sin(this.t * 0.7 + b.ph) > 0, dir = Math.sin(b.a) > 0 ? 1 : -1, s = b.big ? 2 : 1;
+      ctx.fillStyle = '#08020c'; ctx.fillRect(x - s, y, 2 * s + 1, 2 + (s - 1)); // Leib
+      if (up) { ctx.fillRect(x - 3 - 2 * s, y - 1 - s, 2 + s, 1 + (s - 1)); ctx.fillRect(x + 2 + s - 1, y - 1 - s, 2 + s, 1 + (s - 1)); ctx.fillRect(x - 1 - s, y - 1, 1, 1); ctx.fillRect(x + 1 + s, y - 1, 1, 1); }
+      else { ctx.fillRect(x - 3 - 2 * s, y + 1, 2 + s, 1 + (s - 1)); ctx.fillRect(x + 2 + s - 1, y + 1, 2 + s, 1 + (s - 1)); }
+      ctx.fillStyle = '#5c2c6c'; ctx.fillRect(x - s, y, 1, 1); // Mondlicht auf dem Fell
+      ctx.fillStyle = '#fc3c3c'; ctx.fillRect(x + (dir > 0 ? s : -s), y, 1, 1); // Augen glühen
     }
   }
 }

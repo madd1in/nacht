@@ -8,9 +8,10 @@ const Input = (() => {
     KeyZ: 'jump', KeyK: 'jump', Space: 'jump',
     KeyX: 'attack', KeyJ: 'attack',
     KeyC: 'sub', KeyL: 'sub',
+    ShiftLeft: 'dash', ShiftRight: 'dash', KeyE: 'dash', KeyI: 'dash',
     Enter: 'start', Escape: 'start', KeyP: 'start',
   };
-  const ACTIONS = ['left', 'right', 'up', 'down', 'jump', 'attack', 'sub', 'start'];
+  const ACTIONS = ['left', 'right', 'up', 'down', 'jump', 'attack', 'sub', 'start', 'dash'];
   const kb = {}, touch = {}, held = {}, prev = {}, pressed = {}, latch = {}, prevReal = {};
   let demoFn = null, realHit = false, tapHit = false; // Demo-Modus: Eingaben kommen aus einer Funktion, echte Tasten beenden ihn
   let anyListener = null, lastDevice = 'keys', padName = null, padIndex = -1, prevPadBack = false;
@@ -69,7 +70,8 @@ const Input = (() => {
     out.down = b(13) || ay > 0.55;
     out.jump = b(0);                       // A
     out.attack = b(2) || b(1);             // X oder B
-    out.sub = b(3) || b(5) || b(7);        // Y, RB oder RT
+    out.sub = b(3) || b(7);                // Y oder RT
+    out.dash = b(5) || b(4) || b(6);       // RB, LB oder LT: Dash
     out.start = b(9);                      // Menü-Taste
     const back = b(8);                     // Ansicht-Taste = Ton
     if (back && !prevPadBack) Audio8.toggleMute();

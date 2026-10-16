@@ -2,7 +2,7 @@
 'use strict';
 
 // Gewitter über dem ganzen Schloss: [Dunkelheit zwischen den Blitzen, Restdunkel im Blitz] (Hof und Schiff: Freiluft, ohne Abdunklung)
-const STORMY = { courtyard: null, ship: null, glass: [0.44, 0.12], foyer: [0.88, 0.02], library: [0.52, 0.08], hall: [0.5, 0.1], tower: [0.5, 0.1], throne: [0.46, 0.1] };
+const STORMY = { courtyard: null, ship: null, bridge: null, glass: [0.44, 0.12], foyer: [0.88, 0.02], library: [0.52, 0.08], hall: [0.5, 0.1], tower: [0.5, 0.1], throne: [0.46, 0.1] };
 // Fenster in der Wandebene (x, Oberkante, Breite, Höhe): werfen im Blitz Lichtbahnen in den Raum
 const STORM_WINS = { foyer: [[44, 20, 56, 216], [300, 20, 56, 216]], library: [[296, 24, 48, 98]], hall: [[64, 40, 32, 88], [320, 40, 32, 88]], throne: [[59, 24, 32, 108], [315, 24, 32, 108]] };
 const W = {
@@ -41,8 +41,15 @@ const W = {
         case 'panther': this.spawn(new Panther(d.x, d.y)); break;
         case 'fgear': this.platforms.push(this.spawn(new FlatGear(d))); break;
         case 'wgear': this.platforms.push(this.spawn(new WheelGear(d))); break;
+        case 'gears': { // Räderwerk: hintere Räder zuerst, damit die Scheiben sie überdecken
+          const list = buildGearTrain(d.list);
+          [...list.filter(g => g.behind), ...list.filter(g => !g.behind)].forEach(g => this.platforms.push(this.spawn(g)));
+          break;
+        }
         case 'throne': this.spawn(new Throne(d)); break;
         case 'portrait': this.spawn(new Portrait(d)); break;
+        case 'hint': this.spawn(new Hint(d)); break;
+        case 'bridgerun': this.spawn(new BridgeRun(d)); break;
         case 'waterfall': this.spawn(new Waterfall(d)); break;
         case 'cocoon': this.spawn(new Cocoon(d.x, d.y, d.inner)); break;
         case 'brazier': this.spawn(new Brazier(d)); break;
@@ -198,7 +205,12 @@ const W = {
     const deckY = (this.room.h - 2) * T;
     for (let i = 0; i < (View.lite ? 24 : 46); i++) this.spawn(new Particle(this.cam.x + Math.random() * View.w, deckY - Math.random() * 40, rnd(-2.6, -0.6), rnd(-5, -1.5), i % 3 ? '#a4b4e4' : '#fcfcfc', 50, 2, 0.18));
   },
-  songName() { return (this.room && this.room.music) || this.stageDef.music; },
+  // Musik in Abschnitten: ein Raum mit eigenem Lied startet es, die folgenden Räume spielen es weiter (kein Wechsel bei jeder Tür)
+  songName() {
+    const rs = this.stageDef.rooms;
+    for (let i = Math.min(this.roomIdx, rs.length - 1); i >= 0; i--) if (rs[i].music) return rs[i].music;
+    return this.stageDef.music;
+  },
 
   // Blutmond (rote Kerze): 12 s doppelte Punkte, mehr Herzen, rote Nacht, Musik zieht an
   bloodMoon(x, y) {
@@ -482,10 +494,11 @@ const W = {
     order.forEach(k => { for (const e of this.ents) if (e.kind === k) e.draw(ctx); if (k === 'boss') this.player.draw(ctx, this.cam); });
     for (const e of this.ents) if (e.drawFront && !e.dead) e.drawFront(ctx); // Bauwerke, die vor dem Helden liegen (Torhaus beim Durchgehen)
     this.drawReflections(ctx, sx, sy);
+    if (theme === 'throne' || theme === 'gallery') this.drawFloorMirror(ctx, sx, sy);
     FX.drawAmbient(ctx, this.cam);
     Tiles.drawFront(ctx, this.room, this.cam);
     FX.drawFog(ctx, theme, this.cam, this.frame, this.room.h * T - this.cam.y);
-    if (theme === 'courtyard' || theme === 'ship') this.drawRain(ctx);
+    if (theme === 'courtyard' || theme === 'ship' || theme === 'bridge') this.drawRain(ctx);
     if (flashOn) { this.drawStormShafts(ctx); ctx.fillStyle = `rgba(220,214,255,${dark ? 0.24 : 0.16})`; ctx.fillRect(0, 0, vw, 208); }
     FX.render(ctx, this.collectLights(), theme, dark ? (flashOn ? dark[1] : dark[0]) : undefined); // zwischen den Blitzen dunkel, im Blitz taghell
     Rays.draw(ctx, this.room, this.cam, this.frame);
@@ -549,6 +562,23 @@ const W = {
   },
 
   // Gespiegelte, wellige Szene auf Wasseroberflächen
+  // Thronsaal: polierter Boden – das Bild über der Bodenkante wird gespiegelt und schwach darunter gelegt (nur über festem Boden)
+  drawFloorMirror(ctx, sx, sy) {
+    const row = this.room.h - 2, fy = row * T - Math.round(this.cam.y), h = Math.min(30, 208 - fy);
+    if (h < 4 || fy < 30) return;
+    const cv = ctx.canvas, s = cv.width / View.w, g = this.room.grid;
+    ctx.save();
+    ctx.beginPath();
+    const c0 = Math.max(0, Math.floor(this.cam.x / T)), c1 = Math.min(this.room.w - 1, c0 + Math.ceil(View.w / T) + 1);
+    for (let c = c0; c <= c1; c++) if (g[row][c] === '#') ctx.rect(c * T - Math.round(this.cam.x), fy, T, h);
+    ctx.clip();
+    ctx.globalAlpha = 0.24; ctx.translate(0, fy * 2); ctx.scale(1, -1);
+    ctx.drawImage(cv, 0, Math.round((32 + sy + fy - h) * s), Math.round(View.w * s), Math.round(h * s), -sx, fy - h, View.w, h);
+    ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(0, fy, View.w, h); ctx.clip();
+    const gr = ctx.createLinearGradient(0, fy, 0, fy + h); gr.addColorStop(0, 'rgba(10,0,6,0)'); gr.addColorStop(1, 'rgba(10,0,6,0.5)');
+    ctx.fillStyle = gr; ctx.fillRect(0, fy, View.w, h); ctx.restore();
+  },
   drawReflections(ctx, sx, sy) {
     const r = this.room, g = r.grid;
     if (!r.grid.some(row => row.includes('~'))) return;
@@ -615,7 +645,7 @@ const W = {
       else if (e instanceof Ring) L.push({ x, y, r: 14, c: [248, 184, 0], a: 0.35 });
       else if (e instanceof Ghost && e.alpha > 0) L.push({ x, y, r: 24, c: [120, 180, 252], a: 0.35 * e.alpha });
       else if (e instanceof GiantBat && e.state !== 'sleep' && !e.dying) L.push({ x, y: y - 9, r: 22, c: [252, 40, 40], a: 0.55 });
-      else if (e instanceof Count && e.state === 'open') L.push({ x, y: y - 6, r: 34, c: [168, 0, 32], a: 0.45 });
+      else if (e instanceof Count && !e.dying) L.push({ x, y: e.y + 8 - this.cam.y, r: e.state === 'open' ? 52 : 32, c: [168, 0, 32], a: e.state === 'open' ? 0.5 : 0.3 });
       else if (e instanceof Pillar && e.openT > 0) L.push({ x, y, r: 22, c: [248, 120, 0], a: 0.5 });
     }
     if (this.room.theme === 'foyer' || this.room.theme === 'library') for (const [wx, wy, ww, wh] of this.stormWindows()) { // Fenster schimmern im Mondlicht, auch zwischen den Blitzen

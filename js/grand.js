@@ -351,18 +351,21 @@ const GEAR_TEX = (() => {
 // seitwärts wie ein Laufband (vx = -ω·z).
 class FlatGear extends Ent {
   // d: x (Achse, Kachel), row (Laufhöhe = Oberkante der Reihe), r (px), v (px/Frame an der Lauflinie, negativ = nach links)
+  //    oder für Räderwerke: ax/ay (Mitte in px), om (rad/Frame), rot; shaft: false = keine Achse bis zur Decke
   constructor(d) {
     const R = d.r, sq = 0.3, zc = 0.45, half = Math.sqrt(1.06 * 1.06 - zc * zc) * R;
-    super(d.x * T - half, d.row * T, half * 2, 4);
-    this.kind = 'platform'; this.R = R; this.sq = sq; this.zc = zc; this.v = d.v; this.om = -d.v / (zc * R);
-    this.ax = d.x * T; this.ay = d.row * T - R * zc * sq; this.rot = d.phase || 0; this.dx = 0; this.dy = 0; this.buf = null;
+    const ax = d.ax !== undefined ? d.ax : d.x * T, ay = d.ay !== undefined ? d.ay : d.row * T - R * zc * sq;
+    super(ax - half, ay + R * zc * sq, half * 2, 4);
+    this.kind = 'platform'; this.R = R; this.sq = sq; this.zc = zc;
+    this.om = d.om !== undefined ? d.om : -d.v / (zc * R); this.v = -this.om * zc * R;
+    this.ax = ax; this.ay = ay; this.rot = d.rot || d.phase || 0; this.dx = 0; this.dy = 0; this.buf = null; this.shaft = d.shaft !== false;
   }
   carryAt() { return [this.v, 0]; }
   update() { this.t++; this.rot += this.om; if (this.t % 26 === 0 && Math.abs(this.ax - W.player.cx) < View.w * 0.7) Audio8.sfx('cog', this.ax); }
   draw(ctx) {
     const R = this.R, sq = this.sq, RR = R * 1.08, W2 = Math.ceil(RR), H2 = Math.ceil(RR * sq), TH = 10;
     const sx = Math.round(this.ax - W.cam.x), sy = Math.round(this.ay - W.cam.y);
-    if (sx + W2 < -8 || sx - W2 > View.w + 8) return;
+    if (sx + W2 < -8 || sx - W2 > View.w + 8 || sy + H2 + TH < -4 || sy - H2 > View.fh + (this.shaft ? 0 : 4)) return;
     // Achse unten (in die Grube) und Lagerbock
     ctx.fillStyle = '#16120e'; ctx.fillRect(sx - 7, sy + H2, 14, 200);
     ctx.fillStyle = '#3c3024'; ctx.fillRect(sx - 7, sy + H2, 2, 200);
@@ -392,7 +395,9 @@ class FlatGear extends Ent {
     B.x.putImageData(B.img, 0, 0);
     ctx.drawImage(B.c, sx - W2, sy - H2);
     // Achse nach oben (hinter der Lauflinie) mit Nabenkappe
-    for (let k3 = 0; k3 < 12; k3++) { ctx.fillStyle = ['#2c2418', '#5c4a2c', '#8c7044', '#b08c54', '#c8a060', '#b08c54', '#8c7044', '#6c5434', '#4c3c24', '#3c3020', '#2c2418', '#1c160e'][k3]; ctx.fillRect(sx - 6 + k3, 0, 1, sy + 2); }
+    const top = this.shaft ? 0 : sy - 9;
+    for (let k3 = 0; k3 < 12; k3++) { ctx.fillStyle = ['#2c2418', '#5c4a2c', '#8c7044', '#b08c54', '#c8a060', '#b08c54', '#8c7044', '#6c5434', '#4c3c24', '#3c3020', '#2c2418', '#1c160e'][k3]; ctx.fillRect(sx - 6 + k3, top, 1, sy + 2 - top); }
+    if (!this.shaft) { ctx.fillStyle = '#e8c070'; ctx.fillRect(sx - 4, top - 2, 8, 2); ctx.fillStyle = '#8c7044'; ctx.fillRect(sx - 5, top, 10, 1); }
     ctx.fillStyle = '#5c4a2c'; ctx.fillRect(sx - 10, sy - 2, 20, 5); ctx.fillStyle = '#e8c070'; ctx.fillRect(sx - 9, sy - 2, 18, 1);
   }
 }
@@ -417,14 +422,19 @@ function wheelImg(R) {
     const i = (y * S + X) * 4; d[i] = Math.min(255, col[0] * lit); d[i + 1] = Math.min(255, col[1] * lit); d[i + 2] = Math.min(255, col[2] * lit); d[i + 3] = 255;
   }
   x.putImageData(img, 0, 0);
-  return (WHEEL_IMGS[R] = { c, S, N });
+  // dunklere Kopien für die Seitenflächen (PS1-Look: das Rad wird als dicker Körper in die Tiefe extrudiert)
+  const dark = [0.62, 0.42, 0.26].map(k => { const d2 = Sprites.canvas(S, S), x2 = d2.getContext('2d'); x2.drawImage(c, 0, 0); x2.globalCompositeOperation = 'source-atop'; x2.fillStyle = `rgba(14,8,4,${1 - k})`; x2.fillRect(0, 0, S, S); return d2; });
+  return (WHEEL_IMGS[R] = { c, S, N, dark });
 }
 class WheelGear extends Ent {
   // d: x (Achse, Kachel), top (Weltpixel-y des Scheitels), r (Zahngrund, px), v (px/Frame am Scheitel, negativ = nach links)
+  //    oder für Räderwerke: ax/ay (Achse in px), om (rad/Frame), rot; post: false = ohne Lagerbock, walk: false = nicht begehbar
   constructor(d) {
-    super(d.x * T - d.r, d.top, d.r * 2, 4);
-    this.kind = 'platform'; this.R = d.r; this.v = d.v; this.om = d.v / (d.r + 5); this.rot = 0;
-    this.ax = d.x * T; this.ay = d.top + d.r + 5; this.img = wheelImg(d.r); this.dx = 0; this.dy = 0;
+    const R = d.r, ax = d.ax !== undefined ? d.ax : d.x * T, ay = d.ay !== undefined ? d.ay : d.top + R + 5;
+    super(ax - R, ay - R - 5, R * 2, 4);
+    this.kind = 'platform'; this.R = R; this.om = d.om !== undefined ? d.om : d.v / (R + 5); this.v = this.om * (R + 5); this.rot = d.rot || 0;
+    this.ax = ax; this.ay = ay; this.img = wheelImg(R); this.dx = 0; this.dy = 0; this.post = d.post !== false;
+    if (d.walk === false) this.solid = false;
   }
   surfR(x) { // Lauffläche: Zahnspitzen heben den Helden an, in den Lücken sinkt er ein wenig ein
     const dx = x - this.ax, a = Math.atan2(-Math.sqrt(Math.max(0, (this.R + 5) ** 2 - dx * dx)), dx) - this.rot;
@@ -440,11 +450,49 @@ class WheelGear extends Ent {
   update() { this.t++; this.rot += this.om; if (this.t % 22 === 0 && Math.abs(this.ax - W.player.cx) < View.w * 0.7) Audio8.sfx('cog', this.ax); }
   draw(ctx) {
     const sx = Math.round(this.ax - W.cam.x), sy = Math.round(this.ay - W.cam.y), h = this.img.S / 2;
-    if (sx + h < 0 || sx - h > View.w) return;
-    ctx.fillStyle = '#120e0a'; ctx.fillRect(sx - 9, sy, 18, 220); ctx.fillStyle = '#2c241a'; ctx.fillRect(sx - 9, sy, 2, 220); // Lagerbock
+    if (sx + h < 0 || sx - h > View.w || sy + h < 0 || sy - h > View.fh) return;
+    if (this.post) { ctx.fillStyle = '#120e0a'; ctx.fillRect(sx - 9, sy, 18, 220); ctx.fillStyle = '#2c241a'; ctx.fillRect(sx - 9, sy, 2, 220); } // Lagerbock
+    // PS1-Look: das Rad hat Tiefe – Scheiben hinter der Vorderseite laufen perspektivisch zur Bildmitte (Fluchtpunkt),
+    // je nach Kamerastand sieht man die Zahnflanken links, rechts, oben oder unten
+    const ox = (View.w / 2 - sx) * 0.06, oy = (View.fh / 2 - sy) * 0.06, n = Math.min(10, Math.max(3, Math.ceil(Math.hypot(ox, oy)) + 2)), D = this.img.dark;
+    for (let k = n; k >= 1; k--) {
+      const f = k / n, im = D[f > 0.66 ? 2 : f > 0.33 ? 1 : 0];
+      ctx.save(); ctx.imageSmoothingEnabled = false;
+      ctx.translate(Math.round(sx + ox * f), Math.round(sy + oy * f)); ctx.rotate(this.rot); ctx.drawImage(im, -h, -h);
+      ctx.restore();
+    }
     ctx.save(); ctx.imageSmoothingEnabled = false;
     ctx.translate(sx, sy); ctx.rotate(this.rot); ctx.drawImage(this.img.c, -h, -h);
     ctx.restore();
+    ctx.fillStyle = '#2c2418'; ctx.fillRect(Math.round(sx + ox) - 5, Math.round(sy + oy) - 5, 10, 10); // Achse hinten
     ctx.fillStyle = '#3c3020'; ctx.fillRect(sx - 6, sy - 6, 12, 12); ctx.fillStyle = '#c8a060'; ctx.fillRect(sx - 5, sy - 5, 10, 2); ctx.fillStyle = '#e8c070'; ctx.fillRect(sx - 2, sy - 2, 4, 4); // feststehende Achskappe
   }
+}
+
+// Uhrwerk aus ineinandergreifenden Rädern. Jedes Rad nach dem ersten hängt an einem Nachbarn (mesh = Index in der Liste):
+//  stehend an stehend: Abstand R1+R2+9 unter dem Winkel ang (Grad), Gegenlauf im Verhältnis der Zahnzahlen, Phase so,
+//                      dass an der Berührstelle Zahn auf Lücke trifft
+//  liegend auf stehend: die Scheibe ruht mit der Unterkante ihres Zahnkranzes auf dem Scheitel des Rades (Kronrad), xo = Versatz
+//  stehend hinter liegend: das Rad greift hinten in den Kranz der Scheibe und ragt über sie hinaus (wird zuerst gezeichnet)
+function buildGearTrain(spec) {
+  const out = [];
+  for (const g of spec) {
+    let ent;
+    const p = g.mesh === undefined ? null : out[g.mesh];
+    if (!p) ent = g.type === 'flat' ? new FlatGear(g) : new WheelGear(g);
+    else if (g.type === 'wheel' && p instanceof WheelGear) {
+      const a = g.ang * Math.PI / 180, d = p.R + g.r + 9, N1 = p.img.N, N2 = wheelImg(g.r).N;
+      const rot = a + Math.PI - (Math.PI - N1 * (a - p.rot)) / N2;
+      ent = new WheelGear({ ...g, ax: p.ax + Math.cos(a) * d, ay: p.ay + Math.sin(a) * d, om: -p.om * N1 / N2, rot });
+    } else if (g.type === 'flat') { // liegende Scheibe auf dem Scheitel eines stehenden Rades
+      const RR = g.r * 1.08, xo = g.xo || 0, z = Math.sqrt(RR * RR - xo * xo);
+      ent = new FlatGear({ ...g, ax: p.ax - xo, ay: p.ay - p.R - 9 + 4 - 10 - z * 0.3, om: -p.om * (p.R + 5) / z });
+    } else { // stehendes Rad hinten auf der Scheibe
+      const RR = p.R * 1.08, xo = g.xo || 0, z = Math.sqrt(RR * RR - xo * xo);
+      ent = new WheelGear({ ...g, ax: p.ax + xo, ay: p.ay - z * p.sq - g.r - 9 + 6, om: -p.om * z / (g.r + 5) });
+      ent.behind = true;
+    }
+    out.push(ent);
+  }
+  return out;
 }

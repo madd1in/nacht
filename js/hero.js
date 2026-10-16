@@ -313,6 +313,13 @@ const HEROES = (() => {
     H.stairDown = STAIR_DOWN.map((l, i) => F({ legs: l, fa: { a: [i ? 15 : -10, 30] }, ba: { a: [i ? -15 : 20, 25] }, coil: true }));
     H.hurt = F({ legs: [[25, 45], [-30, 30]], air: true, flare: 3, hurt: true, fa: { a: [150, 20] }, ba: { a: [-150, -20] }, lean: -1 });
     H.swing = F({ legs: [[30, 40], [-10, 30]], air: true, flare: 2, fa: { a: [178, 0] }, ba: { a: [-30, 30] } });
+    // Kantengriff: beide Hände oben an der Kante, Beine hängen; Hochziehen: Ellbogen gebeugt, Knie angezogen;
+    // Wandrutschen: Rücken zur Wand, hintere Hand an der Mauer, ein Bein stemmt sich ab
+    H.hang = F({ legs: [[12, 22], [-6, 14]], air: true, flare: 1, fa: { a: [168, 8] }, ba: { a: [174, -6] } });
+    H.climb = F({ legs: [[78, 118], [36, 92]], air: true, flare: 2, fa: { a: [128, 74] }, ba: { a: [116, 84] }, lean: 1 });
+    H.dash = F({ legs: [[62, 38], [-52, 28]], flare: 3, fa: { a: [48, 72] }, ba: { a: [-74, 30] }, lean: 2 }); // Dash: weit nach vorn gelehnt
+    H.adash = F({ legs: [[84, 104], [-34, 58]], air: true, flare: 3, fa: { a: [70, 46] }, ba: { a: [-84, 20] }, lean: 2 });
+    H.wall = F({ legs: [[42, 84], [-34, 46]], air: true, flare: 2, fa: { a: [72, 48] }, ba: { a: [-128, 24] }, lean: 1 });
     H.atk = atk(STANCE);
     H.atkDir = {}; Object.keys(DIR).forEach(d => { H.atkDir[d] = F({ legs: STANCE, ...P2(d) }); });
     H.catk = atk(CROUCH, H.crouchDrop);
@@ -347,9 +354,11 @@ const HEROES = (() => {
     S.giant = [...walk2(M.skel, k => ({ fa: { a: [k ? 20 : -15, 35] }, ba: { a: [k ? -15 : 20, 30] } }), 2),
       frame(M.skel, { legs: STANCE, fa: { t: [20, 1], bend: 'back' }, ba: { a: [30, 30] } }, 2)];
     // Graf Nachtmahr: geschlossen im Umhang / Umhang aufgerissen
+    // in doppelter Auflösung: der Graf überragt den Helden um mehr als das Doppelte
     S.count = {
-      closed: frame(M.count, { legs: STAND, fa: { a: [10, 20] }, ba: { a: [-10, 20] } }),
-      open: frame(M.count, { legs: [[12, 4], [-12, 4]], fa: { a: [128, 22] }, ba: { a: [-128, -22] }, capeOpen: true }),
+      closed: frame(M.count, { legs: STAND, fa: { a: [10, 20] }, ba: { a: [-10, 20] } }, 2),
+      open: frame(M.count, { legs: [[12, 4], [-12, 4]], fa: { a: [128, 22] }, ba: { a: [-128, -22] }, capeOpen: true }, 2),
+      cast: frame(M.count, { legs: [[8, 4], [-8, 4]], fa: { a: [166, 12] }, ba: { a: [-166, -12] }, capeOpen: true, lean: -1 }, 2), // Arme hoch: Blutregen, Fledermäuse
     };
   }
   buildMonsters();

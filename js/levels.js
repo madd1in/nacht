@@ -123,6 +123,7 @@ const Levels = (() => {
     .enemy('raven', 29, 8).enemy('raven', 45, 9)
     .chest(62, 10)
     .zone('ghoul', 29, 60, { interval: 110, max: 3 })
+    .music('stage1') // nach dem Seemannslied: Burgsturm bis zur Riesenfledermaus
     .start(2, 10).exit(70).done();
 
   // Eingangshalle: hoch, deckenhohe Fenster, Gewitter (Blitzlicht und Dunkelheit), fallende Kronleuchter,
@@ -139,7 +140,7 @@ const Levels = (() => {
     .enemy('bat', 24, 2).enemy('bat', 52, 3).enemy('bat', 79, 2)
     .candle(3, 15).candle(9, 15, 'H').candle(23, 9).candle(33, 9, 'W').candle(42, 9).candle(48, 15, '$').candle(56, 15, 'H').candle(66, 10).candle(78, 15, '2')
     .statue(48, 17)
-    .prop('portrait', { wx: 168, wy: 40, v: 0 }).prop('portrait', { wx: 424, wy: 40, v: 1 }) // Ahnenbilder zwischen den Fenstern, ihre Augen folgen
+    .prop('portrait', { wx: 160, wy: 26, v: 0 }).prop('portrait', { wx: 416, wy: 26, v: 1 }) // Ahnenbilder zwischen den Fenstern, ihre Augen folgen
     .zone('ghoul', 4, 80, { interval: 170, max: 2 })
     .start(2, 17).exit(82).done();
 
@@ -170,7 +171,7 @@ const Levels = (() => {
     .candle(50, 9, '$').candle(53, 3, 'H').candle(61, 3).candle(67, 9).candle(73, 9, 'H').candle(80, 9, '2').candle(86, 9)
     .enemy('bat', 14, 3).enemy('bat', 40, 2).enemy('bat', 70, 3)
     .zone('ghoul', 18, 50, { interval: 140, max: 2 })
-    .prop('portrait', { wx: 118, wy: 34, v: 0 }).prop('portrait', { wx: 373, wy: 34, v: 2 })
+    .prop('portrait', { wx: 114, wy: 30, v: 0 }).prop('portrait', { wx: 370, wy: 30, v: 2 })
     .start(2, 10).arena('gbat').done();
 
   // ======================= STAGE 2: Die Katakomben =======================
@@ -233,61 +234,77 @@ const Levels = (() => {
     .zone('skull', 30, 60, { interval: 380, max: 1 })
     .start(2, 10).exit(62).done();
 
-  // Bibliothek: deckenhohe Bücherwände, Galerien auf den Regalen, fliegende Bücher, schwebende Zauberbücher,
-  // Lesepulte mit sich selbst umblätternden Büchern, drehende Globen – oben unter dem Gewölbe ein Lesesaal mit Truhe
-  const lb = room(100, 'library', 22)
-    .ground(0, 99, 20)
-    .stair(8, 19, 5, 1).fill(13, 15, 30, 15, '=')                        // Galerie links
-    .stair(26, 14, 5, 1).fill(31, 10, 46, 10, '=')                       // obere Galerie
-    .stair(42, 9, 5, 1).fill(47, 5, 58, 5, '=')                          // Lesesaal unter dem Gewölbe
-    .stair(63, 9, 5, -1).fill(60, 10, 76, 10, '=')                       // obere Galerie rechts
-    .stair(81, 14, 5, -1).fill(74, 15, 86, 15, '=')                      // Galerie rechts
-    .stair(91, 19, 5, -1)
-    .fill(38, 18, 40, 19, '=').fill(66, 19, 67, 19, '=')                 // niedrige Bücherregale im Weg
-    .prop('lectern', { x: 6, y: 19 }).prop('lectern', { x: 54, y: 4 }).prop('lectern', { x: 69, y: 9 })
-    .prop('globe', { x: 20, y: 19 }).prop('globe', { x: 82, y: 19 })
-    .enemy('book', 18, 14).enemy('book', 24, 14).enemy('book', 36, 9).enemy('book', 51, 4).enemy('book', 72, 9).enemy('book', 83, 14)
-    .enemy('book', 30, 19).enemy('book', 58, 19)
-    .enemy('tome', 53, 11).enemy('tome', 71, 16)
-    .candle(4, 17).candle(12, 17, 'H').candle(16, 12).candle(22, 12, 'W').candle(26, 17).candle(34, 7).candle(40, 7, 'H')
-    .candle(44, 17, '$').candle(50, 2, '$').candle(56, 2, 'H').candle(62, 17).candle(64, 7).candle(74, 7, '2')
-    .candle(76, 17, 'H').candle(78, 12, 'H').candle(84, 12).candle(94, 17)
-    .chest(57, 4, 'big')
-    .statue(48, 19)
-    .zone('books', 4, 96, { interval: 200, max: 2 })
+  // Marmorgalerie: ein langer Säulengang. Hinten stehen drei Säulenreihen in echter Perspektive (PS1-Look), Mondlicht fällt
+  // durch hohe Fenster und streift die Säulen, Kerzen flackern, vorn ziehen dunkle Säulen vorbei. Lebende Rüstungen als Wache.
+  const mg = room(96, 'gallery')
+    .ground(0, 95)
+    .fill(16, 8, 20, 8, '=').fill(34, 7, 38, 7, '=').fill(46, 9, 49, 10, '#').fill(58, 7, 62, 7, '=').fill(76, 8, 80, 8, '=')
+    .prop('candelabra', { x: 6, y: 10 }).prop('candelabra', { x: 26, y: 10 }).prop('candelabra', { x: 54, y: 10 }).prop('candelabra', { x: 70, y: 10 }).prop('candelabra', { x: 88, y: 10 })
+    .prop('armor', { x: 12, y: 10 }).prop('armor', { x: 30, y: 10, live: true, flip: true }).prop('armor', { x: 66, y: 10, live: true }).prop('armor', { x: 84, y: 10, flip: true })
+    .candle(18, 5, 'H').candle(36, 4, '$').candle(42, 8).candle(60, 4, 'W').candle(64, 8, 'H').candle(78, 5).candle(92, 8, 'H')
+    .enemy('ghost', 24, 5).enemy('ghost', 72, 4).enemy('knight', 40, 10).enemy('pillar', 82, 10)
+    .statue(52, 10)
+    .start(2, 10).exit(94).done();
+
+  // Bibliotheksturm: senkrechter Aufstieg zwischen deckenhohen Bücherwänden. Erst eine Kante, die man nur mit dem
+  // Doppelsprung packt und sich hochzieht, dann zwei Wandsprung-Schächte zwischen den Regalen, oben eine Lücke, die nur
+  // ein Dash-Sprung oder Luft-Dash überbrückt. Fliegende Bücher, Zauberbücher, Lesepulte, Globen, eine Empore mit Truhe.
+  const lb = room(36, 'library', 50)
+    .fill(0, 0, 0, 49, 'B').fill(35, 0, 35, 49, 'B').fill(1, 0, 30, 0, 'B')   // Bücherwände links und rechts, Decke
+    .ground(0, 35, 48)
+    .stair(5, 47, 4, 1).fill(9, 44, 16, 44, '=')                           // Treppe zur ersten Galerie
+    .fill(20, 38, 34, 47, 'B').fill(23, 38, 34, 38, '=')                     // Riesenregal: Kante bei x 20 packen und hochziehen
+    .fill(1, 40, 4, 40, '=').fill(3, 31, 6, 31, '=')                         // Regalbrett links, Lesenische (Wandsprung an der Außenwand)
+    .fill(29, 23, 30, 34, 'B')                                               // Regalpfeiler: Wandsprung-Schacht rechts (x 31–34)
+    .fill(17, 23, 28, 23, '=')                                               // Galerie Mitte
+    .stair(17, 22, 5, -1).fill(1, 18, 12, 18, '=')                           // Treppe zur Galerie links
+    .fill(5, 5, 6, 14, 'B').fill(5, 4, 13, 4, '=')                           // Regalpfeiler: Wandsprung-Schacht links (x 1–4), oben Galerie
+    .fill(21, 4, 34, 4, '=')                                                 // Galerie zum Ausgang – davor 7 Kacheln Luft: nur mit Dash
+    .fill(25, 17, 28, 17, '=').fill(23, 12, 27, 14, 'B')                     // Leiterbrett und Empore mit Truhe
+    .prop('hint', { x: 15, y: 40, w: 4, h: 4, key: 'hintLedge' }).prop('hint', { x: 30, y: 34, w: 3, h: 4, key: 'hintWall' })
+    .prop('hint', { x: 8, y: 1, w: 4, h: 3, key: 'hintDash' })
+    .prop('lectern', { x: 13, y: 47 }).prop('lectern', { x: 9, y: 17 }).prop('lectern', { x: 28, y: 3 })
+    .prop('globe', { x: 17, y: 47 }).prop('globe', { x: 26, y: 37 })
+    .enemy('book', 12, 43).enemy('book', 25, 37).enemy('book', 32, 30).enemy('book', 21, 22).enemy('book', 7, 17).enemy('book', 10, 3)
+    .enemy('book', 27, 16).enemy('book', 31, 3)
+    .enemy('tome', 11, 33).enemy('tome', 20, 9)
+    .candle(3, 45, 'H').candle(11, 41).candle(15, 41, 'W').candle(2, 37, '$').candle(4, 28, 'H').candle(6, 28, '2')
+    .candle(24, 35).candle(32, 34, 'H').candle(33, 26).candle(19, 20, 'H').candle(27, 20).candle(9, 15).candle(3, 15, 'H')
+    .candle(2, 9).candle(10, 1, '$').candle(24, 9, 'H').candle(26, 1, 'R').candle(33, 1, 'H')
+    .chest(25, 11, 'big').chest(4, 30, 'life')
+    .statue(24, 22)
+    .zone('books', 2, 33, { interval: 260, max: 2 })
     .music('library')
-    .start(2, 19).exit(98).done();
+    .start(2, 47).exitAt(31, 0, 34, 3).done();
 
-  // Uhrwerk: vertikaler Aufstieg (Aufzüge, Treppen, Pendel-Kronleuchter), Stürze landen auf unteren Ebenen
-  const v3 = room(28, 'tower', 32)
-    .ground(0, 27, 30)
-    .elevator(2, 30, 20)
-    .fill(5, 20, 12, 20, '=')
-    .stair(10, 19, 4, 1).fill(14, 16, 22, 16, '=')
-    .chandelier(8, 5, 164, 0.4, 1)
-    .elevator(24, 16, 7)
-    .fill(14, 7, 22, 7, '=')
-    .stair(16, 6, 3, -1).fill(3, 4, 13, 4, '=')
-    .candle(8, 18, 'H').candle(6, 13, 'H').candle(10, 13).candle(18, 14).candle(21, 14, '$').candle(20, 5, 'H')
-    .candle(6, 2).candle(10, 2, '1')
-    .chest(19, 6, 'life')
-    .enemy('bat', 18, 11).enemy('bat', 9, 1).enemy('ghost', 14, 12)
-    .start(6, 29).exitAt(3, 0, 6, 3).done();
-
-  // Zahnradwerk im Uhrturm: riesige Zahnräder als Mode-7-Drehscheiben. Erst zwei liegende Räder – man läuft vorn über die
-  // Scheibe gegen die Drehung an –, dann zwei stehende Räder, deren Zähne oben entgegenrollen. Darunter Stacheln.
-  const gw = room(104, 'tower')
-    .ground(0, 9).fill(10, 12, 31, 12, '^').ground(32, 43).fill(44, 12, 61, 12, '^').ground(62, 103)
-    .stair(38, 10, 3, 1).fill(41, 8, 43, 12, '#').fill(62, 8, 64, 12, '#').stair(67, 10, 3, -1) // Steinpodeste vor und hinter den stehenden Rädern
-    .prop('fgear', { x: 15.47, row: 11, r: 88, v: -0.75 })
-    .prop('fgear', { x: 27.43, row: 11, r: 80, v: -0.9, phase: 0.4 })
-    .prop('wgear', { x: 47.625, top: 120, r: 80, v: -0.8 })
-    .prop('wgear', { x: 57.375, top: 128, r: 64, v: -1.0 })
-    .statue(37, 10)
-    .candle(3, 9).candle(7, 9, 'H').candle(15, 5).candle(21, 5, 'W').candle(28, 5, '$').candle(35, 9, 'H').candle(40, 9)
-    .candle(48, 4, 'H').candle(58, 4).candle(66, 9, '3').candle(74, 9, 'H').candle(84, 9).candle(94, 9, '$').candle(99, 9)
-    .enemy('bat', 38, 4).enemy('bat', 70, 3).enemy('knight', 80, 10).enemy('pillar', 92, 10)
-    .start(2, 10).exit(102).done();
+  // Uhrturm-Zahnradwerk: senkrechter Aufstieg durch ineinandergreifende Räder. Ganz unten ein Riesenrad über der
+  // Stachelgrube, dessen Zähne dem Helden entgegenrollen, daneben ein kleineres im Gegenlauf. Rechts ein Wandsprung-
+  // Schacht zum Steinpfeiler, darüber eine liegende Mode-7-Drehscheibe, hinter der ein stehendes Rad in den Zahnkranz
+  // greift; es treibt zwei weitere Räder, auf dem obersten ruht die zweite Drehscheibe (Kronrad) – von dort zum Ausgang.
+  const gw = room(32, 'tower', 42)
+    .ground(0, 5, 40).fill(6, 41, 21, 41, '^').ground(22, 31, 40)               // Stachelgrube unter dem Riesenrad
+    .fill(0, 0, 0, 39, '#').fill(31, 8, 31, 39, '#').fill(1, 0, 26, 0, '#')     // Turmwände und Decke
+    .fill(25, 24, 26, 33, '#')                                                  // Steinpfeiler: Wandsprung-Schacht rechts (x 27–30)
+    .fill(1, 18, 8, 19, '#')                                                    // Mauervorsprung links (Kante packen)
+    .fill(3, 8, 6, 8, '#')                                                      // Nische mit Truhe (Wandsprung an der Turmwand)
+    .fill(27, 6, 31, 7, '#')                                                    // Ausgangssims
+    .prop('gears', { list: [
+      { type: 'wheel', ax: 200, ay: 700, r: 96, v: -0.7 },                    // 0 Riesenrad über der Grube
+      { type: 'wheel', mesh: 0, ang: -28, r: 48 },                            // 1 greift ins Riesenrad, läuft gegen
+      { type: 'flat', ax: 250, ay: 349.2, r: 80, v: -0.6, shaft: false },     // 2 Drehscheibe über dem Pfeiler
+      { type: 'wheel', mesh: 2, xo: -70, r: 48 },                             // 3 steht hinten in ihrem Zahnkranz
+      { type: 'wheel', mesh: 3, ang: -45, r: 40 },                            // 4
+      { type: 'wheel', mesh: 4, ang: -20, r: 32, walk: false, post: false },  // 5 trägt die obere Scheibe
+      { type: 'flat', mesh: 5, r: 64, shaft: false },                         // 6 obere Drehscheibe (Kronrad)
+      { type: 'wheel', mesh: 6, xo: 44, r: 26, walk: false, post: false },    // 7 kleines Rad hinten auf der oberen Scheibe
+    ] })
+    .prop('hint', { x: 27, y: 34, w: 4, h: 6, key: 'hintWall' })
+    .statue(25, 23).chest(4, 7, 'life')
+    .candle(2, 37, 'H').candle(9, 34, '$').candle(17, 33).candle(24, 36, 'H').candle(29, 36).candle(29, 28, 'H').candle(29, 20)
+    .candle(25, 20, 'W').candle(14, 19).candle(5, 15, 'H').candle(2, 5, '$').candle(5, 5, 'H').candle(20, 6).candle(26, 3, 'H').candle(29, 3)
+    .enemy('bat', 12, 10).enemy('bat', 28, 14).enemy('ghost', 10, 24).enemy('knight', 23, 39)
+    .zone('skull', 2, 30, { interval: 420, max: 1 })
+    .start(2, 39).exitAt(27, 0, 30, 5).done();
 
   // Seelenstrudel: schwebende Steine über dem Nichts, Ankerringe, rotierender Mode-7-Tunnel
   const vx = room(64, 'vortex')
@@ -299,6 +316,7 @@ const Levels = (() => {
     .candle(12, 7, 'H').candle(27, 7).candle(37, 6, 'H').candle(54, 7, '$').candle(60, 9, 'H').candle(32, 2, '1').candle(50, 2, 'W')
     .zone('skull', 10, 56, { interval: 640, max: 1 })
     .prop('cocoon', { x: 27, y: 8 }).prop('cocoon', { x: 37, y: 7 }).prop('cocoon', { x: 54, y: 8 }).prop('cocoon', { x: 60, y: 10, inner: 'bat' }) // in Schleim eingeschlossene Gegner
+    .music('chapel') // ab hier bis zum Thronsaal: Orgel-Toccata ohne Wechsel
     .start(2, 10).exit(62).done();
 
   // Glasturm: senkrechter Aufstieg zum Thronsaal zwischen riesigen Buntglasfenstern (Treppen im Zickzack, zwei Aufzüge)
@@ -319,6 +337,24 @@ const Levels = (() => {
     .zone('skull', 0, 27, { interval: 420, max: 1 })
     .start(2, 41).exitAt(11, 0, 15, 2).music('chapel').done();
 
+  // Brücke zum Bergfried: im Sturm hoch über einem Wolkenmeer. Kaum betritt der Held die Brücke, bricht sie hinter ihm
+  // weg und ein Fledermausschwarm jagt ihn; Lücken im Deck, eine davon so breit, dass nur ein Dash-Sprung hinüberreicht.
+  // In der Mitte eine Turmruine als Kontrollpunkt. Dahinter ein Mode-7-Wolkenstrom im Zeitraffer.
+  const br = room(112, 'bridge')
+    .fill(0, 9, 5, 12, '#')                                                  // Torbogen am Glasturm
+    .fill(6, 9, 104, 9, '=')                                                 // Brückendeck
+    .fill(29, 9, 31, 9, '.').fill(47, 9, 53, 9, '.')                         // Lücken – die große (7) nur mit Dash
+    .fill(60, 9, 63, 12, '#').fill(60, 6, 60, 8, '#').fill(63, 7, 63, 8, '#') // Turmruine in der Mitte (bleibt stehen)
+    .fill(76, 9, 78, 9, '.').fill(89, 9, 92, 9, '.')
+    .fill(105, 9, 111, 12, '#')                                              // Torhaus des Bergfrieds
+    .prop('bridgerun', { row: 9, x0: 6, x1: 104, end: 106, safe: [[3, 9], [61.5, 9]] })
+    .prop('hint', { x: 40, y: 6, w: 4, h: 3, key: 'hintDash' })
+    .statue(61, 8)
+    .candle(12, 6, 'H').candle(21, 6).candle(36, 6, '$').candle(44, 6, 'H').candle(57, 6).candle(66, 6, 'H').candle(71, 6)
+    .candle(84, 6, 'W').candle(97, 6, 'H').candle(102, 6)
+    .enemy('raven', 70, 7).enemy('raven', 95, 7)
+    .start(2, 8).exit(108).done();
+
   const r32 = room(88, 'throne')
     .ground(0, 15).ground(26, 87)
     .grand(21, 0, 134, 0.3, 0.8)
@@ -328,7 +364,7 @@ const Levels = (() => {
     .enemy('knight', 38, 10).enemy('pillar', 46, 10).enemy('bat', 16, 4).enemy('bat', 40, 3).enemy('ghost', 33, 5)
     .zone('skull', 30, 50, { interval: 420, max: 1 })
     // imposanter Thronsaal: der Thron des Grafen unter dem Baldachin, Feuerschalen, goldene Standleuchter, Rüstungen als Ehrenwache
-    .prop('portrait', { wx: 171, wy: 34, v: 1 })
+    .prop('portrait', { wx: 148, wy: 30, v: 2, once: true })
     .prop('throne', { x: 80, y: 10 }).prop('brazier', { x: 75.3, y: 10 }).prop('brazier', { x: 84.7, y: 10 })
     .prop('candelabra', { x: 3, y: 10 }).prop('candelabra', { x: 13, y: 10 }).prop('candelabra', { x: 28, y: 10 }).prop('candelabra', { x: 37, y: 10 }).prop('candelabra', { x: 51, y: 10 }).prop('candelabra', { x: 57, y: 10 })
     .prop('armor', { x: 8, y: 10 }).prop('armor', { x: 32, y: 10, flip: true }).prop('armor', { x: 55, y: 10 }).prop('armor', { x: 60, y: 10, flip: true })
@@ -337,7 +373,7 @@ const Levels = (() => {
   const STAGES = [
     { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
-    { name: 'DER BERGFRIED', music: 'stage3', time: 1080, rooms: [r31, lb, v3, gw, vx, vg, r32], boss: 'GRAF NACHTMAHR' },
+    { name: 'DER BERGFRIED', music: 'stage3', time: 1260, rooms: [r31, mg, lb, gw, vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
   return { STAGES };

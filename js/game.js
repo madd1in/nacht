@@ -384,7 +384,7 @@ const Game = {
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('pause'); }
         break;
       case 'fade':
-        if (this.t === 18) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); Audio8.play(W.songName()); } // eigener Song pro Raum möglich (Schiff)
+        if (this.t === 18) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); Audio8.play(W.songName(), null, 0.12); } // neuer Musikabschnitt: weich überblenden
         if (this.t > 30) this.state = 'play';
         break;
       case 'respawn':
@@ -875,12 +875,12 @@ const Game = {
     });
     const tags = [Options.easy && tr('tagEasy'), Options.maxWhip && tr('tagWhip'), Options.infHearts && tr('tagHearts')].filter(Boolean);
     if (tags.length) Font.draw(ctx, tags.join(' + '), cx, 84, '#58f898', { align: 'center', shadow: '#000' });
-    const lines = this.controlLines(), lh = I18N.cjk ? 12 : 10;
+    const lines = this.controlLines(), lh = I18N.cjk ? 11 : 10, by = lines.length > 6 ? 130 : 136;
     const bh = lines.length * lh + 6;
-    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(cx - 116, 136, 232, bh);
-    ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 116, 136, 232, 1); ctx.fillRect(cx - 116, 136 + bh - 1, 232, 1);
-    lines.forEach(([l, c], i) => Font.draw(ctx, l, cx - 110, 141 + i * lh + (I18N.cjk ? 2 : 0), c));
-    Font.draw(ctx, 'HI-SCORE ' + String(Math.max(this.hi, Scores.top())).padStart(6, '0'), cx, 214, '#7c7c7c', { align: 'center' });
+    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(cx - 116, by, 232, bh);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 116, by, 232, 1); ctx.fillRect(cx - 116, by + bh - 1, 232, 1);
+    lines.forEach(([l, c], i) => Font.draw(ctx, l, cx - 110, by + 5 + i * lh + (I18N.cjk ? 2 : 0), c));
+    Font.draw(ctx, 'HI-SCORE ' + String(Math.max(this.hi, Scores.top())).padStart(6, '0'), cx, Math.max(214, by + bh + 2), '#7c7c7c', { align: 'center' });
     const pad = Input.padName;
     const foot = !Audio8.ready() && this.t > 90 ? tr('soundOn') : pad ? tr('padReady', pad) : '© 1691  NACHTMAHR';
     Font.draw(ctx, foot, cx, 226, pad && Audio8.ready() ? '#3cbcfc' : '#4c4c4c', { align: 'center' });
