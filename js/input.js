@@ -99,6 +99,7 @@ const Input = (() => {
     const btns = [...document.querySelectorAll('#touch .tbtn')];
     const base = document.getElementById('stickBase'), knob = document.getElementById('stickKnob'), hint = document.getElementById('stickHint');
     const active = new Map(); // touchId -> Taste
+    let fullTouch = null; // Vollbild-Knopf: erst beim Loslassen umschalten (Browser verlangen eine abgeschlossene Geste)
     const stick = { id: null, ox: 0, oy: 0, dx: 0, dy: 0 };
     const refresh = () => {
       ACTIONS.forEach(a => { touch[a] = false; });
@@ -134,8 +135,9 @@ const Input = (() => {
       for (const tc of e.changedTouches) {
         const id = tc.identifier, x = tc.clientX, y = tc.clientY;
         if (e.type === 'touchstart') {
-          if (typeof Game !== 'undefined' && Game.state === 'pause') { latch.start = true; continue; } // Pause: Tippen irgendwo = weiter
+          if (typeof Game !== 'undefined' && Game.state === 'pause') { if (!Game.pauseTouch(x, y)) latch.start = true; continue; } // Pause: Menüpunkt antippen, sonst weiter
           const a = hitTest(x, y);
+          if (a === 'full') { fullTouch = id; continue; }
           if (a && (x > window.innerWidth * 0.45 || a === 'start')) { latch[a] = true; active.set(id, a); }
           else if (x < window.innerWidth * 0.5 && stick.id === null) { stick.id = id; stick.ox = x; stick.oy = y; stick.dx = 0; stick.dy = 0; if (hint) hint.style.display = 'none'; }
         } else if (e.type === 'touchmove') {
@@ -145,6 +147,7 @@ const Input = (() => {
             if (d > 70) { stick.ox += stick.dx * (1 - 70 / d); stick.oy += stick.dy * (1 - 70 / d); stick.dx = x - stick.ox; stick.dy = y - stick.oy; }
           } else if (active.has(id)) { const a = hitTest(x, y); if (a) active.set(id, a); }
         } else {
+          if (id === fullTouch) { fullTouch = null; if (e.type === 'touchend' && typeof Game !== 'undefined') Game.toggleFullscreen(); }
           if (id === stick.id) { stick.id = null; stick.dx = stick.dy = 0; }
           active.delete(id);
         }

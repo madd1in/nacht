@@ -104,6 +104,26 @@ const Sprites = (() => {
     return spr.white;
   }
 
+  // Stein-Version (Medusas Blick): Graustufen mit leichtem Grünstich und Körnung, Kontur bleibt dunkel
+  function stoneOf(spr) {
+    if (spr.stone) return spr.stone;
+    const mk = (src) => {
+      const c = canvas(src.width, src.height), x = c.getContext('2d');
+      x.drawImage(src, 0, 0);
+      const im = x.getImageData(0, 0, c.width, c.height), d = im.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (!d[i + 3]) continue;
+        const l = d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11, n = (Math.imul(i >> 2, 2654435761) >>> 29) * 2;
+        const v = l < 24 ? 26 : 70 + l * 0.6 + n;
+        d[i] = v - 2; d[i + 1] = v + 2; d[i + 2] = v - 8;
+      }
+      x.putImageData(im, 0, 0);
+      return c;
+    };
+    spr.stone = { c: mk(spr.c), f: mk(spr.f) };
+    return spr.stone;
+  }
+
   // Zeichnet Sprite; x/y = linke obere Ecke der Figur (ohne Kontur). flip = nach links schauen.
   function draw(ctx, spr, x, y, flip = false, flash = false) {
     if (!spr) return;
@@ -407,5 +427,5 @@ const Sprites = (() => {
     plain(['....o...', '.o.oyo..', '.ooyyo..', '.oyywyo.', 'oyywwyyo', 'oyywwyyo', '.oyyyyo.', '..oooo..']),
   ];
 
-  return { S, draw, make, plain, compose, whiteOf, canvas, paint, fromCanvas: (c, outline = true) => finish(c, outline) };
+  return { S, draw, make, plain, compose, whiteOf, stoneOf, canvas, paint, fromCanvas: (c, outline = true) => finish(c, outline) };
 })();

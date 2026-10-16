@@ -655,33 +655,66 @@ class Spawner {
 // Liegt lauernd auf Simsen und Galerien. Kommt der Held nahe, duckt er sich fauchend und springt ihn an,
 // landet und hetzt weiter; an Kanten springt er erneut.
 const PANTHER_SPR = (() => {
-  const W0 = 30, H0 = 16;
-  const frame = (pose) => {
-    const c = Sprites.canvas(W0, H0), x = c.getContext('2d'), R = (col, a, b, w, h) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
-    const B = '#1c1424', M = '#2c2238', L = '#4c3c60', E = '#f8e800';
-    if (pose === 'rest') { // liegt, Kopf erhoben, Schwanz eingerollt
-      R(B, 4, 10, 20, 5); R(M, 6, 9, 16, 2); R(L, 8, 9, 12, 1);
-      R(B, 22, 5, 7, 6); R(M, 23, 5, 5, 2); R(B, 23, 3, 2, 2); R(B, 27, 3, 2, 2); R(E, 26, 7, 2, 1);
-      R(B, 1, 12, 4, 2); R(B, 0, 10, 2, 3); R(B, 20, 14, 8, 2);
-    } else if (pose === 'crouch') { // geduckt, sprungbereit, Maul offen
-      R(B, 3, 9, 20, 6); R(M, 5, 8, 16, 2); R(L, 7, 8, 12, 1);
-      R(B, 21, 7, 8, 6); R(M, 22, 7, 6, 2); R(B, 22, 5, 2, 2); R(B, 26, 5, 2, 2); R(E, 25, 9, 2, 1); R('#a80020', 26, 11, 3, 2); R('#fcfcfc', 27, 11, 1, 1);
-      R(B, 0, 6, 3, 2); R(B, 2, 8, 2, 2); R(B, 4, 14, 4, 2); R(B, 18, 14, 4, 2);
-    } else if (pose === 'leap') { // gestreckt im Sprung
-      R(B, 4, 5, 20, 6); R(M, 6, 4, 16, 2); R(L, 8, 4, 12, 1);
-      R(B, 22, 2, 8, 6); R(M, 23, 2, 6, 2); R(B, 23, 0, 2, 2); R(B, 27, 0, 2, 2); R(E, 26, 4, 2, 1); R('#a80020', 27, 6, 3, 2);
-      R(B, 24, 8, 5, 2); R(B, 27, 9, 3, 2); R(B, 1, 9, 5, 2); R(B, 0, 10, 3, 2); R(B, 0, 4, 4, 2);
-    } else { // Lauf, zwei Phasen
-      const a = pose === 'run1';
-      R(B, 4, 6, 20, 6); R(M, 6, 5, 16, 2); R(L, 8, 5, 12, 1);
-      R(B, 22, 4, 7, 6); R(M, 23, 4, 5, 2); R(B, 23, 2, 2, 2); R(B, 27, 2, 2, 2); R(E, 26, 6, 2, 1);
-      R(B, 0, a ? 4 : 7, 4, 2);
-      if (a) { R(B, 6, 12, 3, 4); R(B, 2, 11, 4, 2); R(B, 20, 12, 3, 4); R(B, 24, 11, 4, 2); }
-      else { R(B, 8, 12, 3, 4); R(B, 11, 13, 3, 3); R(B, 17, 12, 3, 4); R(B, 14, 13, 3, 3); }
+  // Schwarzer Panther, gemalt (40×22): schlanker Leib mit Mondlicht-Saum auf Rücken und Kopf, kräftige Schultern,
+  // langer geschwungener Schwanz, gelbgrün glühende Augen, Fänge beim Fauchen; Lauf in vier Phasen
+  const W0 = 40, H0 = 22, FUR = ['#06030a', '#100a18', '#1c1428', '#2c2240'], RIM = '#6c5ca8', RIM2 = '#b0a0ec', EYE = '#e8f048';
+  const frame = (pose, ph = 0) => {
+    const c = Sprites.canvas(W0, H0), x = c.getContext('2d');
+    const R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(Math.round(a), Math.round(b), w, h); };
+    const ell = (ex, ey, rx, ry, col) => { for (let y = Math.floor(ey - ry); y <= ey + ry; y++) for (let X = Math.floor(ex - rx); X <= ex + rx; X++) { const q = ((X + 0.5 - ex) / rx) ** 2 + ((y + 0.5 - ey) / ry) ** 2; if (q <= 1) R(q < 0.45 ? FUR[col + 1] || FUR[col] : FUR[col], X, y); } };
+    const limb = (x0, y0, x1, y1, x2, y2, w = 2) => { // Ober- und Unterschenkel, Pfote
+      for (const [a, b, c2, d] of [[x0, y0, x1, y1], [x1, y1, x2, y2]]) { const n = Math.ceil(Math.hypot(c2 - a, d - b)) * 2; for (let k = 0; k <= n; k++) R(FUR[1], a + (c2 - a) * k / n - w / 2, b + (d - b) * k / n, w, 1); }
+      R(FUR[0], x2 - 1, y2, 3, 1);
+    };
+    const tail = (pts) => { for (let i = 0; i < pts.length - 1; i++) { const [a, b] = pts[i], [c2, d] = pts[i + 1], n = Math.ceil(Math.hypot(c2 - a, d - b)) * 2; for (let k = 0; k <= n; k++) R(FUR[1], a + (c2 - a) * k / n, b + (d - b) * k / n, i < 2 ? 2 : 1, i < 2 ? 2 : 1); } };
+    const head = (hx, hy, open) => {
+      ell(hx, hy, 4.3, 3.5, 1); ell(hx + 3.6, hy + 1.2, 2.6, 2, 1); // Schädel, Schnauze
+      R(FUR[1], hx - 3, hy - 5, 2, 3); R(FUR[1], hx + 0.5, hy - 5, 2, 3); R('#3c2c4c', hx - 2.5, hy - 4, 1, 1); R('#3c2c4c', hx + 1, hy - 4, 1, 1); // Ohren
+      R(EYE, hx + 1, hy - 1, 2, 1); R('#fcfcd0', hx + 2, hy - 1, 1, 1); R('#000', hx + 1.5, hy - 1, 1, 1); // glühendes Auge mit Schlitz
+      R('#3c3048', hx + 6, hy + 0.5, 1, 1); // Nase
+      if (open) { R('#5c0010', hx + 3, hy + 2.5, 4, 2); R('#a80020', hx + 4, hy + 3, 2, 1); R('#fcfcfc', hx + 4, hy + 2.5, 1, 1); R('#fcfcfc', hx + 6, hy + 2.5, 1, 1); R('#fcfcfc', hx + 5, hy + 4, 1, 1); }
+      else R('#0a0610', hx + 3, hy + 2.5, 4, 1);
+    };
+    if (pose === 'rest') { // liegt lauernd, Kopf erhoben, Schwanz zuckt
+      tail([[8, 18], [4, 17], [2, 14], [3, 11], [5, 10]]);
+      ell(17, 17, 10, 3.6, 1); ell(24, 15.5, 5, 4, 1);
+      limb(25, 17, 29, 19, 33, 20, 2); limb(12, 18, 16, 20, 20, 20, 2);
+      head(31, 12, false);
+    } else if (pose === 'crouch') { // geduckt, Hinterteil hoch, fauchend
+      tail([[8, 11], [4, 9], [1, 10], [0, 13]]);
+      ell(16, 14, 9, 4, 1); ell(10, 12.5, 4.5, 4, 1); ell(23, 15, 5, 4, 1);
+      limb(11, 15, 9, 18, 11, 20, 2.5); limb(24, 17, 27, 19, 30, 20, 2);
+      head(30, 14.5, true);
+    } else if (pose === 'leap') { // gestreckt im Sprung, Vorderpfoten mit Krallen voraus
+      tail([[7, 9], [3, 8], [1, 10], [0, 13]]);
+      ell(18, 9, 11, 3.6, 1); ell(26, 8.5, 5, 3.6, 1);
+      limb(27, 10, 31, 12, 36, 11, 2); R('#e8e0d0', 37, 11, 1, 1); R('#e8e0d0', 37, 12, 1, 1); // Krallen
+      limb(10, 10, 6, 13, 3, 15, 2.5);
+      head(33, 6, true);
+    } else { // Galopp in vier Phasen
+      const s = [0, 1, 2, 1][ph], gather = ph === 2;
+      tail([[8, 10 + s], [4, 8 + s], [1, 8 + s * 2], [0, 11 + s]]);
+      ell(18, 11 + s * 0.5, gather ? 9 : 11, 3.6, 1); ell(26, 10.5, 5, 3.8, 1); ell(11, 11, 4, 3.5, 1);
+      const fr = [[[27, 13, 30, 17, 34, 20], [25, 13, 27, 17, 28, 20]], [[27, 13, 31, 16, 35, 17], [25, 13, 29, 16, 31, 19]], [[27, 13, 26, 17, 24, 20], [25, 13, 23, 17, 22, 20]], [[27, 13, 29, 17, 30, 20], [25, 13, 24, 17, 26, 20]]][ph];
+      const bk = [[[11, 13, 8, 17, 6, 20], [13, 13, 11, 17, 9, 20]], [[11, 13, 6, 15, 3, 16], [13, 13, 9, 16, 6, 18]], [[11, 13, 14, 17, 17, 20], [13, 13, 16, 17, 19, 20]], [[11, 13, 10, 17, 11, 20], [13, 13, 12, 17, 14, 20]]][ph];
+      fr.concat(bk).forEach(l => limb(...l, 2));
+      head(33, 8 + (ph === 1 ? -1 : 0), ph === 1);
     }
+    // Mondlicht-Saum: oberste Pixel jeder Spalte hell, damit der Panther im Dunkeln lesbar bleibt
+    const img = x.getImageData(0, 0, W0, H0), d = img.data;
+    for (let X = 0; X < W0; X++) {
+      let seen = 0;
+      for (let y = 0; y < H0; y++) {
+        const i = (y * W0 + X) * 4;
+        if (!d[i + 3]) { seen = 0; continue; }
+        if (seen < 2 && !(d[i] > 200 && d[i + 1] > 200)) { const col = seen === 0 ? [176, 160, 236] : [108, 92, 168]; if (!(d[i] === 232 && d[i + 1] === 240)) { d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; } }
+        seen++;
+      }
+    }
+    x.putImageData(img, 0, 0);
     return Sprites.fromCanvas(c);
   };
-  return { rest: frame('rest'), crouch: frame('crouch'), leap: frame('leap'), run: [frame('run1'), frame('run2')] };
+  return { rest: frame('rest'), crouch: frame('crouch'), leap: frame('leap'), run: [0, 1, 2, 3].map(i => frame('run', i)) };
 })();
 
 class Panther extends Enemy {
@@ -714,8 +747,8 @@ class Panther extends Enemy {
     this.touch();
   }
   draw(ctx) {
-    const S = PANTHER_SPR, s = this.state === 'rest' ? S.rest : this.state === 'crouch' ? S.crouch : this.state === 'leap' && !this.onGround ? S.leap : S.run[Math.floor(this.t / 4) % 2];
-    this.ds(ctx, s, Math.round(this.cx - 15 - W.cam.x), Math.round(this.y + this.h - 16 - W.cam.y), this.face < 0, this.flash);
+    const S = PANTHER_SPR, s = this.state === 'rest' ? S.rest : this.state === 'crouch' ? S.crouch : this.state === 'leap' && !this.onGround ? S.leap : S.run[Math.floor(this.t / 3) % S.run.length];
+    this.ds(ctx, s, Math.round(this.cx - 20 - W.cam.x), Math.round(this.y + this.h - 21 - W.cam.y), this.face < 0, this.flash);
   }
 }
 

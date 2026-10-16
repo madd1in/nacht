@@ -49,6 +49,7 @@ const W = {
         case 'throne': this.spawn(new Throne(d)); break;
         case 'portrait': this.spawn(new Portrait(d)); break;
         case 'hint': this.spawn(new Hint(d)); break;
+        case 'tubecocoons': this.spawn(new TubeCocoons(d)); break;
         case 'bridgerun': this.spawn(new BridgeRun(d)); break;
         case 'waterfall': this.spawn(new Waterfall(d)); break;
         case 'cocoon': this.spawn(new Cocoon(d.x, d.y, d.inner)); break;
@@ -259,7 +260,7 @@ const W = {
         const vul = e.hurtBoxes ? e.hurtBoxes().some(hits) : hits(e.hurtBox ? e.hurtBox() : e);
         if (vul) { if (e.hit(dmg, id)) Input.rumble(0.15, 0.35, 60); }
         else if (e.armorBoxes) { const ab = e.armorBoxes().find(hits); if (ab) e.deflect(id, ab); } // Panzerung: prallt ab
-      } else if (e.kind === 'eproj' && !e.reflected && hits(e)) { // Konter: Geschosse zerschlagen bzw. zurückschleudern
+      } else if (e.kind === 'eproj' && !e.reflected && !e.unstoppable && hits(e)) { // Konter: Geschosse zerschlagen bzw. zurückschleudern
         if (e.type === 'fire') {
           const p = this.player;
           e.reflected = true; e.vx = p.face * Math.max(2.6, Math.abs(e.vx) * 1.5); e.vy = -0.3; e.grav = 0;
@@ -495,7 +496,7 @@ const W = {
     order.forEach(k => { for (const e of this.ents) if (e.kind === k) e.draw(ctx); if (k === 'boss') this.player.draw(ctx, this.cam); });
     for (const e of this.ents) if (e.drawFront && !e.dead) e.drawFront(ctx); // Bauwerke, die vor dem Helden liegen (Torhaus beim Durchgehen)
     this.drawReflections(ctx, sx, sy);
-    if (theme === 'throne' || theme === 'gallery') this.drawFloorMirror(ctx, sx, sy);
+    if ((theme === 'throne' || theme === 'gallery') && !View.lite) this.drawFloorMirror(ctx, sx, sy);
     FX.drawAmbient(ctx, this.cam);
     Tiles.drawFront(ctx, this.room, this.cam);
     FX.drawFog(ctx, theme, this.cam, this.frame, this.room.h * T - this.cam.y);
@@ -625,16 +626,19 @@ const W = {
     const flick = (k) => Math.sin(f * 0.3 + k) * 1.5 + Math.sin(f * 0.13 + k * 2) * 1.5;
     const p = this.player;
     if (p.alive && !p.hidden) L.push({ x: p.cx - cx, y: p.cy - cy, r: p.chargeT >= 50 ? 60 : 46, c: p.chargeT >= 50 ? [248, 184, 0] : null, a: 0.4 });
+    const darkRoom = (STORMY[this.room.theme] || [0])[0] > 0.6; // stockdunkle Säle: Gegner bekommen einen schwachen Schimmer
     for (const e of this.ents) {
       if (e.dead) continue;
       const x = e.cx - cx, y = e.cy - cy;
       if (x < -48 || x > View.w + 48 || y < -60 || y > 270) continue;
+      if (darkRoom && e.kind === 'enemy') L.push({ x, y, r: 30, c: [150, 140, 230], a: 0.3 });
       if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + (e.blood ? 10 + Math.sin(f * 0.15) * 4 : 0) + flick(e.x), c: e.blood ? [232, 24, 48] : [248, 140, 40], a: e.blood ? 0.65 : 0.5 });
       else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
       else if (e instanceof Gatehouse) e.lights(L, this.cam.x, this.cam.y, flick);
       else if (e instanceof FallingChandelier) e.lights(L, this.cam.x, this.cam.y, flick);
       else if (e instanceof Lectern || e instanceof Brazier || e instanceof Candelabra || e instanceof Waterfall) e.lights(L, cx, cy, flick);
       else if (e instanceof Tome && e.open) L.push({ x, y, r: 34, c: [232, 40, 80], a: 0.5 });
+      else if (e instanceof Panther) L.push({ x: x + e.face * 11, y: y - 5, r: 22, c: [210, 230, 60], a: 0.5 }); // glühende Raubtieraugen
       else if (e instanceof Chandelier) L.push({ x, y: e.y - cy - 6, r: 42 + flick(e.px), c: [248, 160, 60], a: 0.55 });
       else if (e instanceof Statue && e.active) L.push({ x, y: y - 8, r: 30, c: [60, 188, 252], a: 0.45 });
       else if (e instanceof Chest && e.opened) L.push({ x, y, r: 20, c: [248, 184, 0], a: 0.4 });

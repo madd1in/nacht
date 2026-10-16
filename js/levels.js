@@ -168,10 +168,10 @@ const Levels = (() => {
     .statue(64, 10)
     .fill(91, 8, 93, 8, '=').fill(98, 8, 100, 8, '=')
     .candle(5, 9).candle(11, 9, '5').candle(21, 9).candle(33, 9).candle(32, 5).candle(38, 5, 'H').candle(42, 5, 'M')
-    .candle(50, 9, '$').candle(53, 3, 'H').candle(61, 3).candle(67, 9).candle(73, 9, 'H').candle(80, 9, '2').candle(86, 9)
+    .candle(50, 9, '$').candle(53, 3, 'H').candle(61, 3).candle(67, 9, 'W').candle(73, 9, 'H').candle(80, 9, '2').candle(86, 9, 'W')
     .enemy('bat', 14, 3).enemy('bat', 40, 2).enemy('bat', 70, 3)
     .zone('ghoul', 18, 50, { interval: 140, max: 2 })
-    .prop('portrait', { wx: 114, wy: 30, v: 0 }).prop('portrait', { wx: 370, wy: 30, v: 2 })
+    .prop('portrait', { wx: 136, wy: 30, v: 0 }) // ein Ahnenbild pro Joch, zwischen Fenster und Pfeiler
     .start(2, 10).arena('gbat').done();
 
   // ======================= STAGE 2: Die Katakomben =======================
@@ -214,7 +214,7 @@ const Levels = (() => {
     .statue(34, 10)
     .fill(83, 8, 85, 8, '=').fill(90, 8, 92, 8, '=')
     .candle(4, 9).candle(16, 4, 'M').candle(23, 4, 'H').candle(20, 9, '$').candle(37, 9, '3').candle(44, 9)
-    .candle(48, 9, 'W').candle(56, 9).candle(60, 9, 'H').candle(66, 9).candle(72, 9, 'H')
+    .candle(48, 9, 'W').candle(56, 9, 'W').candle(60, 9, 'H').candle(66, 9).candle(72, 9, 'H')
     .chest(24, 5, 'big')
     .enemy('skel', 18, 5).enemy('skel', 45, 10).enemy('knight', 50, 10)
     .enemy('bat', 30, 3).enemy('bat', 54, 4).enemy('ghost', 60, 6)
@@ -234,17 +234,18 @@ const Levels = (() => {
     .zone('skull', 30, 60, { interval: 380, max: 1 })
     .start(2, 10).exit(62).done();
 
-  // Marmorgalerie: ein langer Säulengang. Hinten stehen drei Säulenreihen in echter Perspektive (PS1-Look), Mondlicht fällt
+  // Marmorgalerie (Ende von Stage 3, Arena der Medusa): ein langer Säulengang. Hinten stehen drei Säulenreihen in echter Perspektive (PS1-Look), Mondlicht fällt
   // durch hohe Fenster und streift die Säulen, Kerzen flackern, vorn ziehen dunkle Säulen vorbei. Lebende Rüstungen als Wache.
   const mg = room(96, 'gallery')
     .ground(0, 95)
     .fill(16, 8, 20, 8, '=').fill(34, 7, 38, 7, '=').fill(46, 9, 49, 10, '#').fill(58, 7, 62, 7, '=').fill(76, 8, 80, 8, '=')
     .prop('candelabra', { x: 6, y: 10 }).prop('candelabra', { x: 26, y: 10 }).prop('candelabra', { x: 54, y: 10 }).prop('candelabra', { x: 70, y: 10 }).prop('candelabra', { x: 88, y: 10 })
-    .prop('armor', { x: 12, y: 10 }).prop('armor', { x: 30, y: 10, live: true, flip: true }).prop('armor', { x: 66, y: 10, live: true }).prop('armor', { x: 84, y: 10, flip: true })
-    .candle(18, 5, 'H').candle(36, 4, '$').candle(42, 8).candle(60, 4, 'W').candle(64, 8, 'H').candle(78, 5).candle(92, 8, 'H')
-    .enemy('ghost', 24, 5).enemy('ghost', 72, 4).enemy('knight', 40, 10).enemy('pillar', 82, 10)
-    .statue(52, 10)
-    .start(2, 10).exit(94).done();
+    .prop('armor', { x: 12, y: 10 }).prop('armor', { x: 30, y: 10, live: true, flip: true }).prop('armor', { x: 66, y: 10 }).prop('armor', { x: 84, y: 10, flip: true })
+    .candle(18, 5, 'H').candle(36, 4, '$').candle(42, 8).candle(48, 9, 'H').candle(54, 9, 'W').candle(57, 9, 'W').candle(60, 4, 'H').candle(64, 8).candle(78, 5, 'H').candle(92, 8)
+    .enemy('ghost', 24, 5).enemy('ghost', 44, 4).enemy('knight', 40, 10)
+    .statue(52, 10) // Kontrollpunkt vor Medusa, danach zwei Peitschen-Kerzen
+    .music('stage3')
+    .start(2, 10).arena('medusa').done();
 
   // Bibliotheksturm: senkrechter Aufstieg zwischen deckenhohen Bücherwänden. Erst eine Kante, die man nur mit dem
   // Doppelsprung packt und sich hochzieht, dann zwei Wandsprung-Schächte zwischen den Regalen, oben eine Lücke, die nur
@@ -306,6 +307,7 @@ const Levels = (() => {
     .zone('skull', 2, 30, { interval: 420, max: 1 })
     .start(2, 39).exitAt(27, 0, 30, 5).done();
 
+  // ======================= STAGE 4: Der Thron der Nacht =======================
   // Seelenstrudel: schwebende Steine über dem Nichts, Ankerringe, rotierender Mode-7-Tunnel
   const vx = room(64, 'vortex')
     .ground(0, 7).ground(57, 63)
@@ -315,7 +317,7 @@ const Levels = (() => {
     .statue(4, 10)
     .candle(12, 7, 'H').candle(27, 7).candle(37, 6, 'H').candle(54, 7, '$').candle(60, 9, 'H').candle(32, 2, '1').candle(50, 2, 'W')
     .zone('skull', 10, 56, { interval: 640, max: 1 })
-    .prop('cocoon', { x: 27, y: 8 }).prop('cocoon', { x: 37, y: 7 }).prop('cocoon', { x: 54, y: 8 }).prop('cocoon', { x: 60, y: 10, inner: 'bat' }) // in Schleim eingeschlossene Gegner
+    .prop('tubecocoons', { list: [[40, 30], [110, 150, 'bat'], [170, 90], [230, 200], [20, 215, 'bat'], [140, 10]] }) // in Schleim eingeschlossene Gegner in der Röhrenwand
     .music('chapel') // ab hier bis zum Thronsaal: Orgel-Toccata ohne Wechsel
     .start(2, 10).exit(62).done();
 
@@ -360,7 +362,7 @@ const Levels = (() => {
     .grand(21, 0, 134, 0.3, 0.8)
     .statue(30, 10)
     .fill(69, 7, 71, 7, '=').fill(86, 7, 87, 7, '=')                     // Plattformen links und rechts neben dem Thron
-    .candle(5, 9, 'H').candle(10, 9).candle(18, 2, 'H').candle(34, 9, '1').candle(40, 9).candle(44, 9, 'U').candle(48, 9, 'R')
+    .candle(5, 9, 'H').candle(10, 9).candle(18, 2, 'H').candle(34, 9, '1').candle(37, 9, 'W').candle(40, 9, 'W').candle(44, 9, 'U').candle(48, 9, 'R') // nach dem Kontrollpunkt zwei Peitschen-Kerzen
     .enemy('knight', 38, 10).enemy('pillar', 46, 10).enemy('bat', 16, 4).enemy('bat', 40, 3).enemy('ghost', 33, 5)
     .zone('skull', 30, 50, { interval: 420, max: 1 })
     // imposanter Thronsaal: der Thron des Grafen unter dem Baldachin, Feuerschalen, goldene Standleuchter, Rüstungen als Ehrenwache
@@ -373,7 +375,8 @@ const Levels = (() => {
   const STAGES = [
     { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
-    { name: 'DER BERGFRIED', music: 'stage3', time: 1260, rooms: [r31, mg, lb, gw, vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
+    { name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
+    { name: 'DER THRON DER NACHT', music: 'chapel', time: 660, rooms: [vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
   return { STAGES };

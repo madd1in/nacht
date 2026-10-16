@@ -88,6 +88,7 @@ class Player {
     this.atkDir = 'fwd'; this.slideT = 0; this.flingT = 0; this.trail = []; this.dangle = false; this.ring = null;
     this.ledge = null; this.ledgeCool = 0; this.ledgeT = 0; this.climbT = 0; this.wallSlide = 0;
     this.dashT = 0; this.dashCool = 0; this.airDash = false; this.canAirDash = true; this.dashCarry = false; this.tapDir = 0; this.tapT = 0; this.wallT = 0; this.wallLast = 0;
+    this.stoneT = 0; this.stoneMax = 1; this.stoneSpr = null; this.stoneShake = 0;
   }
   get cx() { return this.x + this.w / 2; }
   get cy() { return this.y + this.h / 2; }
@@ -181,6 +182,7 @@ class Player {
 
   hurt(dmg, srcX) {
     if (this.inv > 0 || !this.alive || W.cleared || Game.state === 'demo') return; // Demo: unverwundbar
+    if (this.stoneT > 0) this.breakStone(false); // ein Treffer sprengt den Stein
     this.dangle = false; W.combo.n = 0; W.combo.t = 0; W.stats.hits++;
     if (this.state === 'swing') { this.state = 'normal'; this.ring = null; }
     if (this.state === 'zip') { this.zip.line.cool = 40; this.state = 'normal'; this.zip = null; }
@@ -200,9 +202,40 @@ class Player {
   die(silent) {
     if (!this.alive) return;
     this.setCrouch(false);
-    this.state = 'dead'; this.deadT = 0; this.atkT = 0; this.vx = 0; this.vy = silent ? 0 : -2.5;
+    this.state = 'dead'; this.deadT = 0; this.atkT = 0; this.stoneT = 0; this.vx = 0; this.vy = silent ? 0 : -2.5;
     this.onGround = false; this.inv = 0; this.hidden = !!silent;
     Audio8.stop(); Audio8.sfx('die'); Input.rumble(1, 1, 600);
+  }
+
+  // Medusas Blick: der Held erstarrt zu Stein; Tasten hämmern bricht ihn schneller frei
+  petrify() {
+    if (!this.alive || this.stoneT > 0 || Game.state === 'demo') return;
+    if (this.state === 'zip') { this.zip.line.cool = 40; this.zip = null; }
+    if (this.state === 'swing' || this.state === 'zip' || this.state === 'ledge' || this.state === 'climb' || this.state === 'hurt') { this.state = 'normal'; this.ring = null; this.ledge = null; }
+    this.flipT = 0; this.atkT = 0; this.chargeT = 0; this.dashT = 0; this.dashCarry = false; this.wallSlide = 0; this.slideT = 0; this.vx = 0; this.dangle = false;
+    this.stoneT = this.stoneMax = Options.easy ? 80 : 125; this.stoneSpr = this.sprite(); this.stoneShake = 0;
+    Audio8.sfx('crumble', this.cx); Input.rumble(0.6, 0.3, 300); W.flash = Math.max(W.flash, 4);
+    Game.note('mash'); Game.noteT = this.stoneT + 20;
+  }
+  updateStone(P) {
+    if (['left', 'right', 'up', 'down', 'jump', 'attack', 'sub', 'dash'].some(k => P[k])) {
+      this.stoneT -= 7; this.stoneShake = 4; Audio8.sfx('step', this.cx);
+      W.spawn(new Particle(this.cx + rnd(-5, 5), this.y + rnd(2, this.h - 4), rnd(-1.2, 1.2), rnd(-2, -0.5), '#9c9c94', 26, 1, 0.2));
+    }
+    if (this.stoneShake > 0) this.stoneShake--;
+    if (--this.stoneT <= 0) return this.breakStone(true);
+    if (this.state === 'stairs') return;
+    this.vx = 0; this.vy = Math.min(this.vy + GRAV, MAXFALL);
+    const r = Phys.moveY(this, this.vy);
+    this.onGround = r === 1; if (r) this.vy = 0;
+    this.checkPlatforms(); this.hazards();
+  }
+  breakStone(free) {
+    this.stoneT = 0; this.stoneSpr = null;
+    if (Game.noteKey === 'mash') Game.noteT = Math.min(Game.noteT, 20);
+    for (let i = 0; i < 14; i++) W.spawn(new Particle(this.cx + rnd(-6, 6), this.y + rnd(0, this.h), rnd(-2, 2), rnd(-3, -0.5), i % 3 ? '#8c8c84' : '#c8c8bc', 34, 2, 0.2));
+    Audio8.sfx('crumble', this.cx);
+    if (free) this.inv = Math.max(this.inv, 40);
   }
 
   findStair(top) {
@@ -243,6 +276,7 @@ class Player {
     if (this.landT > 0) this.landT--;
     if (this.state === 'dead') return this.updateDead();
     if (this.inv > 0) this.inv--;
+    if (this.stoneT > 0) return this.updateStone(P);
     if (this.crashT > 0) this.crashT--;
     this.updateCharge(I);
     this.recordTrail();
@@ -794,6 +828,11 @@ class Player {
   draw(ctx, cam) {
     if (this.hidden) return;
     if (this.inv > 0 && this.alive && (W.frame & 2)) return;
+    if (this.stoneT > 0 && this.stoneSpr) { // versteinert: graue Statue, zittert beim Freistrampeln
+      const spr = this.stoneSpr, st = Sprites.stoneOf(spr), sh = this.stoneShake > 0 ? ((W.frame & 1) ? 1 : -1) : 0;
+      ctx.drawImage(this.face < 0 ? st.f : st.c, Math.round(this.x - 3 - cam.x) - (spr.mx || 0) + sh - spr.pad, Math.round(this.feet - spr.h - cam.y) - spr.pad);
+      return;
+    }
     const spr = this.sprite();
     const flash = (this.powerT > 0 || this.chargeT >= 50 || this.crashT > 0) && (W.frame & 4);
     if (spr === this.H.dead) {

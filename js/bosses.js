@@ -1,75 +1,69 @@
 // Bosse: Riesenfledermaus, Knochenriese, Graf Nachtmahr – und der lila Tentakel als Miniboss auf dem Schiff.
 'use strict';
 
-// ---------------- Riesenfledermaus: prozedurale Pixel-Art (72x44, symmetrisch) ----------------
+// ---------------- Riesenfledermaus im PS2-Look (128×84, symmetrisch) ----------------
+// Die Flügel sind ein kleines 3D-Modell: Arm, Handgelenk, vier Finger, dazwischen Flughaut. Beim Abschlag schwingen sie
+// nach vorn und verkürzen sich perspektivisch, beim Aufschlag spannen sie sich weit auf. Flughaut halb durchscheinend
+// mit Adern, weich schattiert; pelziger Leib, große Ohren mit rosa Innenseite, glühende Augen, Fänge.
 (() => {
-  const Wc = 72, Hc = 44;
-  const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => v / 16);
-  const bay = (x, y) => BAY[(y & 3) * 4 + (x & 3)];
-  // Linker Flügel je Pose: Schulter S, Handgelenk W, Fingerspitzen F, Körperansatz B
-  const POSES = {
-    up: { S: [31, 16], W: [18, 4], F: [[2, 0], [4, 12], [14, 21]], B: [30, 26] },
-    midU: { S: [31, 17], W: [15, 10], F: [[0, 6], [2, 20], [16, 27]], B: [30, 27] },
-    down: { S: [31, 18], W: [16, 22], F: [[1, 31], [8, 39], [20, 35]], B: [30, 28] },
-    midD: { S: [31, 17], W: [14, 14], F: [[0, 15], [4, 29], [17, 31]], B: [30, 27] },
-    fold: { S: [31, 15], W: [27, 4], F: [[23, 11], [24, 25], [28, 33]], B: [31, 33] },
-  };
-  const inside = (poly, x, y) => {
-    let c = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const [xi, yi] = poly[i], [xj, yj] = poly[j];
-      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
-    }
-    return c;
-  };
-  const segDist = (px, py, [ax, ay], [bx, by]) => {
-    const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
-    return Math.hypot(px - ax - dx * t, py - ay - dy * t);
-  };
-  const toward = ([ax, ay], [bx, by], [tx, ty], k) => [(ax + bx) / 2 + (tx - (ax + bx) / 2) * k, (ay + by) / 2 + (ty - (ay + by) / 2) * k];
-
-  function frame(poseName, open, sleep = false) {
-    const P = POSES[poseName], pix = new Array(Wc * Hc).fill(null);
-    const set = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < Wc && y < Hc) { pix[y * Wc + x] = c; pix[y * Wc + (Wc - 1 - x)] = c; } };
-    const get = (x, y) => (x >= 0 && y >= 0 && x < Wc && y < Hc) ? pix[y * Wc + x] : null;
-    const [F1, F2, F3] = P.F;
-    const poly = [P.S, P.W, F1, toward(F1, F2, P.W, 0.35), F2, toward(F2, F3, P.W, 0.35), F3, toward(F3, P.B, P.W, 0.25), P.B];
-    const maxD = Math.max(...P.F.map(([x, y]) => Math.hypot(x - P.S[0], y - P.S[1])));
-    for (let y = 0; y < Hc; y++) for (let x = 0; x < Wc / 2; x++) {
-      if (!inside(poly, x + 0.5, y + 0.5)) continue;
-      const d = Math.hypot(x - P.S[0], y - P.S[1]) / maxD + (bay(x, y) - 0.5) * 0.18;
-      let c = d > 0.72 ? '#7a3a9a' : d > 0.4 ? '#56246e' : '#3a1450';
-      if (P.F.some(f => segDist(x, y, P.W, f) < 0.7)) c = '#200a2e';          // Fingerknochen
-      else if (P.F.some(f => segDist(x, y, P.W, toward(P.W, f, P.S, 0.5)) < 0.5) && bay(x, y) < 0.5) c = '#8c2058'; // Adern
-      set(x, y, c);
-    }
-    for (let x = 0; x < Wc / 2; x++) for (let y = 0; y < Hc; y++) { // helle Hinterkante
-      const c = get(x, y);
-      if (c && c !== '#200a2e' && (!get(x, y + 1) || !get(x - 1, y))) set(x, y, '#a85cc8');
-    }
-    for (let k = 0; k <= 10; k++) { const t = k / 10; set(P.S[0] + (P.W[0] - P.S[0]) * t, P.S[1] + (P.W[1] - P.S[1]) * t, '#1c0828'); set(P.S[0] + (P.W[0] - P.S[0]) * t, P.S[1] + 1 + (P.W[1] - P.S[1]) * t, '#3a1450'); }
-    set(P.W[0], P.W[1] - 1, '#fce0a8'); set(P.W[0] - 1, P.W[1] - 2, '#fce0a8');          // Daumenkralle
-    P.F.forEach(([fx, fy]) => set(fx, fy, '#c8a0d8'));
-    // Körper (Fell)
-    for (let y = 0; y < Hc; y++) for (let x = 0; x < Wc / 2; x++) {
-      const bd = ((x - 36) / 6.5) ** 2 + ((y - 22) / 9.5) ** 2, hd = ((x - 36) / 6.5) ** 2 + ((y - 11) / 5.5) ** 2;
-      if (bd <= 1) set(x, y, bd > 0.75 ? '#2a0c38' : (x < 34 && y < 20) ? '#5c2c70' : (y > 24 && x > 33) ? '#6c3c5c' : ((x + y) % 3 ? '#3a1a48' : '#4a2258'));
-      if (hd <= 1) set(x, y, hd > 0.7 ? '#2a0c38' : y < 10 && x < 34 ? '#5c2c70' : '#3a1a48');
-    }
-    for (let i = 0; i < 8; i++) { set(30 + Math.floor(i / 4), 8 - i, '#3a1a48'); set(31 + Math.floor(i / 3), 8 - i, '#2a0c38'); } // Ohren
-    for (let i = 0; i < 5; i++) set(31, 7 - i, '#c8507c');
-    if (sleep) { set(33, 11, '#5c2c70'); set(34, 11, '#5c2c70'); }
-    else { set(33, 11, '#fc2c2c'); set(34, 11, '#fc2c2c'); set(33, 12, '#a80010'); set(34, 12, '#fc2c2c'); set(33, 11, '#fcfcfc'); }
-    set(35, 13, '#1c0410');
-    if (open) { for (let x = 34; x <= 35; x++) for (let y = 14; y <= 17; y++) set(x, y, '#5c0010'); set(34, 14, '#fcfcfc'); set(34, 17, '#fcfcfc'); set(35, 16, '#c8204c'); }
-    else { set(34, 15, '#1c0410'); set(35, 15, '#1c0410'); set(34, 16, '#fcfcfc'); }
-    set(34, 31, '#fce0a8'); set(33, 32, '#fce0a8');                                         // Fußkrallen
+  const Wc = 128, Hc = 84, CX = 64;
+  const WING = { E: [-22, -10], Wr: [-40, -18], F: [[-60, -6], [-58, 16], [-44, 32], [-24, 36]], B: [-5, 30] };
+  function frame(phase, open, sleep = false) {
     const c = Sprites.canvas(Wc, Hc), x = c.getContext('2d');
-    pix.forEach((col, i) => { if (col) { x.fillStyle = col; x.fillRect(i % Wc, Math.floor(i / Wc), 1, 1); } });
+    const phi = sleep ? -1.2 : 0.55 * Math.cos(phase * Math.PI * 2), psi = sleep ? 0 : 0.65 * Math.max(0, Math.sin(phase * Math.PI * 2));
+    const P = (sd, p) => { // Rotation in der Bildebene (phi), Schwung nach vorn (psi) → Verkürzung
+      const [px, py] = p, x1 = px * Math.cos(phi) + py * Math.sin(phi), y1 = -px * Math.sin(phi) + py * Math.cos(phi);
+      const x2 = x1 * Math.cos(psi), z = Math.abs(x1) * Math.sin(psi);
+      return [CX + sd * (-12 + x2), 26 + y1 + z * 0.22];
+    };
+    for (const sd of [-1, 1]) { // Flügel: links (sd = −1) und gespiegelt rechts
+      const S = [CX + sd * -12, 26], E = P(sd, WING.E), Wr = P(sd, WING.Wr), F = WING.F.map(f => P(sd, f)), B = [CX + sd * -5, 56];
+      const mid = (a, b, k) => [(a[0] + b[0]) / 2 + (Wr[0] - (a[0] + b[0]) / 2) * k, (a[1] + b[1]) / 2 + (Wr[1] - (a[1] + b[1]) / 2) * k];
+      const memb = [S, E, Wr, F[0], mid(F[0], F[1], 0.3), F[1], mid(F[1], F[2], 0.28), F[2], mid(F[2], F[3], 0.25), F[3], mid(F[3], B, 0.2), B];
+      const face = Math.cos(psi) * (0.75 + 0.25 * Math.cos(phi)); // zum Betrachter gewandt = heller
+      const g = x.createLinearGradient(Wr[0], Wr[1], CX, 60);
+      g.addColorStop(0, `rgba(${40 + 50 * face | 0},${12 + 14 * face | 0},${58 + 50 * face | 0},0.97)`);
+      g.addColorStop(0.55, `rgba(${70 + 70 * face | 0},${18 + 20 * face | 0},${80 + 50 * face | 0},0.93)`);
+      g.addColorStop(1, `rgba(${110 + 70 * face | 0},${30 + 20 * face | 0},${90 + 40 * face | 0},0.9)`); // durchscheinend rötlich am Saum
+      x.fillStyle = g; x.beginPath(); memb.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill();
+      x.strokeStyle = 'rgba(200,140,230,0.55)'; x.lineWidth = 1; x.stroke(); // heller Saum
+      x.strokeStyle = 'rgba(170,40,90,0.55)'; x.lineWidth = 0.8; // Adern
+      F.forEach(f => { const a = [(Wr[0] + f[0]) / 2, (Wr[1] + f[1]) / 2]; x.beginPath(); x.moveTo(a[0], a[1]); x.quadraticCurveTo((a[0] + S[0]) / 2, (a[1] + f[1]) / 2 + 4, (a[0] + B[0]) / 2, (a[1] + B[1]) / 2 + 2); x.stroke(); });
+      x.lineCap = 'round'; x.strokeStyle = '#12061a'; x.lineWidth = 3.2; x.beginPath(); x.moveTo(S[0], S[1]); x.lineTo(E[0], E[1]); x.lineTo(Wr[0], Wr[1]); x.stroke(); // Arm
+      x.strokeStyle = '#5c3470'; x.lineWidth = 1; x.beginPath(); x.moveTo(S[0], S[1] - 1); x.lineTo(E[0], E[1] - 1); x.lineTo(Wr[0], Wr[1] - 1); x.stroke();
+      x.strokeStyle = '#1c0a26'; x.lineWidth = 1.6; F.forEach(f => { x.beginPath(); x.moveTo(Wr[0], Wr[1]); x.lineTo(f[0], f[1]); x.stroke(); }); // Finger
+      x.fillStyle = '#e8d8c0'; x.beginPath(); x.moveTo(Wr[0], Wr[1]); x.lineTo(Wr[0] + sd * 2, Wr[1] - 5); x.lineTo(Wr[0] + sd * 3.5, Wr[1] - 1); x.fill(); // Daumenkralle
+    }
+    // Leib: pelzig, Licht von oben, heller Brustlatz
+    const bg = x.createRadialGradient(CX - 3, 30, 3, CX, 38, 18); bg.addColorStop(0, '#6c4078'); bg.addColorStop(0.6, '#38183e'); bg.addColorStop(1, '#14061a');
+    x.fillStyle = bg; x.beginPath(); x.ellipse(CX, 38, 12, 18, 0, 0, Math.PI * 2); x.fill();
+    x.fillStyle = 'rgba(160,110,120,0.35)'; x.beginPath(); x.ellipse(CX, 36, 6, 9, 0, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = 'rgba(30,8,36,0.7)'; x.lineWidth = 1; for (let k = 0; k < 14; k++) { const a = k * 0.9, r = 6 + (k % 4) * 2; x.beginPath(); x.moveTo(CX + Math.cos(a) * r, 38 + Math.sin(a) * r * 1.4); x.lineTo(CX + Math.cos(a) * (r + 2.5), 38 + Math.sin(a) * (r + 2.5) * 1.4 + 1); x.stroke(); } // Fellstriche
+    for (const sd of [-1, 1]) { x.strokeStyle = '#1c0a26'; x.lineWidth = 2; x.beginPath(); x.moveTo(CX + sd * 5, 54); x.lineTo(CX + sd * 7, 60); x.stroke(); x.fillStyle = '#e8d8c0'; x.fillRect(CX + sd * 7 - 1, 60, 2, 2); } // Füße mit Krallen
+    // Kopf mit großen Ohren
+    for (const sd of [-1, 1]) {
+      x.fillStyle = '#2a0e32'; x.beginPath(); x.moveTo(CX + sd * 3, 14); x.lineTo(CX + sd * 12, -1 + (sleep ? 6 : 0)); x.lineTo(CX + sd * 11, 16); x.closePath(); x.fill();
+      x.fillStyle = '#b05878'; x.beginPath(); x.moveTo(CX + sd * 5, 14); x.lineTo(CX + sd * 11, 3 + (sleep ? 6 : 0)); x.lineTo(CX + sd * 10, 15); x.closePath(); x.fill();
+    }
+    const hg = x.createRadialGradient(CX - 2, 15, 2, CX, 18, 10); hg.addColorStop(0, '#6c3c78'); hg.addColorStop(1, '#1c0824');
+    x.fillStyle = hg; x.beginPath(); x.ellipse(CX, 18, 9, 8, 0, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#3c1c44'; x.beginPath(); x.ellipse(CX, 23, 4.5, 3.2, 0, 0, Math.PI * 2); x.fill(); // Schnauze
+    x.fillStyle = '#7c3c64'; x.beginPath(); x.moveTo(CX, 18); x.lineTo(CX - 2, 22); x.lineTo(CX + 2, 22); x.fill(); // Nasenblatt
+    if (sleep) { x.strokeStyle = '#140610'; x.lineWidth = 1; for (const sd of [-1, 1]) { x.beginPath(); x.moveTo(CX + sd * 2, 17); x.lineTo(CX + sd * 6, 16); x.stroke(); } }
+    else for (const sd of [-1, 1]) { // glühende Augen
+      const eg = x.createRadialGradient(CX + sd * 4, 16, 0, CX + sd * 4, 16, 5); eg.addColorStop(0, 'rgba(255,90,60,0.9)'); eg.addColorStop(1, 'rgba(255,0,0,0)');
+      x.fillStyle = eg; x.fillRect(CX + sd * 4 - 5, 11, 10, 10);
+      x.fillStyle = '#fc2c2c'; x.beginPath(); x.ellipse(CX + sd * 4, 16, 2.2, 1.6, sd * -0.3, 0, Math.PI * 2); x.fill(); x.fillStyle = '#fcfcfc'; x.fillRect(CX + sd * 4 - 1, 15, 1, 1);
+    }
+    if (open) { x.fillStyle = '#4c0010'; x.beginPath(); x.ellipse(CX, 26, 4, 3.4, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = '#c8204c'; x.fillRect(CX - 2, 27, 4, 1); x.fillStyle = '#fcfcfc'; for (const d of [-3, -1, 1, 3]) x.fillRect(CX + d - (d > 0 ? 1 : 0), d * d > 4 ? 23 : 28, 1, 2); }
+    else { x.fillStyle = '#fcfcfc'; x.fillRect(CX - 3, 25, 1, 2); x.fillRect(CX + 2, 25, 1, 2); }
+    if (sleep) { // Flügel um den Leib geschlagen, kopfüber hängend
+      for (const sd of [-1, 1]) { const g2 = x.createLinearGradient(CX + sd * 18, 20, CX, 60); g2.addColorStop(0, '#2c1036'); g2.addColorStop(1, '#4c2058'); x.fillStyle = g2; x.beginPath(); x.moveTo(CX + sd * 4, 20); x.quadraticCurveTo(CX + sd * 20, 30, CX + sd * 10, 62); x.lineTo(CX, 60); x.closePath(); x.fill(); }
+    }
     return Sprites.fromCanvas(c);
   }
-  const order = ['up', 'midU', 'down', 'midD'];
-  Sprites.S.gbatX = { flap: order.map(p => frame(p, false)), open: order.map(p => frame(p, true)), fold: frame('fold', false, true) };
+  const ph = [0, 1, 2, 3, 4, 5, 6, 7].map(i => i / 8);
+  Sprites.S.gbatX = { flap: ph.map(p => frame(p, false)), open: ph.map(p => frame(p, true)), fold: frame(0, false, true) };
 })();
 
 // Kleine Fledermäuse, die beim Tod der Riesenfledermaus auseinanderstieben (nur Effekt)
@@ -142,7 +136,7 @@ class Boss extends Enemy {
 
 class GiantBat extends Boss {
   constructor(ax, aw) {
-    super(ax + aw / 2 - 20, 30, 40, 18, 16, 3);
+    super(ax + aw / 2 - 24, 30, 48, 24, 16, 3);
     this.ax = ax; this.aw = aw; this.state = 'sleep'; this.score = 3000;
   }
   pickHover() { this.tx = this.ax + rnd(40, this.aw - 40); this.ty = rnd(40, 90); }
@@ -193,15 +187,15 @@ class GiantBat extends Boss {
     if (this.state === 'sleep') s = G.fold;
     else {
       const fast = this.state === 'swoop' || this.state === 'rise';
-      const f = Math.floor(this.t / (fast ? 3 : 5)) % 4;
+      const f = Math.floor(this.t / (fast ? 2 : 3)) % G.flap.length;
       s = (this.state === 'swoop' || this.state === 'shoot') ? G.open[f] : G.flap[f];
-      if (f === 2 && this.t % 20 === 0) Audio8.sfx('bat');
+      if (f === 4 && this.t % 24 === 0) Audio8.sfx('flap', this.cx);
     }
     ctx.globalAlpha = 0.5;
-    const aura = FX.disc(26, [60, 10, 90], [0.6, 0.38, 0.2, 0.08]);
-    ctx.drawImage(aura, x - 26, y - 24);
+    const aura = FX.disc(36, [60, 10, 90], [0.6, 0.38, 0.2, 0.08]);
+    ctx.drawImage(aura, x - 36, y - 30);
     ctx.globalAlpha = 1;
-    this.ds(ctx, s, x - 36, y - 20, false, this.flash);
+    this.ds(ctx, s, x - 64, y - 32, false, this.flash);
   }
 }
 
@@ -373,6 +367,7 @@ class Count extends Boss {
   constructor(ax, aw) {
     super(ax + aw - 96, 176 - 80, 24, 80, 28, 4);
     this.ax = ax; this.aw = aw; this.state = 'appear'; this.timer = 0; this.cycle = 0; this.score = 10000; this.hover = 0;
+    this.nameKey = 'boss4'; this.voice = 'boss3'; // Boss von Stage 4; die Studioaufnahme heißt noch boss3
   }
   vulnerable() { return this.state === 'open'; }
   hurtBox() { return { x: this.x - 6, y: this.y + 2 + this.hover, w: this.w + 12, h: 54 }; }
@@ -450,6 +445,218 @@ class Count extends Boss {
     ctx.globalAlpha = this.state === 'open' && this.timer < 12 ? 0.85 : 0.35 + 0.15 * Math.sin(this.t * 0.2);
     ctx.drawImage(FX.disc(this.state === 'open' && this.timer < 12 ? 12 : 6, [252, 30, 30], [0.8, 0.45, 0.15]), ex - (this.state === 'open' && this.timer < 12 ? 12 : 6), ey - (this.state === 'open' && this.timer < 12 ? 12 : 6));
     ctx.restore();
+  }
+}
+
+// ---------------- Medusa: Herrin der Marmorgalerie (Ende von Stage 3) ----------------
+// Oberkörper einer Gorgo, vorgemalt: blassgrüne Haut, goldener Brustpanzer mit Rubin, Armreifen, Krallen, hageres,
+// grausames Gesicht mit gelb glühenden Augen und Diadem. Live gezeichnet: der geschuppte Schlangenleib, der sich hinter
+// ihr über den Marmor windet, und neun zischende Schlangen im Haar.
+// Angriffe: Schlangen fallen aus dem Haar und kriechen auf den Helden zu; der versteinernde Blick – eine Lichtwelle am
+// Boden (drüberspringen) oder in Kopfhöhe (ducken); wer getroffen wird, erstarrt zu Stein und muss sich freistrampeln.
+// Ab der Hälfte fliegen Medusenköpfe in Wellen heran und die Blicke kommen doppelt.
+const MEDUSA_ART = (() => {
+  const W0 = 64, H0 = 62, cx = 32;
+  let art = null;
+  function paint(open) {
+    const c = Sprites.canvas(W0, H0), x = c.getContext('2d');
+    const R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(Math.round(a), Math.round(b), w, h); };
+    const ell = (ex, ey, rx, ry, f) => { for (let y = Math.floor(ey - ry); y <= ey + ry; y++) for (let X = Math.floor(ex - rx); X <= ex + rx; X++) { const q = ((X + 0.5 - ex) / rx) ** 2 + ((y + 0.5 - ey) / ry) ** 2; if (q <= 1) f(X, y, q); } };
+    const SK = ['#2c5c44', '#4c8c64', '#7cbc8c', '#b0e4bc'], GOLD = ['#6c4c08', '#c89020', '#f8d878'];
+    // Arme: einer krallt nach vorn (beim Fauchen erhoben), einer ruht an der Hüfte
+    for (const [x0, y0, x1, y1, x2, y2] of [[cx - 11, 30, cx - 20, 40, cx - 26, open ? 28 : 47], [cx + 11, 30, cx + 19, 42, cx + 14, 53]]) {
+      for (const [a, b, c2, d] of [[x0, y0, x1, y1], [x1, y1, x2, y2]]) {
+        const n = Math.ceil(Math.hypot(c2 - a, d - b)) * 2;
+        for (let k = 0; k <= n; k++) { const px = a + (c2 - a) * k / n, py = b + (d - b) * k / n; R(SK[0], px - 2, py, 4, 1); R(SK[1], px - 1, py, 2, 1); R(SK[2], px - 1, py, 1, 1); }
+      }
+      R(GOLD[0], x1 - 2, y1 - 1, 5, 3); R(GOLD[1], x1 - 2, y1 - 1, 4, 2); R(GOLD[2], x1 - 2, y1 - 1, 4, 1); // Armreif
+      for (let k = -1; k <= 1; k++) R('#e8e0c8', x2 + k * 1.5, y2 + (y2 < y1 ? -2 : 1), 1, 2); // Krallen
+    }
+    // Rumpf mit goldenem Brustpanzer
+    ell(cx, 40, 11, 16, (X, y, q) => R(q > 0.85 ? SK[0] : X < cx - 3 && y < 44 ? SK[2] : SK[1], X, y));
+    for (const s of [-1, 1]) ell(cx + s * 4.5, 34, 4.5, 4, (X, y, q) => R(q < 0.25 ? GOLD[2] : q < 0.7 ? GOLD[1] : GOLD[0], X, y));
+    R(GOLD[1], cx - 1, 31, 2, 6); R('#a80020', cx - 1, 33, 2, 2); R('#f86080', cx - 1, 33, 1, 1); // Spange mit Rubin
+    for (let X = cx - 10; X <= cx + 10; X++) for (let y = 47; y < 58; y++) if (((X - cx) / 10.5) ** 2 + ((y - 47) / 13) ** 2 < 1) R(((X + y * 2) % 4) ? SK[0] : '#1c3c2c', X, y); // Schuppen zum Schlangenleib
+    R(GOLD[0], cx - 10, 45, 21, 3); R(GOLD[1], cx - 10, 45, 21, 2); R(GOLD[2], cx - 10, 45, 21, 1); // Gürtel
+    // Hals und Kopf: hageres, schönes, grausames Gesicht
+    R(SK[0], cx - 3, 21, 6, 6); R(SK[1], cx - 2, 21, 4, 6);
+    ell(cx, 14, 7, 9, (X, y, q) => { const l = -(X - cx) / 7 * 0.5 - (y - 14) / 9 * 0.3 + (1 - q) * 0.7; R(l > 0.9 ? SK[3] : l > 0.5 ? SK[2] : l > 0.15 ? SK[1] : SK[0], X, y); });
+    R(SK[0], cx - 5, 17, 2, 2); R(SK[0], cx + 4, 17, 2, 2); // eingefallene Wangen
+    for (const s of [-1, 1]) { R('#0c1c14', cx + s * 3 - 2, 11, 4, 3); R('#f8e800', cx + s * 3 - 1, 12, 2, 1); R('#fcfcc0', cx + s * 3 - (s > 0 ? 0 : 1), 12, 1, 1); } // gelbe Augen in dunklen Höhlen
+    for (const s of [-1, 1]) for (let k = 0; k < 4; k++) R('#0c1c14', cx + s * (1 + k) - (s < 0 ? 1 : 0), 10 - (k > 1 ? 1 : 0), 1, 1); // Brauen, böse geschwungen
+    R(SK[0], cx, 14, 1, 4); R(SK[3], cx - 1, 14, 1, 3); // Nase
+    if (open) { R('#1c0410', cx - 3, 19, 6, 3); R('#a80020', cx - 2, 20, 4, 1); R('#fcfcfc', cx - 2, 19, 1, 2); R('#fcfcfc', cx + 1, 19, 1, 2); R('#d82848', cx - 1, 21, 2, 2); } // Fauchen mit gespaltener Zunge
+    else { R('#0c140c', cx - 3, 19, 6, 1); R('#fcfcfc', cx - 2, 20, 1, 1); R('#fcfcfc', cx + 1, 20, 1, 1); }
+    R(GOLD[0], cx - 7, 5, 14, 2); R(GOLD[1], cx - 7, 5, 14, 1); R(GOLD[2], cx - 5, 5, 10, 1); R('#a80020', cx - 1, 3, 2, 3); // Diadem
+    return Sprites.fromCanvas(c);
+  }
+  // fliegender Medusenkopf: grünes Gesicht, Schlangenhaar, zwei Bilder
+  function head(k) {
+    const c = Sprites.canvas(16, 16), x = c.getContext('2d'), R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    for (let i = 0; i < 6; i++) { const a = -2.6 + i * 0.6, w = Math.sin(i * 1.7 + k * 2) * 0.5; for (let j = 0; j < 5; j++) R(j % 2 ? '#3c9c5c' : '#1c5c34', Math.round(8 + Math.cos(a + w * j * 0.3) * (4 + j)), Math.round(8 + Math.sin(a + w * j * 0.3) * (4 + j)), 1, 1); }
+    for (let y = 3; y < 14; y++) for (let X = 3; X < 13; X++) { const q = ((X - 7.5) / 4.6) ** 2 + ((y - 8.5) / 5.2) ** 2; if (q < 1) R(q > 0.75 ? '#2c5c44' : X < 7 ? '#7cbc8c' : '#4c8c64', X, y); }
+    R('#0c1c14', 5, 7, 2, 2); R('#0c1c14', 9, 7, 2, 2); R('#f8e800', 5, 7, 1, 1); R('#f8e800', 10, 7, 1, 1);
+    R(k ? '#1c0410' : '#0c140c', 6, 11, 4, k ? 2 : 1); R('#fcfcfc', 6, 11, 1, 1); R('#fcfcfc', 9, 11, 1, 1);
+    return Sprites.fromCanvas(c);
+  }
+  return { get: () => art || (art = { calm: paint(false), hiss: paint(true), head: [head(0), head(1)], W0, H0 }) };
+})();
+
+class Snake extends Enemy {
+  // kleine Schlange aus Medusas Haar: fällt herab und schlängelt sich über den Boden auf den Helden zu
+  constructor(x, y, dir) { super(x - 7, y - 3, 14, 6, 1, 2, 100); this.dir = dir; this.face = dir; this.vx = dir * 0.6; this.vy = -1.8; }
+  update() {
+    super.update();
+    if (this.onGround) this.vx = this.dir * 1.1;
+    if (this.physics()) { this.dir *= -1; this.face = this.dir; }
+    this.despawnOff(40); this.touch();
+    if (this.t > 600) this.dead = true;
+  }
+  draw(ctx) {
+    const X = Math.round(this.x - W.cam.x), Y = Math.round(this.y - W.cam.y), d = this.dir;
+    this.lastDraw = null;
+    for (let k = 0; k < 12; k++) {
+      const sx = d > 0 ? X + k : X + 13 - k, sy = Y + 3 + Math.round(Math.sin(k * 0.8 - this.t * 0.4) * 1.5);
+      ctx.fillStyle = this.flash ? '#fcfcfc' : k % 3 ? '#3c9c5c' : '#1c5c34'; ctx.fillRect(sx, sy, 1, 2);
+      if (k % 3 === 1) { ctx.fillStyle = '#c8d888'; ctx.fillRect(sx, sy + 2, 1, 1); }
+    }
+    const hx = d > 0 ? X + 11 : X, hy = Y + 2 + Math.round(Math.sin(12 * 0.8 - this.t * 0.4) * 1.5);
+    ctx.fillStyle = '#1c5c34'; ctx.fillRect(hx - 1, hy - 1, 5, 4); ctx.fillStyle = '#58c878'; ctx.fillRect(hx, hy, 3, 2);
+    ctx.fillStyle = '#fc2020'; ctx.fillRect(hx + (d > 0 ? 2 : 0), hy, 1, 1);
+    if ((this.t >> 3) % 3 === 0) { ctx.fillStyle = '#d82848'; ctx.fillRect(d > 0 ? hx + 4 : hx - 3, hy + 1, 2, 1); } // Zunge
+  }
+}
+
+class MedusaHead extends Skull {
+  // fliegender Medusenkopf: Wellenflug wie in Castlevania, hier mit Schlangenhaar
+  draw(ctx) {
+    const s = MEDUSA_ART.get().head[(this.t >> 3) & 1];
+    this.ds(ctx, s, Math.round(this.cx - 8 - W.cam.x), Math.round(this.cy - 8 - W.cam.y), this.dir > 0, this.flash);
+  }
+}
+
+class GazeWave extends EProj {
+  // versteinernder Blick: eine flirrende Lichtwelle, am Boden (drüberspringen) oder in Kopfhöhe (ducken)
+  constructor(x, y, dir, high) { super('gaze', x, y, dir * 2.3, 0, 0, 0); this.w = 10; this.h = high ? 12 : 14; this.x = x - 5; this.y = y; this.high = high; this.dir = dir; this.unstoppable = true; }
+  update() {
+    this.t++; this.x += this.vx;
+    if (!this.onScreen(24)) this.dead = true;
+    const p = W.player;
+    if (p.alive && !(p.stoneT > 0) && p.inv <= 0 && Phys.overlap(this, p)) { p.petrify(); this.dead = true; }
+  }
+  draw(ctx) {
+    const X = Math.round(this.cx - W.cam.x), Y = Math.round(this.cy - W.cam.y), d = this.dir;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 4; k++) { // Nachleuchten: drei blassere Bögen hinter der Front
+      const bx = X - d * k * 6, a = (1 - k / 4) * (0.75 + 0.25 * Math.sin(this.t * 0.9));
+      ctx.globalAlpha = a; ctx.strokeStyle = k ? '#a8e070' : '#fcfcc0'; ctx.lineWidth = k ? 1.5 : 2.5;
+      ctx.beginPath(); ctx.ellipse(bx, Y, 3 + k, this.h / 2 + 1, 0, d > 0 ? -Math.PI / 2 : Math.PI / 2, d > 0 ? Math.PI / 2 : Math.PI * 1.5); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.5; ctx.drawImage(FX.disc(10, [200, 240, 120], [0.5, 0.25, 0.08]), X - 10, Y - 10);
+    ctx.restore();
+  }
+}
+
+class Medusa extends Boss {
+  constructor(ax, aw) {
+    super(ax + aw - 90, 176 - 70, 28, 70, 28, 3);
+    this.ax = ax; this.aw = aw; this.state = 'rise'; this.timer = 0; this.score = 8000; this.cycle = 0; this.face = -1;
+    this.nameKey = 'boss3'; this.voice = 'bossMedusa'; this.floorY = this.y; this.y += 70; this.tx = this.x;
+  }
+  vulnerable() { return this.state !== 'rise'; }
+  hurtBox() { return { x: this.x - 6, y: this.y, w: this.w + 12, h: 58 }; }
+  update() {
+    this.tick();
+    if (this.dying) {
+      if (this.dying === 1) for (let i = 0; i < 8; i++) W.spawn(new Particle(this.cx + rnd(-12, 12), this.y + rnd(0, 20), rnd(-1.5, 1.5), rnd(-3, -1), i & 1 ? '#3c9c5c' : '#58c878', 60, 2, 0.15));
+      return this.updateDeath(160);
+    }
+    const p = W.player, half = this.hp <= this.maxHp / 2;
+    if (this.state !== 'gaze' || this.timer < 26) this.face = p.cx < this.cx ? -1 : 1;
+    switch (this.state) {
+      case 'rise': // steigt zischend aus dem Marmor
+        this.y = Math.max(this.floorY, this.y - 1.2);
+        if (this.timer === 1) { Audio8.sfx('growl', this.cx); W.shake = 8; }
+        if (this.timer % 6 === 0) W.debris(this.cx + rnd(-16, 16), this.floorY + 70, '#d8d0c0', 2);
+        if (this.timer > 70) { this.state = 'glide'; this.timer = 0; }
+        break;
+      case 'glide': { // schlängelt sich durch die Arena, hält Abstand zum Helden
+        if (this.timer === 1) { let tries = 0; do { this.tx = this.ax + rnd(24, this.aw - 52); } while (Math.abs(this.tx + 14 - p.cx) < 60 && ++tries < 12); }
+        const d = this.tx - this.x; this.x += Math.sign(d) * Math.min(Math.abs(d), half ? 1.5 : 1.05);
+        this.y = this.floorY + Math.sin(this.t * 0.08) * 2;
+        if (this.timer > (half ? 64 : 92)) {
+          this.timer = 0; this.cycle++;
+          this.state = half && this.cycle % 3 === 0 ? 'heads' : this.cycle % 2 ? 'gaze' : 'spit';
+          if (this.state === 'gaze') Audio8.sfx('ready', this.cx);
+        }
+        break;
+      }
+      case 'spit': // Schlangen fallen aus dem Haar
+        if (this.timer % 18 === 6 && this.timer < (half ? 60 : 42)) { W.spawn(new Snake(this.cx + this.face * 8 + rnd(-6, 6), this.y + 6, this.face)); Audio8.sfx('slime', this.cx); }
+        if (this.timer > 64) { this.state = 'glide'; this.timer = 0; }
+        break;
+      case 'gaze': { // Augen glühen auf, dann der versteinernde Blick (Phase 2: tief und hoch hintereinander)
+        const lanes = half ? [this.cycle % 4 === 1, this.cycle % 4 !== 1] : [this.cycle % 4 === 3];
+        lanes.forEach((high, i) => {
+          if (this.timer === 34 + i * 30) {
+            W.spawn(new GazeWave(this.cx + this.face * 12, high ? 140 : 161, this.face, high));
+            Audio8.sfx('holy', this.cx); W.flash = Math.max(W.flash, 3);
+          }
+        });
+        if (this.timer > 50 + lanes.length * 30) { this.state = 'glide'; this.timer = 0; }
+        break;
+      }
+      case 'heads': // Medusenköpfe fliegen von beiden Seiten heran
+        if (this.timer % 22 === 1 && this.timer < 66) { const s = (this.timer / 22 | 0) % 2 ? 1 : -1; W.spawn(new MedusaHead(s > 0 ? W.cam.x - 12 : W.cam.x + View.w + 2, W.cam.y + 122 + rnd(-8, 8), s)); }
+        if (this.timer === 1) Audio8.sfx('growl', this.cx);
+        if (this.timer > 70) { this.state = 'glide'; this.timer = 0; }
+        break;
+    }
+    if (this.state !== 'rise') this.touch();
+  }
+  draw(ctx) {
+    if (this.dying && (this.dying & 2)) return;
+    const A = MEDUSA_ART.get(), X = Math.round(this.cx - W.cam.x), Y = Math.round(this.y - W.cam.y), f = this.face, t = this.t, fl = this.flash;
+    const floor = Math.round(this.floorY + 70 - W.cam.y);
+    ctx.save();
+    if (this.state === 'rise') { ctx.beginPath(); ctx.rect(-10, -60, View.w + 20, floor + 60); ctx.clip(); }
+    // Schatten auf dem Marmor
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(X - f * 18, floor, 34, 4, 0, 0, Math.PI * 2); ctx.fill();
+    // Schlangenleib: windet sich nach hinten über den Boden, Schwanzspitze hebt sich
+    for (let k = 32; k >= 0; k--) {
+      const u = k / 32, r = 8.5 - u * 6;
+      const bx = X - f * (u * 46 - 2) + Math.sin(t * 0.07 + u * 6) * 4 * u;
+      const by = Math.min(floor - r * 0.8, Y + 58 + u * 12) - Math.max(0, u - 0.8) * 50 + Math.sin(t * 0.09 + u * 5) * 1.5 * u;
+      ctx.fillStyle = fl ? '#fcfcfc' : '#14301e'; ctx.beginPath(); ctx.ellipse(bx, by, r + 1, r * 0.8 + 1, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = fl ? '#fcfcfc' : k % 4 === 0 ? '#1c4c34' : '#2c7c4c'; ctx.beginPath(); ctx.ellipse(bx, by, r, r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+      if (!fl) {
+        ctx.fillStyle = '#7cd89c'; ctx.fillRect(Math.round(bx - r * 0.5), Math.round(by - r * 0.65), Math.max(1, Math.round(r * 0.7)), 1); // Glanzkante
+        if (k % 3 === 1) { ctx.fillStyle = '#c8d888'; ctx.fillRect(Math.round(bx - r * 0.4), Math.round(by + r * 0.45), Math.max(1, Math.round(r * 0.8)), 1); } // heller Bauch
+      }
+    }
+    const s = this.state === 'spit' || this.state === 'gaze' || this.state === 'rise' || this.state === 'heads' ? A.hiss : A.calm;
+    this.ds(ctx, s, X - 32, Y - 4, f > 0, fl);
+    // Schlangenhaar: neun Schlangen winden sich vom Kopf nach oben und zur Seite
+    for (let k = 0; k < 9; k++) {
+      const a = -Math.PI / 2 + (k - 4) * 0.37, len = 10 + (k % 3) * 3;
+      let px = X + Math.cos(a) * 6, py = Y + 10 + Math.sin(a) * 8;
+      for (let i = 0; i < len; i++) {
+        const w = Math.sin(t * 0.22 + k * 1.3 + i * 0.6) * 0.55, nx = px + Math.cos(a + w) * 1.2, ny = py + Math.sin(a + w) * 1.2;
+        ctx.fillStyle = fl ? '#fcfcfc' : i % 3 ? '#3c9c5c' : '#1c5c34'; ctx.fillRect(Math.round(nx), Math.round(ny), 2, 2);
+        px = nx; py = ny;
+      }
+      ctx.fillStyle = '#1c5c34'; ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 4, 3);
+      ctx.fillStyle = '#58c878'; ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 3, 2);
+      ctx.fillStyle = '#fc2020'; ctx.fillRect(Math.round(px), Math.round(py) - 1, 1, 1);
+    }
+    ctx.restore();
+    // Blick: die Augen glühen auf, bevor die Welle losbricht
+    if (this.state === 'gaze' && !this.dying) {
+      const ey = Y + 8, k = (this.timer % 30) / 30, r = 4 + k * 8;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 + 0.65 * k;
+      ctx.drawImage(FX.disc(12, [250, 240, 90], [0.9, 0.45, 0.12]), X - r, ey - r, r * 2, r * 2);
+      ctx.restore();
+    }
   }
 }
 
@@ -931,4 +1138,4 @@ class TentacleBoss extends Boss {
   }
 }
 
-const BOSSES = { gbat: GiantBat, giant: GiantSkeleton, count: Count, tentacle: TentacleBoss };
+const BOSSES = { gbat: GiantBat, giant: GiantSkeleton, medusa: Medusa, count: Count, tentacle: TentacleBoss };

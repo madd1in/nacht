@@ -354,7 +354,7 @@ const Audio8 = (() => {
     // Glasturm, Brücke und Thronsaal: Orgel-Toccata (e-Moll, 152 BPM) – Choral über rauschenden 16teln, dann ein
     // rhythmischer B-Teil mit 32tel-Arpeggien; Pedalbass in treibenden 16teln, Pauken auf der Eins
     chapel: {
-      bpm: 152, loop: true, echo: { delay: 3, vol: 0.32 },
+      bpm: 164, loop: true, echo: { delay: 3, vol: 0.32 },
       p1: ['b4:8 e5:4 g5:4', 'f#5:4 e5:4 d#5:4 e5:4', 'c5:8 e5:4 a5:4', 'g5:4 f#5:4 d#5:8',
         'e5:8 b5:4 g5:4', 'e5:4 g5:4 c6:8', 'b5:4 a5:4 g5:4 e5:4', 'f#5:12 -:4',
         'd5:8 g5:4 b5:4', 'a5:4 f#5:4 d5:8', 'e5:4 g5:4 b5:4 e6:4', 'd6:4 c6:4 b5:4 g5:4',
@@ -366,7 +366,7 @@ const Audio8 = (() => {
       p2: CH_C.map(c => toccata(...CH[c])).join(' ') + ' ' + CH_C.map(c => arp3f(...CH[c])).join(' '),
       tri: rep(CH_C.map(c => { const lo = CH_B[c]; return drive(lo, lo.replace(/\d/, d => +d + 1)); }).join(' '), 2), // Orgelpedal in 16teln
       pad: rep(CH_C.map(c => CH[c].join('+') + ':16').join(' '), 2),
-      dr: rep([PFOUR, FOUR, FOUR, FILLS, PFOUR, FOUR, FOUR, FILLP].join(' '), 2) + ' ' + sectionB(),
+      dr: rep([PFOUR, DK, FOUR, FILLS, PFOUR, DK, DK, FILLP].join(' '), 2) + ' ' + sectionB(), // galoppierende Kick schon im Choral-Teil
     },
     // Bibliothek und Uhrturm: Cembalo-Toccata mit Ohrwurm-Melodie, im B-Teil 32tel-Arpeggien und galoppierende Kick
     library: {

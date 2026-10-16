@@ -39,13 +39,13 @@ const Game = {
       this.fsActive = !!document.fullscreenElement;
       settle();
     });
-    document.addEventListener('pointerdown', (e) => { if (this.state === 'pause' && e.pointerType !== 'mouse' && e.clientX > window.innerWidth / 2) this.unpause = true; });
+    // Touch in der Pause: input.js wertet den Tipp aus (Menüpunkt wählen oder weiterspielen)
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.3); Audio8.muffle(true); }
     });
     this.resize();
     const q = new URLSearchParams(location.search);
-    this.debugStage = q.has('stage') ? clamp(parseInt(q.get('stage'), 10) - 1, 0, 2) : null;
+    this.debugStage = q.has('stage') ? clamp(parseInt(q.get('stage'), 10) - 1, 0, Levels.STAGES.length - 1) : null;
     this.debugRoom = q.has('room') ? Math.max(0, parseInt(q.get('room'), 10) - 1) : 0;
     this.toTitle();
     let acc = 0, last = performance.now();
@@ -150,6 +150,7 @@ const Game = {
     if (this.pendingView) this.applyView(this.pendingView);
     W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1)); this.shoutT = 0; this.noteT = 0;
     Audio8.stop();
+    this.prewarmStage(s);
     this.go('card');
     Voice.say('stage' + (s + 1));
   },
@@ -190,7 +191,7 @@ const Game = {
     const rank = Scores.place(sc);
     if (rank < 0) { this.toTitle(); return; }
     const init = Scores.lastInit();
-    this.entry = { s: sc, st: allClear ? 4 : W.stage + 1, c: Options.character, rank, chars: [...init].map(ch => Math.max(0, Scores.ALPHA.indexOf(ch))), pos: 0, rep: 0, done: false };
+    this.entry = { s: sc, st: allClear ? Levels.STAGES.length + 1 : W.stage + 1, c: Options.character, rank, chars: [...init].map(ch => Math.max(0, Scores.ALPHA.indexOf(ch))), pos: 0, rep: 0, done: false };
     W.score = 0; // nicht noch einmal über toTitle()/saveHi() werten
     this.go('entry'); Voice.stop(); Audio8.play('names'); Audio8.sfx('oneUp');
   },
@@ -324,6 +325,7 @@ const Game = {
     Input.update();
     const P = Input.pressed;
     this.t++;
+    if (this.warmJobs && this.warmJobs.length && this.state !== 'play') { try { this.warmJobs.shift()(); } catch (e) { console.warn(e); } } // Vorbauen außerhalb des Spiels (Karte, Übergänge)
     this.idleT = Input.realHit ? 0 : (this.idleT || 0) + 1; // Leerlauf (für den Attract-Modus)
     // Arcade-Zählwerk: angezeigter Score rollt zum echten hoch
     if (this.dispScore === undefined || W.score < this.dispScore) this.dispScore = W.score;
@@ -376,9 +378,11 @@ const Game = {
         if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
         break;
       case 'play': this.updatePlay(P); break;
-      case 'pause': // Pausenmenü: WEITER / ZUM TITEL
-        if (P.up || P.down) { this.pauseSel = 1 - (this.pauseSel || 0); Audio8.sfx('select'); }
-        if ((P.jump || P.attack) && this.pauseSel === 1 && this.t > 10) {
+      case 'pause': // Pausenmenü: WEITER / LEICHT-MODUS / ZUM TITEL
+        if (P.up || P.down) { this.pauseSel = ((this.pauseSel || 0) + (P.down ? 1 : 2)) % 3; Audio8.sfx('select'); }
+        if (this.pauseAct !== undefined) { this.pauseSel = this.pauseAct; this.pauseAct = undefined; if (this.pauseSel === 1) this.toggleEasy(); else if (this.pauseSel === 0) this.unpause = true; else if (this.t > 10) { Audio8.setMusicVolume(0.5); Audio8.muffle(false); this.finishRun(false); break; } }
+        if ((P.jump || P.attack) && this.pauseSel === 1) this.toggleEasy();
+        else if ((P.jump || P.attack) && this.pauseSel === 2 && this.t > 10) {
           this.unpause = false; Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('select'); this.finishRun(false); // Score zählt trotzdem
         } else if (P.start || this.unpause || ((P.jump || P.attack) && !this.pauseSel)) {
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('pause'); }
@@ -559,7 +563,7 @@ const Game = {
       Font.draw(ctx, (i < 9 ? ' ' : '') + (i + 1) + '.', cx - 110, y, c);
       Font.draw(ctx, e.n, cx - 76, y, c);
       Font.draw(ctx, String(e.s).padStart(6, '0'), cx + 34, y, c, { align: 'right' });
-      Font.draw(ctx, e.st >= 4 ? tr('allClear') : String(e.st), cx + 66, y, c, { align: 'center' });
+      Font.draw(ctx, e.st > Levels.STAGES.length ? tr('allClear') : String(e.st), cx + 66, y, c, { align: 'center' });
       const hd = HEROES.get(e.c === 'ragnor' ? 'ragnor' : 'henrik').def; // Kopf-Symbol des Helden
       hd.icon.forEach((row, yy) => [...row].forEach((ch, xx) => { if (hd.iconPal[ch]) { ctx.fillStyle = hd.iconPal[ch]; ctx.fillRect(cx + 94 + xx, y + yy, 1, 1); } }));
     });
@@ -628,20 +632,33 @@ const Game = {
     }
   },
 
+  // Leicht-Modus mitten im Spiel umschalten: doppelte Lebensleiste und doppelter Schaden, die Leiste wird mitskaliert
+  toggleEasy() {
+    const p = W.player, old = p.maxHp;
+    Options.toggle('easy');
+    p.maxHp = Options.maxHp; p.hp = Math.max(1, Math.min(p.maxHp, Math.round(p.hp * p.maxHp / old)));
+    Audio8.sfx(Options.easy ? 'heart' : 'select');
+  },
+  // Touch im Pausenmenü: Tipp auf einen Menüpunkt wählt ihn (true), sonst geht es weiter
+  pauseTouch(clientX, clientY) {
+    const r = this.canvas.getBoundingClientRect(), y = (clientY - r.top) / r.height * 240;
+    for (let i = 0; i < 3; i++) if (y >= 117 + i * 12 && y < 129 + i * 12) { this.pauseAct = i; return true; }
+    return false;
+  },
   drawPause(ctx) {
-    const cx = View.cx, items = [tr('resume'), tr('toTitle')];
+    const cx = View.cx, items = [tr('resume'), tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), tr('toTitle')];
     const hint = tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey');
-    const pw = Math.min(View.w - 8, Math.max(140, Font.width(hint) + 16, ...items.map(s => Font.width(s) + 64)));
-    ctx.fillStyle = '#000'; ctx.fillRect(cx - pw / 2, 96, pw, 70);
-    ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - pw / 2 + 0.5, 96.5, pw - 1, 69);
+    const pw = Math.min(View.w - 8, Math.max(150, Font.width(hint) + 16, ...items.map(s => Font.width(s) + 96)));
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - pw / 2, 96, pw, 82);
+    ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - pw / 2 + 0.5, 96.5, pw - 1, 81);
     Font.draw(ctx, tr('pause'), cx, 104, '#fcfcfc', { align: 'center' });
     items.forEach((s, i) => {
       const on = (this.pauseSel || 0) === i;
-      Font.draw(ctx, s, cx - 30, 120 + i * 12, on ? '#fcfcfc' : '#8c8c8c');
-      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 44, 119 + i * 12);
+      Font.draw(ctx, s, cx - 46, 120 + i * 12, on ? (i === 1 && Options.easy ? '#58f898' : '#fcfcfc') : '#8c8c8c');
+      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 60, 119 + i * 12);
     });
-    Font.draw(ctx, hint, cx, 152, '#7c7c7c', { align: 'center' });
-    if (!Audio8.ready()) Font.draw(ctx, tr('soundShort'), cx, 172, '#7c7c7c', { align: 'center' });
+    Font.draw(ctx, hint, cx, 164, '#7c7c7c', { align: 'center' });
+    if (!Audio8.ready()) Font.draw(ctx, tr('soundShort'), cx, 184, '#7c7c7c', { align: 'center' });
   },
 
   panel(ctx, title, sub) {
@@ -667,21 +684,42 @@ const Game = {
   // PS1-Schrift: der Schriftzug als Körper – nach hinten unten extrudiert (dunkle Flanken, je nach Winkel zur Seite) und
   // langsam um die Hochachse gedreht (seitlich gestaucht); zoom > 1 lässt ihn aus der Tiefe heranfliegen
   big3d(ctx, text, cx, y, scale, colors, ang, depth = 6, zoom = 1) {
-    const b = this.bigCanvas, bx = b.getContext('2d'), fbk = Font.hasFB(text), top = fbk ? 3 : 0, H = fbk ? 12 : 7;
+    const b = this.bigCanvas, fbk = Font.hasFB(text), top = fbk ? 3 : 0, H = fbk ? 12 : 7;
     const w = Math.min(b.width, Font.width(text) + 1), mid = y + (H * scale) / 2, ca = Math.cos(ang), sa = Math.sin(ang);
-    const paint = (col) => { bx.clearRect(0, 0, b.width, b.height); for (let r = 0; r < H; r++) { bx.save(); bx.beginPath(); bx.rect(0, r, b.width, 1); bx.clip(); Font.draw(bx, text, 0, top, Array.isArray(col) ? col[Math.min(6, Math.floor(r * 7 / H))] : col); bx.restore(); } };
+    const paint = (col) => this.textLayer(text, col, w, H, top); // vorgemalte Schriftebene aus dem Zwischenspeicher
     ctx.save(); ctx.imageSmoothingEnabled = false;
     ctx.translate(cx, mid); ctx.scale(ca * zoom, zoom); ctx.translate(-cx, -mid);
     const dx = Math.round(cx - (w * scale) / 2), dy = y - top * scale, step = Math.max(1, scale / 2);
-    paint('#000'); for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(b, 0, 0, w, H, dx + ox, dy + oy, w * scale, H * scale);
+    const ol = paint('#000'); for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(ol, 0, 0, w, H, dx + ox, dy + oy, w * scale, H * scale);
     const side = ['#2c0008', '#480010', '#640418', '#7c0820'];
     for (let k = depth; k >= 1; k--) { // Flanken von hinten nach vorn, vorne heller
-      paint(side[Math.min(3, Math.floor((depth - k) / depth * 4))]);
-      ctx.drawImage(b, 0, 0, w, H, Math.round(dx + k * step * (0.35 + sa * 1.4)), Math.round(dy + k * step * 0.8), w * scale, H * scale);
+      ctx.drawImage(paint(side[Math.min(3, Math.floor((depth - k) / depth * 4))]), 0, 0, w, H, Math.round(dx + k * step * (0.35 + sa * 1.4)), Math.round(dy + k * step * 0.8), w * scale, H * scale);
     }
-    paint(colors); ctx.drawImage(b, 0, 0, w, H, dx, dy, w * scale, H * scale);
+    ctx.drawImage(paint(colors), 0, 0, w, H, dx, dy, w * scale, H * scale);
     ctx.restore();
     return { x: Math.round(cx - (w * scale * ca * zoom) / 2), w: w * scale * ca * zoom };
+  },
+  // Schriftzug in einer Farbe (oder Zeilen-Verlauf) einmal malen und merken – das Malen über Clip-Zeilen ist teuer
+  textLayer(text, cols, w, H, top) {
+    const key = text + '|' + (Array.isArray(cols) ? cols.join(',') : cols);
+    this.txtCache = this.txtCache || new Map();
+    let c = this.txtCache.get(key);
+    if (!c) {
+      if (this.txtCache.size > 160) this.txtCache.clear();
+      c = Sprites.canvas(w, H); const bx = c.getContext('2d');
+      for (let r = 0; r < H; r++) { bx.save(); bx.beginPath(); bx.rect(0, r, w, 1); bx.clip(); Font.draw(bx, text, 0, top, Array.isArray(cols) ? cols[Math.min(6, Math.floor(r * 7 / H))] : cols); bx.restore(); }
+      this.txtCache.set(key, c);
+    }
+    return c;
+  },
+  // Hintergründe aller Räume der Stage vorbauen (einer pro Frame, während der Kapitelkarte) – sonst stockt der Raumwechsel
+  prewarmStage(s) {
+    const rooms = Levels.STAGES[s].rooms, jobs = [];
+    [...new Set(rooms.map(r => r.theme))].forEach(th => jobs.push(() => Tiles.build(th)));
+    rooms.forEach(r => r.ents.forEach(e => { if (e.type === 'gears') jobs.push(() => buildGearTrain(e.list)); }));
+    if (rooms.some(r => r.arena && r.arena.boss === 'count')) jobs.push(() => COUNT_ART.get());
+    if (rooms.some(r => r.arena && r.arena.boss === 'medusa')) jobs.push(() => MEDUSA_ART.get());
+    this.warmJobs = jobs;
   },
   big(ctx, text, cx, y, scale, colors, shadow, outline) {
     const b = this.bigCanvas, bx = b.getContext('2d');
@@ -862,7 +900,7 @@ const Game = {
     // Riesenfledermaus-Silhouette vor dem Mond
     const bt = this.t % 900;
     if (bt < 260) {
-      const s = Sprites.S.gbatX.flap[Math.floor(this.t / 6) % 4], bx = View.w + 40 - bt * (View.w + 120) / 260, by = 48 + Math.sin(bt / 30) * 10;
+      const s = Sprites.S.gbatX.flap[Math.floor(this.t / 4) % Sprites.S.gbatX.flap.length], bx = View.w + 40 - bt * (View.w + 120) / 260, by = 48 + Math.sin(bt / 30) * 10;
       ctx.save(); ctx.filter = 'brightness(0)'; ctx.globalAlpha = 0.85; Sprites.draw(ctx, s, bx, by); ctx.restore();
     }
     if (this.t % 600 > 590) { ctx.fillStyle = 'rgba(164,164,252,0.3)'; ctx.fillRect(0, 32, View.w, 176); }

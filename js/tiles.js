@@ -1658,8 +1658,6 @@ const Tiles = (() => {
           }
           lightShaft(x, wx, 130, 32, 46, '#3c4ca8', 0.32);
         });
-        banner(x, 200, 20, 22, 70, '#a80020', '#f8b800', '#fce0a8');
-        banner(x, 456, 20, 22, 70, '#a80020', '#f8b800', '#fce0a8');
       } else {
         // Thronsaal im ruhigen Rhythmus: vier gleich breite Joche zwischen Bündelpfeilern – Spitzbogenfenster, Ahnenbild (eigene
         // Ebene), Spitzbogenfenster, große Rosette; über jedem Joch eine Samt-Draperie
@@ -1683,7 +1681,7 @@ const Tiles = (() => {
           px(x, '#c89020', X, sag, 1, 1); if (X % 2 === 0) px(x, '#f8b800', X, sag + 1, 1, 2);
         } });
       }
-      if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); else [0, 236, 488].forEach(cx => pillar(x, cx, 22, 208));
+      if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); else [0, 256].forEach(cx => pillar(x, cx, 22, 208)); // Halle: ruhiger Rhythmus – Fenster, Ahnenbild, Pfeiler, Fenster
       add('wall', c, 0.5, { vtile });
       L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) });
       if (theme === 'throne') { // Kronleuchter vorne
@@ -1926,10 +1924,9 @@ const Tiles = (() => {
   // und werden streifenweise beleuchtet – Mondlicht von hinten links als Saum, warmes Licht von vorn, ein Glanzlicht,
   // das mit dem Blickwinkel wandert. Im Blitz flammen sie auf.
   const COLS3D = {
-    hall: { z: 1.36, sp: 232, off: 120, r: 15, mat: [70, 58, 62], cap: [120, 100, 92], fog: [20, 6, 10] },
-    throne: { z: 1.32, sp: 256, off: 200, r: 16, mat: [150, 34, 50], cap: [200, 144, 32], fog: [22, 4, 12] },
-    foyer: { z: 1.3, sp: 256, off: 128, r: 16, mat: [60, 54, 74], cap: [110, 96, 70], fog: [6, 4, 14] },
-    crypt: { z: 1.42, sp: 208, off: 60, r: 14, mat: [60, 68, 100], cap: [86, 94, 124], fog: [6, 8, 20] },
+    throne: { z: 1.32, sp: 256, off: 200, r: 16, mat: [150, 34, 50], cap: [200, 144, 32], fog: [22, 4, 12], floor: [[46, 8, 16], [24, 4, 10]], seam: [120, 86, 20] },
+    foyer: { z: 1.3, sp: 256, off: 128, r: 16, mat: [60, 54, 74], cap: [110, 96, 70], fog: [6, 4, 14], floor: [[54, 50, 64], [14, 12, 20]], checker: true },
+    crypt: { z: 1.42, sp: 208, off: 60, r: 14, mat: [60, 68, 100], cap: [86, 94, 124], fog: [6, 8, 20], floor: [[30, 34, 52], [22, 26, 40]], seam: [10, 12, 22] },
   };
   let colBuf = null;
   function drawDepthColumns(ctx, cam, frame, theme) {
@@ -1938,6 +1935,24 @@ const Tiles = (() => {
     const top = Math.max(-4, hz + (ceilY - hz) / z), bot = hz + (floorY - hz) / z, cw = Math.round(S.r * 2 / z);
     if (bot < 0 || top > 208) return;
     if (!colBuf) { const c = C(64, 16), x = c.getContext('2d'), img = x.createImageData(64, 16); colBuf = { c, x, img, d: new Int32Array(img.data.buffer) }; }
+    // Boden zwischen Wand (Tiefe 2) und Spielebene (Tiefe 1): Platten in Perspektive, hinten dunkler – darauf stehen die Säulen
+    const zb = 2, yw = hz + (floorY - hz) / zb;
+    if (S.floor && floorY > 0 && yw < 208) {
+      const P = (wx, z) => [vx + (wx - cam.x - vx) / z, hz + (floorY - hz) / z], step = 32, zs = [1, 1.18, 1.4, 1.68, 2];
+      const i0 = Math.floor((cam.x - w) / step), i1 = Math.ceil((cam.x + 2 * w) / step);
+      for (let j = 0; j < zs.length - 1; j++) {
+        const fk = 1 - j * 0.16;
+        for (let i = i0; i < i1; i++) {
+          const a = P(i * step, zs[j]), b = P((i + 1) * step, zs[j]), c2 = P((i + 1) * step, zs[j + 1]), d = P(i * step, zs[j + 1]);
+          if (Math.max(a[0], b[0]) < 0 || Math.min(c2[0], d[0]) > w) continue;
+          const col = S.floor[S.checker ? (i + j) & 1 : (i * 3 + j) % 4 === 0 ? 1 : 0];
+          ctx.fillStyle = `rgb(${col[0] * fk | 0},${col[1] * fk | 0},${col[2] * fk | 0})`;
+          ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c2[0], c2[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill();
+        }
+      }
+      if (S.seam) { ctx.fillStyle = `rgb(${S.seam.join(',')})`; for (const z2 of zs.slice(1, -1)) ctx.fillRect(0, Math.round(hz + (floorY - hz) / z2), w, 1); }
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, Math.round(yw) - 1, w, 2); // Fuge an der Wand
+    }
     const flash = FX.stormOn(W.storm) ? 1 : 0, camWX = cam.x + vx, list = [];
     const k0 = Math.floor((cam.x - 200 - S.off) / S.sp), k1 = Math.ceil((cam.x + w + 200 - S.off) / S.sp);
     for (let k = k0; k <= k1 && list.length < 16; k++) {
@@ -1980,71 +1995,72 @@ const Tiles = (() => {
   ];
   let castleBuf = null;
   function drawCastle3D(ctx, cam, frame) {
-    const w = View.w, W2 = Math.ceil(w / 2), P = 1229, Zc = 2.4, D = 130, baseY = 176, vx = w / 2, camX = cam.x * 0.6;
-    if (!castleBuf || castleBuf.c.width !== W2) { castleBuf = { c: C(W2, 104), key: null }; castleBuf.x = castleBuf.c.getContext('2d'); }
-    const flash = FX.stormOn(W.storm) ? 1 : 0, key = Math.round(camX / Zc / 2) + '|' + flash + '|' + (frame >> 5);
+    const w = View.w, P = 1229, Zc = 2.4, D = 130, baseY = 176, vx = w / 2, camX = cam.x * 0.6;
+    if (!castleBuf || castleBuf.c.width !== w) { castleBuf = { c: C(w, 208), key: null }; castleBuf.x = castleBuf.c.getContext('2d'); }
+    const flash = FX.stormOn(W.storm) ? 1 : 0, key = Math.round(camX / Zc / (View.lite ? 3 : 1)) + '|' + flash + '|' + (frame >> 5);
     if (castleBuf.key !== key) {
       castleBuf.key = key;
-      const x = castleBuf.x; x.clearRect(0, 0, W2, 104);
-      const pr = (X, Y, Z) => [Math.round((vx + (X - camX - vx) / Z) / 2), Math.round((baseY - Y / Z) / 2)];
-      const shade = (nx, nz, up = 0) => { // Mond rechts vorn oben
-        const l = Math.max(0, nx * 0.75 + -nz * 0.35 + up * 0.6) * (1 + flash * 0.8), k = Math.min(3, Math.floor(l * 3.2));
-        return ['#0a0412', '#140820', '#22102e', '#3a1c48'][k];
-      };
-      const poly = (pts, col) => { x.fillStyle = col; x.beginPath(); pts.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill(); };
+      const x = castleBuf.x; x.clearRect(0, 0, w, 208);
+      const pr = (X, Y, Z) => [vx + (X - camX - vx) / Z, baseY - Y / Z];
+      const tone = (nx, nz, up = 0) => Math.max(0, nx * 0.72 - nz * 0.35 + up * 0.5) * (1 + flash * 0.9);
+      const col = (l, k = 1) => `rgb(${Math.round((14 + 52 * l) * k)},${Math.round((8 + 30 * l) * k)},${Math.round((24 + 62 * l) * k)})`;
+      const poly = (pts, fill) => { x.fillStyle = fill; x.beginPath(); pts.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill(); };
       const camWX = camX + vx;
       for (let k = -1; k <= 1; k++) {
-        const ox = 400 + k * P; // Burgmitte in Weltkoordinaten
+        const ox = 400 + k * P;
         if (Math.abs((vx + (ox - camX - vx) / Zc) - vx) > w * 1.5) continue;
-        // Ringmauer zwischen den Türmen (Vorderfläche mit Zinnen)
         const wl = pr(ox - 170, 0, Zc + 0.2), wr2 = pr(ox + 210, 0, Zc + 0.2), wt = pr(ox, 58, Zc + 0.2)[1];
-        poly([[wl[0], wt], [wr2[0], wt], [wr2[0], wl[1]], [wl[0], wl[1]]], '#120818');
-        for (let X = wl[0]; X < wr2[0]; X += 3) x.fillRect(X, wt - 2, 2, 2);
-        // Bogenbrücke links
-        const bl = pr(ox - 330, 0, Zc + 0.05), br = pr(ox - 175, 0, Zc + 0.05), bt = pr(ox, 40, Zc + 0.05)[1];
-        poly([[bl[0], bt], [br[0], bt], [br[0], bt + 3], [bl[0], bt + 3]], '#120818');
-        for (let a = bl[0]; a < br[0] - 2; a += 7) { x.fillStyle = '#120818'; x.fillRect(a, bt + 3, 2, bl[1] - bt - 3); }
-        // Türme: hintere zuerst
+        const gw = x.createLinearGradient(0, wt, 0, wl[1]); gw.addColorStop(0, col(0.35)); gw.addColorStop(1, col(0.05)); // Ringmauer
+        poly([[wl[0], wt], [wr2[0], wt], [wr2[0], wl[1]], [wl[0], wl[1]]], gw);
+        x.fillStyle = col(0.3); for (let X = wl[0]; X < wr2[0]; X += 5) x.fillRect(Math.round(X), Math.round(wt) - 3, 3, 3);
+        const bl = pr(ox - 330, 0, Zc + 0.05), br = pr(ox - 175, 0, Zc + 0.05), bt = pr(ox, 40, Zc + 0.05)[1]; // Bogenbrücke
+        x.fillStyle = col(0.25); x.fillRect(bl[0], bt, br[0] - bl[0], 4);
+        x.fillStyle = col(0.12); for (let a = bl[0]; a < br[0] - 3; a += 12) { x.fillRect(a, bt + 4, 3, bl[1] - bt - 4); x.beginPath(); x.arc(a + 7.5, bt + 9, 4.5, Math.PI, 0); x.lineTo(a + 12, bt + 4); x.lineTo(a + 3, bt + 4); x.fill(); }
         const towers = CASTLE.map(([dx, dz, r, h, roof]) => ({ X: ox + dx, Z: Zc + dz, r, h, roof })).sort((a, b) => b.Z - a.Z);
         for (const T0 of towers) {
-          const n = 8, faces = [];
+          const n = 12, faces = [];
           for (let i = 0; i < n; i++) {
-            const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2, am = (a0 + a1) / 2;
-            const nx = Math.sin(am), nz = -Math.cos(am); // Flächennormale (−z = zum Betrachter)
-            const tx = T0.X + Math.sin(am) * T0.r - camWX, tz = T0.Z * D + nz * T0.r; // Blick vom Betrachter auf die Fläche
-            if (nx * -tx + nz * -tz <= 0) continue; // Rückseite
-            const p0 = [T0.X + Math.sin(a0) * T0.r, T0.Z - Math.cos(a0) * T0.r / D], p1 = [T0.X + Math.sin(a1) * T0.r, T0.Z - Math.cos(a1) * T0.r / D];
-            faces.push({ p0, p1, nx, nz, z: (p0[1] + p1[1]) / 2 });
+            const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2, am = (a0 + a1) / 2, nx = Math.sin(am), nz = -Math.cos(am);
+            const tx = T0.X + Math.sin(am) * T0.r - camWX, tz = T0.Z * D + nz * T0.r;
+            if (nx * -tx + nz * -tz <= 0) continue;
+            faces.push({ p0: [T0.X + Math.sin(a0) * T0.r, T0.Z - Math.cos(a0) * T0.r / D], p1: [T0.X + Math.sin(a1) * T0.r, T0.Z - Math.cos(a1) * T0.r / D], nx, nz });
           }
-          faces.sort((a, b) => b.z - a.z);
           for (const f of faces) {
-            const A = pr(f.p0[0], 0, f.p0[1]), B = pr(f.p1[0], 0, f.p1[1]), At = pr(f.p0[0], T0.h, f.p0[1]), Bt = pr(f.p1[0], T0.h, f.p1[1]);
-            poly([At, Bt, B, A], shade(f.nx, f.nz));
-            if (f.nz < -0.3 && Math.abs(B[0] - A[0]) >= 2) for (let wy = 0.25; wy < 0.9; wy += 0.22) { // erleuchtete Fenster
-              const yy = Math.round(A[1] + (At[1] - A[1]) * wy), xx = Math.round((A[0] + B[0]) / 2);
-              if (((T0.X | 0) + wy * 10 | 0) % 3 !== 0) { x.fillStyle = (frame >> 4) % 23 === ((T0.X | 0) % 23) ? '#f87800' : '#f8b800'; x.fillRect(xx, yy, 1, 2); }
+            const A = pr(f.p0[0], 0, f.p0[1]), B = pr(f.p1[0], 0, f.p1[1]), At = pr(f.p0[0], T0.h, f.p0[1]), Bt = pr(f.p1[0], T0.h, f.p1[1]), l = tone(f.nx, f.nz);
+            const g = x.createLinearGradient(0, At[1], 0, A[1]); g.addColorStop(0, col(l)); g.addColorStop(1, col(l * 0.35)); // oben heller, unten im Dunst
+            poly([At, Bt, [B[0] + 0.4, B[1]], [A[0] - 0.4, A[1]]], g);
+          }
+          for (const f of faces) if (f.nz < -0.4) { // erleuchtete Fenster mit Lichthof
+            const A = pr(f.p0[0], 0, f.p0[1]), B = pr(f.p1[0], 0, f.p1[1]), At = pr(f.p0[0], T0.h, f.p0[1]);
+            for (let wy = 0.3; wy < 0.9; wy += 0.25) if (((T0.X | 0) + Math.round(wy * 10)) % 3 !== 0) {
+              const yy = A[1] + (At[1] - A[1]) * wy, xx = (A[0] + B[0]) / 2, lit = (frame >> 4) % 23 === ((T0.X | 0) % 23) ? '#f87800' : '#f8c040';
+              x.fillStyle = 'rgba(248,160,40,0.18)'; x.fillRect(xx - 2, yy - 2, 5, 7); x.fillStyle = lit; x.fillRect(xx - 0.5, yy, 1.5, 3);
             }
           }
           const topC = pr(T0.X, T0.h, T0.Z);
-          if (T0.roof) { // Kegeldach: Dreiecke vom Rand zur Spitze, steil beleuchtet
+          if (T0.roof) {
             const apex = pr(T0.X, T0.h + T0.roof, T0.Z);
-            for (const f of faces) { const At = pr(f.p0[0] + (f.p0[0] - T0.X) * 0.25, T0.h, f.p0[1]), Bt = pr(f.p1[0] + (f.p1[0] - T0.X) * 0.25, T0.h, f.p1[1]); poly([At, Bt, apex], shade(f.nx, f.nz, 0.4)); }
-            x.fillStyle = '#120818'; x.fillRect(apex[0], apex[1] - 4, 1, 4); x.fillStyle = '#a80020'; x.fillRect(apex[0] + 1, apex[1] - 4, 2 + ((frame >> 3) & 1), 1); // Wimpel
-          } else { // Zinnen
+            for (const f of faces) {
+              const At = pr(f.p0[0] + (f.p0[0] - T0.X) * 0.25, T0.h, f.p0[1]), Bt = pr(f.p1[0] + (f.p1[0] - T0.X) * 0.25, T0.h, f.p1[1]), l = tone(f.nx, f.nz, 0.5);
+              const g = x.createLinearGradient(apex[0], apex[1], (At[0] + Bt[0]) / 2, At[1]); g.addColorStop(0, col(l * 1.2)); g.addColorStop(1, col(l * 0.55));
+              poly([At, Bt, apex], g);
+            }
+            x.fillStyle = col(0.2); x.fillRect(apex[0] - 0.5, apex[1] - 7, 1, 7);
+            x.fillStyle = '#c8102c'; x.beginPath(); x.moveTo(apex[0] + 0.5, apex[1] - 7); x.lineTo(apex[0] + 6 + Math.sin(frame * 0.2 + T0.X) * 1.5, apex[1] - 5.5); x.lineTo(apex[0] + 0.5, apex[1] - 4); x.fill(); // Wimpel
+          } else {
             const L0 = pr(T0.X - T0.r, T0.h, T0.Z), R0 = pr(T0.X + T0.r, T0.h, T0.Z);
-            x.fillStyle = '#0c0614'; for (let X = L0[0]; X <= R0[0]; X += 2) x.fillRect(X, topC[1] - 2, 1, 2);
+            x.fillStyle = col(0.3); for (let X = L0[0]; X <= R0[0] - 2; X += 4) x.fillRect(X, topC[1] - 3, 2.5, 3);
           }
         }
       }
     }
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(castleBuf.c, 0, 0, W2, 104, 0, 0, W2 * 2, 208);
+    ctx.drawImage(castleBuf.c, 0, 0);
   }
 
-  // ---------------- Burghof: Bergketten als Low-Poly-Modelle (PS1-Look) ----------------
-  // Jeder Berg ein kleiner Fächer aus Dreiecken um einen Gipfel (plus Nebengipfel), flach schattiert vom Mond rechts oben:
-  // zum Mond gewandte Flanken hell mit rotem Saum, abgewandte dunkel; oberhalb der Schneegrenze Schnee. Die Ketten liegen
-  // in verschiedenen Tiefen (Parallaxe 0.6/z), die Eckpunkte rasten auf ganze Pixel – beim Laufen wackeln sie wie auf der PS1.
+  // ---------------- Burghof: Bergketten im PS2-Look ----------------
+  // Jeder Berg ein Fächer aus Dreiecken um Haupt- und Nebengipfel, in voller Auflösung und weich schattiert: jede Fläche
+  // mit einem Verlauf vom Gipfel (Schnee, vom Blutmond rötlich angestrahlt) zum Fuß, der im Talnebel versinkt. Ferne Ketten
+  // bläulich und blass (Luftperspektive). Zwischengespeichert, neu gerendert erst, wenn sich die nahe Kette um ein Pixel verschiebt.
   let mtnMesh = null, mtnBuf = null;
   function drawMountains3D(ctx, cam, frame) {
     const P = 3000;
@@ -2058,41 +2074,36 @@ const Tiles = (() => {
       }
       mtnMesh.sort((a, b) => b.z - a.z); seed = sd0;
     }
-    const w = View.w, W2 = Math.ceil(w / 2);
-    if (!mtnBuf || mtnBuf.c.width !== W2) { mtnBuf = { c: C(W2, 104), key: null }; mtnBuf.x = mtnBuf.c.getContext('2d'); }
-    const key = Math.round(cam.x * 0.6 / 3.6 / 2); // neu rendern nur, wenn sich die nächste Kette um ein Pixel verschiebt (PS1-Ruckeln inklusive)
-    if (mtnBuf.key === key) { ctx.imageSmoothingEnabled = false; ctx.drawImage(mtnBuf.c, 0, 0, W2, 104, 0, 0, W2 * 2, 208); return; }
-    mtnBuf.key = key;
-    const x = mtnBuf.x; x.clearRect(0, 0, W2, 104);
-    const vx = w / 2, baseY = 150, Lm = [0.62, 0.6, 0.5], camX = cam.x * 0.6;
-    const ROCK = [[12, 8, 22], [22, 15, 34], [34, 24, 48], [50, 36, 66], [72, 52, 88]], SNOW = [[46, 42, 68], [72, 66, 98], [104, 96, 136], [140, 132, 176], [180, 172, 214]];
-    const shadeCol = (ramp, n, z, rim) => {
-      const lum = Math.max(0, n[0] * Lm[0] + n[1] * Lm[1] + n[2] * Lm[2]) * 0.9 + 0.12, c = ramp[Math.min(4, Math.floor(lum * 5))];
-      const f = Math.min(0.75, (z - 2.5) / 11); // Dunst in der Ferne
-      return `rgb(${Math.round(c[0] * (1 - f) + 40 * f + rim * 46)},${Math.round(c[1] * (1 - f) + 14 * f + rim * 6)},${Math.round(c[2] * (1 - f) + 62 * f + rim * 10)})`;
-    };
-    const tri = (a, b, c, col) => { x.fillStyle = col; x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.lineTo(c[0], c[1]); x.closePath(); x.fill(); };
-    for (const M of mtnMesh) {
-      for (let k = -1; k <= 1; k++) for (const pk of M.peaks) {
-        const wx = M.ax + pk.dx + k * P, sx = vx + (wx - camX - vx) / M.z;
-        const half = pk.w / M.z;
-        if (sx + half < -20 || sx - half > w + 20) continue;
-        // Eckpunkte in Bildkoordinaten (halbe Auflösung, auf ganze Pixel gerastet)
-        const snap = (X, Y) => [Math.round(X / 2), Math.round(Y / 2)];
-        const apex = snap(sx + M.skew * half, baseY - pk.h / M.z), L0 = snap(sx - half, baseY), L1 = snap(sx - half * 0.35, baseY + 6 / M.z * 10), R1 = snap(sx + half * 0.4, baseY + 6 / M.z * 10), R0 = snap(sx + half, baseY);
-        // Flächennormalen (3D): links abgewandt vom Mond, Mitte zum Betrachter, rechts zum Mond
-        const faces = [[L0, L1, [-0.75, 0.45, 0.48]], [L1, R1, [0.05, 0.42, 0.9]], [R1, R0, [0.78, 0.45, 0.42]]];
-        for (const [p, q, n] of faces) {
-          const snowK = 0.42, ps = [apex[0] + (p[0] - apex[0]) * snowK, apex[1] + (p[1] - apex[1]) * snowK], qs = [apex[0] + (q[0] - apex[0]) * snowK, apex[1] + (q[1] - apex[1]) * snowK];
-          const rim = n[0] > 0.5 ? 1 : 0, rock = shadeCol(ROCK, n, M.z, rim * 0.6), snow = shadeCol(SNOW, n, M.z, rim * 0.4);
-          tri(apex, p, q, rock); x.fillStyle = rock; x.beginPath(); x.moveTo(ps[0], ps[1]); x.lineTo(p[0], p[1]); x.lineTo(q[0], q[1]); x.lineTo(qs[0], qs[1]); x.closePath(); x.fill();
-          if (pk.h / M.z > 26) { const mid = [(ps[0] + qs[0]) / 2, (ps[1] + qs[1]) / 2 + 2]; x.fillStyle = snow; x.beginPath(); x.moveTo(apex[0], apex[1]); x.lineTo(ps[0], ps[1]); x.lineTo(mid[0], mid[1] - 1); x.lineTo(qs[0], qs[1]); x.closePath(); x.fill(); } // Schneekappe mit Zacken
+    const w = View.w;
+    if (!mtnBuf || mtnBuf.c.width !== w) { mtnBuf = { c: C(w, 208), key: null }; mtnBuf.x = mtnBuf.c.getContext('2d'); }
+    const key = Math.round(cam.x * 0.6 / 3.6 / (View.lite ? 3 : 1));
+    if (mtnBuf.key !== key) {
+      mtnBuf.key = key;
+      const x = mtnBuf.x; x.clearRect(0, 0, w, 208);
+      const vx = w / 2, baseY = 152, Lm = [0.62, 0.6, 0.5], camX = cam.x * 0.6;
+      const mix = (c, f, to) => c.map((v, i) => Math.round(v * (1 - f) + to[i] * f));
+      const css = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+      for (const M of mtnMesh) {
+        const haze = Math.min(0.72, (M.z - 2.5) / 11), sky = [44, 20, 72];
+        for (let k = -1; k <= 1; k++) for (const pk of M.peaks) {
+          const wx = M.ax + pk.dx + k * P, sx = vx + (wx - camX - vx) / M.z, half = pk.w / M.z;
+          if (sx + half < -20 || sx - half > w + 20) continue;
+          const apex = [sx + M.skew * half, baseY - pk.h / M.z], foot = baseY + 14 / M.z * 10;
+          const L0 = [sx - half, baseY], L1 = [sx - half * 0.35, foot], R1 = [sx + half * 0.4, foot], R0 = [sx + half, baseY];
+          const faces = [[L0, L1, [-0.75, 0.45, 0.48]], [L1, R1, [0.05, 0.42, 0.9]], [R1, R0, [0.78, 0.45, 0.42]]];
+          for (const [p, q, n] of faces) {
+            const lum = Math.max(0, n[0] * Lm[0] + n[1] * Lm[1] + n[2] * Lm[2]) * 0.85 + 0.15, moon = n[0] > 0.5 ? 1 : 0;
+            const rock = [26 + 70 * lum + moon * 30, 18 + 50 * lum, 40 + 80 * lum], snow = [120 + 120 * lum + moon * 20, 110 + 100 * lum, 150 + 100 * lum];
+            const top = mix(pk.h / M.z > 26 ? snow : rock, haze, sky), mid = mix(rock, haze, sky), bot = mix([16, 8, 26], Math.min(0.9, haze + 0.3), sky);
+            const g = x.createLinearGradient(apex[0], apex[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2);
+            g.addColorStop(0, css(top)); g.addColorStop(0.38, css(top)); g.addColorStop(0.46, css(mid)); g.addColorStop(1, css(bot));
+            x.fillStyle = g; x.beginPath(); x.moveTo(apex[0], apex[1]); x.lineTo(p[0], p[1]); x.lineTo(q[0], q[1]); x.closePath(); x.fill();
+          }
         }
+        if (M.z < 6) { const g = x.createLinearGradient(0, 118, 0, 168); g.addColorStop(0, 'rgba(46,18,70,0)'); g.addColorStop(1, 'rgba(46,18,70,0.75)'); x.fillStyle = g; x.fillRect(0, 118, w, 90); } // Talnebel
       }
-      if (M.z < 6) { x.fillStyle = 'rgba(40,14,60,0.35)'; x.fillRect(0, 74, W2, 30); } // Talnebel vor den nahen Ketten
     }
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(mtnBuf.c, 0, 0, W2, 104, 0, 0, W2 * 2, 208);
+    ctx.drawImage(mtnBuf.c, 0, 0);
   }
 
   // ---------------- Marmorgalerie: Säulengang in echter Perspektive (PS1-Look) ----------------
@@ -2123,7 +2134,7 @@ const Tiles = (() => {
     const pack = (r, g, b) => (255 << 24) | (Math.min(255, b | 0) << 16) | (Math.min(255, g | 0) << 8) | Math.min(255, r | 0);
     for (let j = 0; j < 104; j++) {
       const y = j * 2 + 1, row = j * W2;
-      if (y > yt && y < yb) { d.fill(0, row, row + W2); continue; }
+      if ((y > yt && y < yb) || (View.lite && y <= yt)) { d.fill(View.lite && y <= yt ? 0xff140a10 : 0, row, row + W2); continue; }
       const floor = y >= yb, z = floor ? (floorY - hz) / (y - hz) : (ceilY - hz) / (y - hz), dz = z * 110, f = Math.min(1, (z - 0.8) / (ZB - 0.8)) * 0.75;
       const fogC = (r, g, b) => pack(r * (1 - f) + 12 * f, g * (1 - f) + 8 * f, b * (1 - f) + 26 * f);
       const cell = floor ? 48 : 64, cv = Math.floor(dz / cell), cvm = ((dz % 64) + 64) % 64;
@@ -2257,6 +2268,8 @@ const Tiles = (() => {
     }
     const HZ = 122, w = Math.ceil(View.w / 2), h = 104;
     if (!streamBuf || streamBuf.w !== w) { const c = C(w, h), x = c.getContext('2d'), img = x.createImageData(w, h); streamBuf = { w, c, x, img, d: new Int32Array(img.data.buffer) }; }
+    if (View.lite && (frame & 1) && streamBuf.done) { ctx.drawImage(streamBuf.c, 0, 0, w, h, 0, 0, w * 2, h * 2); return; }
+    streamBuf.done = true;
     const d = streamBuf.d, flash = FX.stormOn(W.storm) ? 1 : 0, step = View.lite ? 2 : 1;
     if (step > 1) d.fill(0);
     for (let j = 0; j < h; j += step) {
@@ -2318,6 +2331,8 @@ const Tiles = (() => {
     }
     const HZ = 112, w = Math.ceil(View.w / 2), h = HZ >> 1;
     if (!cloudBuf || cloudBuf.w !== w) { const c = C(w, h), x = c.getContext('2d'), img = x.createImageData(w, h); cloudBuf = { w, c, x, img, d: new Int32Array(img.data.buffer) }; }
+    if (View.lite && (frame & 1) && cloudBuf.done) { ctx.drawImage(cloudBuf.c, 0, 0, w, h, 0, 0, w * 2, h * 2); return; }
+    cloudBuf.done = true;
     const d = cloudBuf.d;
     for (let j = 0; j < h; j++) {
       const yy = HZ - (j * 2 + 1), dist = 1300 / (yy + 6), sc = dist / 230, fade = Math.min(1, yy / 46) * 0.8, du = 2 * sc;
@@ -2468,12 +2483,16 @@ const Tiles = (() => {
     }
     return c;
   }
+  let frontA = 1;
   function drawFront(ctx, room, cam) {
     if (room.theme === 'ship') { drawShipFront(ctx, room, cam, W.frame); return; }
     if (room.theme === 'glass') { drawGlassFront(ctx, room, cam); return; }
+    frontA += ((W.arenaOn && !W.room.mini ? 0.2 : 1) - frontA) * 0.06; // im Bosskampf treten die Vordergrund-Silhouetten zurück
     const c = fronts[room.theme] || (fronts[room.theme] = buildFront(room.theme));
     const off = ((Math.floor(cam.x * 1.3) % 640) + 640) % 640;
+    ctx.globalAlpha = frontA;
     for (let x = -off; x < View.w; x += 640) ctx.drawImage(c, x, 0);
+    ctx.globalAlpha = 1;
   }
 
   const DECO_SOLID = new Set(['#', '=', 'X', 'Y']);

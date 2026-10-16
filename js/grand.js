@@ -454,7 +454,7 @@ class WheelGear extends Ent {
     if (this.post) { ctx.fillStyle = '#120e0a'; ctx.fillRect(sx - 9, sy, 18, 220); ctx.fillStyle = '#2c241a'; ctx.fillRect(sx - 9, sy, 2, 220); } // Lagerbock
     // PS1-Look: das Rad hat Tiefe – Scheiben hinter der Vorderseite laufen perspektivisch zur Bildmitte (Fluchtpunkt),
     // je nach Kamerastand sieht man die Zahnflanken links, rechts, oben oder unten
-    const ox = (View.w / 2 - sx) * 0.06, oy = (View.fh / 2 - sy) * 0.06, n = Math.min(10, Math.max(3, Math.ceil(Math.hypot(ox, oy)) + 2)), D = this.img.dark;
+    const ox = (View.w / 2 - sx) * 0.06, oy = (View.fh / 2 - sy) * 0.06, n = View.lite ? 2 : Math.min(10, Math.max(3, Math.ceil(Math.hypot(ox, oy)) + 2)), D = this.img.dark;
     for (let k = n; k >= 1; k--) {
       const f = k / n, im = D[f > 0.66 ? 2 : f > 0.33 ? 1 : 0];
       ctx.save(); ctx.imageSmoothingEnabled = false;

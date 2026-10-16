@@ -1315,3 +1315,60 @@ class BatSwarm extends Ent {
     }
   }
 }
+
+// ---------------- Schleimkokons in der Wand der drehenden Röhre (Seelenstrudel) ----------------
+// Wie in Super Castlevania IV gehören sie zur Mode-7-Wand: sie drehen sich mit der Röhre, sind hinten klein und dunkel,
+// vorn oben/unten groß. Kommt ein Kokon auf der nahen Wand dicht am Helden vorbei, platzt er – heraus bricht ein Skelett
+// (fällt auf die Steine) oder ein Fledermauspaar. Danach bleibt die aufgerissene Hülle in der Wand.
+const TUBE_COCOON = (() => {
+  const mk = (broken) => {
+    const c = Sprites.canvas(18, 28), x = c.getContext('2d'), R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    for (let y = 0; y < 28; y++) for (let X = 0; X < 18; X++) {
+      const q = ((X - 8.5) / 8.5) ** 2 + ((y - 14) / 13.5) ** 2;
+      if (q > 1) continue;
+      if (broken && q < 0.55 && y > 6) { R(q < 0.3 ? '#0c140c' : '#1c2c1c', X, y); continue; } // aufgerissen, dunkles Inneres
+      R(q > 0.82 ? '#1c4c2c' : q > 0.55 ? '#2c7c48' : (X + y) % 5 === 0 ? '#58c878' : '#3c9c5c', X, y);
+    }
+    if (!broken) { // Skelett schimmert durch
+      R('#d8d0b8', 7, 6, 4, 4); R('#1c1c14', 7, 7, 1, 1); R('#1c1c14', 10, 7, 1, 1); for (let k = 0; k < 4; k++) R('#c8c0a8', 6, 12 + k * 2, 6, 1); R('#c8c0a8', 8, 11, 2, 9);
+      R('rgba(170,252,190,0.7)', 4, 4, 2, 6); R('rgba(170,252,190,0.5)', 12, 8, 1, 10); // Schleimglanz
+    } else { R('#58c878', 2, 5, 3, 1); R('#58c878', 13, 6, 3, 1); R('#2c7c48', 4, 24, 10, 2); }
+    return c;
+  };
+  return { whole: mk(false), broken: mk(true) };
+})();
+class TubeCocoons extends Ent {
+  constructor(d) { super(0, 0, 1, 1); this.kind = 'prop'; this.list = d.list.map(([u, v, inner]) => ({ u, v, inner: inner || 'skel', open: false })); }
+  update() {
+    this.t++;
+    const p = W.player; if (!p.alive) return;
+    const px = p.cx - W.cam.x, py = p.cy - W.cam.y;
+    for (const c of this.list) {
+      if (c.open) continue;
+      const P = Mode7.tubeProject(c.u, c.v, View.w, W.frame, W.cam.x);
+      if (!P || P.near < 0.5) continue;
+      if (Math.hypot(P.x - px, P.y - py) < 70) this.burst(c, P);
+    }
+  }
+  burst(c, P) {
+    c.open = true;
+    const wx = W.cam.x + P.x, wy = W.cam.y + P.y;
+    Audio8.sfx('slime', wx); Audio8.sfx('splat', wx); W.shake = Math.max(W.shake, 4);
+    for (let i = 0; i < 22; i++) W.spawn(new Particle(wx + rnd(-10, 10), wy + rnd(-12, 12), rnd(-2.6, 2.6), rnd(-3, 1), i % 3 ? '#58d860' : '#a8fc98', 46, 2, 0.18));
+    if (c.inner === 'bat') { for (const s of [-1, 1]) { const b = W.spawn(new Bat(wx / T + s * 0.4, wy / T)); b.state = 'fly'; b.dir = s; b.face = s; b.baseY = b.y; } }
+    else { const k = W.spawn(new Skeleton(wx / T, Math.min(wy, (W.room.h - 4) * T) / T)); k.throwCD = 60; k.vy = -1; }
+  }
+  draw() {}
+  drawBack(ctx) {
+    for (const c of this.list) {
+      const P = Mode7.tubeProject(c.u, c.v, View.w, W.frame, W.cam.x);
+      if (!P) continue;
+      const img = c.open ? TUBE_COCOON.broken : TUBE_COCOON.whole, k = 1.5, w = 18 * P.sx * k, h = 28 * P.sy * k;
+      if (P.x + w < 0 || P.x - w > View.w) continue;
+      ctx.save(); ctx.imageSmoothingEnabled = false; ctx.globalAlpha = 0.45 + 0.55 * P.near; // hinten im Dunst
+      ctx.translate(Math.round(P.x), Math.round(P.y)); if (P.top) ctx.scale(1, -1); // an der Decke kopfüber
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+  }
+}
