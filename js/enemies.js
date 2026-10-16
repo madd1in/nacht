@@ -353,9 +353,9 @@ class Bat extends Enemy {
     if (!this.onScreen(40)) this.dead = true;
   }
   draw(ctx) {
-    const B = Sprites.S.bat;
-    const s = this.state === 'perch' ? B.perch : B.fly[Math.floor(this.t / 3) % B.fly.length];
-    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.y - W.cam.y - (this.state === 'perch' ? 2 : 7)), this.dir < 0, this.flash);
+    const B = Sprites.S.bat3d; // PS1-Look: vorgerendertes 3D-Modell
+    const s = this.state === 'perch' ? B.perch : B.fly[Math.floor(this.t / 1.5) % B.fly.length];
+    this.ds(ctx, s, Math.round(this.cx - s.w / 2 - W.cam.x), Math.round(this.y + 4 - s.h / 2 - W.cam.y - (this.state === 'perch' ? 2 : 4)), this.dir < 0, this.flash);
   }
 }
 

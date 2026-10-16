@@ -805,7 +805,7 @@ const Game = {
     FX.drawStormSky(ctx, this.tStorm, View.w);
     Tiles.drawLayer(ctx, L('peaks'), { x: 1500, y: 0 }, this.t);
     Tiles.drawLayer(ctx, L('mountains'), { x: 1500, y: 0 }, this.t);
-    ctx.drawImage(L('castle').c, Math.round(View.w * 0.5 - 408) + (shake ? Math.round(rnd(-2, 2)) : 0), sink);
+    ctx.save(); ctx.translate(shake ? Math.round(rnd(-2, 2)) : 0, sink); Tiles.drawLayer(ctx, L('castle'), { x: (659 - View.w / 2) / 0.6, y: 0 }, this.t); ctx.restore(); // Low-Poly-Burg, mittig über dem Titel
     FX.drawFog(ctx, 'courtyard', cam0, this.t);
     ctx.fillStyle = 'rgba(180,180,240,0.5)'; // Regen
     for (let i = 0; i < Math.round(40 * View.w / 256); i++) {

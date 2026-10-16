@@ -1344,6 +1344,7 @@ const Tiles = (() => {
       // Deckengesims mit Riss
       px(x, '#2c2434', 0, 0, 512, 10); px(x, '#5c5468', 0, 8, 512, 2); for (let X = 0; X < 512; X += 8) px(x, '#3c3448', X, 3, 4, 4);
       add('wall', c, 0.5, { vtile: true });
+      L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) }); // Säulen in der Tiefe (PS1-Look)
     } else if (theme === 'library') { // Bibliothek: deckenhohe Bücherwände, Galerie mit Balustrade, Rollleitern, hohes Bogenfenster mit Sturm dahinter
       const sky = C(640, 208), xs = sky.getContext('2d');
       smooth(xs, 640, 208, ['#000000', '#04010c', '#0a0418', '#120826', '#1c0c34', '#26103e', '#301446', '#3a184c', '#421c50']);
@@ -1527,7 +1528,8 @@ const Tiles = (() => {
       };
       const pk = C(512, 208), hp = peaks(6, 38, 150, 0.6, 1.2, 22);
       range(pk, hp, { face: ['#28163e', '#382252', '#52366c'], deep: '#2c1844', rim: '#5c4478', rimLit: '#b49cd4', snow: ['#6c5c8c', '#8c7cac', '#d0c0e8'] }, 84, { from: 120, len: 56, col: '#2c1642' });
-      add('peaks', pk, 0.06);
+      add('peaks2d', pk, 0.06, { hidden: true }); // ersetzt durch die Low-Poly-Berge
+      L.push({ name: 'peaks', custom: drawMountains3D, par: 0.06, c: C(1, 1) });
       const mt = C(512, 208), mx = mt.getContext('2d'), hm = peaks(8, 92, 176, 0.45, 0.85, 14);
       range(mt, hm, { face: ['#10061a', '#1a0a26', '#2a1238'], deep: '#14081e', rim: '#30163e', rimLit: '#6c2a58' }, 0, { from: 162, len: 46, col: '#2a1238' });
       for (let i = 0; i < 80; i++) { // Tannen auf den unteren Hängen
@@ -1535,7 +1537,7 @@ const Tiles = (() => {
         for (let r = 0; r < hgt; r++) { const w = Math.max(1, Math.round((r / hgt) * 4)); px(mx, '#08020e', X - (w >> 1), base - hgt + r, w, 1); }
         px(mx, '#08020e', X, base, 1, 2);
       }
-      add('mountains', mt, 0.12);
+      add('mountains', mt, 0.12, { hidden: true });
       const fo = C(512, 208), fx2 = fo.getContext('2d');
       for (let i = 0; i < 95; i++) { // dunkler Tannenwald am Fuß der Berge, die Spitzen im Mondlicht
         const X = ri(0, 511), base = ri(178, 202), hgt = ri(14, 32);
@@ -1567,7 +1569,8 @@ const Tiles = (() => {
         for (let y = 0; y < 8; y++) { const half = Math.round(Math.sqrt(Math.max(0, 25 - (y - 4) ** 2))); px(x2, col, 80 + a * 14, 154 + y, 7 - half, 1); px(x2, col, 87 + a * 14 + half, 154 + y, 7 - half, 1); }
       }
       for (let i = 0; i < 22; i++) { const wx = 160 + ri(0, 280), wy = 125 + ri(0, 50); px(x2, '#f8b800', wx, wy, 1, 2); }
-      add('castle', cs, 0.25);
+      add('castle2d', cs, 0.25, { hidden: true }); // ersetzt durch die Low-Poly-Burg
+      L.push({ name: 'castle', custom: drawCastle3D, par: 0.25, c: cs });
       const nr = C(512, 208), x3 = nr.getContext('2d');
       // knorrige, tote Bäume: sich verjüngende, verzweigte Äste mit Zweigen, Wurzeln und Moosbärten; die zum Mond gewandte
       // Kante leuchtet rötlich-violett, auf den Ästen sitzen eine Eule mit glühenden Augen und ein Rabe
@@ -1682,6 +1685,7 @@ const Tiles = (() => {
       }
       if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); else [0, 236, 488].forEach(cx => pillar(x, cx, 22, 208));
       add('wall', c, 0.5, { vtile });
+      L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) });
       if (theme === 'throne') { // Kronleuchter vorne
         const n = C(512, 208), x2 = n.getContext('2d');
         [100, 360].forEach(cx => {
@@ -1761,6 +1765,7 @@ const Tiles = (() => {
       }
       for (let i = 0; i < 5; i++) { const cx = ri(0, 500), len = ri(20, 60); for (let y = 0; y < len; y += 3) px(x, y % 6 ? '#3c3c4c' : '#6c6c7c', cx, y, 2, 2); }
       add('wall', c, 0.5, { vtile: true });
+      L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) }); // Säulen in der Tiefe (PS1-Look)
     } else if (theme === 'gallery') { // Marmorgalerie: alles im Säulengang wird live in Perspektive gezeichnet
       L.push({ name: 'colonnade', custom: drawColonnade, par: 1, c: C(1, 1) });
     } else if (theme === 'bridge') { // Brücke zum Bergfried: Sturmhimmel mit Blutmond, der Bergfried mit erleuchteten Fenstern,
@@ -1914,6 +1919,180 @@ const Tiles = (() => {
       if (X0 > View.w || X0 + 16 < 0) continue;
       for (let i = 0; i < 22; i++) { const y = (((i * 37 + frame * 3.2 - oy) % 208) + 208) % 208, len = 5 + (i % 4) * 3; ctx.fillRect(X0 + (i * 5) % 16, Math.round(y), 1, len); }
     }
+  }
+
+  // ---------------- Säulen in der Tiefe (PS1-Look) für Halle, Eingangshalle, Thronsaal und Gruft ----------------
+  // Eine Reihe runder Säulen zwischen Wand und Spielebene (Tiefe z): sie wandern mit 1/z, schrumpfen zur Bildmitte hin
+  // und werden streifenweise beleuchtet – Mondlicht von hinten links als Saum, warmes Licht von vorn, ein Glanzlicht,
+  // das mit dem Blickwinkel wandert. Im Blitz flammen sie auf.
+  const COLS3D = {
+    hall: { z: 1.36, sp: 232, off: 120, r: 15, mat: [70, 58, 62], cap: [120, 100, 92], fog: [20, 6, 10] },
+    throne: { z: 1.32, sp: 256, off: 200, r: 16, mat: [150, 34, 50], cap: [200, 144, 32], fog: [22, 4, 12] },
+    foyer: { z: 1.3, sp: 256, off: 128, r: 16, mat: [60, 54, 74], cap: [110, 96, 70], fog: [6, 4, 14] },
+    crypt: { z: 1.42, sp: 208, off: 60, r: 14, mat: [60, 68, 100], cap: [86, 94, 124], fog: [6, 8, 20] },
+  };
+  let colBuf = null;
+  function drawDepthColumns(ctx, cam, frame, theme) {
+    const S = COLS3D[theme], room = W.room; if (!S || !room) return;
+    const w = View.w, vx = w / 2, hz = 82, z = S.z, floorY = (room.h - 2) * T - cam.y, ceilY = -cam.y;
+    const top = Math.max(-4, hz + (ceilY - hz) / z), bot = hz + (floorY - hz) / z, cw = Math.round(S.r * 2 / z);
+    if (bot < 0 || top > 208) return;
+    if (!colBuf) { const c = C(64, 16), x = c.getContext('2d'), img = x.createImageData(64, 16); colBuf = { c, x, img, d: new Int32Array(img.data.buffer) }; }
+    const flash = FX.stormOn(W.storm) ? 1 : 0, camWX = cam.x + vx, list = [];
+    const k0 = Math.floor((cam.x - 200 - S.off) / S.sp), k1 = Math.ceil((cam.x + w + 200 - S.off) / S.sp);
+    for (let k = k0; k <= k1 && list.length < 16; k++) {
+      const wx = S.off + k * S.sp, sx = vx + (wx - cam.x - vx) / z, x0 = Math.round(sx - cw / 2);
+      if (x0 > w || x0 + cw < 0) continue;
+      const vdx = camWX - wx, vdz = -z * 110, vl = Math.hypot(vdx, vdz), Vx = vdx / vl, Vz = vdz / vl;
+      const warmX = Math.round(wx / 320) * 320 + 120, wlx = warmX - wx, wlz = (0.95 - z) * 110, wll = Math.hypot(wlx, wlz), WLx = wlx / wll, WLz = wlz / wll, wf = Math.max(0, 1 - wll / 340) * (0.8 + 0.2 * Math.sin(frame * 0.2 + k));
+      const row = list.length * 64;
+      for (let i = 0; i < cw && i < 64; i++) {
+        const nx = (i + 0.5) / cw * 2 - 1, nz = -Math.sqrt(Math.max(0, 1 - nx * nx));
+        const moon = Math.max(0, nx * -0.62 + nz * -0.2 + 0.55 * Math.max(0, -nx)) * (0.55 + flash * 1.4); // Saum links vom Mondlicht
+        const warm = Math.max(0, nx * WLx + nz * WLz) * wf;
+        let sp = 0; { const hx = WLx + Vx, hzz = WLz + Vz, hl = Math.hypot(hx, hzz) || 1; let c2 = (nx * hx + nz * hzz) / hl; if (c2 > 0.85) { c2 *= c2; c2 *= c2; c2 *= c2; c2 *= c2; c2 *= c2; sp = c2 * wf; } }
+        const amb = 0.22, f = 0.3;
+        const r = (S.mat[0] * (amb + moon * 0.7 + warm * 1.1) + 230 * sp) * (1 - f) + S.fog[0] * f, g = (S.mat[1] * (amb + moon * 0.8 + warm * 0.75) + 200 * sp) * (1 - f) + S.fog[1] * f, b = (S.mat[2] * (amb + moon * 1.1 + warm * 0.45) + 170 * sp) * (1 - f) + S.fog[2] * f;
+        colBuf.d[row + i] = (255 << 24) | (Math.min(255, b | 0) << 16) | (Math.min(255, g | 0) << 8) | Math.min(255, r | 0);
+      }
+      list.push([sx, x0]);
+    }
+    if (!list.length) return;
+    colBuf.x.putImageData(colBuf.img, 0, 0, 0, 0, 64, list.length);
+    const capH = Math.max(3, Math.round(12 / z)), capW = Math.round(cw * 1.45), baseH = Math.max(3, Math.round(10 / z)), baseW = Math.round(cw * 1.35);
+    const cap = `rgb(${S.cap.join(',')})`, capHi = `rgb(${S.cap.map(v => Math.min(255, v + 70)).join(',')})`, capLo = `rgb(${S.cap.map(v => v >> 1).join(',')})`;
+    list.forEach(([sx, x0], n) => {
+      ctx.drawImage(colBuf.c, 0, n, Math.min(64, cw), 1, x0, Math.floor(top), cw, Math.ceil(bot - top));
+      const cx0 = Math.round(sx - capW / 2), bx0 = Math.round(sx - baseW / 2), cy = Math.round(hz + (ceilY + 12 - hz) / z);
+      if (cy > -capH) { ctx.fillStyle = cap; ctx.fillRect(cx0, cy, capW, capH); ctx.fillStyle = capHi; ctx.fillRect(cx0, cy, capW, 1); ctx.fillStyle = capLo; ctx.fillRect(cx0, cy + capH - 1, capW, 1); }
+      ctx.fillStyle = capLo; ctx.fillRect(bx0, Math.round(bot - baseH), baseW, baseH); ctx.fillStyle = cap; ctx.fillRect(bx0, Math.round(bot - baseH), baseW, 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(bx0 - 2, Math.round(bot), baseW + 4, 2);
+    });
+  }
+
+  // ---------------- Burghof: die Burg als Low-Poly-Modell (PS1-Look) ----------------
+  // Achteckige Türme mit Kegeldächern und Wimpeln, Zinnen-Türme, Ringmauern mit Zinnen und eine Bogenbrücke – alles echte
+  // Körper in Perspektive: beim Laufen drehen sich die Turmflächen ein wenig, die beleuchtete Seite zum Mond (rechts oben)
+  // wechselt, erleuchtete Fenster sitzen auf den Flächen. Halbe Auflösung, Eckpunkte auf ganze Pixel gerastet.
+  const CASTLE = [ // x (Welt), Tiefe dz, Radius, Höhe, Dach (Höhe oder 0 = Zinnen)
+    [-150, 0.1, 13, 130, 34], [-90, -0.05, 15, 165, 40], [-30, 0.15, 19, 205, 52], [30, 0.05, 12, 140, 0], [80, -0.1, 17, 190, 46],
+    [140, 0.12, 13, 120, 0], [190, 0.0, 11, 140, 32], [-340, 0.2, 10, 105, 28], [-290, 0.05, 14, 90, 0],
+  ];
+  let castleBuf = null;
+  function drawCastle3D(ctx, cam, frame) {
+    const w = View.w, W2 = Math.ceil(w / 2), P = 1229, Zc = 2.4, D = 130, baseY = 176, vx = w / 2, camX = cam.x * 0.6;
+    if (!castleBuf || castleBuf.c.width !== W2) { castleBuf = { c: C(W2, 104), key: null }; castleBuf.x = castleBuf.c.getContext('2d'); }
+    const flash = FX.stormOn(W.storm) ? 1 : 0, key = Math.round(camX / Zc / 2) + '|' + flash + '|' + (frame >> 5);
+    if (castleBuf.key !== key) {
+      castleBuf.key = key;
+      const x = castleBuf.x; x.clearRect(0, 0, W2, 104);
+      const pr = (X, Y, Z) => [Math.round((vx + (X - camX - vx) / Z) / 2), Math.round((baseY - Y / Z) / 2)];
+      const shade = (nx, nz, up = 0) => { // Mond rechts vorn oben
+        const l = Math.max(0, nx * 0.75 + -nz * 0.35 + up * 0.6) * (1 + flash * 0.8), k = Math.min(3, Math.floor(l * 3.2));
+        return ['#0a0412', '#140820', '#22102e', '#3a1c48'][k];
+      };
+      const poly = (pts, col) => { x.fillStyle = col; x.beginPath(); pts.forEach((p, i) => i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])); x.closePath(); x.fill(); };
+      const camWX = camX + vx;
+      for (let k = -1; k <= 1; k++) {
+        const ox = 400 + k * P; // Burgmitte in Weltkoordinaten
+        if (Math.abs((vx + (ox - camX - vx) / Zc) - vx) > w * 1.5) continue;
+        // Ringmauer zwischen den Türmen (Vorderfläche mit Zinnen)
+        const wl = pr(ox - 170, 0, Zc + 0.2), wr2 = pr(ox + 210, 0, Zc + 0.2), wt = pr(ox, 58, Zc + 0.2)[1];
+        poly([[wl[0], wt], [wr2[0], wt], [wr2[0], wl[1]], [wl[0], wl[1]]], '#120818');
+        for (let X = wl[0]; X < wr2[0]; X += 3) x.fillRect(X, wt - 2, 2, 2);
+        // Bogenbrücke links
+        const bl = pr(ox - 330, 0, Zc + 0.05), br = pr(ox - 175, 0, Zc + 0.05), bt = pr(ox, 40, Zc + 0.05)[1];
+        poly([[bl[0], bt], [br[0], bt], [br[0], bt + 3], [bl[0], bt + 3]], '#120818');
+        for (let a = bl[0]; a < br[0] - 2; a += 7) { x.fillStyle = '#120818'; x.fillRect(a, bt + 3, 2, bl[1] - bt - 3); }
+        // Türme: hintere zuerst
+        const towers = CASTLE.map(([dx, dz, r, h, roof]) => ({ X: ox + dx, Z: Zc + dz, r, h, roof })).sort((a, b) => b.Z - a.Z);
+        for (const T0 of towers) {
+          const n = 8, faces = [];
+          for (let i = 0; i < n; i++) {
+            const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2, am = (a0 + a1) / 2;
+            const nx = Math.sin(am), nz = -Math.cos(am); // Flächennormale (−z = zum Betrachter)
+            const tx = T0.X + Math.sin(am) * T0.r - camWX, tz = T0.Z * D + nz * T0.r; // Blick vom Betrachter auf die Fläche
+            if (nx * -tx + nz * -tz <= 0) continue; // Rückseite
+            const p0 = [T0.X + Math.sin(a0) * T0.r, T0.Z - Math.cos(a0) * T0.r / D], p1 = [T0.X + Math.sin(a1) * T0.r, T0.Z - Math.cos(a1) * T0.r / D];
+            faces.push({ p0, p1, nx, nz, z: (p0[1] + p1[1]) / 2 });
+          }
+          faces.sort((a, b) => b.z - a.z);
+          for (const f of faces) {
+            const A = pr(f.p0[0], 0, f.p0[1]), B = pr(f.p1[0], 0, f.p1[1]), At = pr(f.p0[0], T0.h, f.p0[1]), Bt = pr(f.p1[0], T0.h, f.p1[1]);
+            poly([At, Bt, B, A], shade(f.nx, f.nz));
+            if (f.nz < -0.3 && Math.abs(B[0] - A[0]) >= 2) for (let wy = 0.25; wy < 0.9; wy += 0.22) { // erleuchtete Fenster
+              const yy = Math.round(A[1] + (At[1] - A[1]) * wy), xx = Math.round((A[0] + B[0]) / 2);
+              if (((T0.X | 0) + wy * 10 | 0) % 3 !== 0) { x.fillStyle = (frame >> 4) % 23 === ((T0.X | 0) % 23) ? '#f87800' : '#f8b800'; x.fillRect(xx, yy, 1, 2); }
+            }
+          }
+          const topC = pr(T0.X, T0.h, T0.Z);
+          if (T0.roof) { // Kegeldach: Dreiecke vom Rand zur Spitze, steil beleuchtet
+            const apex = pr(T0.X, T0.h + T0.roof, T0.Z);
+            for (const f of faces) { const At = pr(f.p0[0] + (f.p0[0] - T0.X) * 0.25, T0.h, f.p0[1]), Bt = pr(f.p1[0] + (f.p1[0] - T0.X) * 0.25, T0.h, f.p1[1]); poly([At, Bt, apex], shade(f.nx, f.nz, 0.4)); }
+            x.fillStyle = '#120818'; x.fillRect(apex[0], apex[1] - 4, 1, 4); x.fillStyle = '#a80020'; x.fillRect(apex[0] + 1, apex[1] - 4, 2 + ((frame >> 3) & 1), 1); // Wimpel
+          } else { // Zinnen
+            const L0 = pr(T0.X - T0.r, T0.h, T0.Z), R0 = pr(T0.X + T0.r, T0.h, T0.Z);
+            x.fillStyle = '#0c0614'; for (let X = L0[0]; X <= R0[0]; X += 2) x.fillRect(X, topC[1] - 2, 1, 2);
+          }
+        }
+      }
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(castleBuf.c, 0, 0, W2, 104, 0, 0, W2 * 2, 208);
+  }
+
+  // ---------------- Burghof: Bergketten als Low-Poly-Modelle (PS1-Look) ----------------
+  // Jeder Berg ein kleiner Fächer aus Dreiecken um einen Gipfel (plus Nebengipfel), flach schattiert vom Mond rechts oben:
+  // zum Mond gewandte Flanken hell mit rotem Saum, abgewandte dunkel; oberhalb der Schneegrenze Schnee. Die Ketten liegen
+  // in verschiedenen Tiefen (Parallaxe 0.6/z), die Eckpunkte rasten auf ganze Pixel – beim Laufen wackeln sie wie auf der PS1.
+  let mtnMesh = null, mtnBuf = null;
+  function drawMountains3D(ctx, cam, frame) {
+    const P = 3000;
+    if (!mtnMesh) {
+      const sd0 = seed; seed = 4711; mtnMesh = [];
+      for (let i = 0; i < 26; i++) {
+        const z = i < 14 ? 7 + rand() * 4 : 3.6 + rand() * 1.6, h = (z > 6 ? 420 : 150) + rand() * (z > 6 ? 300 : 130), w = h * (1.1 + rand() * 0.55);
+        const ax = rand() * P, sub = [];
+        for (let k = 0; k < 2; k++) { const o = (rand() - 0.5) * w * 1.2; sub.push({ dx: o, h: h * (0.45 + rand() * 0.3), w: w * (0.45 + rand() * 0.2) }); }
+        mtnMesh.push({ z, peaks: [{ dx: 0, h, w }, ...sub], ax, skew: (rand() - 0.5) * 0.4 });
+      }
+      mtnMesh.sort((a, b) => b.z - a.z); seed = sd0;
+    }
+    const w = View.w, W2 = Math.ceil(w / 2);
+    if (!mtnBuf || mtnBuf.c.width !== W2) { mtnBuf = { c: C(W2, 104), key: null }; mtnBuf.x = mtnBuf.c.getContext('2d'); }
+    const key = Math.round(cam.x * 0.6 / 3.6 / 2); // neu rendern nur, wenn sich die nächste Kette um ein Pixel verschiebt (PS1-Ruckeln inklusive)
+    if (mtnBuf.key === key) { ctx.imageSmoothingEnabled = false; ctx.drawImage(mtnBuf.c, 0, 0, W2, 104, 0, 0, W2 * 2, 208); return; }
+    mtnBuf.key = key;
+    const x = mtnBuf.x; x.clearRect(0, 0, W2, 104);
+    const vx = w / 2, baseY = 150, Lm = [0.62, 0.6, 0.5], camX = cam.x * 0.6;
+    const ROCK = [[12, 8, 22], [22, 15, 34], [34, 24, 48], [50, 36, 66], [72, 52, 88]], SNOW = [[46, 42, 68], [72, 66, 98], [104, 96, 136], [140, 132, 176], [180, 172, 214]];
+    const shadeCol = (ramp, n, z, rim) => {
+      const lum = Math.max(0, n[0] * Lm[0] + n[1] * Lm[1] + n[2] * Lm[2]) * 0.9 + 0.12, c = ramp[Math.min(4, Math.floor(lum * 5))];
+      const f = Math.min(0.75, (z - 2.5) / 11); // Dunst in der Ferne
+      return `rgb(${Math.round(c[0] * (1 - f) + 40 * f + rim * 46)},${Math.round(c[1] * (1 - f) + 14 * f + rim * 6)},${Math.round(c[2] * (1 - f) + 62 * f + rim * 10)})`;
+    };
+    const tri = (a, b, c, col) => { x.fillStyle = col; x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.lineTo(c[0], c[1]); x.closePath(); x.fill(); };
+    for (const M of mtnMesh) {
+      for (let k = -1; k <= 1; k++) for (const pk of M.peaks) {
+        const wx = M.ax + pk.dx + k * P, sx = vx + (wx - camX - vx) / M.z;
+        const half = pk.w / M.z;
+        if (sx + half < -20 || sx - half > w + 20) continue;
+        // Eckpunkte in Bildkoordinaten (halbe Auflösung, auf ganze Pixel gerastet)
+        const snap = (X, Y) => [Math.round(X / 2), Math.round(Y / 2)];
+        const apex = snap(sx + M.skew * half, baseY - pk.h / M.z), L0 = snap(sx - half, baseY), L1 = snap(sx - half * 0.35, baseY + 6 / M.z * 10), R1 = snap(sx + half * 0.4, baseY + 6 / M.z * 10), R0 = snap(sx + half, baseY);
+        // Flächennormalen (3D): links abgewandt vom Mond, Mitte zum Betrachter, rechts zum Mond
+        const faces = [[L0, L1, [-0.75, 0.45, 0.48]], [L1, R1, [0.05, 0.42, 0.9]], [R1, R0, [0.78, 0.45, 0.42]]];
+        for (const [p, q, n] of faces) {
+          const snowK = 0.42, ps = [apex[0] + (p[0] - apex[0]) * snowK, apex[1] + (p[1] - apex[1]) * snowK], qs = [apex[0] + (q[0] - apex[0]) * snowK, apex[1] + (q[1] - apex[1]) * snowK];
+          const rim = n[0] > 0.5 ? 1 : 0, rock = shadeCol(ROCK, n, M.z, rim * 0.6), snow = shadeCol(SNOW, n, M.z, rim * 0.4);
+          tri(apex, p, q, rock); x.fillStyle = rock; x.beginPath(); x.moveTo(ps[0], ps[1]); x.lineTo(p[0], p[1]); x.lineTo(q[0], q[1]); x.lineTo(qs[0], qs[1]); x.closePath(); x.fill();
+          if (pk.h / M.z > 26) { const mid = [(ps[0] + qs[0]) / 2, (ps[1] + qs[1]) / 2 + 2]; x.fillStyle = snow; x.beginPath(); x.moveTo(apex[0], apex[1]); x.lineTo(ps[0], ps[1]); x.lineTo(mid[0], mid[1] - 1); x.lineTo(qs[0], qs[1]); x.closePath(); x.fill(); } // Schneekappe mit Zacken
+        }
+      }
+      if (M.z < 6) { x.fillStyle = 'rgba(40,14,60,0.35)'; x.fillRect(0, 74, W2, 30); } // Talnebel vor den nahen Ketten
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(mtnBuf.c, 0, 0, W2, 104, 0, 0, W2 * 2, 208);
   }
 
   // ---------------- Marmorgalerie: Säulengang in echter Perspektive (PS1-Look) ----------------
@@ -2235,11 +2414,12 @@ const Tiles = (() => {
   }
 
   // onSky: wird nach den Himmelsebenen aufgerufen (Blitze hinter Burg & Bäumen)
-  function drawBg(ctx, room, cam, frame = 0, onSky = null) {
+  function drawBg(ctx, room, cam, frame = 0, onSky = null, onWall = null) {
     const vt = room.h > 13;
     build(room.theme).bg.forEach(l => {
       drawLayer(ctx, l, cam, frame, vt);
       if (onSky && l.name === 'clouds') onSky(ctx);
+      if (onWall && l.name === 'wall') onWall(ctx);
       if (l.name === 'wall' && room.theme === 'throne') drawRose(ctx, cam, frame);
     });
     if (room.theme === 'tower') drawClockLive(ctx, room, cam, frame);

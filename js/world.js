@@ -484,8 +484,9 @@ const W = {
     ctx.translate(sx, 32 + sy);
     this.applyCamFx(ctx, vw);
     const storm = theme in STORMY ? this.storm : null; // Gewitter über dem ganzen Schloss: Blitze lassen Fenster und Räume aufleuchten
-    Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); if (theme === 'courtyard') FX.drawFlock(c); } : null);
-    for (const e of this.ents) if (e.drawBack && !e.dead) e.drawBack(ctx); // Kulissen vor den Kacheln (Thron mit Baldachin)
+    Tiles.drawBg(ctx, this.room, this.cam, this.frame, storm ? (c) => { FX.drawStormSky(c, storm, vw); if (theme === 'courtyard') FX.drawFlock(c); } : null,
+      (c) => { for (const e of this.ents) if (e instanceof Portrait && !e.dead) e.drawBack(c); }); // Ahnenbilder hängen an der Wand, hinter den Säulen
+    for (const e of this.ents) if (e.drawBack && !e.dead && !(e instanceof Portrait)) e.drawBack(ctx); // Kulissen vor den Kacheln (Thron mit Baldachin)
     const flashOn = storm && FX.stormOn(storm), dark = STORMY[theme];
     if (flashOn && dark && theme !== 'glass') this.drawCastShadows(ctx); // Blitz in dunklen Sälen: alles wirft harte Schlagschatten an die Wand
     this.drawDoor(ctx);

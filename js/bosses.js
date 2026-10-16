@@ -80,7 +80,7 @@ class SwarmBat extends Ent {
     this.vx = Math.cos(a) * sp; this.vy = Math.sin(a) * sp - 0.6; this.ph = Math.random() * 6;
   }
   update() { this.t++; this.x += this.vx; this.y += this.vy + Math.sin(this.t * 0.3 + this.ph) * 0.8; if (this.t > 150) this.dead = true; }
-  draw(ctx) { const s = Sprites.S.bat.fly[Math.floor(this.t / 3) % 4]; Sprites.draw(ctx, s, Math.round(this.x - s.w / 2 - W.cam.x), Math.round(this.y - 4 - W.cam.y), this.vx < 0); }
+  draw(ctx) { const s = Sprites.S.bat3d.fly[Math.floor(this.t / 1.5 + this.ph * 3) % 16]; Sprites.draw(ctx, s, Math.round(this.x - s.w / 2 - W.cam.x), Math.round(this.y - s.h / 2 - W.cam.y), this.vx < 0); }
 }
 
 class Boss extends Enemy {

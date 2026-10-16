@@ -56,6 +56,63 @@
   }
   S.bat = { fly: [0, 1, 2, 3, 4, 5].map(i => bat(i / 6)), perch: batPerch() };
 
+  // ---------------- Fledermaus im PS1-Look ----------------
+  // Ein Low-Poly-Modell (Oktaeder-Leib, Kopf mit Ohren, Flughäute mit drei Fingerknochen) wird in 16 Flügelschlag-Phasen
+  // vorgerendert – flach schattiert vom Mondlicht, leicht von oben und schräg vorn gesehen. Die Flügel verkürzen sich
+  // perspektivisch, wenn sie auf den Betrachter zeigen, der hintere Flügel liegt hinter dem Leib.
+  (function bat3d() {
+    const W = 40, H = 32, tilt = 0.42, yaw = 0.62;
+    const rot = ([x, y, z]) => {
+      const x1 = x * Math.cos(yaw) + z * Math.sin(yaw), z1 = -x * Math.sin(yaw) + z * Math.cos(yaw);
+      return [x1, y * Math.cos(tilt) - z1 * Math.sin(tilt), y * Math.sin(tilt) + z1 * Math.cos(tilt)];
+    };
+    const norm = v => { const l = Math.hypot(...v) || 1; return v.map(a => a / l); };
+    const Lt = norm([-0.35, -0.8, 0.55]);
+    const MEM = [[20, 8, 28], [44, 18, 58], [72, 32, 92], [104, 52, 124], [140, 84, 160]], FUR = [[14, 8, 12], [34, 20, 28], [58, 36, 46], [86, 60, 70], [120, 92, 100]];
+    function frame(phi, fold) {
+      const c = Sprites.canvas(W, H), x = c.getContext('2d'), polys = [];
+      const add = (pts, ramp, bias = 0) => { const P = pts.map(rot); polys.push({ P, ramp, bias, z: P.reduce((a, p) => a + p[2], 0) / P.length }); };
+      const v = (a, b, k) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
+      // Leib (Oktaeder) und Kopf mit Ohren, Blick nach +x
+      const F = [5, 0, 0], B = [-6, 1, 0], T = [0, -2.6, 0], D = [0, 2.8, 0], N = [0, 0, 2.6], R = [0, 0, -2.6];
+      [[F, T, N], [F, N, D], [F, D, R], [F, R, T], [B, N, T], [B, D, N], [B, R, D], [B, T, R]].forEach(t => add(t, FUR));
+      const HT = [9, -1.2, 0];
+      add([F, HT, [6, -2.4, 1.2]], FUR, 0.1); add([F, HT, [6, -2.4, -1.2]], FUR); add([F, HT, [6.5, 0.8, 0]], FUR, -0.1);
+      add([[6, -2.4, 1.2], [7.6, -6.5, 1.6], [8, -2, 0.6]], FUR, 0.15); add([[6, -2.4, -1.2], [7.6, -6.5, -1.6], [8, -2, -0.6]], FUR); // Ohren
+      // Flügel: Richtung aus dem Schlagwinkel, Arm – Handgelenk – drei Finger, Flughaut dazwischen
+      for (const sd of [1, -1]) {
+        const dir = fold ? [0, 0.95, sd * 0.3] : [0, -Math.sin(phi), sd * Math.cos(phi)];
+        const len = fold ? 0.45 : 1;
+        const rF = [2.5, -1, sd * 1.8], rB = [-4, -0.5, sd * 1.6];
+        const wrist = v([2, -1, sd * 1.8], dir, 10 * len), f1 = v(v(wrist, dir, 6 * len), [1, 0, 0], 3.5), f2 = v(v(wrist, dir, 7 * len), [1, 0, 0], -2.5), f3 = v(v(wrist, dir, 5 * len), [1, 0, 0], -7);
+        const s1 = v(v(wrist, dir, 3.5 * len), [1, 0, 0], 0.5), s2 = v(v(wrist, dir, 3.5 * len), [1, 0, 0], -4.5);
+        add([rF, wrist, f3, rB], MEM); add([wrist, f1, s1], MEM, 0.05); add([wrist, s1, f2], MEM); add([wrist, f2, s2], MEM, -0.03); add([wrist, s2, f3], MEM);
+        polys.push({ bone: [rF, wrist, f1, f2, f3].map(rot), z: rot(wrist)[2] + 0.01 });
+      }
+      polys.sort((a, b) => a.z - b.z);
+      const cx = W / 2 - 1, cy = H / 2;
+      for (const p of polys) {
+        if (p.bone) { // Fingerknochen und Arm hell
+          const [a, w, ...fs] = p.bone; x.strokeStyle = 'rgb(150,110,150)'; x.lineWidth = 1;
+          x.beginPath(); x.moveTo(cx + a[0], cy + a[1]); x.lineTo(cx + w[0], cy + w[1]); fs.forEach(f => { x.moveTo(cx + w[0], cy + w[1]); x.lineTo(cx + f[0], cy + f[1]); }); x.stroke();
+          continue;
+        }
+        const [a, b, c2] = p.P, u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], w = [c2[0] - a[0], c2[1] - a[1], c2[2] - a[2]];
+        let n = norm([u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]); if (n[2] < 0) n = n.map(q => -q);
+        const lum = Math.max(0, Math.min(0.999, Math.max(0, n[0] * Lt[0] + n[1] * Lt[1] + n[2] * Lt[2]) * 0.85 + 0.12 + p.bias)), col = p.ramp[Math.floor(lum * p.ramp.length)];
+        x.fillStyle = `rgb(${col.join(',')})`; x.beginPath(); p.P.forEach(([px2, py2], i) => i ? x.lineTo(cx + px2, cy + py2) : x.moveTo(cx + px2, cy + py2)); x.closePath(); x.fill();
+      }
+      const eye = rot([7.8, -1.3, 1]); x.fillStyle = '#fc2020'; x.fillRect(Math.round(cx + eye[0]), Math.round(cy + eye[1]), 1, 1); // rotes Auge
+      const img = x.getImageData(0, 0, W, H), d = img.data; for (let i = 3; i < d.length; i += 4) d[i] = d[i] < 100 ? 0 : 255; x.putImageData(img, 0, 0);
+      return Sprites.fromCanvas(c);
+    }
+    const fly = Array.from({ length: 16 }, (_, i) => frame(0.2 + 0.95 * Math.sin(i / 16 * Math.PI * 2), false));
+    // hängend: Flügel angelegt, kopfüber
+    const pc = frame(0, true), hang = Sprites.canvas(pc.c.width, pc.c.height), hx = hang.getContext('2d');
+    hx.translate(pc.c.width / 2, pc.c.height / 2); hx.rotate(Math.PI / 2); hx.drawImage(pc.c, -pc.c.width / 2, -pc.c.height / 2);
+    S.bat3d = { fly, perch: Sprites.fromCanvas(hang, false) };
+  })();
+
   // ---------------- Fliegender Schädel: Feuerschweif in vier Phasen, glühende Augen, klappernder Kiefer, Haarrisse ----------------
   const BONE = ['#3c3428', '#7c7058', '#b4a888', '#dcd4b8', '#fcfcf0'];
   const FIRE = ['#881400', '#d82800', '#f87800', '#f8b800', '#fcf0a0'];
