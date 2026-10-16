@@ -1372,3 +1372,54 @@ class TubeCocoons extends Ent {
     }
   }
 }
+
+// ---------------- Tutorial auf dem Achterschiff ----------------
+// Jede Station ist ein Bereich: steht der Held darin, zeigt eine Tafel oben im Bild den Move und die Tasten für das gerade
+// benutzte Gerät (Tastatur, Xbox-Controller, Touch) – wechselt man das Gerät, wechseln die Tasten sofort mit.
+// An Deck steht ein kleines Holzschild mit Fragezeichen.
+const TUT_BTN = {
+  keys: { MOVE: '← →', DOWN: '↓', UP: '↑', JUMP: 'Z', ATK: 'X', SUB: 'C', DASH: 'SHIFT', PAUSE: 'ENTER' },
+  pad: { MOVE: 'STICK', DOWN: '↓', UP: '↑', JUMP: 'A', ATK: 'X', SUB: 'Y', DASH: 'RB', PAUSE: 'MENU' },
+  touch: { MOVE: 'STICK', DOWN: '↓', UP: '↑', JUMP: 'A', ATK: 'B', SUB: 'SUB', DASH: 'DASH', PAUSE: 'II' },
+};
+class TutorialSign extends Ent {
+  constructor(d) { super(d.x * T, d.y * T, d.w * T, d.h * T); this.kind = 'prop'; this.key = d.key; this.a = 0; }
+  update() {
+    const inside = W.player.alive && Phys.overlap(W.player, this);
+    if (inside && W.tutSign !== this) { if (W.tutSign) W.tutSign.a = 0; W.tutSign = this; Audio8.sfx('select'); }
+    this.a = clamp(this.a + (inside ? 0.12 : -0.05), 0, 1);
+  }
+  title() { return tr('tut.' + this.key + 'T'); }
+  text() { const b = TUT_BTN[Input.device] || TUT_BTN.keys; return tr('tut.' + this.key).replace(/\{([A-Z]+)\}/g, (_, k) => b[k] || k); }
+  draw(ctx) { // Holzschild an Deck
+    const x = Math.round(this.x + 6 - W.cam.x), y = Math.round(this.y + this.h - W.cam.y);
+    if (x < -20 || x > View.w + 20) return;
+    ctx.fillStyle = '#2c1808'; ctx.fillRect(x + 4, y - 11, 3, 11);
+    ctx.fillStyle = '#2c1808'; ctx.fillRect(x - 1, y - 21, 13, 11);
+    ctx.fillStyle = '#6c4420'; ctx.fillRect(x, y - 20, 11, 9); ctx.fillStyle = '#9c6c34'; ctx.fillRect(x, y - 20, 11, 1);
+    Font.draw(ctx, '?', x + 3, y - 19, this === W.tutSign && this.a > 0.5 ? '#fcfcfc' : '#f8d878');
+  }
+}
+
+// Durchschlupf: eine Kachel hohe Öffnung (Luke unter der Kajüte, Mauerdurchbruch) – dunkel mit Rahmen, damit man sieht,
+// dass man hier hindurchrutschen kann
+class Crawl extends Ent {
+  constructor(d) { super(d.x0 * T, d.row * T, (d.x1 - d.x0 + 1) * T, T); this.kind = 'prop'; this.stone = d.style === 'stone'; }
+  draw(ctx) {
+    const X = Math.round(this.x - W.cam.x), Y = Math.round(this.y - W.cam.y), w = this.w;
+    if (X > View.w || X + w < 0) return;
+    const g = ctx.createLinearGradient(X, 0, X + w, 0); g.addColorStop(0, '#000000'); g.addColorStop(0.15, '#0a0606'); g.addColorStop(0.85, '#0a0606'); g.addColorStop(1, '#000000');
+    ctx.fillStyle = g; ctx.fillRect(X, Y, w, 16);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(X, Y + 16, w, 2);
+    if (this.stone) { // gemauerter Bogen mit Schlussstein
+      ctx.fillStyle = '#4c4858'; ctx.fillRect(X - 2, Y - 2, w + 4, 3); ctx.fillStyle = '#8c88a0'; ctx.fillRect(X - 2, Y - 2, w + 4, 1);
+      for (let k = 0; k < w; k += 8) { ctx.fillStyle = '#2c2838'; ctx.fillRect(X + k, Y - 2, 1, 3); }
+      ctx.fillStyle = '#6c6880'; ctx.fillRect(X + w / 2 - 3, Y - 4, 6, 5);
+      for (const s of [X - 3, X + w]) { ctx.fillStyle = '#3c3848'; ctx.fillRect(s, Y, 3, 16); ctx.fillStyle = '#7c788c'; ctx.fillRect(s, Y, 1, 16); }
+    } else { // Luke mit Holzrahmen und Tauen
+      ctx.fillStyle = '#2c1808'; ctx.fillRect(X - 2, Y - 3, w + 4, 4); ctx.fillStyle = '#8c5c2c'; ctx.fillRect(X - 2, Y - 3, w + 4, 1);
+      for (const s of [X - 2, X + w - 1]) { ctx.fillStyle = '#3c2410'; ctx.fillRect(s, Y, 3, 16); ctx.fillStyle = '#7c5428'; ctx.fillRect(s, Y, 1, 16); }
+      ctx.strokeStyle = '#9c8458'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X + 6, Y + 1); ctx.quadraticCurveTo(X + w / 2, Y + 7, X + w - 6, Y + 1); ctx.stroke();
+    }
+  }
+}

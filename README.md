@@ -15,7 +15,7 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 | Angriff in 8 Richtungen | X, J (+ Richtung) | X / B | B |
 | Peitsche drehen / Schwertwirbel | Angriff halten | Angriff halten | B halten |
 | Ankerring: einhaken & pendeln | schräg hoch angreifen, Z = abspringen | dito | dito |
-| Rutschen (unverwundbar) | Unten + Z | Unten + A | Unten + A |
+| Rutschen (unverwundbar, flach durch eine Kachel hohe Spalten) | Unten + Z | Unten + A | Unten + A |
 | Dash / Luft-Dash (Schwung bleibt im Sprung) | Shift, E (oder 2× Richtung) | RB / LB / LT | DASH |
 | Wandsprung (an der Wand rutschen) | zur Wand drücken + Z | zur Wand + A | zur Wand + A |
 | Kante packen, hängen, hochziehen | im Fallen zur Kante drücken, Hoch / Z = hochziehen, Unten = loslassen | dito | dito |
@@ -26,7 +26,8 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 ## Inhalt
 
 - **2 Helden**: Henrik (Peitsche) und Ragnor, Barbar aus dem Norden (Breitschwert + Wurfseil)
-- **4 Stages, 16 Räume** – Burghof, Katakomben, Bergfried, Thron der Nacht – inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
+- **Tutorial auf dem Achterschiff**: acht Stationen bringen die Moves bei – Laufen, Angriff, Spezialwaffe, Doppelsprung, Kante packen (Kistenturm), Rutschen (niedrige Luke unter der Kajüte), Dash (gebrochenes Deck) und Wandsprung (Schacht vor der Kampanje); jede Station schafft man nur mit ihrem Move, eine Tafel zeigt die Tasten für das gerade benutzte Gerät – Tastatur, Xbox-Controller oder Touch – und wechselt sofort mit
+- **4 Stages, 17 Räume** – Burghof, Katakomben, Bergfried, Thron der Nacht – inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
 - **Glasturm** vor dem Thronsaal: senkrechter Aufstieg in einer Mode-7-Röhre aus riesigen gotischen Buntglasfenstern und Bündelpfeilern – die Röhre dreht sich stetig und beim Treppensteigen vor und zurück, dazu eine Orgel-Toccata – König, Königin, Ritter, Schlachtross, Engel, der Drachentöter gegen den Drachen – und ein Pirat mit Gummihuhn gegen den lila Tentakel, jede Figur unter einem Baldachin mit Maßwerkrosette, Schwarzlot-Malerei und lateinischem Inschriftband; das Glas leuchtet auf und ab, wenn Wolken am Mond vorbeiziehen, Blitze lassen es aufflammen, ferner Chor. Die drehenden Rosetten (Mode 7) sitzen im Thronsaal
 - **Grüße an Monkey Island** auf dem Schiff – wer genau hinsieht, findet sie
 - **Treppen wie im modernen Castlevania**: mitten auf die Stufen springen und mitten von der Treppe abspringen (Unten gedrückt: hindurchfallen); das Wurfkreuz wirbelt sichtbar
@@ -66,7 +67,7 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 - **Welt**: Gewitter mit Blitzen, Ankerringe, Pendel-Kronleuchter mit begehbaren Etagen, drehende Zahnrad-Plattformen, Aufzüge, Bröckelsteine, Checkpoint-Statuen, Truhen, Gespenster
 - **Optionen**: Leicht-Modus (2× Leben, 2× Schaden – auch mitten im Spiel im Pausenmenü umschaltbar), maximale Waffe, unendlich Herzen, Musik, Sprachausgabe, Sprache, Röhren-Look, Vollbild
 - **Musik**: eigener Chiptune-Soundtrack, live synthetisiert (Puls + Echo, Dreieck, Drumkit mit Doppelbass, Orgel-Fläche); das Seemannslied auf dem Schiff galoppiert mit 176 BPM, Akkordeon-16teln und einem B-Teil mit Doppel-Kick; die Lieder laufen über ganze Abschnitte durch und blenden beim Wechsel weich über, Bibliothek und Buntglas-Abschnitt treiben mit schnellen Toccaten und Doppelbass, die Orgel-Toccata trägt vom Seelenstrudel bis zum Grafen
-- **Bewegung**: Dash und Luft-Dash, Wandrutschen und Wandsprung, Kanten packen, hängen und hochziehen – senkrechte Abschnitte, in denen man das alles wirklich braucht, mit Tipps beim ersten Mal
+- **Bewegung**: Dash und Luft-Dash, Wandrutschen und Wandsprung, Kanten packen, hängen und hochziehen, flaches Rutschen mit eigener Animation – schon in den ersten Leveln gebraucht (Mauerdurchbruch im Burghof nur rutschend, Wandsprung-Schacht im Glockenturm, Dash-Sprung über den Höhlensee) und in den senkrechten Abschnitten des Bergfrieds, mit Tipps beim ersten Mal
 
 ## Technik
 

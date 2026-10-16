@@ -26,10 +26,10 @@ const W = {
     this.room = { ...def, grid: def.grid.map(r => r.slice()) };
     this.ents = []; this.platforms = []; this.boss = null;
     this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0; this.arenaBoss = null; this.camEase = 0;
-    this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
+    this.tutSign = null; this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
     if (this.bloodT > 0) { this.bloodT = 0; Audio8.tempo(1); }
     this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200; this.tubeRot = 0; this.tubeRotS = 0;
-    this.sail = def.dock ? 1 : 0; this.roll = 0; this.rollAmp = 0; this.heave = 0; this.docked = 0; this.dockT = 0; this.rogue = null; this.kraken = null; this.gust = 0;
+    this.sail = def.dock || def.atSea ? 1 : 0; this.roll = 0; this.rollAmp = 0; this.heave = 0; this.docked = 0; this.dockT = 0; this.rogue = null; this.kraken = null; this.gust = 0;
     this.spawners = def.zones.map(z => new Spawner(z));
     const torch = def.theme === 'courtyard';
     def.ents.forEach(d => {
@@ -49,6 +49,8 @@ const W = {
         case 'throne': this.spawn(new Throne(d)); break;
         case 'portrait': this.spawn(new Portrait(d)); break;
         case 'hint': this.spawn(new Hint(d)); break;
+        case 'tut': this.spawn(new TutorialSign(d)); break;
+        case 'crawl': this.spawn(new Crawl(d)); break;
         case 'tubecocoons': this.spawn(new TubeCocoons(d)); break;
         case 'bridgerun': this.spawn(new BridgeRun(d)); break;
         case 'waterfall': this.spawn(new Waterfall(d)); break;
@@ -189,7 +191,7 @@ const W = {
       if (K.t === 1) { Audio8.sfx('roar'); Input.rumble(0.4, 0.3, 400); if (!fight) Game.shout('kraken'); }
       if (K.t === 362) { this.shake = Math.max(this.shake, 10); Audio8.sfx('boom'); Audio8.sfx('splash'); this.sway.v += 0.003; }
       if (K.t > 430) { K.t = -1; K.cd = 1500 + Math.random() * 900; }
-    } else if (this.sail > 0.6 && p.alive && !(this.rogue && this.rogue.v > 0) && --K.cd <= 0) {
+    } else if (this.sail > 0.6 && this.room.dock && p.alive && !(this.rogue && this.rogue.v > 0) && --K.cd <= 0) { // nicht im Tutorial
       K.t = 0; K.arms = [-1, 0, 1].map(k => ({ u: k * 34 + rnd(-8, 8), z: 70 + Math.random() * 40, len: 70 + Math.random() * 30, ph: Math.random() * 6 }));
     }
     const R = this.rogue || (this.rogue = { v: 0, cd: 900, warned: false });
@@ -197,7 +199,7 @@ const W = {
       R.v -= 1.7;
       if (!R.warned && R.v < 260) { R.warned = true; Game.shout('rogueWave'); Audio8.sfx('thunder'); }
       if (R.v <= 24) { R.v = 0; R.cd = 1000 + Math.random() * 700; this.rogueHit(); }
-    } else if (this.sail > 0.6 && p.alive && K.t < 0 && --R.cd <= 0) { R.v = 430; R.warned = false; }
+    } else if (this.sail > 0.6 && this.room.dock && p.alive && K.t < 0 && --R.cd <= 0) { R.v = 430; R.warned = false; }
   },
   miniPending() { const M = this.room.mini; return !!M && !this.miniDone[this.stage + ':' + this.roomIdx]; },
   rogueHit() { // Schiff krängt, Gischt fegt übers Deck

@@ -66,6 +66,7 @@ const WHIP_DIRS = {
   downd: { hx: 18, hy: 15, a: Math.PI / 4 }, down: { hx: 13, hy: 17, a: Math.PI / 2 },
 };
 const FLIP_LEN = 26; // Salto-Dauer in Frames
+const SLIDE_H = 14; // Rutschen: flacher als eine Kachel – passt durch Spalten, durch die man weder geht noch kriecht
 const DASH_LEN = 20, AIRDASH_LEN = 15, DASH_V = 3.7, DASH_AIR = 2.5; // Dash am Boden / in der Luft, Schwung danach
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
@@ -97,7 +98,10 @@ class Player {
 
   setCrouch(on) {
     if (on && this.h === 28) { this.y += 8; this.h = 20; }
-    else if (!on && this.h === 20) { this.y -= 8; this.h = 28; }
+    else if (!on && this.h < 28) {
+      if (Phys.rectSolid(this.x, this.feet - 28, this.w, 28)) return; // unter niedriger Decke bleibt der Held unten
+      this.y = this.feet - 28; this.h = 28;
+    }
     this.crouch = on;
   }
 
@@ -754,22 +758,30 @@ class Player {
   // ---------- Rutschen (Unten + Sprung) ----------
   startSlide() {
     this.slideT = 26; this.dangle = false; this.setCrouch(true);
+    this.y += this.h - SLIDE_H; this.h = SLIDE_H; // ganz flach
     this.vx = this.face * 3.6; this.inv = Math.max(this.inv, 16);
     Audio8.sfx('whoosh'); W.dust(this.cx, this.feet, 5);
   }
-  updateSlide() {
+  updateSlide(I) {
     this.slideT--;
-    this.vx = this.face * Math.max(0.8, 3.6 * this.slideT / 26 + 0.4);
+    const roof = Phys.rectSolid(this.x - 1, this.feet - 20, this.w + 2, 6); // niedrige Decke: weiterrutschen, bis Platz zum Aufstehen ist
+    if (roof && this.slideT < 1) this.slideT = 1;
+    if (roof && I) { const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0); if (mx) this.face = mx; }
+    this.vx = this.face * Math.max(roof ? 1.7 : 0.8, 3.6 * this.slideT / 26 + 0.4);
     if (this.slideT % 3 === 0) W.dust(this.cx - this.face * 5, this.feet, 1);
+    if (W.frame % 2 === 0) W.spawn(new Particle(this.cx + this.face * 7, this.feet - 1, this.face * rnd(0.4, 1.4), -rnd(0.4, 1.2), Math.random() < 0.5 ? '#b8a890' : '#7c6c58', 12, 1, 0.12)); // Staub vor dem Fuß
     this.vy = Math.min(this.vy + GRAV, MAXFALL);
-    if (Phys.moveX(this, this.vx)) this.slideT = 0;
+    if (Phys.moveX(this, this.vx)) { if (roof) this.face *= -1; else this.slideT = 0; } // in der Röhre an der Wand: umkehren
     const r = Phys.moveY(this, this.vy);
     this.onGround = r === 1;
     if (r) this.vy = 0;
     this.checkPlatforms();
     if (!this.onGround) this.slideT = 0;
     this.clampRoom(); this.hazards(); this.trackSafe();
-    if (this.slideT === 0) { this.setCrouch(false); if (Phys.rectSolid(this.x, this.y, this.w, this.h)) this.setCrouch(true); }
+    if (this.slideT === 0) { // aufstehen – oder wenigstens ducken, wenn die Decke tief hängt
+      this.setCrouch(false);
+      if (this.h < 20 && !Phys.rectSolid(this.x, this.feet - 20, this.w, 20)) { this.y = this.feet - 20; this.h = 20; this.crouch = true; }
+    }
   }
 
   // Schritt: leiser Tritt, im Regen (Burghof) platschend mit kleinen Wasserspritzern
@@ -803,7 +815,7 @@ class Player {
     if (this.state === 'swing' || this.state === 'zip') return H.swing;
     if (this.state === 'ledge') return H.hang;
     if (this.state === 'climb') return this.climbT <= 10 ? H.climb : H.crouch;
-    if (this.slideT > 0) return H.crouch;
+    if (this.slideT > 0) return H.slide ? H.slide[(W.frame >> 2) & 1] : H.crouch;
     if (this.state === 'stairs') {
       if (this.atkT) return (this.stairUpPose ? H.satkUp : H.satkDown)[p];
       return (this.stairUpPose ? H.stairUp : H.stairDown)[Math.floor(this.stairPos / 8) % 2];

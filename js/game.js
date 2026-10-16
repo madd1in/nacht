@@ -290,6 +290,22 @@ const Game = {
     if (W.boss) trail(bv, B.b); else B.b = { v: bv, g: bv, d: 0 }; // ohne Boss kein Nachlauf (Arena-Start leert die Leiste)
   },
 
+  // Tutorial-Tafel (Achterschiff): Name des Moves, Gerät, Tasten – umbrochen, damit sie auch hochkant passt
+  drawTut(ctx) {
+    const s = W.tutSign; if (!s || s.a <= 0) return;
+    const title = s.title(), dev = tr('tutDev.' + (Input.device || 'keys')), lh = I18N.cjk ? 13 : 10;
+    const lines = [], words = s.text().split(' '), maxW = View.w - 24;
+    for (const wd of words) { const cur = lines.length ? lines[lines.length - 1] + ' ' + wd : wd; if (lines.length && Font.width(cur) <= maxW) lines[lines.length - 1] = cur; else lines.push(wd); }
+    const w = Math.min(View.w - 8, Math.max(Font.width(title) + Font.width(dev) + 26, ...lines.map(l => Font.width(l) + 14))), h = 16 + lines.length * lh;
+    const x = Math.round(View.cx - w / 2), y = 36;
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = 'rgba(10,6,20,0.84)'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + h - 1, w, 1); ctx.fillRect(x, y + 12, w, 1);
+    Font.draw(ctx, title, x + 6, y + 3, '#f8d878', { shadow: '#000' });
+    Font.draw(ctx, dev, x + w - 6, y + 3, '#8cc8fc', { align: 'right' });
+    lines.forEach((l, i) => Font.draw(ctx, l, View.cx, y + 16 + i * lh, '#fcfcfc', { align: 'center', shadow: '#000' }));
+    ctx.globalAlpha = 1;
+  },
   // kleine Nachricht oben im Bild (z. B. Gruß an Infernax)
   note(key) { this.noteT = 240; this.noteKey = key; },
   drawNote(ctx) {
@@ -510,6 +526,7 @@ const Game = {
         if (this.state === 'play' && this.readyT > 0) this.drawReady(ctx);
         if (this.state === 'play' && this.annT > 0) this.drawAnnounce(ctx);
         if (this.state === 'play' && this.shoutT > 0) this.drawShout(ctx);
+        if (this.state === 'play') this.drawTut(ctx);
         if (this.state === 'play' && this.noteT > 0) this.drawNote(ctx);
         if (this.state === 'clear') this.drawClear(ctx);
         if (this.state === 'demo') this.drawDemo(ctx);

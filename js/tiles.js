@@ -741,7 +741,7 @@ const Tiles = (() => {
     const room = W.room, g = room.grid, ox = Math.round(cam.x), oy = Math.round(cam.y);
     if (!room.rail) { // Reling hinter jeder freien Deck-Oberkante
       room.rail = [];
-      for (let cx = 0; cx < room.w; cx++) for (let cy = 1; cy < room.h; cy++) if (g[cy][cx] === '#' && g[cy - 1][cx] === '.') room.rail.push([cx, cy]);
+      for (let cx = 0; cx < room.w; cx++) for (let cy = 1; cy < room.h; cy++) if (g[cy][cx] === '#' && g[cy - 1][cx] === '.' && (cy < 2 || g[cy - 2][cx] === '.')) room.rail.push([cx, cy]); // nicht unter Überhängen (Luke)
     }
     const c0 = Math.floor(cam.x / T) - 1, c1 = c0 + Math.ceil(View.w / T) + 2;
     for (const [cx, cy] of room.rail) {

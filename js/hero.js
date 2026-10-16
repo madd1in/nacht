@@ -320,6 +320,8 @@ const HEROES = (() => {
     H.dash = F({ legs: [[62, 38], [-52, 28]], flare: 3, fa: { a: [48, 72] }, ba: { a: [-74, 30] }, lean: 2 }); // Dash: weit nach vorn gelehnt
     H.adash = F({ legs: [[84, 104], [-34, 58]], air: true, flare: 3, fa: { a: [70, 46] }, ba: { a: [-84, 20] }, lean: 2 });
     H.wall = F({ legs: [[42, 84], [-34, 46]], air: true, flare: 2, fa: { a: [72, 48] }, ba: { a: [-128, 24] }, lean: 1 });
+    // Rutschen: flach zurückgelehnt, vorderes Bein lang voraus, hinteres untergeschlagen, eine Hand schleift am Boden; zwei Bilder (Schal flattert)
+    H.slide = [3, 1].map(fl => slideRot(F({ legs: [[8, 4], [-28, 110]], air: true, flare: fl, fa: { a: [44, 36] }, ba: { a: [-38, 50] } }), 70));
     H.atk = atk(STANCE);
     H.atkDir = {}; Object.keys(DIR).forEach(d => { H.atkDir[d] = F({ legs: STANCE, ...P2(d) }); });
     H.catk = atk(CROUCH, H.crouchDrop);
@@ -337,6 +339,22 @@ const HEROES = (() => {
     const c = Sprites.canvas(FH, bot - top + 1);
     c.getContext('2d').drawImage(r, 0, -top);
     const s = Sprites.fromCanvas(c, false); s.mx = 0;
+    return s;
+  }
+
+  // Rutsch-Pose: die ganze Figur flach nach hinten gekippt (Pixel bleiben hart), zugeschnitten; die Hüfte liegt in der Mitte,
+  // so sitzt der Held in beide Richtungen mittig über seiner flachen Trefferbox
+  function slideRot(src, deg) {
+    const S0 = 72, r = Sprites.canvas(S0, S0), rx = r.getContext('2d');
+    rx.imageSmoothingEnabled = false;
+    rx.translate(S0 / 2, S0 / 2); rx.rotate(-deg * Math.PI / 180); rx.drawImage(src.c, -src.pad - CX, -src.pad - HIP);
+    const img = rx.getImageData(0, 0, S0, S0), d = img.data;
+    let x0 = S0, x1 = 0, y0 = S0, y1 = 0;
+    for (let y = 0; y < S0; y++) for (let x = 0; x < S0; x++) { const i = (y * S0 + x) * 4 + 3; d[i] = d[i] < 128 ? 0 : 255; if (d[i]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } }
+    rx.setTransform(1, 0, 0, 1, 0, 0); rx.putImageData(img, 0, 0);
+    const half = Math.ceil(Math.max(S0 / 2 - x0, x1 + 1 - S0 / 2)), Wc = half * 2, Hc = y1 - y0 + 1;
+    const c = Sprites.canvas(Wc, Hc); c.getContext('2d').drawImage(r, -(S0 / 2 - half), -y0);
+    const s = Sprites.fromCanvas(c, false); s.mx = Wc / 2 - 8;
     return s;
   }
 

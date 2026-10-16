@@ -60,6 +60,7 @@ const Levels = (() => {
       wheel(x, y) { r.wheel = { x, y }; return api; },
       dock(x, x0, x1, row) { r.dock = { x, x0, x1, row }; return api; },
       music(name) { r.music = name; return api; },
+      atSea() { r.atSea = true; return api; }, // Schiff in voller Fahrt (Rollen, ziehendes Meer) ohne Anlegen
       noDoor() { r.noDoor = true; return api; },
       done() {
         if (r.door) { // Tür auf dem ersten Boden unterhalb der Ausgangszone
@@ -72,6 +73,33 @@ const Levels = (() => {
     };
     return api;
   }
+
+  // ======================= STAGE 1: Tutorial auf dem Achterschiff =======================
+  // Kurz vor der Burg: das Achterschiff der Galeone im aufziehenden Sturm. Jede Station bringt einen Move bei, die Tafel
+  // oben zeigt die Tasten für das gerade benutzte Gerät (Tastatur, Xbox-Controller, Touch): Laufen, Angriff, Spezialwaffe,
+  // Sprung und Doppelsprung, Kante packen (Kistenturm), Rutschen (niedrige Luke unter der Kajüte), Dash (gebrochenes Deck)
+  // und Wandsprung (Schacht vor der Kampanje) – jede dieser Stationen schafft man nur mit ihrem Move.
+  const r09 = room(80, 'ship', 34)
+    .ground(0, 45).ground(55, 79)                                      // Deck (Oberkante Reihe 32), 9 Planken weggebrochen: Dash
+    .fill(18, 30, 19, 31, '=')                                         // Kiste: springen
+    .fill(29, 26, 30, 31, '=')                                         // Kistenturm (6 hoch): Doppelsprung reicht nicht – Kante packen
+    .fill(36, 17, 42, 30, '#')                                         // Kajüte, darunter nur eine Kachel hohe Luke: rutschen
+    .prop('crawl', { x0: 36, x1: 42, row: 31 })
+    .fill(60, 16, 60, 28, '#')                                         // Wandsprung-Schacht: linke Wand (unten offen)
+    .fill(65, 12, 79, 31, '#')                                         // Kampanje: hohes Achterdeck, oben der Weg nach vorn
+    .prop('tut', { x: 0, y: 24, w: 8, h: 8, key: 'move' })
+    .prop('tut', { x: 8, y: 24, w: 5, h: 8, key: 'attack' })
+    .prop('tut', { x: 13, y: 24, w: 3, h: 8, key: 'sub' })
+    .prop('tut', { x: 16, y: 22, w: 7, h: 10, key: 'jump' })
+    .prop('tut', { x: 23, y: 18, w: 8, h: 14, key: 'ledge' })
+    .prop('tut', { x: 31, y: 22, w: 5, h: 10, key: 'slide' })
+    .prop('tut', { x: 43, y: 22, w: 3, h: 10, key: 'dash' })
+    .prop('tut', { x: 55, y: 10, w: 10, h: 22, key: 'wall' })
+    .candle(9, 30).candle(11, 30, '1').candle(22, 30, 'H').candle(30, 24, '$').candle(33, 30).candle(44, 30, 'H')
+    .candle(57, 30).candle(62, 22, 'H').candle(63, 15).candle(70, 10, 'H').candle(75, 10, 'W')
+    .mast(24.5, 3, [8, 13]).mast(57.5, 2, [7, 11], 1)
+    .atSea().music('sea')
+    .start(3, 31).exitAt(76, 0, 79, 11).noDoor().done();
 
   // ======================= STAGE 1: Ankunft per Schiff =======================
   // Galeone im Sturm: Achterdeck mit Steuerrad, Hauptdeck (Fischmenschen springen aus dem Meer an Bord),
@@ -119,9 +147,12 @@ const Levels = (() => {
     .fill(28, 9, 30, 10, '=')
     .fill(44, 10, 45, 10, '=')
     .candle(3, 9).candle(11, 9, 'W').candle(31, 9).candle(33, 9, 'H').candle(29, 7)
-    .candle(35, 9, '1').candle(41, 9).candle(47, 9, 'W').candle(53, 9, '$').candle(59, 9).candle(64, 9, 'H')
+    .candle(35, 9, '1').candle(41, 9).candle(47, 9, 'W').candle(53, 9, '$').candle(59, 9).candle(68, 9, 'H')
     .enemy('raven', 29, 8).enemy('raven', 45, 9)
-    .chest(62, 10)
+    .chest(61, 10)
+    .fill(64, 1, 66, 9, '#')                                           // eingestürzter Mauerbogen: darunter nur eine Kachel Luft – rutschen
+    .prop('crawl', { x0: 64, x1: 66, row: 10, style: 'stone' })
+    .prop('hint', { x: 59, y: 8, w: 4, h: 3, key: 'hintSlide' })
     .zone('ghoul', 29, 60, { interval: 110, max: 3 })
     .music('stage1') // nach dem Seemannslied: Burgsturm bis zur Riesenfledermaus
     .start(2, 10).exit(70).done();
@@ -149,8 +180,9 @@ const Levels = (() => {
     .ground(0, 27, 28)
     .stair(4, 27, 5, 1).fill(9, 23, 15, 23, '=')
     .fill(18, 21, 24, 21, '=')
-    .stair(22, 20, 5, -1).fill(8, 16, 17, 16, '=')
-    .elevator(4, 16, 9)
+    .stair(22, 20, 5, -1).fill(2, 16, 17, 16, '=')
+    .fill(1, 8, 1, 15, '#').fill(6, 10, 6, 13, '#')                    // Wandsprung-Schacht statt Aufzug (oder Doppelsprung + Kante packen)
+    .prop('hint', { x: 2, y: 13, w: 4, h: 3, key: 'hintWall' })
     .fill(7, 9, 14, 9, '=')
     .chandelier(19, 0, 120, 0.5, 0)
     .fill(24, 6, 27, 6, '=')
@@ -179,11 +211,12 @@ const Levels = (() => {
     .ground(0, 19).fill(20, 11, 78, 12, '~').ground(79, 95)
     .fill(22, 9, 25, 9, '=').fill(28, 9, 31, 9, '=').fill(34, 8, 37, 8, '=')
     .fill(40, 10, 47, 12, '#')
-    .fill(50, 9, 53, 9, '=').crumble(56, 8).fill(61, 9, 64, 9, '=').crumble(67, 9).crumble(69, 9).fill(73, 10, 76, 10, '=')
+    .fill(57, 9, 64, 9, '=').crumble(67, 9).crumble(69, 9).fill(73, 10, 76, 10, '=')
     .statue(43, 9)
-    .candle(5, 9).candle(12, 9, 'H').candle(23, 7).candle(35, 6, 'H').candle(46, 8).candle(51, 7, '4')
+    .candle(5, 9).candle(12, 9, 'H').candle(23, 7).candle(35, 6, 'H').candle(46, 8).candle(58, 7, '4')
     .candle(62, 7).candle(68, 7, '$').candle(84, 9).candle(90, 9, 'H')
     .enemy('skel', 46, 9)
+    .prop('hint', { x: 44, y: 7, w: 4, h: 3, key: 'hintDash' }) // 9 Kacheln See: nur mit Dash-Sprung oder Luft-Dash
     .prop('waterfall', { x: 59.5, y0: 0, y1: 11, w: 40 })                // großer Wasserfall in den Höhlensee
     .zone('fish', 20, 78, { interval: 170, max: 2 })
     .zone('skull', 50, 78, { interval: 280, max: 1 })
@@ -373,7 +406,7 @@ const Levels = (() => {
     .start(2, 10).arena('count').done();
 
   const STAGES = [
-    { name: 'DER BURGHOF', music: 'stage1', time: 600, rooms: [r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
+    { name: 'DER BURGHOF', music: 'stage1', time: 700, rooms: [r09, r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
     { name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
     { name: 'DER THRON DER NACHT', music: 'chapel', time: 660, rooms: [vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
