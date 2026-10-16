@@ -650,7 +650,7 @@ const W = {
       else if (e instanceof Ring) L.push({ x, y, r: 14, c: [248, 184, 0], a: 0.35 });
       else if (e instanceof Ghost && e.alpha > 0) L.push({ x, y, r: 24, c: [120, 180, 252], a: 0.35 * e.alpha });
       else if (e instanceof GiantBat && e.state !== 'sleep' && !e.dying) L.push({ x, y: y - 9, r: 22, c: [252, 40, 40], a: 0.55 });
-      else if (e instanceof Count && !e.dying) L.push({ x, y: e.y + 8 - this.cam.y, r: e.state === 'open' ? 52 : 32, c: [168, 0, 32], a: e.state === 'open' ? 0.5 : 0.3 });
+      else if (e instanceof Count && !e.dying) L.push({ x, y: e.y + 8 - this.cam.y, r: e.state === 'open' ? 44 : 30, c: [150, 20, 70], a: e.state === 'open' ? 0.3 : 0.18 });
       else if (e instanceof Pillar && e.openT > 0) L.push({ x, y, r: 22, c: [248, 120, 0], a: 0.5 });
     }
     if (this.room.theme === 'foyer' || this.room.theme === 'library') for (const [wx, wy, ww, wh] of this.stormWindows()) { // Fenster schimmern im Mondlicht, auch zwischen den Blitzen

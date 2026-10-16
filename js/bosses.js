@@ -260,98 +260,129 @@ class GiantSkeleton extends Boss {
   }
 }
 
-// ---------------- Graf Nachtmahr, von Hand gemalt (100×88) ----------------
-// Hageres, bleiches Gesicht mit Witwenspitze, spitzen Ohren, roten Augen und Fangzähnen; hoher Stehkragen mit rotem Futter,
-// Frack, rote Weste mit Goldknöpfen, Jabot und Blutstein-Medaillon. Der Umhang ist geschlossen eine dunkle Säule, geöffnet
-// spannt er sich wie Fledermausflügel mit Knochenrippen und gezacktem Saum, beim Zaubern reißt der Graf ihn über den Kopf.
+// ---------------- Graf Nachtmahr, gemalt mit weichen Verläufen (100×88), Kanten pixelhart ----------------
+// Hageres, bleiches Gesicht mit hohen Wangenknochen, Adlernase, Witwenspitze, silbernen Schläfen und spitzen Ohren; tief
+// liegende rote Augen, schmale dunkelrote Lippen mit Fängen. Hoher Stehkragen mit blutrotem Futter und Goldkante, Frack aus
+// schwarzem Satin mit glänzenden Revers, Brokatweste mit Goldknöpfen, Jabot, Goldkette mit Blutstein-Medaillon, polierte
+// Stiefel. Der Samtumhang fällt geschlossen in schweren Falten, geöffnet spannt er sich wie Fledermausflügel mit
+// Knochenrippen und gezacktem Saum, beim Zaubern reißt der Graf ihn über den Kopf.
 const COUNT_ART = (() => {
   const W = 100, H = 88, cx = 50;
-  const OUT = ['#08050e', '#120a1c', '#1e122c', '#2c1c40', '#3c2a54'], LIN = ['#3c000c', '#640816', '#901022', '#b81c30', '#e03848'];
-  const SUIT = ['#06050a', '#100e16', '#1c1824', '#2c2838'], SK = ['#4c4460', '#857c9c', '#b8b0cc', '#e4e0f4'], GOLD = ['#6c4c08', '#c89020', '#f8d878'];
   function paint(pose) {
     const c = Sprites.canvas(W, H), x = c.getContext('2d');
-    const R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(Math.round(a), Math.round(b), w, h); };
-    const poly = (pts, col) => { x.fillStyle = col; x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) x.lineTo(p[0], p[1]); x.closePath(); x.fill(); };
-    const line = (x0, y0, x1, y1, col) => { const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))); for (let k = 0; k <= n; k++) R(col, x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n); };
-    const ell = (ex, ey, rx, ry, f) => { for (let y = Math.floor(ey - ry); y <= ey + ry; y++) for (let X = Math.floor(ex - rx); X <= ex + rx; X++) { const q = ((X + 0.5 - ex) / rx) ** 2 + ((y + 0.5 - ey) / ry) ** 2; if (q <= 1) f(X, y, q); } };
+    const G = (x0, y0, x1, y1, st) => { const g = x.createLinearGradient(x0, y0, x1, y1); st.forEach(([o, col]) => g.addColorStop(o, col)); return g; };
+    const RG = (x0, y0, r0, x1, y1, r1, st) => { const g = x.createRadialGradient(x0, y0, r0, x1, y1, r1); st.forEach(([o, col]) => g.addColorStop(o, col)); return g; };
+    const poly = (pts) => { x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) p.length === 4 ? x.quadraticCurveTo(p[0], p[1], p[2], p[3]) : x.lineTo(p[0], p[1]); x.closePath(); };
+    const fillPoly = (pts, style) => { poly(pts); x.fillStyle = style; x.fill(); };
+    const stroke = (pts, col, w) => { x.strokeStyle = col; x.lineWidth = w; x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) p.length === 4 ? x.quadraticCurveTo(p[0], p[1], p[2], p[3]) : x.lineTo(p[0], p[1]); x.stroke(); };
+    const disc = (px, py, r, col) => { x.fillStyle = col; x.beginPath(); x.arc(px, py, Math.max(0.3, r), 0, Math.PI * 2); x.fill(); };
+    const VELVET = (x0, x1) => G(x0, 0, x1, 0, [[0, '#5a4478'], [0.18, '#36264c'], [0.55, '#1c1228'], [1, '#07040c']]);
     const claw = (hx, hy, dir, up) => { // bleiche Hand mit langen Krallen
-      ell(hx, hy, 2.4, 2.2, (X, y, q) => R(q < 0.4 ? SK[3] : SK[2], X, y));
-      for (let k = -1; k <= 2; k++) { const fx = hx + dir * (1 + k * 0.4), fy = hy + (up ? -1 : 1) * 1; line(fx, fy, fx + dir * (2 + (k === 1 ? 1 : 0)) + k * 0.6, fy + (up ? -4 : 4), k === 1 ? SK[2] : SK[1]); R('#e8e0d0', fx + dir * (2.5 + (k === 1 ? 1 : 0)) + k * 0.6, fy + (up ? -4.5 : 4.5)); }
+      disc(hx, hy, 2.6, '#6c6488'); disc(hx - 0.4, hy - 0.4, 2.1, '#c8c0dc'); disc(hx - 0.8, hy - 0.8, 0.9, '#f0ecfc');
+      for (let k = -1; k <= 2; k++) {
+        const a = (up ? -Math.PI / 2 : Math.PI / 2) + dir * (0.5 - k * 0.32), len = 4.2 + (k === 1 ? 1 : 0);
+        const fx = hx + Math.cos(a) * len, fy = hy + Math.sin(a) * len;
+        stroke([[hx, hy], [fx, fy]], '#a8a0c0', 1.1); disc(fx + Math.cos(a) * 0.8, fy + Math.sin(a) * 0.8, 0.55, '#f4ecd8');
+      }
     };
     // ---------- Umhang hinten ----------
     if (pose === 'closed') {
-      poly([[cx - 15, 29], [cx + 15, 29], [cx + 24, 87], [cx - 24, 87]], OUT[1]);
-      for (let X = cx - 24; X <= cx + 24; X++) for (let y = 30; y < 88; y++) { // Falten, Licht von links
-        const half = 15 + (y - 29) / 58 * 9; if (Math.abs(X - cx) > half) continue;
-        const u = (X - cx) / half, fold = Math.sin(u * 7 + y * 0.03) > 0.55;
-        R(fold ? OUT[3] : u < -0.4 ? OUT[2] : u > 0.5 ? OUT[0] : OUT[1], X, y);
+      const cape = [[cx - 13, 29], [cx - 21, 50, cx - 25.5, 86], [cx - 19, 88, cx - 13, 86], [cx - 7, 88.5, cx, 86.5], [cx + 7, 88.5, cx + 13, 86], [cx + 19, 88, cx + 25.5, 86], [cx + 21, 50, cx + 13, 29]];
+      fillPoly(cape, VELVET(cx - 25, cx + 25));
+      x.save(); poly(cape); x.clip();
+      for (const f of [-19, -12, -6, 6, 12, 19]) { // schwere Samtfalten: Lichtkante + Schattenrinne
+        stroke([[cx + f * 0.45, 31], [cx + f * 0.8, 58, cx + f, 88]], 'rgba(150,120,200,0.22)', 1.6);
+        stroke([[cx + f * 0.45 + 1.4, 31], [cx + f * 0.8 + 1.4, 58, cx + f + 1.6, 88]], 'rgba(0,0,0,0.38)', 1.4);
       }
-      poly([[cx - 2, 36], [cx + 2, 36], [cx + 6, 87], [cx - 6, 87]], LIN[1]); line(cx - 2, 36, cx - 6, 87, LIN[3]); line(cx + 2, 36, cx + 6, 87, LIN[0]); // Spalt mit rotem Futter
-      for (let k = 0; k < 9; k++) { R(OUT[4], cx - 24 + k * 1.2, 86 - (k % 2) * 2, 2, 1); R(OUT[4], cx + 16 + k, 86 - (k % 2) * 2, 2, 1); } // Saum
+      x.restore();
+      stroke([[cx - 13, 29], [cx - 21, 50, cx - 25.5, 86]], '#7c64a4', 0.9); // Lichtkante links
     } else {
       const lift = pose === 'cast';
       for (const s of [-1, 1]) { // Flügel: Schulter → Hand → gezackter Saum bis zum Boden
         const sh = [cx + s * 10, 30], hand = lift ? [cx + s * 15, 3] : [cx + s * 39, 22], tip = [cx + s * (lift ? 47 : 46), lift ? 70 : 64];
-        const scal = []; const n = 4;
+        const scal = [], n = 4;
         for (let k = 0; k <= n; k++) { const t = k / n, bx = tip[0] + (cx + s * 13 - tip[0]) * t, by = tip[1] + (87 - tip[1]) * t; scal.push([bx, by]); if (k < n) scal.push([bx + (cx + s * 13 - tip[0]) / n * 0.5 - s * 2, by + (87 - tip[1]) / n * 0.5 - 6]); }
-        poly([sh, hand, tip, ...scal, [cx + s * 12, 87], [cx + s * 9, 40]], OUT[1]); // Außenrand
-        const inner = [[sh[0] + s * 1, sh[1] + 2], [hand[0] - s * 1, hand[1] + 2], [tip[0] - s * 2, tip[1] - 1], ...scal.map(([a, b]) => [a - s * 2, b - 2]), [cx + s * 12, 85], [cx + s * 9, 41]];
-        poly(inner, LIN[2]); // rotes Futter
-        for (const [a, b] of scal.filter((_, i) => i % 2 === 0)) { line(hand[0], hand[1] + 1, a - s * 1, b - 2, LIN[0]); line(hand[0] - s, hand[1] + 2, a - s * 2, b - 3, LIN[3]); } // Knochenrippen mit Glanz
-        for (let k = 0; k < 40; k++) { const t = k / 40; R(LIN[4], sh[0] + (hand[0] - sh[0]) * t, sh[1] + 2 + (hand[1] - sh[1]) * t, 1, 1); } // Glanzkante oben
-        // Arm im Ärmel entlang der Oberkante, Hand mit Krallen
-        line(sh[0], sh[1], hand[0], hand[1], SUIT[2]); line(sh[0], sh[1] + 1, hand[0], hand[1] + 1, SUIT[1]); line(sh[0], sh[1] - 1, hand[0], hand[1] - 1, SUIT[3]);
-        R('#e8e4dc', hand[0] - s * 2, hand[1] - 1, 2, 3); // Manschette
+        const outer = [sh, hand, tip, ...scal, [cx + s * 12, 87], [cx + s * 9, 40]];
+        fillPoly(outer, G(hand[0], hand[1], cx, 80, [[0, '#2c1c40'], [1, '#07040c']])); // schwarzer Außenstoff
+        const inner = [[sh[0] + s * 1.2, sh[1] + 2.2], [hand[0] - s * 1.2, hand[1] + 2.4], [tip[0] - s * 2.2, tip[1] - 1], ...scal.map(([a, b]) => [a - s * 2, b - 2]), [cx + s * 12, 85], [cx + s * 9, 41.5]];
+        fillPoly(inner, RG(hand[0], hand[1], 2, hand[0], hand[1], 70, [[0, '#ff5a6a'], [0.25, '#d01c34'], [0.6, '#8c0c20'], [1, '#3c0010']])); // blutrotes Futter, am Arm am hellsten
+        x.save(); poly(inner); x.clip();
+        scal.filter((_, i) => i % 2 === 0).forEach(([a, b], i) => { // zwischen den Rippen gespannte, leicht durchhängende Bahnen
+          if (i % 2) fillPoly([[hand[0], hand[1]], [a - s * 1, b - 2], scal[Math.min(scal.length - 1, i * 2 + 2)]], 'rgba(30,0,10,0.22)');
+        });
+        x.restore();
+        for (const [a, b] of scal.filter((_, i) => i % 2 === 0)) { // Knochenrippen mit Glanz
+          stroke([[hand[0], hand[1] + 1], [a - s * 1, b - 2]], '#2c0010', 1.5);
+          stroke([[hand[0] - s * 0.6, hand[1] + 0.6], [a - s * 1.6, b - 2.6]], 'rgba(255,140,150,0.75)', 0.6);
+        }
+        stroke([[sh[0], sh[1] + 1.5], [hand[0], hand[1] + 1.5]], 'rgba(255,170,180,0.6)', 0.7); // Glanzkante oben
+        // Arm im Ärmel entlang der Oberkante, Manschette, Krallenhand
+        stroke([sh, hand], '#08070c', 3.4); stroke([[sh[0], sh[1] - 0.6], [hand[0], hand[1] - 0.6]], '#3c3850', 1.2);
+        disc(hand[0] - s * 1.6, hand[1], 1.6, '#f0ece4');
         claw(hand[0] + s * 1, hand[1] - (lift ? 2 : 0), s, lift);
       }
     }
-    // ---------- Beine, Stiefel ----------
-    for (const s of [-1, 1]) { R(SUIT[1], cx + s * 4 - 2.5, 62, 5, 22); R(SUIT[2], cx + s * 4 - 2.5, 62, 1, 22); R(SUIT[0], cx + s * 4 - 3.5, 83, 7, 4); R(SUIT[3], cx + s * 4 - 2.5, 83, 3, 1); }
-    // ---------- Rumpf: Frack, Weste, Goldknöpfe, Jabot, Medaillon ----------
-    poly([[cx - 11, 30], [cx + 11, 30], [cx + 8, 63], [cx - 8, 63]], SUIT[1]);
-    poly([[cx - 11, 30], [cx - 6, 30], [cx - 5, 63], [cx - 8, 63]], SUIT[2]);
-    poly([[cx - 4, 33], [cx + 4, 33], [cx + 3, 58], [cx - 3, 58]], '#6c0c1c'); line(cx - 4, 33, cx - 3, 58, '#9c1c2c');
-    for (let k = 0; k < 4; k++) R(GOLD[2], cx, 40 + k * 5, 1, 1);
-    for (let y = 28; y < 37; y++) { const wd = 3 + (y % 3 === 0 ? 1 : 0); R(y % 2 ? '#f0ece4' : '#c8c4bc', cx - wd / 2, y, wd, 1); } // Jabot
-    line(cx - 5, 33, cx, 39, GOLD[1]); line(cx + 5, 33, cx, 39, GOLD[1]); ell(cx, 41, 2.2, 2.4, (X, y, q) => R(q < 0.35 ? '#fc6c6c' : q < 0.7 ? '#d81c1c' : GOLD[1], X, y)); // Medaillon
-    R(SUIT[0], cx - 11, 30, 22, 1);
-    if (pose === 'closed') { // der Umhang umhüllt den Körper vorn bis auf einen Spalt; eine Hand hält ihn zu
-      for (const sd of [-1, 1]) for (let y = 31; y < 88; y++) {
-        const outer = 15 + (y - 29) / 58 * 9, inner = 2 + (y - 31) / 56 * 3 + (sd > 0 && y > 40 && y < 50 ? 2 : 0);
-        for (let X = Math.round(cx + sd * inner); sd > 0 ? X <= cx + outer : X >= cx - outer; X += sd) {
-          const u = (X - cx) / outer, fold = Math.sin(u * 8 + y * 0.04) > 0.6;
-          R(fold ? OUT[3] : u < -0.45 ? OUT[2] : u > 0.55 ? OUT[0] : OUT[1], X, y);
-        }
-        R(sd < 0 ? OUT[4] : OUT[2], cx + sd * inner, y, 1, 1); // Kante des Umhangs
+    // ---------- Beine, polierte Stiefel ----------
+    for (const s of [-1, 1]) {
+      fillPoly([[cx + s * 1.2, 60], [cx + s * 7, 60], [cx + s * 6.4, 82], [cx + s * 1.8, 82]], G(cx + s * 1, 0, cx + s * 7, 0, s < 0 ? [[0, '#14121c'], [1, '#3c3850']] : [[0, '#2c2838'], [1, '#08070c']]));
+      stroke([[cx + s * 4.2, 62], [cx + s * 4.1, 81]], s < 0 ? '#5c5874' : '#2c2838', 0.6); // Bügelfalte
+      fillPoly([[cx + s * 1.4, 81], [cx + s * 6.8, 81], [cx + s * 7.6, 85], [cx + s * 8.4, 87.5], [cx + s * 0.8, 87.5]], G(0, 81, 0, 88, [[0, '#24202e'], [1, '#040306']]));
+      x.fillStyle = 'rgba(200,196,230,0.75)'; x.beginPath(); x.ellipse(cx + s * 3.5, 83.6, 1.3, 0.5, 0, 0, Math.PI * 2); x.fill(); // Glanz auf dem Stiefel
+    }
+    // ---------- Rumpf: Frack aus Satin, Revers, Brokatweste, Jabot, Medaillon ----------
+    fillPoly([[cx - 11, 30], [cx + 11, 30], [cx + 8.5, 63], [cx - 8.5, 63]], G(cx - 11, 0, cx + 11, 0, [[0, '#4c4860'], [0.3, '#24202e'], [1, '#050408']]));
+    for (const s of [-1, 1]) fillPoly([[cx + s * 3, 30], [cx + s * 9, 31], [cx + s * 4.2, 47]], G(cx + s * 3, 30, cx + s * 7, 44, s < 0 ? [[0, '#8c88a8'], [0.4, '#3c3850'], [1, '#14121c']] : [[0, '#3c3850'], [1, '#08070c']])); // glänzende Revers
+    fillPoly([[cx - 4, 33], [cx + 4, 33], [cx + 3.6, 58], [cx - 3.6, 58]], G(cx - 4, 0, cx + 4, 0, [[0, '#b01c34'], [0.5, '#7c0c20'], [1, '#3c0410']])); // Brokatweste
+    for (let y = 35; y < 57; y += 2) for (let X = cx - 3 + ((y >> 1) & 1); X < cx + 3; X += 2) { x.fillStyle = 'rgba(232,180,60,0.45)'; x.fillRect(X, y, 0.8, 0.8); }
+    for (let k = 0; k < 4; k++) { disc(cx, 43 + k * 4, 0.9, '#8c6010'); disc(cx - 0.3, 42.7 + k * 4, 0.45, '#fcec9c'); } // Goldknöpfe
+    for (let k = 0; k < 6; k++) { const y = 28.5 + k * 1.7, w = 2.4 + (k % 2) * 0.8; x.fillStyle = '#9c94b4'; x.beginPath(); x.ellipse(cx + 0.3, y + 0.5, w, 1.1, 0, 0, Math.PI * 2); x.fill(); x.fillStyle = '#f6f2ea'; x.beginPath(); x.ellipse(cx - 0.2, y, w - 0.3, 0.9, 0, 0, Math.PI * 2); x.fill(); } // Jabot in Rüschen
+    stroke([[cx - 6, 31.5], [cx - 3, 37, cx, 40]], '#c89020', 0.8); stroke([[cx + 6, 31.5], [cx + 3, 37, cx, 40]], '#8c6010', 0.8); // Goldkette
+    disc(cx, 41.5, 3, '#6c4c08'); disc(cx - 0.2, 41.3, 2.5, G(cx - 2.5, 39, cx + 2.5, 44, [[0, '#fcec9c'], [1, '#a87010']]));
+    x.fillStyle = RG(cx - 0.6, 40.8, 0.2, cx, 41.5, 1.9, [[0, '#ffc0c8'], [0.35, '#f02040'], [1, '#600010']]); x.beginPath(); x.arc(cx, 41.5, 1.8, 0, Math.PI * 2); x.fill(); // Blutstein
+    if (pose === 'closed') { // vorn schließt sich der Umhang bis auf einen Spalt; eine Hand hält ihn zu
+      for (const s of [-1, 1]) {
+        const panel = [[cx + s * 2, 31], [cx + s * 13, 29], [cx + s * 21, 50, cx + s * 25.5, 86], [cx + s * 16, 88.5, cx + s * 6.5, 86.5], [cx + s * 4, 60, cx + s * 2, 31]];
+        fillPoly(panel, VELVET(cx - 25, cx + 25));
+        x.save(); poly(panel); x.clip();
+        for (const f of [9, 15, 21]) { stroke([[cx + s * f * 0.5, 32], [cx + s * f * 0.85, 60, cx + s * f, 88]], 'rgba(150,120,200,0.22)', 1.6); stroke([[cx + s * f * 0.5 + 1.4, 32], [cx + s * f * 0.85 + 1.4, 60, cx + s * f + 1.6, 88]], 'rgba(0,0,0,0.4)', 1.4); }
+        x.restore();
+        stroke([[cx + s * 2, 31], [cx + s * 4, 60, cx + s * 6.5, 86.5]], s < 0 ? '#e03848' : '#901022', 1.2); // rotes Futter an der Kante
       }
-      claw(cx + 4, 46, -1, false); R(SUIT[2], cx + 5, 44, 4, 3);
+      stroke([[cx - 13, 29], [cx - 21, 50, cx - 25.5, 86]], '#7c64a4', 0.9);
+      claw(cx + 4, 46, -1, false); disc(cx + 6.5, 45, 1.6, '#f0ece4');
     }
     // ---------- Stehkragen hinter dem Kopf ----------
     for (const s of [-1, 1]) {
-      poly([[cx + s * 6, 30], [cx + s * 9, 30], [cx + s * 17, 2], [cx + s * 13, 6], [cx + s * 6, 22]], OUT[1]);
-      poly([[cx + s * 7, 28], [cx + s * 9, 28], [cx + s * 15, 6], [cx + s * 12, 9], [cx + s * 7, 21]], LIN[s < 0 ? 3 : 2]);
-      line(cx + s * 9, 30, cx + s * 17, 2, GOLD[1]);
+      fillPoly([[cx + s * 6, 30], [cx + s * 9.5, 30], [cx + s * 18, 1.5], [cx + s * 13.5, 5.5], [cx + s * 6, 22]], '#120a1c');
+      fillPoly([[cx + s * 7, 28], [cx + s * 9.2, 28], [cx + s * 16, 5], [cx + s * 12.5, 8.4], [cx + s * 7, 21]], G(cx + s * 7, 28, cx + s * 15, 5, s < 0 ? [[0, '#640816'], [0.5, '#c81c34'], [1, '#ff5a6a']] : [[0, '#3c0010'], [0.6, '#901022'], [1, '#c81c34']]));
+      stroke([[cx + s * 9.5, 30], [cx + s * 18, 1.5]], s < 0 ? '#fcec9c' : '#c89020', 0.8);
     }
     // ---------- Kopf ----------
-    R(SK[1], cx - 3, 24, 6, 6); R(SK[0], cx + 1, 24, 2, 6); // Hals
-    ell(cx, 16, 7.2, 10, (X, y, q) => { // hageres Gesicht, Licht von links oben, eingefallene Wangen
-      let l = -(X - cx) / 7 * 0.5 - (y - 16) / 10 * 0.3 + (1 - q) * 0.7;
-      if (Math.abs(X - cx) > 3 && y > 17 && y < 23) l -= 0.4;
-      if (y > 23 && Math.abs(X - cx) > 2) l -= 0.2;
-      R(l > 0.95 ? SK[3] : l > 0.55 ? SK[2] : l > 0.15 ? SK[1] : SK[0], X, y);
-    });
-    for (const s of [-1, 1]) { line(cx + s * 7, 13, cx + s * 11, 9, SK[1]); line(cx + s * 7, 15, cx + s * 10, 10, SK[0]); R(SK[2], cx + s * 7.5, 13, 1, 2); } // spitze Ohren
-    for (let X = cx - 8; X <= cx + 8; X++) { // Haar zurückgekämmt, Witwenspitze
-      const top = 6 + Math.abs(X - cx) * 0.05, peak = 12 - Math.abs(X - cx) * 0.9;
-      for (let y = Math.floor(top); y < Math.max(top + 2, Math.min(15, peak)); y++) if (((X - cx) / 8.5) ** 2 + ((y - 13) / 8) ** 2 < 1) R((X + y) % 4 ? '#06040a' : '#24203a', X, y);
+    fillPoly([[cx - 3.2, 22], [cx + 3.2, 22], [cx + 3, 30], [cx - 3, 30]], G(cx - 3, 0, cx + 3, 0, [[0, '#c8c0dc'], [1, '#5c5478']])); // Hals
+    for (const s of [-1, 1]) { fillPoly([[cx + s * 6.4, 12], [cx + s * 11.5, 7.5], [cx + s * 7, 17]], s < 0 ? '#b8b0cc' : '#6c6488'); stroke([[cx + s * 7, 13.5], [cx + s * 10, 9.5]], s < 0 ? '#f0ecfc' : '#8c84a4', 0.5); } // spitze Ohren
+    const face = () => { x.beginPath(); x.moveTo(cx, 5.2); x.bezierCurveTo(cx + 5.6, 5.2, cx + 7.4, 9.5, cx + 7.2, 14); x.bezierCurveTo(cx + 7, 18.5, cx + 5.4, 22, cx + 3.2, 24.2); x.quadraticCurveTo(cx, 26.4, cx - 3.2, 24.2); x.bezierCurveTo(cx - 5.4, 22, cx - 7, 18.5, cx - 7.2, 14); x.bezierCurveTo(cx - 7.4, 9.5, cx - 5.6, 5.2, cx, 5.2); x.closePath(); };
+    face(); x.fillStyle = RG(cx - 3, 11, 0.8, cx + 0.5, 15, 12, [[0, '#fbf8ff'], [0.35, '#d8d2ec'], [0.72, '#9a92b6'], [1, '#5a5276']]); x.fill();
+    x.save(); face(); x.clip();
+    for (const s of [-1, 1]) { x.fillStyle = s > 0 ? 'rgba(40,24,64,0.5)' : 'rgba(40,24,64,0.32)'; x.beginPath(); x.ellipse(cx + s * 5, 19.4, 2.1, 3.6, s * 0.25, 0, Math.PI * 2); x.fill(); } // eingefallene Wangen
+    x.fillStyle = 'rgba(255,255,255,0.55)'; x.beginPath(); x.ellipse(cx - 4.4, 15.6, 1.8, 0.8, -0.35, 0, Math.PI * 2); x.fill(); // Wangenknochen
+    x.restore();
+    // Haar: zurückgekämmt, blauschwarz glänzend, Witwenspitze, silberne Schläfen
+    x.beginPath(); x.moveTo(cx - 7.6, 13.5); x.bezierCurveTo(cx - 8.4, 6.5, cx - 4.5, 2.8, cx, 2.8); x.bezierCurveTo(cx + 4.5, 2.8, cx + 8.4, 6.5, cx + 7.6, 13.5); x.lineTo(cx + 6.4, 10.6); x.quadraticCurveTo(cx + 3, 8.4, cx, 11.8); x.quadraticCurveTo(cx - 3, 8.4, cx - 6.4, 10.6); x.closePath();
+    x.fillStyle = G(cx - 7, 3, cx + 5, 12, [[0, '#4c4c78'], [0.3, '#16142a'], [1, '#040308']]); x.fill();
+    stroke([[cx - 5.6, 5.2], [cx - 2, 3.8, cx + 2.6, 4.4]], 'rgba(160,170,230,0.7)', 0.6); // Glanz im Haar
+    for (const s of [-1, 1]) stroke([[cx + s * 7.3, 12.6], [cx + s * 7.8, 9, cx + s * 6.2, 6.6]], s < 0 ? '#d8d4ec' : '#8c88a8', 0.9); // silberne Schläfen
+    // Augen: tiefe Höhlen, rot glühend, scharfe Brauen
+    for (const s of [-1, 1]) {
+      const ex = cx + s * 3.2, ey = 15.2;
+      x.fillStyle = RG(ex, ey, 0.4, ex, ey, 2.8, [[0, 'rgba(30,8,30,0.95)'], [1, 'rgba(60,30,80,0)']]); x.beginPath(); x.ellipse(ex, ey, 2.9, 2.1, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = RG(ex, ey, 0.1, ex, ey, 1.4, [[0, '#ffe0e0'], [0.35, '#ff2a2a'], [1, '#7c0000']]); x.beginPath(); x.ellipse(ex + s * 0.2, ey, 1.4, 0.75, 0, 0, Math.PI * 2); x.fill();
+      stroke([[cx + s * 1.2, 13.4], [cx + s * 3.5, 12.4, cx + s * 6.2, 11.2]], '#06040a', 0.9); // böse Brauen, zur Mitte gesenkt
     }
-    R('#3c3858', cx - 4, 7, 3, 1); // Glanz im Haar
-    for (const s of [-1, 1]) { line(cx + s * 2, 13, cx + s * 6, 11, '#06040a'); R('#06040a', cx + s * 2, 14, 1, 1); } // böse Brauen
-    for (const s of [-1, 1]) { R('#1c0c18', cx + s * 3.5 - 1.5, 15, 3, 2); R('#fc1c1c', cx + s * 3 - (s > 0 ? 0 : 1), 15, 2, 1); R('#fca0a0', cx + s * 3 - (s > 0 ? 0 : 1), 15, 1, 1); } // tiefe Augenhöhlen, rote Augen
-    R(SK[0], cx, 17, 1, 4); R(SK[3], cx - 1, 17, 1, 3); // Nase
-    R('#3c0818', cx - 3, 23, 6, 1); R('#7c1028', cx - 2, 24, 4, 1); R('#fcfcf0', cx - 2, 24, 1, 2); R('#fcfcf0', cx + 1, 24, 1, 2); // Mund mit Fängen
-    R(SK[0], cx - 1, 25, 3, 1);
-    // Pixel-Look: weiche Kanten der Flächen weg (Alpha hart)
+    stroke([[cx - 0.5, 15.5], [cx - 0.2, 18.5, cx + 0.7, 20]], '#ffffff', 0.5); stroke([[cx + 0.6, 15.8], [cx + 1.2, 19.2]], '#7c7498', 0.6); disc(cx + 0.9, 20.2, 0.5, '#5a5276'); // Adlernase
+    x.fillStyle = '#4c0814'; x.beginPath(); x.moveTo(cx - 3, 22.4); x.quadraticCurveTo(cx, 21.6, cx + 3.2, 22.1); x.quadraticCurveTo(cx, 23.6, cx - 3, 22.4); x.fill(); // schmale Lippen, leicht höhnisch
+    x.fillStyle = '#9c1c34'; x.fillRect(cx - 1.8, 22.6, 3.4, 0.6);
+    x.fillStyle = '#fcfcf0'; x.beginPath(); x.moveTo(cx - 2, 22.5); x.lineTo(cx - 1.2, 22.5); x.lineTo(cx - 1.6, 24.4); x.fill(); x.beginPath(); x.moveTo(cx + 1.3, 22.5); x.lineTo(cx + 2.1, 22.5); x.lineTo(cx + 1.7, 24.4); x.fill(); // Fänge
+    // Pixel-Look: weiche Kanten der Flächen weg (Alpha hart), Verläufe bleiben
     const img = x.getImageData(0, 0, W, H), d = img.data;
     for (let i = 3; i < d.length; i += 4) d[i] = d[i] < 110 ? 0 : 255;
     x.putImageData(img, 0, 0);
@@ -449,45 +480,129 @@ class Count extends Boss {
 }
 
 // ---------------- Medusa: Herrin der Marmorgalerie (Ende von Stage 3) ----------------
-// Oberkörper einer Gorgo, vorgemalt: blassgrüne Haut, goldener Brustpanzer mit Rubin, Armreifen, Krallen, hageres,
-// grausames Gesicht mit gelb glühenden Augen und Diadem. Live gezeichnet: der geschuppte Schlangenleib, der sich hinter
-// ihr über den Marmor windet, und neun zischende Schlangen im Haar.
+// Vorgemalt mit weichen Verläufen (wie die Riesenfledermaus), Kanten pixelhart: schlanke Gorgo mit schuppiger, nach unten
+// dunkler werdender Haut, breitem Goldkragen mit Perlen, Schuppenmieder mit Goldsaum, Goldgürtel mit Rubin, darunter die
+// hellen Bauchschilde des Schlangenleibs. Ovales Gesicht mit hohen Wangenknochen, Mandelaugen mit Lidstrich, gelb glühende
+// Schlitzpupillen, dunkle Lippen mit Fängen, Flossenohren, Diadem mit Kobra. Live gezeichnet: der geschuppte Schlangenleib
+// mit Rautenmuster und zehn Schlangen im Haar (fünf hinter, fünf vor dem Kopf).
 // Angriffe: Schlangen fallen aus dem Haar und kriechen auf den Helden zu; der versteinernde Blick – eine Lichtwelle am
 // Boden (drüberspringen) oder in Kopfhöhe (ducken); wer getroffen wird, erstarrt zu Stein und muss sich freistrampeln.
 // Ab der Hälfte fliegen Medusenköpfe in Wellen heran und die Blicke kommen doppelt.
 const MEDUSA_ART = (() => {
-  const W0 = 64, H0 = 62, cx = 32;
+  const W0 = 72, H0 = 64, cx = 36;
   let art = null;
   function paint(open) {
     const c = Sprites.canvas(W0, H0), x = c.getContext('2d');
-    const R = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(Math.round(a), Math.round(b), w, h); };
-    const ell = (ex, ey, rx, ry, f) => { for (let y = Math.floor(ey - ry); y <= ey + ry; y++) for (let X = Math.floor(ex - rx); X <= ex + rx; X++) { const q = ((X + 0.5 - ex) / rx) ** 2 + ((y + 0.5 - ey) / ry) ** 2; if (q <= 1) f(X, y, q); } };
-    const SK = ['#2c5c44', '#4c8c64', '#7cbc8c', '#b0e4bc'], GOLD = ['#6c4c08', '#c89020', '#f8d878'];
-    // Arme: einer krallt nach vorn (beim Fauchen erhoben), einer ruht an der Hüfte
-    for (const [x0, y0, x1, y1, x2, y2] of [[cx - 11, 30, cx - 20, 40, cx - 26, open ? 28 : 47], [cx + 11, 30, cx + 19, 42, cx + 14, 53]]) {
-      for (const [a, b, c2, d] of [[x0, y0, x1, y1], [x1, y1, x2, y2]]) {
-        const n = Math.ceil(Math.hypot(c2 - a, d - b)) * 2;
-        for (let k = 0; k <= n; k++) { const px = a + (c2 - a) * k / n, py = b + (d - b) * k / n; R(SK[0], px - 2, py, 4, 1); R(SK[1], px - 1, py, 2, 1); R(SK[2], px - 1, py, 1, 1); }
+    const G = (x0, y0, x1, y1, st) => { const g = x.createLinearGradient(x0, y0, x1, y1); st.forEach(([o, col]) => g.addColorStop(o, col)); return g; };
+    const RG = (x0, y0, r0, x1, y1, r1, st) => { const g = x.createRadialGradient(x0, y0, r0, x1, y1, r1); st.forEach(([o, col]) => g.addColorStop(o, col)); return g; };
+    const path = (pts) => { x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (const p of pts.slice(1)) p.length === 4 ? x.quadraticCurveTo(p[0], p[1], p[2], p[3]) : x.lineTo(p[0], p[1]); x.closePath(); };
+    const disc = (px, py, r, col) => { x.fillStyle = col; x.beginPath(); x.arc(px, py, Math.max(0.3, r), 0, Math.PI * 2); x.fill(); };
+    const ellipse = (px, py, rx, ry, col, rot = 0) => { x.fillStyle = col; x.beginPath(); x.ellipse(px, py, rx, ry, rot, 0, Math.PI * 2); x.fill(); };
+    // schlanker Arm als weich schattierter Schlauch (Umriss, Grundton, Licht, Glanz), mit Goldreif und Krallenhand
+    const arm = (pts, w0, w1, band, up) => {
+      const along = (f) => { // Punkte entlang der Linie mit Breite
+        const L = []; let tot = 0; const seg = []; for (let i = 1; i < pts.length; i++) { const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(l); tot += l; }
+        let acc = 0; for (let i = 1; i < pts.length; i++) { const n = Math.ceil(seg[i - 1] * 3); for (let k = 0; k <= n; k++) { const t = k / n; L.push([pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t, w0 + (w1 - w0) * (acc + seg[i - 1] * t) / tot]); } acc += seg[i - 1]; }
+        L.forEach(f);
+      };
+      along(([px, py, w]) => disc(px, py, w / 2 + 0.7, '#163626'));
+      along(([px, py, w]) => disc(px, py, w / 2, '#4c8c64'));
+      along(([px, py, w]) => disc(px - w * 0.15, py - w * 0.18, w * 0.32, '#8ccc9c'));
+      along(([px, py, w]) => disc(px - w * 0.22, py - w * 0.25, w * 0.12, '#d0f4d4'));
+      const [bx, by] = pts[band], [b2x, b2y] = pts[band + 1], bt = 0.35, gx = bx + (b2x - bx) * bt, gy = by + (b2y - by) * bt;
+      disc(gx, gy, w0 * 0.55, '#6c4c08'); disc(gx - 0.3, gy - 0.3, w0 * 0.45, '#d8a028'); disc(gx - 0.6, gy - 0.6, w0 * 0.18, '#fcec9c'); // Goldreif
+      const [hx, hy] = pts[pts.length - 1], [px0, py0] = pts[pts.length - 2], a = Math.atan2(hy - py0, hx - px0);
+      for (let k = -1.5; k <= 1.5; k++) { // vier Krallenfinger, gespreizt
+        const fa = a + k * 0.38 + (up ? -0.15 : 0.15), fx = hx + Math.cos(fa) * 3.6, fy = hy + Math.sin(fa) * 3.6;
+        x.strokeStyle = '#4c8c64'; x.lineWidth = 1.3; x.lineCap = 'round'; x.beginPath(); x.moveTo(hx, hy); x.lineTo(fx, fy); x.stroke();
+        disc(fx + Math.cos(fa) * 0.9, fy + Math.sin(fa) * 0.9, 0.6, '#f0e8d0');
       }
-      R(GOLD[0], x1 - 2, y1 - 1, 5, 3); R(GOLD[1], x1 - 2, y1 - 1, 4, 2); R(GOLD[2], x1 - 2, y1 - 1, 4, 1); // Armreif
-      for (let k = -1; k <= 1; k++) R('#e8e0c8', x2 + k * 1.5, y2 + (y2 < y1 ? -2 : 1), 1, 2); // Krallen
+      disc(hx, hy, w1 * 0.75, '#5c9c74'); disc(hx - 0.4, hy - 0.4, w1 * 0.35, '#a0dcac');
+    };
+    // ---------- Haaransatz hinter dem Kopf (die Schlangen wachsen live daraus) ----------
+    ellipse(cx, 10.5, 9.5, 8, '#163a28'); ellipse(cx - 1.5, 8.5, 7, 5.5, '#245c3c');
+    // ---------- Rumpf: Wespentaille, Licht von links oben ----------
+    const torso = () => path([[cx - 12, 28], [cx - 14.5, 30.5, cx - 13, 36], [cx - 9.5, 43, cx - 8, 47], [cx - 11.5, 53, cx - 12.5, 61], [cx + 12.5, 61], [cx + 11.5, 53, cx + 8, 47], [cx + 9.5, 43, cx + 13, 36], [cx + 14.5, 30.5, cx + 12, 28], [cx, 25.5, cx - 12, 28]]);
+    torso(); x.fillStyle = '#163626'; x.fill(); x.save(); x.translate(0.6, 0.2); x.scale(0.985, 0.99); x.restore();
+    torso(); x.fillStyle = G(cx - 14, 0, cx + 14, 0, [[0, '#b4e4bc'], [0.3, '#86c496'], [0.68, '#4c8c64'], [1, '#22503a']]); x.fill();
+    x.save(); torso(); x.clip();
+    x.fillStyle = G(0, 40, 0, 61, [[0, 'rgba(14,40,26,0)'], [1, 'rgba(14,40,26,0.62)']]); x.fillRect(0, 40, W0, 22); // unten dunkler: Übergang zum Schlangenleib
+    x.strokeStyle = 'rgba(12,40,24,0.55)'; x.lineWidth = 0.8; // Schuppen ab der Hüfte
+    for (let r = 0, y = 48; y < 61; y += 2.4, r++) for (let X = cx - 13 + (r & 1) * 1.6; X < cx + 13; X += 3.2) { x.beginPath(); x.arc(X, y, 1.6, 0.15, Math.PI - 0.15); x.stroke(); }
+    for (let y = 50; y < 61; y += 2) { x.fillStyle = (y >> 1) & 1 ? '#c8d490' : '#a8b878'; x.beginPath(); x.ellipse(cx, y, 4.2 - (61 - y) * 0.08, 0.9, 0, 0, Math.PI * 2); x.fill(); } // helle Bauchschilde
+    disc(cx - 6, 33, 5, 'rgba(220,255,225,0.18)'); // Glanz auf der Schulter
+    x.restore();
+    // ---------- Schuppenmieder mit Goldsaum (Herzausschnitt) ----------
+    const bod = () => path([[cx - 10.5, 32], [cx - 11, 38, cx - 8.5, 43], [cx - 3, 44.5, cx, 42.5], [cx + 3, 44.5, cx + 8.5, 43], [cx + 11, 38, cx + 10.5, 32], [cx + 6, 30, cx + 2.5, 34], [cx, 36.5, cx, 36.5], [cx - 2.5, 34, cx - 2.5, 34], [cx - 6, 30, cx - 10.5, 32]]);
+    bod(); x.fillStyle = G(cx - 11, 32, cx + 11, 44, [[0, '#3c9c80'], [0.45, '#1c6c58'], [1, '#0c3830']]); x.fill();
+    x.save(); bod(); x.clip(); x.strokeStyle = 'rgba(160,240,210,0.35)'; x.lineWidth = 0.7;
+    for (let r = 0, y = 33; y < 45; y += 2, r++) for (let X = cx - 11 + (r & 1) * 1.4; X < cx + 11; X += 2.8) { x.beginPath(); x.arc(X, y, 1.3, 0.2, Math.PI - 0.2); x.stroke(); }
+    x.restore();
+    bod(); x.strokeStyle = '#d8a028'; x.lineWidth = 1; x.stroke();
+    // ---------- Goldgürtel mit Rubin-Anhänger ----------
+    x.fillStyle = G(0, 45, 0, 48.5, [[0, '#fcec9c'], [0.4, '#d8a028'], [1, '#6c4c08']]); x.beginPath(); x.moveTo(cx - 9, 45.2); x.quadraticCurveTo(cx, 47.8, cx + 9, 45.2); x.lineTo(cx + 9, 47.6); x.quadraticCurveTo(cx, 50.2, cx - 9, 47.6); x.closePath(); x.fill();
+    x.fillStyle = RG(cx - 0.5, 50, 0.2, cx, 50.8, 2.4, [[0, '#ffb0c0'], [0.35, '#e0204c'], [1, '#600018']]); x.beginPath(); x.moveTo(cx, 47.5); x.quadraticCurveTo(cx + 2.4, 50.5, cx, 53); x.quadraticCurveTo(cx - 2.4, 50.5, cx, 47.5); x.fill();
+    // ---------- Arme ----------
+    if (open) { // fauchend: eine Kralle hoch erhoben, die andere zur Seite gespreizt
+      arm([[cx - 11.5, 30.5], [cx - 19.5, 27], [cx - 25, 17.5]], 4.4, 3, 1, true);
+      arm([[cx + 11.5, 30.5], [cx + 18.5, 36.5], [cx + 25, 31]], 4.4, 3, 1, true);
+    } else { // lauernd: eine Kralle nach vorn gereckt, die andere an der Hüfte
+      arm([[cx - 11.5, 30.5], [cx - 18.5, 40], [cx - 26, 36]], 4.4, 3, 1, false);
+      arm([[cx + 11.5, 30.5], [cx + 16.5, 40.5], [cx + 11, 47.5]], 4.4, 3, 1, false);
     }
-    // Rumpf mit goldenem Brustpanzer
-    ell(cx, 40, 11, 16, (X, y, q) => R(q > 0.85 ? SK[0] : X < cx - 3 && y < 44 ? SK[2] : SK[1], X, y));
-    for (const s of [-1, 1]) ell(cx + s * 4.5, 34, 4.5, 4, (X, y, q) => R(q < 0.25 ? GOLD[2] : q < 0.7 ? GOLD[1] : GOLD[0], X, y));
-    R(GOLD[1], cx - 1, 31, 2, 6); R('#a80020', cx - 1, 33, 2, 2); R('#f86080', cx - 1, 33, 1, 1); // Spange mit Rubin
-    for (let X = cx - 10; X <= cx + 10; X++) for (let y = 47; y < 58; y++) if (((X - cx) / 10.5) ** 2 + ((y - 47) / 13) ** 2 < 1) R(((X + y * 2) % 4) ? SK[0] : '#1c3c2c', X, y); // Schuppen zum Schlangenleib
-    R(GOLD[0], cx - 10, 45, 21, 3); R(GOLD[1], cx - 10, 45, 21, 2); R(GOLD[2], cx - 10, 45, 21, 1); // Gürtel
-    // Hals und Kopf: hageres, schönes, grausames Gesicht
-    R(SK[0], cx - 3, 21, 6, 6); R(SK[1], cx - 2, 21, 4, 6);
-    ell(cx, 14, 7, 9, (X, y, q) => { const l = -(X - cx) / 7 * 0.5 - (y - 14) / 9 * 0.3 + (1 - q) * 0.7; R(l > 0.9 ? SK[3] : l > 0.5 ? SK[2] : l > 0.15 ? SK[1] : SK[0], X, y); });
-    R(SK[0], cx - 5, 17, 2, 2); R(SK[0], cx + 4, 17, 2, 2); // eingefallene Wangen
-    for (const s of [-1, 1]) { R('#0c1c14', cx + s * 3 - 2, 11, 4, 3); R('#f8e800', cx + s * 3 - 1, 12, 2, 1); R('#fcfcc0', cx + s * 3 - (s > 0 ? 0 : 1), 12, 1, 1); } // gelbe Augen in dunklen Höhlen
-    for (const s of [-1, 1]) for (let k = 0; k < 4; k++) R('#0c1c14', cx + s * (1 + k) - (s < 0 ? 1 : 0), 10 - (k > 1 ? 1 : 0), 1, 1); // Brauen, böse geschwungen
-    R(SK[0], cx, 14, 1, 4); R(SK[3], cx - 1, 14, 1, 3); // Nase
-    if (open) { R('#1c0410', cx - 3, 19, 6, 3); R('#a80020', cx - 2, 20, 4, 1); R('#fcfcfc', cx - 2, 19, 1, 2); R('#fcfcfc', cx + 1, 19, 1, 2); R('#d82848', cx - 1, 21, 2, 2); } // Fauchen mit gespaltener Zunge
-    else { R('#0c140c', cx - 3, 19, 6, 1); R('#fcfcfc', cx - 2, 20, 1, 1); R('#fcfcfc', cx + 1, 20, 1, 1); }
-    R(GOLD[0], cx - 7, 5, 14, 2); R(GOLD[1], cx - 7, 5, 14, 1); R(GOLD[2], cx - 5, 5, 10, 1); R('#a80020', cx - 1, 3, 2, 3); // Diadem
+    // ---------- Hals ----------
+    x.fillStyle = G(cx - 3.5, 0, cx + 3.5, 0, [[0, '#a8dcb0'], [0.6, '#5c9c74'], [1, '#2c5c44']]); x.fillRect(cx - 3.2, 20, 6.4, 9);
+    x.fillStyle = 'rgba(12,40,24,0.55)'; x.beginPath(); x.ellipse(cx + 0.5, 21.5, 3.6, 1.6, 0, 0, Math.PI * 2); x.fill(); // Schatten unter dem Kinn
+    // ---------- breiter Goldkragen mit Perlen ----------
+    x.lineCap = 'round';
+    x.strokeStyle = '#4c3404'; x.lineWidth = 4.6; x.beginPath(); x.moveTo(cx - 11, 28.6); x.quadraticCurveTo(cx, 36, cx + 11, 28.6); x.stroke();
+    x.strokeStyle = G(cx - 11, 26, cx + 11, 34, [[0, '#fcec9c'], [0.35, '#e0b030'], [0.75, '#a87010'], [1, '#6c4c08']]); x.lineWidth = 3.4; x.beginPath(); x.moveTo(cx - 11, 28.6); x.quadraticCurveTo(cx, 36, cx + 11, 28.6); x.stroke();
+    for (let k = 0; k <= 10; k++) { const t = k / 10, bx = (1 - t) ** 2 * (cx - 11) + 2 * (1 - t) * t * cx + t * t * (cx + 11), by = (1 - t) ** 2 * 28.6 + 2 * (1 - t) * t * 36 + t * t * 28.6; disc(bx, by + 1.2, 0.75, k % 2 ? '#3cc8b0' : '#e0204c'); disc(bx - 0.25, by + 0.95, 0.25, '#ffffff'); }
+    x.fillStyle = RG(cx - 0.6, 32, 0.2, cx, 32.6, 2.2, [[0, '#ffb0c0'], [0.4, '#e0204c'], [1, '#600018']]); x.beginPath(); x.arc(cx, 32.6, 1.9, 0, Math.PI * 2); x.fill(); // Rubin
+    // ---------- Kopf: ovales Gesicht, hohe Wangenknochen ----------
+    for (const s of [-1, 1]) { // Flossenohren
+      x.fillStyle = '#2c6c48'; x.beginPath(); x.moveTo(cx + s * 6.6, 10.5); x.lineTo(cx + s * 11, 7.2); x.lineTo(cx + s * 10, 10); x.lineTo(cx + s * 11.2, 12.2); x.lineTo(cx + s * 6.8, 15.5); x.closePath(); x.fill();
+      x.strokeStyle = '#5ca878'; x.lineWidth = 0.6; x.beginPath(); x.moveTo(cx + s * 7, 12); x.lineTo(cx + s * 10.4, 8.4); x.stroke();
+    }
+    const face = () => { x.beginPath(); x.moveTo(cx, 4.2); x.bezierCurveTo(cx + 5.5, 4.2, cx + 7.8, 8.5, cx + 7.4, 12.8); x.bezierCurveTo(cx + 7, 17.5, cx + 4.6, 21.5, cx, 23.6); x.bezierCurveTo(cx - 4.6, 21.5, cx - 7, 17.5, cx - 7.4, 12.8); x.bezierCurveTo(cx - 7.8, 8.5, cx - 5.5, 4.2, cx, 4.2); x.closePath(); };
+    face(); x.fillStyle = '#163626'; x.save(); x.translate(cx, 13.5); x.scale(1.12, 1.07); x.translate(-cx, -13.5); x.fill(); x.restore();
+    face(); x.fillStyle = RG(cx - 3, 9.5, 0.8, cx + 0.5, 13.5, 11.5, [[0, '#d8f8dc'], [0.4, '#9cd4a6'], [0.78, '#5c9c72'], [1, '#356a4c']]); x.fill();
+    x.save(); face(); x.clip();
+    x.fillStyle = 'rgba(16,48,30,0.38)'; x.beginPath(); x.ellipse(cx + 4.6, 17.5, 2.6, 3.4, 0.3, 0, Math.PI * 2); x.fill(); x.beginPath(); x.ellipse(cx - 5.2, 17.8, 1.6, 2.6, -0.3, 0, Math.PI * 2); x.fill(); // eingefallene Wangen
+    x.fillStyle = 'rgba(236,255,236,0.6)'; x.beginPath(); x.ellipse(cx - 4.2, 14, 1.8, 0.9, -0.4, 0, Math.PI * 2); x.fill(); // Wangenknochen-Glanz
+    x.fillStyle = 'rgba(10,30,20,0.28)'; x.fillRect(cx - 8, 9.6, 16, 1.6); // Schatten unter dem Diadem
+    x.restore();
+    // Augen: Mandelform mit Lidstrich, gelb glühende Schlitzpupillen
+    for (const s of [-1, 1]) {
+      const ex = cx + s * 3.3, ey = 12.6;
+      x.fillStyle = 'rgba(12,30,40,0.55)'; x.beginPath(); x.ellipse(ex, ey - 0.6, 2.7, 1.5, 0, 0, Math.PI * 2); x.fill(); // dunkler Lidschatten
+      x.fillStyle = '#0c1410'; x.beginPath(); x.moveTo(ex - s * 2.4, ey + 0.3); x.quadraticCurveTo(ex, ey - 1.9, ex + s * 2.3, ey - 0.6); x.lineTo(ex + s * 3.4, ey - 1.5); x.quadraticCurveTo(ex + s * 1.4, ey + 1.6, ex - s * 2.4, ey + 0.3); x.fill(); // Mandel + Lidstrich-Schwinge
+      x.fillStyle = RG(ex, ey, 0.1, ex, ey, 1.6, [[0, '#fcfcc0'], [0.5, '#f0e020'], [1, '#c08000']]); x.beginPath(); x.ellipse(ex + s * 0.1, ey - 0.2, 1.55, 0.85, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#200808'; x.fillRect(ex + s * 0.1 - 0.35, ey - 1, 0.7, 1.7); // Schlitzpupille
+      x.strokeStyle = '#0c1410'; x.lineWidth = 0.8; x.beginPath(); x.moveTo(ex - s * 2.2, ey - 2.6); x.quadraticCurveTo(ex + s * 0.5, ey - 3.6, ex + s * 2.8, ey - 2.2); x.stroke(); // geschwungene Braue, zur Mitte gesenkt
+    }
+    x.strokeStyle = '#d4f4d8'; x.lineWidth = 0.6; x.beginPath(); x.moveTo(cx - 0.4, 13.6); x.lineTo(cx - 0.6, 17.4); x.stroke(); // Nasenrücken
+    disc(cx + 0.7, 17.8, 0.45, '#24503a');
+    if (open) { // Fauchen: Fänge, gespaltene Zunge
+      x.fillStyle = '#1c0410'; x.beginPath(); x.ellipse(cx, 20.4, 2.5, 1.7, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#f8f4e8'; x.beginPath(); x.moveTo(cx - 2, 19.1); x.lineTo(cx - 1.2, 19.1); x.lineTo(cx - 1.6, 21.2); x.fill(); x.beginPath(); x.moveTo(cx + 1.2, 19.1); x.lineTo(cx + 2, 19.1); x.lineTo(cx + 1.6, 21.2); x.fill();
+      x.strokeStyle = '#e02848'; x.lineWidth = 0.7; x.beginPath(); x.moveTo(cx, 20.6); x.lineTo(cx - 0.4, 23.6); x.moveTo(cx - 0.4, 23); x.lineTo(cx - 1.4, 24.4); x.moveTo(cx - 0.4, 23); x.lineTo(cx + 0.6, 24.5); x.stroke();
+      x.strokeStyle = '#4c1838'; x.lineWidth = 0.8; x.beginPath(); x.ellipse(cx, 20.4, 2.6, 1.8, 0, 0, Math.PI * 2); x.stroke(); // Lippen
+    } else { // geschlossene dunkle Lippen, ein Hauch von Lächeln, Fangspitzen
+      x.fillStyle = '#3c1430'; x.beginPath(); x.moveTo(cx - 2.6, 20); x.quadraticCurveTo(cx - 1, 19.1, cx, 19.7); x.quadraticCurveTo(cx + 1, 19.1, cx + 2.8, 19.6); x.quadraticCurveTo(cx, 20.6, cx - 2.6, 20); x.fill();
+      x.fillStyle = '#7c2c58'; x.beginPath(); x.moveTo(cx - 2.2, 20.2); x.quadraticCurveTo(cx, 22, cx + 2.4, 19.9); x.quadraticCurveTo(cx, 20.8, cx - 2.2, 20.2); x.fill();
+      x.fillStyle = '#f8f4e8'; x.fillRect(cx - 1.6, 20.2, 0.6, 1.1); x.fillRect(cx + 1.1, 20.2, 0.6, 1.1);
+    }
+    // Diadem mit Kobra (Uräus) und Rubin
+    x.strokeStyle = '#4c3404'; x.lineWidth = 2.2; x.beginPath(); x.moveTo(cx - 7, 8.4); x.quadraticCurveTo(cx, 5.4, cx + 7, 8.4); x.stroke();
+    x.strokeStyle = G(cx - 7, 5, cx + 7, 9, [[0, '#fcec9c'], [0.5, '#d8a028'], [1, '#8c6010']]); x.lineWidth = 1.3; x.beginPath(); x.moveTo(cx - 7, 8.4); x.quadraticCurveTo(cx, 5.4, cx + 7, 8.4); x.stroke();
+    x.fillStyle = '#d8a028'; x.beginPath(); x.moveTo(cx, 0.4); x.quadraticCurveTo(cx + 2.4, 1.6, cx + 1.8, 4.2); x.lineTo(cx + 0.8, 6.8); x.lineTo(cx - 0.8, 6.8); x.lineTo(cx - 1.8, 4.2); x.quadraticCurveTo(cx - 2.4, 1.6, cx, 0.4); x.fill(); // Kobrahaube
+    x.fillStyle = '#fcec9c'; x.fillRect(cx - 0.9, 1.4, 0.8, 3.2);
+    disc(cx, 3, 0.75, '#e0204c');
+    // Pixel-Look: weiche Kanten weg (Alpha hart), Verläufe bleiben
+    const img = x.getImageData(0, 0, W0, H0), d = img.data;
+    for (let i = 3; i < d.length; i += 4) d[i] = d[i] < 110 ? 0 : 255;
+    x.putImageData(img, 0, 0);
     return Sprites.fromCanvas(c);
   }
   // fliegender Medusenkopf: grünes Gesicht, Schlangenhaar, zwei Bilder
@@ -614,6 +729,26 @@ class Medusa extends Boss {
     }
     if (this.state !== 'rise') this.touch();
   }
+  hair(ctx, X, Y, t, fl, front) { // Schlangenhaar: fünf Schlangen hinter, fünf vor dem Kopf – sie winden sich, schauen umher und züngeln
+    for (let k = front ? 1 : 0; k < 10; k += 2) {
+      const a = -Math.PI + 0.3 + k * (Math.PI - 0.6) / 9, len = 11 + (k * 7) % 6, pts = [];
+      let px = X + Math.cos(a) * 7.5, py = Y + 7 + Math.sin(a) * 6.5, dir = a;
+      for (let i = 0; i < len; i++) {
+        dir = a + Math.sin(t * 0.18 + k * 1.7 + i * 0.5) * 0.65 * (i / len + 0.3);
+        px += Math.cos(dir) * 1.15; py += Math.sin(dir) * 1.15; pts.push([px, py, 2.8 - i / len * 1.3]);
+      }
+      ctx.fillStyle = fl ? '#fcfcfc' : '#0e2a1a'; for (const [qx, qy, w] of pts) ctx.fillRect(Math.round(qx - w / 2 - 0.5), Math.round(qy - w / 2 - 0.5), Math.ceil(w + 1), Math.ceil(w + 1));
+      ctx.fillStyle = fl ? '#fcfcfc' : '#2c8048'; for (const [qx, qy, w] of pts) ctx.fillRect(Math.round(qx - w / 2), Math.round(qy - w / 2), Math.ceil(w), Math.ceil(w));
+      if (!fl) { ctx.fillStyle = '#7cd894'; pts.forEach(([qx, qy, w], i) => { if (i % 2 === 0) ctx.fillRect(Math.round(qx - w / 2), Math.round(qy - w / 2), 1, 1); }); }
+      const [hx, hy] = pts[pts.length - 1], dx = Math.cos(dir), dy = Math.sin(dir);
+      ctx.fillStyle = fl ? '#fcfcfc' : '#0e2a1a'; ctx.fillRect(Math.round(hx - 2), Math.round(hy - 2), 4, 4);
+      ctx.fillStyle = fl ? '#fcfcfc' : '#3c9c5c'; ctx.fillRect(Math.round(hx - 1.5), Math.round(hy - 1.5), 3, 3);
+      if (fl) continue;
+      ctx.fillStyle = '#9ce0ac'; ctx.fillRect(Math.round(hx - 1.5), Math.round(hy - 1.5), 1, 1);
+      ctx.fillStyle = '#fce040'; ctx.fillRect(Math.round(hx + dx * 0.9 - 0.5), Math.round(hy + dy * 0.9 - 1), 1, 1); // Auge
+      if (((t >> 3) + k) % 5 === 0) { ctx.fillStyle = '#e02848'; ctx.fillRect(Math.round(hx + dx * 2.6), Math.round(hy + dy * 2.6), 1, 1); ctx.fillRect(Math.round(hx + dx * 3.6 + dy * 0.6), Math.round(hy + dy * 3.6 - dx * 0.6), 1, 1); } // Zunge
+    }
+  }
   draw(ctx) {
     if (this.dying && (this.dying & 2)) return;
     const A = MEDUSA_ART.get(), X = Math.round(this.cx - W.cam.x), Y = Math.round(this.y - W.cam.y), f = this.face, t = this.t, fl = this.flash;
@@ -622,33 +757,25 @@ class Medusa extends Boss {
     if (this.state === 'rise') { ctx.beginPath(); ctx.rect(-10, -60, View.w + 20, floor + 60); ctx.clip(); }
     // Schatten auf dem Marmor
     ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(X - f * 18, floor, 34, 4, 0, 0, Math.PI * 2); ctx.fill();
-    // Schlangenleib: windet sich nach hinten über den Boden, Schwanzspitze hebt sich
+    // Schlangenleib: windet sich nach hinten über den Boden, Schwanzspitze hebt sich; Licht von oben, Rautenmuster, Bauchschilde
+    const E = (ex, ey, rx, ry, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(ex, ey, Math.max(0.5, rx), Math.max(0.5, ry), 0, 0, Math.PI * 2); ctx.fill(); };
     for (let k = 32; k >= 0; k--) {
       const u = k / 32, r = 8.5 - u * 6;
       const bx = X - f * (u * 46 - 2) + Math.sin(t * 0.07 + u * 6) * 4 * u;
       const by = Math.min(floor - r * 0.8, Y + 58 + u * 12) - Math.max(0, u - 0.8) * 50 + Math.sin(t * 0.09 + u * 5) * 1.5 * u;
-      ctx.fillStyle = fl ? '#fcfcfc' : '#14301e'; ctx.beginPath(); ctx.ellipse(bx, by, r + 1, r * 0.8 + 1, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = fl ? '#fcfcfc' : k % 4 === 0 ? '#1c4c34' : '#2c7c4c'; ctx.beginPath(); ctx.ellipse(bx, by, r, r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
-      if (!fl) {
-        ctx.fillStyle = '#7cd89c'; ctx.fillRect(Math.round(bx - r * 0.5), Math.round(by - r * 0.65), Math.max(1, Math.round(r * 0.7)), 1); // Glanzkante
-        if (k % 3 === 1) { ctx.fillStyle = '#c8d888'; ctx.fillRect(Math.round(bx - r * 0.4), Math.round(by + r * 0.45), Math.max(1, Math.round(r * 0.8)), 1); } // heller Bauch
-      }
+      E(bx, by, r + 1, r * 0.8 + 1, fl ? '#fcfcfc' : '#0e2a1a');
+      E(bx, by, r, r * 0.8, fl ? '#fcfcfc' : '#2c7c4c');
+      if (fl) continue;
+      E(bx, by + r * 0.3, r * 0.92, r * 0.45, '#1c5a36'); // Schatten unten
+      if (k % 2 === 0) E(bx, by + r * 0.52, r * 0.62, r * 0.2, '#c8d490'); // helle Bauchschilde
+      E(bx - r * 0.12, by - r * 0.36, r * 0.66, r * 0.3, '#5cb878'); // Licht von oben
+      E(bx - r * 0.2, by - r * 0.48, r * 0.25, r * 0.12, '#c4f4cc'); // Glanz
+      if (k % 4 === 1) { ctx.fillStyle = '#0e2a1a'; ctx.beginPath(); ctx.moveTo(bx, by - r * 0.75); ctx.lineTo(bx + r * 0.35, by - r * 0.4); ctx.lineTo(bx, by - r * 0.05); ctx.lineTo(bx - r * 0.35, by - r * 0.4); ctx.closePath(); ctx.fill(); } // Rautenmuster
     }
+    this.hair(ctx, X, Y, t, fl, false); // hintere Schlangen
     const s = this.state === 'spit' || this.state === 'gaze' || this.state === 'rise' || this.state === 'heads' ? A.hiss : A.calm;
-    this.ds(ctx, s, X - 32, Y - 4, f > 0, fl);
-    // Schlangenhaar: neun Schlangen winden sich vom Kopf nach oben und zur Seite
-    for (let k = 0; k < 9; k++) {
-      const a = -Math.PI / 2 + (k - 4) * 0.37, len = 10 + (k % 3) * 3;
-      let px = X + Math.cos(a) * 6, py = Y + 10 + Math.sin(a) * 8;
-      for (let i = 0; i < len; i++) {
-        const w = Math.sin(t * 0.22 + k * 1.3 + i * 0.6) * 0.55, nx = px + Math.cos(a + w) * 1.2, ny = py + Math.sin(a + w) * 1.2;
-        ctx.fillStyle = fl ? '#fcfcfc' : i % 3 ? '#3c9c5c' : '#1c5c34'; ctx.fillRect(Math.round(nx), Math.round(ny), 2, 2);
-        px = nx; py = ny;
-      }
-      ctx.fillStyle = '#1c5c34'; ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 4, 3);
-      ctx.fillStyle = '#58c878'; ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 3, 2);
-      ctx.fillStyle = '#fc2020'; ctx.fillRect(Math.round(px), Math.round(py) - 1, 1, 1);
-    }
+    this.ds(ctx, s, X - 36, Y - 4, f > 0, fl);
+    this.hair(ctx, X, Y, t, fl, true); // vordere Schlangen
     ctx.restore();
     // Blick: die Augen glühen auf, bevor die Welle losbricht
     if (this.state === 'gaze' && !this.dying) {

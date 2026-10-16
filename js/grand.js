@@ -238,7 +238,7 @@ const Rays = (() => {
           if (grads.size > 48) grads.clear();
           let g = grads.get(rgb + len);
           if (!g) { g = ctx.createLinearGradient(0, 0, 0, len); g.addColorStop(0, `rgba(${rgb},0.26)`); g.addColorStop(0.55, `rgba(${rgb},0.1)`); g.addColorStop(1, `rgba(${rgb},0)`); grads.set(rgb + len, g); }
-          ctx.save(); ctx.translate(X, Y); ctx.globalAlpha = pulse;
+          ctx.save(); ctx.translate(X, Y); ctx.globalAlpha = pulse * (W.boss ? 0.4 : 1); // im Bosskampf gedämpft: der Boss soll nicht überstrahlt werden
           ctx.fillStyle = g; ctx.beginPath();
           ctx.moveTo(0, 0); ctx.lineTo(ww, 0); ctx.lineTo(ww + len * slant * 1.15, len); ctx.lineTo(len * slant * 0.85, len); ctx.closePath(); ctx.fill();
           // Staubkörnchen im Strahl

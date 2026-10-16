@@ -318,17 +318,25 @@ const Audio8 = (() => {
       pad: 'd3+f3+a3:32 d#3+g3+a#3:32 d3+f3+a3:32 c#3+e3+g#3:32',
       dr: [FOURX, DK, FOUR, FILLS, DK, DK, DK, FILLR].join(' '),
     },
-    // Schiff – Seemannslied im 6/8-Takt (d-Moll, 132 BPM): schunkelnd, mit Akkordeon-artigen Pulsen
+    // Schiff – Seemannslied im 6/8-Takt (d-Moll, 176 BPM): A-Teil = das Shanty-Thema über 16tel-Akkordeon und galoppierendem
+    // Bass, B-Teil = eine Oktave höher mit Läufen, 32tel-Arpeggien, pumpendem Bass und Doppel-Kick; Tom-Fill und Riser zum Loop
     sea: {
-      bpm: 142, loop: true, echo: { delay: 3, vol: 0.3 },
+      bpm: 176, loop: true, echo: { delay: 3, vol: 0.3 },
       p1: ['a4:3 d5:3 d5:2 e5:1 f5:3', 'e5:3 d5:3 a4:6', 'g4:3 c5:3 c5:2 d5:1 e5:3', 'd5:3 c5:3 g4:6',
         'a4:3 d5:3 f5:2 e5:1 d5:3', 'f5:3 a5:3 g5:2 f5:1 e5:3', 'e5:3 c#5:3 a4:3 b4:3', 'c#5:3 e5:3 a5:6',
         'c5:3 f5:3 f5:2 g5:1 a5:3', 'g5:3 e5:3 c5:6', 'd5:3 f5:3 a5:2 g5:1 f5:3', 'f5:3 d5:3 a#4:6',
-        'a4:3 c#5:3 e5:3 g5:3', 'f5:3 e5:3 d5:6', 'e5:3 c#5:2 d5:1 e5:3 a4:3', 'd5:9 -:3'].join(' '),
-      p2: SEA_C.map(c => { const [a, b, d] = SEA[c]; return `${a}:2 ${b}:2 ${d}:2 ${b}:2 ${d}:2 ${b}:2`; }).join(' '),
-      tri: SEA_C.map(c => { const [lo, hi] = SEA_B[c]; return `${lo}:2 ${hi}:1 ${lo}:2 ${hi}:1 ${lo}:2 ${hi}:1 ${lo}:2 ${hi}:1`; }).join(' '), // hüpfender Bass
-      pad: SEA_C.map(c => SEA[c].join('+') + ':12').join(' '),
-      dr: SEA_C.map((c, i) => i % 4 === 3 ? 'k:2 h:1 s:2 h:1 k:1 k:1 s:1 t:1 u:1 s:1' : i % 8 === 0 ? 'x:2 h:1 h:2 h:1 s:2 h:1 k:2 o:1' : 'k:2 h:1 h:2 h:1 s:2 h:1 k:2 h:1').join(' '),
+        'a4:3 c#5:3 e5:3 g5:3', 'f5:3 e5:3 d5:6', 'e5:3 c#5:2 d5:1 e5:3 a4:3', 'd5:6 a4:2 c#5:2 e5:2',
+        'd5:1 e5:1 f5:2 a5:2 d6:3 c6:1 a5:2', 'f5:2 a5:2 d6:2 f6:3 e6:1 d6:2', 'e5:1 f5:1 g5:2 c6:2 e6:3 d6:1 c6:2', 'g5:2 c6:2 e6:2 g6:4 e6:2',
+        'f6:2 e6:1 d6:1 a5:2 d6:2 f5:2 a5:2', 'd6:3 e6:1 f6:2 a6:4 g6:2', 'e6:2 c#6:1 a5:1 e5:2 a5:2 c#6:2 e6:2', 'g6:3 f6:1 e6:2 c#6:4 a5:2',
+        'a5:2 c6:2 f6:2 a6:3 g6:1 f6:2', 'g6:2 e6:2 c6:2 g5:2 c6:2 e6:2', 'f6:2 d6:1 a5:1 f5:2 a5:2 d6:2 f6:2', 'f6:3 d6:1 a#5:2 f5:2 a#5:2 d6:2',
+        'c#6:2 e6:2 a6:2 g6:2 f6:2 e6:2', 'f6:2 e6:2 d6:2 a5:4 f5:2', 'e5:1 f5:1 g5:1 a5:1 c#6:2 e6:2 g6:2 e6:2', 'd6:6 a5:2 f5:2 e5:2'].join(' '),
+      p2: SEA_C.map(c => { const [a, b, d] = SEA[c]; return rep(`${a}:1 ${b}:1 ${d}:1`, 4); }).join(' ') + ' ' + // Akkordeon in 16teln
+        SEA_C.map(c => { const [a, b, d] = SEA[c]; return Array.from({ length: 24 }, (_, i) => [a, b, d][i % 3] + ':0.5').join(' '); }).join(' '), // 32tel im B-Teil
+      tri: SEA_C.map(c => { const [lo, hi] = SEA_B[c]; return `${lo}:2 ${lo}:1 ${hi}:2 ${lo}:1 ${lo}:2 ${lo}:1 ${hi}:2 ${lo}:1`; }).join(' ') + ' ' + // Galopp
+        SEA_C.map(c => { const [lo, hi] = SEA_B[c]; return rep(`${lo}:1 ${lo}:1 ${hi}:1`, 4); }).join(' '), // pumpend
+      pad: rep(SEA_C.map(c => SEA[c].join('+') + ':12').join(' '), 2),
+      dr: SEA_C.map((c, i) => i % 4 === 3 ? 'k:1 h:1 q:1 h:1 k:1 k:1 q:1 h:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 h:1 o:1 h:1 k:1 h:1 q:1 h:1 o:1 k:1 k:1 h:1' : 'k:1 h:1 o:1 h:1 k:1 h:1 q:1 h:1 o:1 k:1 k:1 h:1').join(' ') + ' ' +
+        SEA_C.map((c, i) => i === 15 ? 'k:1 h:1 q:1 h:1 t:1 u:1 w:6' : i % 4 === 3 ? 'k:1 k:1 q:1 h:1 k:1 k:1 q:1 q:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 h:1 k:1 h:1 k:1 k:1 q:1 h:1 k:1 k:1 o:1 k:1' : 'k:1 h:1 k:1 h:1 k:1 k:1 q:1 h:1 k:1 k:1 o:1 k:1').join(' '), // B-Teil: Doppel-Kick
     },
     // Miniboss auf dem Schiff: der lila Tentakel
     kraken: {
