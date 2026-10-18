@@ -58,6 +58,7 @@ const Game = {
       const t0 = performance.now();
       try {
         while (acc >= 1000 / 60 && n < 4) { acc -= 1000 / 60; n++; this.step(); }
+        this.runWarm();
         if (!(window.Boot && Boot.cover)) this.render(); // unter dem deckenden Ladebildschirm nicht zeichnen
       } catch (e) { // jeden Fehler nur einmal melden, Spiel läuft weiter statt einzufrieren
         const key = String(e && e.message);
@@ -343,7 +344,6 @@ const Game = {
     Input.update();
     const P = Input.pressed;
     this.t++;
-    if (this.warmJobs && this.warmJobs.length && this.state !== 'play') { try { this.warmJobs.shift()(); } catch (e) { console.warn(e); } } // Vorbauen außerhalb des Spiels (Karte, Übergänge)
     this.idleT = Input.realHit ? 0 : (this.idleT || 0) + 1; // Leerlauf (für den Attract-Modus)
     // Arcade-Zählwerk: angezeigter Score rollt zum echten hoch
     if (this.dispScore === undefined || W.score < this.dispScore) this.dispScore = W.score;
@@ -393,6 +393,7 @@ const Game = {
         else if ((this.t > 60 * 9 && !Voice.busy()) || this.t > 60 * 24) this.newGame(0); // Erzähler ausreden lassen
         break;
       case 'card':
+        if (this.warming()) break; // erst wenn die Stage fertig vorgebaut ist (Ladebalken auf der Karte)
         if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
         break;
       case 'play': this.updatePlay(P); break;
@@ -773,7 +774,33 @@ const Game = {
     if (rooms.some(r => r.arena && r.arena.boss === 'count')) jobs.push(() => COUNT_ART.get());
     if (rooms.some(r => r.arena && r.arena.boss === 'medusa')) jobs.push(() => MEDUSA_ART.get());
     if (rooms.some(r => r.theme === 'cathedral' || r.theme === 'spire')) jobs.push(() => PS2.prewarm());
-    this.warmJobs = jobs;
+    jobs.push(() => this.warmRoom());
+    this.warmJobs = jobs; this.warmTotal = jobs.length; this.warmDoneT = -1;
+  },
+  warming() { return !!(this.warmJobs && this.warmJobs.length); },
+  // Vorbau-Schritte: pro gezeichnetem Bild so viele, wie in ~8 ms passen (mindestens einer) – nie mehrere schwere am Stück
+  runWarm() {
+    if (!this.warming() || this.state === 'play') return;
+    const t0 = performance.now();
+    do { try { this.warmJobs.shift()(); } catch (e) { console.warn(e); } } while (this.warmJobs.length && performance.now() - t0 < 8);
+    if (!this.warmJobs.length) this.warmDoneT = this.t;
+  },
+  // erster Raum einmal unsichtbar zeichnen: alles, was sonst beim ersten Bild gebaut würde (Wald, Torhaus, Lichter …), ist danach fertig
+  warmRoom() {
+    if (!W.room) return;
+    const c = this.warmC && this.warmC.width === View.w ? this.warmC : (this.warmC = Sprites.canvas(View.w, 240)), x = c.getContext('2d');
+    x.setTransform(1, 0, 0, 1, 0, 0); x.imageSmoothingEnabled = false;
+    const f = W.frame; W.draw(x); W.frame = f;
+  },
+  // Ladebildschirm (js/boot.js): alles, was sonst beim ersten Anzeigen von Menü, Karte und erster Stage gebaut würde
+  bootJobs() {
+    const c = Sprites.canvas(View.w, 240), x = c.getContext('2d'), jobs = [() => Audio8.prepare(), () => Mode7.mapData(), () => PS2.prewarmMap()];
+    this.prewarmStage(0); jobs.push(...this.warmJobs.filter((j, i, a) => i < a.length - 1)); this.warmJobs = null; this.warmTotal = 0; // Raum gibt es noch nicht
+    const st = this.state, t = this.t, s = W.stage;
+    jobs.push(() => { this.drawSkyScene(x); this.drawCharSel(x); }, () => this.drawIntro(x));
+    jobs.push(() => { W.stage = 0; try { this.drawCard(x); } finally { W.stage = s; } }); // 3D-Karte und Kapitelschriften einmal zeichnen
+    jobs.push(() => { this.state = st; this.t = t; });
+    return jobs;
   },
   big(ctx, text, cx, y, scale, colors, shadow, outline) { // alle Großschriften (Ausrufe, Combo, Titel der Menüs, Boss-Namen): PS2-3D
     return this.text3d(ctx, text, cx, y, scale, colors, { shadow, outline: !!outline, depth: Math.max(2, scale + 1), wobble: 0.2, bob: 0.4 });
@@ -878,6 +905,19 @@ const Game = {
     }
     Font.draw(ctx, tr('lives', Math.max(0, W.lives)), cx, 176, '#e0e0e0', { align: 'center', shadow: '#000' });
     Font.draw(ctx, tr('bossIs', tr(st.bossKey)), cx, 190, '#b0b0b0', { align: 'center', shadow: '#000' });
+    this.drawWarmBar(ctx, cx, 165);
+  },
+  drawWarmBar(ctx, cx, y) { // kurzer Ladebalken, solange die Stage vorgebaut wird; danach blitzt er auf und verschwindet
+    if (!this.warmTotal) return;
+    const left = this.warmJobs ? this.warmJobs.length : 0, k = 1 - left / this.warmTotal, since = this.warmDoneT >= 0 ? this.t - this.warmDoneT : -1;
+    if (since > 24) return;
+    const a = since < 0 ? 1 : 1 - since / 24, bw = 112, bx = Math.round(cx - bw / 2), fw = Math.round(bw * k);
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = '#100810'; ctx.fillRect(bx - 1, y - 1, bw + 2, 5); ctx.fillStyle = '#5c4020'; ctx.fillRect(bx - 1, y - 1, bw + 2, 1);
+    const g = ctx.createLinearGradient(bx, 0, bx + Math.max(1, fw), 0); g.addColorStop(0, '#580008'); g.addColorStop(0.7, '#d82800'); g.addColorStop(1, '#fcbca0');
+    ctx.fillStyle = since >= 0 && since < 6 ? '#fcfcfc' : g; ctx.fillRect(bx, y, fw, 3);
+    ctx.fillStyle = '#c89020'; for (const ex of [bx - 4, bx + bw + 3]) { ctx.fillRect(ex, y, 1, 3); ctx.fillRect(ex - 1, y + 1, 3, 1); }
+    ctx.restore();
   },
 
   drawClear(ctx) {

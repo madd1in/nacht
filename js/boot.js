@@ -247,11 +247,13 @@ var Boot = (() => {
   const BAT = [['1000001', '1100011', '0110110', '0011100', '0001000'], ['0000000', '0001000', '1111111', '1011101', '0001000'], ['0000000', '0001000', '0011100', '0110110', '1100011']];
   const spark = (px, py, vx, vy, life, col, sz = 1, g = 0, add = true) => { if (parts.length < 500) parts.push({ x: px, y: py, vx, vy, life, max: life, col, sz, g, add }); };
   const gameReady = () => { try { return typeof Game !== 'undefined' && !!Game.ctx; } catch (e) { return false; } };
-  const progress = () => { // fertig geladene Skripte und Bilder (Spiel: 27 Skripte + 9 Atlanten)
-    if (loaded) return 1;
+  let jobs = null, jobsN = 0; // Vorbau-Schritte des Spiels (Ton, Karte, erste Stage, Menüs) – laufen hier statt als Ruckler später
+  const progress = () => { // 0–80 %: fertig geladene Skripte und Bilder (27 Skripte + 9 Atlanten), 80–100 %: Vorbau
+    if (jobs) return 0.8 + 0.2 * (jobsN ? (jobsN - jobs.length) / jobsN : 1);
+    if (loaded) return 0.8;
     let n = 0; const es = performance.getEntriesByType ? performance.getEntriesByType('resource') : [];
     for (const e of es) if (/\/(js|img)\/[^?]+\.(js|png)/.test(e.name)) n++;
-    return Math.min(0.94, n / Math.max(36, n + 2));
+    return Math.min(0.94, n / Math.max(36, n + 2)) * 0.8;
   };
   window.addEventListener('load', () => { loaded = true; loadT = t; });
 
@@ -292,7 +294,8 @@ var Boot = (() => {
       const target = progress();
       if (target > disp) disp = Math.min(target, disp + Math.min(0.011, (target - disp) * 0.12 + 0.0015));
       letters.forEach((L, i) => { if (L.on < 0 && disp >= (i + 1) / 9 - 0.001) ignite(i); });
-      if (disp >= 0.999 && loaded && (gameReady() || t - loadT > 240)) { B.state = 'ready'; readyT = t; flare = 0.8; strike(true); }
+      if (!jobs && loaded && gameReady()) { try { jobs = Game.bootJobs ? Game.bootJobs() : []; } catch (e) { console.warn(e); jobs = []; } jobsN = jobs.length; }
+      if (disp >= 0.999 && ((jobs && !jobs.length) || (loaded && !gameReady() && t - loadT > 240))) { B.state = 'ready'; readyT = t; flare = 0.8; strike(true); }
     } else if (B.state === 'ready' && navigator.getGamepads) {
       for (const p of navigator.getGamepads()) if (p && p.buttons.some(b => b.pressed)) { exit(); break; }
     } else if (B.state === 'exit') {
@@ -427,6 +430,11 @@ var Boot = (() => {
     if (resized) { resized = false; fit(); }
     acc += Math.min(100, now - last); last = now;
     let n = 0; while (acc >= 1000 / 60 && n < 4) { acc -= 1000 / 60; n++; update(); if (B.state === 'gone') return; }
+    if (jobs && jobs.length) { // Vorbau: pro Bild so viel, wie in ~10 ms passt (mindestens ein Schritt)
+      const t0 = performance.now();
+      do { try { jobs.shift()(); } catch (e) { console.warn(e); } } while (jobs.length && performance.now() - t0 < 10);
+      last = performance.now(); // die Zeit des Vorbaus nicht als Spielzeit nachholen
+    }
     render();
   }
   fit(); render(); requestAnimationFrame(frame);

@@ -2719,7 +2719,7 @@ const Tiles = (() => {
     const x0 = Math.floor(cam.x / T), x1 = x0 + Math.ceil(View.w / T) + 1;
     const y0 = Math.max(0, Math.floor(cam.y / T)), y1 = Math.min(room.h - 1, y0 + 14);
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
-    if (!FLAT3D.has(room.theme) && !View.lite && !View.lite3d) draw3DFaces(ctx, room, cam, t, x0 - 2, x1 + 2, y0, y1, ox, oy);
+    if (!FLAT3D.has(room.theme) && !View.lite3d) draw3DFaces(ctx, room, cam, t, x0 - 2, x1 + 2, y0, y1, ox, oy);
     const deco = [];
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       const out = cx < 0 || cx >= room.w; // außerhalb schmaler Räume: Mauer (Bibliothek: Bücherwand)

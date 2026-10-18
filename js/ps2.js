@@ -66,11 +66,22 @@ const PS2 = (() => {
 
   // ---------------- Rendern ----------------
   // cam: { x, y, z, yaw, pitch, f, near, hy }  env: { sun:[x,y,z], sunC, amb, sky, fog, fogD }
-  const css = (r, g, b) => `rgb(${r | 0},${g | 0},${b | 0})`;
+  const CSSQ = new Map(); // Farben auf 4er-Stufen gerundet und zwischengespeichert: keine neuen Farb-Strings pro Fläche und Bild
+  const css = (r, g, b) => {
+    r = (r > 255 ? 255 : r) >> 2; g = (g > 255 ? 255 : g) >> 2; b = (b > 255 ? 255 : b) >> 2;
+    const k = (r << 12) | (g << 6) | b; let s = CSSQ.get(k);
+    if (!s) { s = `rgb(${r << 2},${g << 2},${b << 2})`; CSSQ.set(k, s); }
+    return s;
+  };
+  // Puffer für die 3D-Bilder auf der CPU rastern: Tausende kleine Polygone pro Bild sind dort schnell, auf einer GPU-Canvas
+  // kostet jeder einzelne Zeichenaufruf viel Verwaltung (die Karte brauchte so >100 ms pro Bild). Hochgeladen wird nur das fertige Bild.
+  const CPU2D = { willReadFrequently: true };
+  const POOL = []; // wiederverwendete Polygon-Datensätze (sonst Tausende neue Objekte pro Bild → Müllabfuhr-Ruckler)
   function render(x, W, H, list, cam, env) {
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-    const f = cam.f, hx = W / 2, hy = H * (cam.hy ?? 0.5), near = cam.near || 4, polys = [];
+    const f = cam.f, hx = W / 2, hy = H * (cam.hy ?? 0.5), near = cam.near || 4;
     const L = env.sun, S = env.sunC, A = env.amb, K = env.sky, F = env.fog, fd = env.fogD;
+    let np = 0;
     for (const m of list) {
       const V = m.v, n = V.length / 3, P = m._p && m._p.length === V.length ? m._p : (m._p = new Float32Array(V.length));
       for (let i = 0; i < n; i++) {
@@ -81,30 +92,37 @@ const PS2 = (() => {
       for (const fc of m.f) {
         const i0 = fc.i[0] * 3;
         if (!fc.two && fc.n[0] * (cam.x - V[i0]) + fc.n[1] * (cam.y - V[i0 + 1]) + fc.n[2] * (cam.z - V[i0 + 2]) <= 0) continue; // Rückseite
-        const pts = []; let zs = 0, minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, bad = false;
-        for (const i of fc.i) {
-          const z = P[i * 3 + 2]; if (z < near) { bad = true; break; }
-          const X = hx + P[i * 3] * f / z, Y = hy - P[i * 3 + 1] * f / z;
-          pts.push(X, Y); zs += z;
+        const ids = fc.i, nv = ids.length;
+        let p = POOL[np]; if (!p) p = POOL[np] = { z: 0, n: 0, pts: new Float32Array(16), col: '' };
+        if (p.pts.length < nv * 2) p.pts = new Float32Array(nv * 2);
+        const pts = p.pts; let zs = 0, minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, bad = false;
+        for (let j = 0; j < nv; j++) {
+          const i = ids[j] * 3, z = P[i + 2]; if (z < near) { bad = true; break; }
+          const X = hx + P[i] * f / z, Y = hy - P[i + 1] * f / z;
+          pts[j * 2] = X; pts[j * 2 + 1] = Y; zs += z;
           if (X < minX) minX = X; if (X > maxX) maxX = X; if (Y < minY) minY = Y; if (Y > maxY) maxY = Y;
         }
         if (bad || maxX < 0 || minX > W || maxY < 0 || minY > H) continue;
-        const zm = zs / fc.i.length, nn = fc.n;
-        const d = Math.max(0, nn[0] * L[0] + nn[1] * L[1] + nn[2] * L[2]), up = 0.5 + 0.5 * nn[1];
-        let r = fc.c[0] * (A[0] + d * S[0] + up * K[0]), g = fc.c[1] * (A[1] + d * S[1] + up * K[1]), b = fc.c[2] * (A[2] + d * S[2] + up * K[2]);
-        if (fc.e) { r += 255 * fc.e; g += 200 * fc.e; b += 120 * fc.e; }
+        const zm = zs / nv;
+        let lc = env.static && fc._env === env ? fc._l : null; // Licht je Fläche: bei fester Umgebung nur einmal rechnen
+        if (!lc) {
+          const nn = fc.n, d = Math.max(0, nn[0] * L[0] + nn[1] * L[1] + nn[2] * L[2]), up = 0.5 + 0.5 * nn[1];
+          lc = [fc.c[0] * (A[0] + d * S[0] + up * K[0]), fc.c[1] * (A[1] + d * S[1] + up * K[1]), fc.c[2] * (A[2] + d * S[2] + up * K[2])];
+          if (fc.e) { lc[0] += 255 * fc.e; lc[1] += 200 * fc.e; lc[2] += 120 * fc.e; }
+          if (env.static) { fc._l = lc; fc._env = env; }
+        }
         const k = 1 - Math.exp(-zm * fd);
-        r = r * (1 - k) + F[0] * k; g = g * (1 - k) + F[1] * k; b = b * (1 - k) + F[2] * k;
-        polys.push({ z: zm, pts, col: css(Math.min(255, r), Math.min(255, g), Math.min(255, b)) });
+        p.z = zm; p.n = nv; p.col = css(lc[0] * (1 - k) + F[0] * k, lc[1] * (1 - k) + F[1] * k, lc[2] * (1 - k) + F[2] * k);
+        np++;
       }
     }
-    polys.sort((a, b) => b.z - a.z);
+    const polys = POOL.slice(0, np).sort((a, b) => b.z - a.z);
     x.lineWidth = 0.7; x.lineJoin = 'round';
     for (const p of polys) {
-      const q = p.pts; x.fillStyle = p.col; x.strokeStyle = p.col;
-      x.beginPath(); x.moveTo(q[0], q[1]); for (let k = 2; k < q.length; k += 2) x.lineTo(q[k], q[k + 1]); x.closePath(); x.fill(); x.stroke(); // Kontur schließt Fugen
+      const q = p.pts, n2 = p.n * 2; x.fillStyle = p.col; x.strokeStyle = p.col;
+      x.beginPath(); x.moveTo(q[0], q[1]); for (let k = 2; k < n2; k += 2) x.lineTo(q[k], q[k + 1]); x.closePath(); x.fill(); x.stroke(); // Kontur schließt Fugen
     }
-    return polys.length;
+    return np;
   }
   function project(cam, W, H, X, Y, Z) { // einzelner Punkt → [sx, sy, z]
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
@@ -171,7 +189,7 @@ const PS2 = (() => {
   { const v = [-0.55, 0.32, 0.77], l = Math.hypot(...v); ENV.sun = v.map(c => c / l); }
   let buf = null;
   function getBuf(w, h) {
-    if (!buf || buf.c.width !== w || buf.c.height !== h) { buf = { c: Sprites.canvas(w, h), key: null }; buf.x = buf.c.getContext('2d'); }
+    if (!buf || buf.c.width !== w || buf.c.height !== h) { buf = { c: Sprites.canvas(w, h), key: null }; buf.x = buf.c.getContext('2d', CPU2D); }
     return buf;
   }
   // Zeitraffer: Tag und Nacht wechseln ständig (ein Tag = DAY Bilder). Je Tageszeit: Zenit, Mitte, Horizont, Dunst,
@@ -411,7 +429,7 @@ const PS2 = (() => {
     if (!forest) forest = buildForest();
     const w = View.w, lite = View.lite, dv = lite ? 3 : 2, Wb = Math.ceil(w / dv), Hb = Math.ceil(208 / dv);
     let B = fbuf[band];
-    if (!B || B.c.width !== Wb) { B = fbuf[band] = { c: Sprites.canvas(Wb, Hb), key: null }; B.x = B.c.getContext('2d'); }
+    if (!B || B.c.width !== Wb) { B = fbuf[band] = { c: Sprites.canvas(Wb, Hb), key: null }; B.x = B.c.getContext('2d', CPU2D); }
     const camX = cam.x + w / 2, key = Math.round(cam.x / (lite ? 3 : 2)) + '|' + Wb;
     if (B.key !== key) {
       B.key = key; B.x.clearRect(0, 0, Wb, Hb);
@@ -499,7 +517,7 @@ const PS2 = (() => {
   };
   function drawSea(ctx, w, t, o = {}) {
     const TOP = 48, t0 = performance.now(), lo = View.lite || seaLo, Wb = Math.ceil(w / 2), Hb = SEA.H + TOP, HY = o.horizon || 122; // TOP: Luft über dem Meer für hohe Fangarme
-    if (!seaBuf || seaBuf.c.width !== Wb) { seaBuf = { c: Sprites.canvas(Wb, Hb) }; seaBuf.x = seaBuf.c.getContext('2d'); }
+    if (!seaBuf || seaBuf.c.width !== Wb) { seaBuf = { c: Sprites.canvas(Wb, Hb) }; seaBuf.x = seaBuf.c.getContext('2d', CPU2D); }
     const x = seaBuf.x; x.clearRect(0, 0, Wb, Hb);
     const calm = o.calm === undefined ? 1 : o.calm, A = 30 * (0.3 + 0.7 * calm), light = o.flash ? 1.6 : 1;
     const CAM = SEA.CAM + (o.lift || 0), F = SEA.F, HOR = SEA.HOR + TOP, fx = Wb / (2 * 0.95), q = F / fx;
@@ -574,7 +592,7 @@ const PS2 = (() => {
   // plätzen stehen Burgen als Low-Poly-Modelle (Burghof, Gruft, Bergfried, Sonnenkathedrale, Schloss des Grafen), dazwischen
   // der Weg über das Land und Tannen. Die Kamera kreist um das aktuelle Kapitel, die Burg dort leuchtet.
   let world = null, wmBuf = null;
-  const WENV = { sun: null, sunC: [0.6, 0.62, 0.95], amb: [0.7, 0.66, 0.8], sky: [0.12, 0.12, 0.2], fog: [52, 30, 80], fogD: 0.0042 };
+  const WENV = { static: true, sun: null, sunC: [0.6, 0.62, 0.95], amb: [0.7, 0.66, 0.8], sky: [0.12, 0.12, 0.2], fog: [52, 30, 80], fogD: 0.0042 };
   { const v = [-0.5, 0.75, 0.45], l = Math.hypot(...v); WENV.sun = v.map(c => c / l); }
   function buildWorld() {
     const D = Mode7.mapData(), MS = D.MS, HS = 70, N = 48, cs = MS / N, chunks = [];
@@ -589,7 +607,15 @@ const PS2 = (() => {
         face(m, [a, d, c], col, null, { two: true }); face(m, [a, c, b], col, null, { two: true });
       }
       for (const f of m.f) if (f.n[1] < 0) f.n = f.n.map(v => -v); // Normalen nach oben
-      m.cx = (ci * 8 + 4) * cs; m.cz = (cj * 8 + 4) * cs; chunks.push(m);
+      const lo = mesh(), li = []; // in der Ferne: dasselbe Stück mit halber Auflösung (4 x 4 Zellen)
+      for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) { const x = (ci * 8 + i * 2) * cs, y = (cj * 8 + j * 2) * cs; li.push(vtx(lo, x, H(x, y), y)); }
+      for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+        const a = li[j * 5 + i], b = a + 1, c = li[(j + 1) * 5 + i + 1], d = li[(j + 1) * 5 + i];
+        const col = colAt((ci * 8 + i * 2 + 1) * cs, (cj * 8 + j * 2 + 1) * cs).map(v => Math.min(255, v * 1.15));
+        face(lo, [a, d, c], col, null, { two: true }); face(lo, [a, c, b], col, null, { two: true });
+      }
+      for (const f of lo.f) if (f.n[1] < 0) f.n = f.n.map(v => -v);
+      m.lo = lo; m.cx = (ci * 8 + 4) * cs; m.cz = (cj * 8 + 4) * cs; chunks.push(m);
     }
     const props = mesh(), glow = [];
     const STONE = [150, 144, 170], STONE2 = [110, 104, 132], ROOF = [150, 30, 44], DARKR = [60, 40, 70], GOLDM = [250, 210, 110], WHITE = [236, 230, 220];
@@ -613,7 +639,7 @@ const PS2 = (() => {
     if (!world) world = buildWorld();
     const D = Mode7.mapData(), P = D.POINTS[Math.max(0, Math.min(D.POINTS.length - 1, stage))], ang = t * 0.006 + stage * 1.3;
     const lite = View.lite, Wb = Math.ceil(w / 2), Hb = 104;
-    if (!wmBuf || wmBuf.c.width !== Wb) { wmBuf = { c: Sprites.canvas(Wb, Hb) }; wmBuf.x = wmBuf.c.getContext('2d'); }
+    if (!wmBuf || wmBuf.c.width !== Wb) { wmBuf = { c: Sprites.canvas(Wb, Hb) }; wmBuf.x = wmBuf.c.getContext('2d', CPU2D); }
     const x = wmBuf.x, fx = Math.sin(ang), fz = -Math.cos(ang), R = 150, cx = P[0] - fx * R, cz = P[1] - fz * R, cy = world.H(P[0], P[1]) + 78;
     const cam = { x: cx, y: cy, z: cz, yaw: Math.atan2(fx, fz), pitch: -0.36, f: Wb * 1.1, near: 3, hy: 0.3 };
     if (!(wmBuf.done && (lite ? t % 3 : t & 1))) { // die Karte dreht sich langsam: jedes zweite (Sparmodus: dritte) Bild genügt
@@ -622,7 +648,8 @@ const PS2 = (() => {
       for (let i = 0; i < 50; i++) { const sx = ((i * 89 - ang * 120) % Wb + Wb) % Wb, sy = (i * 37) % (Hb * 0.3); x.fillStyle = i % 5 ? 'rgba(200,200,240,0.7)' : '#fff'; x.fillRect(sx, sy, 1, 1); }
       const mx = (((Wb * 0.7 - ang * 60) % (Wb * 1.6)) + Wb * 1.6) % (Wb * 1.6) - Wb * 0.3, mg = x.createRadialGradient(mx, 12, 0, mx, 12, 18); // Blutmond
       mg.addColorStop(0, '#f86040'); mg.addColorStop(0.3, '#c82830'); mg.addColorStop(0.36, 'rgba(160,30,50,0.5)'); mg.addColorStop(1, 'rgba(120,20,40,0)'); x.fillStyle = mg; x.fillRect(mx - 18, 0, 36, 32);
-      const vis = world.chunks.filter(m => { const a = (m.cx - cx) * fx + (m.cz - cz) * fz, b = Math.abs((m.cx - cx) * -fz + (m.cz - cz) * fx); return a > -20 && a < 330 && b < a * 0.75 + 40; }); // nur Stücke im Blickfeld
+      const vis = world.chunks.filter(m => { const a = (m.cx - cx) * fx + (m.cz - cz) * fz, b = Math.abs((m.cx - cx) * -fz + (m.cz - cz) * fx); return a > -20 && a < 330 && b < a * 0.75 + 40; }) // nur Stücke im Blickfeld
+        .map(m => ((m.cx - cx) ** 2 + (m.cz - cz) ** 2 > 215 * 215 ? m.lo : m)); // ferne Stücke gröber
       render(x, Wb, Hb, vis.concat([world.props]), cam, WENV);
       x.save(); x.globalCompositeOperation = 'lighter'; // Fackelschein an den Burgen, das aktuelle Kapitel leuchtet
       world.glow.forEach(([gx, gy, gz], i) => { const [sx, sy, sz] = project(cam, Wb, Hb, gx, gy + 6, gz); if (sz < 4) return; const r = (i === stage ? 26 : 10) * 30 / sz * (i === stage ? 1 + 0.15 * Math.sin(t * 0.15) : 1), gg = x.createRadialGradient(sx, sy, 0, sx, sy, r); gg.addColorStop(0, i === stage ? 'rgba(255,200,90,0.55)' : 'rgba(255,140,60,0.3)'); gg.addColorStop(1, 'rgba(255,120,40,0)'); x.fillStyle = gg; x.fillRect(sx - r, sy - r, r * 2, r * 2); });
@@ -633,5 +660,6 @@ const PS2 = (() => {
   }
 
   const prewarm = () => { if (!city) city = buildCity(); };
-  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, Tower, ENV, prewarm, dayNight };
+  const prewarmMap = () => { if (!world) world = buildWorld(); }; // Ladebildschirm: Kartenlandschaft vorab bauen
+  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, Tower, ENV, prewarm, prewarmMap, dayNight };
 })();

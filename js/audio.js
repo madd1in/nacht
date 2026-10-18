@@ -8,9 +8,17 @@ const Audio8 = (() => {
   let musicLevel = 1;
   const NOTE = { c: 0, 'c#': 1, d: 2, 'd#': 3, e: 4, f: 5, 'f#': 6, g: 7, 'g#': 8, a: 9, 'a#': 10, b: 11 };
 
-  let tapDest = null;
+  let tapDest = null, preAc = null;
+  // Kontext und Klangkette vorab aufbauen (der Browser hält ihn bis zur ersten Nutzeraktion angehalten): kostet ~0,3 s –
+  // im Ladebildschirm statt als Ruckler beim ersten Tastendruck. Bis init() bleibt ac leer, damit nichts vorher eingereiht wird.
+  function prepare() { if (ac || preAc) return; setup(); preAc = ac; ac = null; }
   function init() {
     if (ac) { if (ac.state === 'suspended') ac.resume().catch(() => {}); return; }
+    if (preAc) { ac = preAc; preAc = null; if (ac.state === 'suspended') ac.resume().catch(() => {}); } else setup();
+    if (!ac) return;
+    if (pending) { const p = pending; pending = null; play(p); }
+  }
+  function setup() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ac = new AC();
@@ -49,7 +57,6 @@ const Audio8 = (() => {
       for (let k = 1; k < n; k++) im[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty);
       pulseWaves[duty] = ac.createPeriodicWave(re, im);
     });
-    if (pending) { const p = pending; pending = null; play(p); }
   }
   const ready = () => !!ac && ac.state === 'running';
 
@@ -726,7 +733,7 @@ const Audio8 = (() => {
   function muffle(on) { if (muffleF && ac) muffleF.frequency.setTargetAtTime(on ? 650 : openFreq(), ac.currentTime, on ? 0.04 : 0.12); }
   function duck(on) { if (duckBus && ac) duckBus.gain.setTargetAtTime(on ? 0.45 : 1, ac.currentTime, on ? 0.06 : 0.5); }
 
-  return { init, sfx, play, stop, ambience, drip, toggleMute, setMusicVolume, setMusicLevel, ready, duck, muffle, tempo,
+  return { init, prepare, sfx, play, stop, ambience, drip, toggleMute, setMusicVolume, setMusicLevel, ready, duck, muffle, tempo,
     context: () => ac, voiceOut: () => voiceBus,
     stream: () => { if (!ac) return null; if (!tapDest) { tapDest = ac.createMediaStreamDestination(); comp.connect(tapDest); } return tapDest.stream; }, // Mitschnitt (Trailer-Aufnahme)
     get muted() { return muted; }, get current() { return songName; }, _songs: parsed };
