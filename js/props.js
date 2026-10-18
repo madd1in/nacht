@@ -478,10 +478,11 @@ class Gatehouse extends Ent {
     for (let i = 0; i <= 60; i++) { const k = i / 60, sx = wx + (tp.x - wx) * k, sy = wy + (tp.y - wy) * k + Math.sin(k * Math.PI) * slack; ctx.fillRect(Math.round(sx - cx), Math.round(sy - cy), 1, 1); }
     this.drawBridge(ctx, cx, cy); // Zugbrücke: schwerer Bohlenkörper mit Eisenbändern, dreht um das Scharnier
     this.drawTowerDeco(ctx);
+    this.drawPassage(ctx); // der dunkle Durchgang liegt immer hinter dem Helden
     if (!this.inside()) this.drawFrontParts(ctx);
   }
-  drawFront(ctx) { if (this.inside()) this.drawFrontParts(ctx); } // Held im Torbogen: die Torfront liegt vor ihm
-  inside() { const p = W.player; return p.cx > this.archCx && p.cx < this.hx + GH.A + 6; }
+  drawFront(ctx) { if (this.inside()) this.drawFrontParts(ctx); } // Held im Torbau: Torfront mit Pfeilern, Gitter und Fackeln liegt vor ihm
+  inside() { const p = W.player; return p.cx > this.hx - 6 && p.cx < this.hx + GH.A + 6; } // ab dem ersten Pfeiler bis hinter den letzten
   // Mauerwerk aus den Bodenblöcken des Burghofs (64 x 256, im Verband versetzt), etwas dunkler als der Boden
   static stoneTex() {
     if (Gatehouse.ST) return Gatehouse.ST;
@@ -570,7 +571,6 @@ class Gatehouse extends Ent {
   }
   drawFrontParts(ctx) {
     const cx = W.cam.x, cy = W.cam.y;
-    this.drawPassage(ctx);
     // Fallgitter im Bogen: dicke Stäbe, Querbänder, lange Spitzen – wird in die Mauer gezogen
     const ax = this.archX - cx, aw = GH.SPAN, bot = this.hy - cy - Math.round(this.gy);
     ctx.save();
