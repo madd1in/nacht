@@ -523,6 +523,7 @@ class Raven extends Enemy {
 // d: { x0, x1: Graben (Kacheln), gx: Spalte des Fallgitters, winch: Spalte der Winde, row: Bodenreihe }
 const GH = { L: 56, A: 80, R: 96, IN: 12, SPAN: 56, SPRING: 112 }; // Turm links, Torbau, Turm rechts, Laibung, Bogenweite, Kämpferhöhe
 class Gatehouse extends Ent {
+  static ENV = (() => { const v = [0.55, 0.62, -0.55], l = Math.hypot(...v); return { static: true, sun: v.map(c => c / l), sunC: [0.62, 0.56, 0.86], amb: [0.36, 0.3, 0.42], sky: [0.12, 0.1, 0.18], fog: [20, 12, 36], fogD: 0.0009 }; })(); // Mondlicht von rechts vorn
   constructor(d) {
     const hx = (d.x1 + 1) * T;
     super(hx - GH.L, 0, GH.L + GH.A + GH.R, d.row * T + T);
@@ -587,8 +588,10 @@ class Gatehouse extends Ent {
       this.gv += 1.1; this.gy = Math.max(0, this.gy - this.gv);
       if (this.gy === 0) {
         this.gate = 'shut'; this.gateTiles('G');
-        W.shake = Math.max(W.shake, 12); Input.rumble(0.8, 0.6, 350); Audio8.sfx('wall', this.archCx); Audio8.sfx('crack', this.archCx);
-        for (let i = 0; i < 8; i++) W.dust(this.archX + 4 + i * 7, this.hy, 2);
+        const G = this.geo();
+        W.shake = Math.max(W.shake, 26); W.sway.v += 0.012; Input.rumble(1, 0.9, 700); Audio8.sfx('wall', this.archCx); Audio8.sfx('crack', this.archCx); Audio8.sfx('boom', G.gx1);
+        W.zoomFx = { t: 0, len: 96, amp: 0.3, b: { cx: G.gx1 - 4, cy: this.hy - 54 } }; // Kamera fährt auf das Fallgatter
+        for (let i = 0; i < 10; i++) { W.dust(this.geo().gx1 + (i % 2 ? 1 : -1) * (i * 3), this.hy, 3); W.dust(this.geo().gx0 + (i % 2 ? 1 : -1) * (i * 3), this.hy, 2); }
         Game.note('gateNote');
       }
     }
@@ -599,170 +602,150 @@ class Gatehouse extends Ent {
     return { x: this.hx - Math.cos(a) * L - Math.sin(a) * 7, y: this.hy - Math.sin(a) * L + Math.cos(a) * 7 };
   }
   lights(L, cx, cy, flick) {
-    const f = Math.sin(this.t * 0.3) * 2, eye = 0.35 + 0.2 * Math.sin(this.t * 0.07);
-    L.push({ x: this.hx + 6 - cx, y: 128 - cy, r: 34 + f + flick(this.hx), c: [248, 140, 40], a: 0.6 },
-      { x: this.hx + GH.A - 6 - cx, y: 128 - cy, r: 34 - f + flick(this.hx + 9), c: [248, 140, 40], a: 0.6 },
-      { x: this.archCx - cx, y: 50 - cy, r: 18, c: [252, 30, 30], a: eye },            // glühende Augen im Schädel
-      { x: this.hx - 28 - cx, y: 78 - cy, r: 18, c: [252, 40, 40], a: 0.4 },           // rote Turmfenster
-      { x: this.hx + GH.A + 34 - cx, y: 58 - cy, r: 16, c: [252, 40, 40], a: 0.4 });
+    const G = this.geo(), eye = 0.45 + 0.25 * Math.sin(this.t * 0.07), fade = this.fade ?? 1;
+    for (const [x, y, z, r, c, a] of [[G.X0 + 18, 72, G.FZ - 4, 40, [248, 140, 40], 0.65 * fade], [G.X1 - 18, 72, G.FZ - 4, 40, [248, 140, 40], 0.65 * fade],
+      [G.X0 + 50, 62, G.TZ - 3, 30, [248, 140, 40], 0.5], [G.X1 - 50, 62, G.TZ - 3, 30, [248, 140, 40], 0.5], [(G.X0 + G.X1) / 2, 90, G.FZ - 18, 22, [252, 30, 30], eye * fade]]) {
+      const [sx, sy] = this.proj(x, y, z); L.push({ x: sx, y: sy, r: r + flick(x), c, a });
+    }
   }
-  // PS2-3D-Torhaus in derselben Perspektive wie die Kacheln (Fluchtpunkt Bildmitte/y 60, Spielebene z = 0, f = 200):
-  // runde Türme als Zylinder, Spalte für Spalte per Sehstrahl getroffen und mit dem Mauerwerk der Bodenblöcke texturiert
-  // (beim Vorbeigehen dreht sich der Mantel weg), Torbau mit Seitenwänden und einem Durchgang, der in die Tiefe führt.
-  draw(ctx) { // hinter dem Helden: Türme, Seitenwände, Durchgang, Zugbrücke, Ketten, Seil – und der Torbau, solange der Held draußen ist
+  // ---------------- PS2-3D-Torhaus ----------------
+  // Echtes 3D in derselben Perspektive wie die Kacheln (Fluchtpunkt Bildmitte/y 60, Spielebene z = 0, Kamera 200 davor).
+  // Weltkoordinaten: x wie das Spielfeld, y nach oben ab dem Boden, z in die Tiefe. Der Torweg läuft entlang des Laufwegs
+  // durch das Torhaus – die Eingangsseite schaut dem Helden entgegen, in der Perspektive sieht man den Bogen schräg.
+  // Die Mauer zwischen Torweg und Betrachter (Fassade mit Pechnasen, Schießscharten, Totenkopf, Bannern) wird zur
+  // Schnittansicht, sobald der Held drinnen ist. Zwei Fallgatter (Ein- und Ausgang), dahinter zwei riesige Rundtürme.
+  geo() {
+    const X0 = this.hx - 6, X1 = this.hx + GH.A + GH.R + 6;
+    return { X0, X1, TZ: 22, TH: 112, TS: 86, FZ: -48, HB: 140, gx0: this.gx * T + 8, gx1: X1 - 26 };
+  }
+  static stoneCol(i, j, k, base) { // Quader: Helligkeit je Stein leicht verschieden
+    const h = ((i * 73856093) ^ (j * 19349663) ^ (k * 83492791)) >>> 0, n = (h % 1000) / 1000;
+    return [base[0] + (n - 0.5) * 22, base[1] + (n - 0.5) * 20, base[2] + (n - 0.5) * 24];
+  }
+  // Viereckfeld: Ursprung o, Kanten U und V (nu x nv Quader), Normale vom Punkt inside weg
+  static panel(m, o, U, V, nu, nv, col, inside, opt = {}) {
+    const P = (i, j) => PS2.vtx(m, o[0] + U[0] * i / nu + V[0] * j / nv, o[1] + U[1] * i / nu + V[1] * j / nv, o[2] + U[2] * i / nu + V[2] * j / nv);
+    const ids = []; for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) ids.push(P(i, j));
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+      const a = ids[j * (nu + 1) + i], b = a + 1, c = ids[(j + 1) * (nu + 1) + i + 1], d = ids[(j + 1) * (nu + 1) + i];
+      PS2.face(m, [a, b, c, d], typeof col === 'function' ? col(i, j) : col, inside, opt);
+    }
+  }
+  buildMeshes() {
+    const G = this.geo(), { X0, X1, TZ, TH, TS, FZ, HB } = G, M = Gatehouse;
+    const STONE = [96, 90, 110], STONE2 = [74, 68, 88], INNER = [26, 22, 32], LIGHT = [134, 126, 150], IRON = [40, 38, 50], RED = [255, 60, 40], BONE = [220, 212, 190];
+    const back = PS2.mesh(), front = PS2.mesh(), L = X1 - X0;
+    const sc = (base, k) => (i, j) => M.stoneCol(i, j, k, base);
+    // --- Fassade (vorn, wird beim Durchgehen durchsichtig) ---
+    M.panel(front, [X0, 0, FZ], [L, 0, 0], [0, HB, 0], 8, 14, sc(STONE, 1), [(X0 + X1) / 2, HB / 2, 0]);
+    M.panel(front, [X0, 0, FZ], [0, 0, TZ * -1 - FZ], [0, HB, 0], 2, 14, sc(STONE2, 2), [X0 + 20, HB / 2, -35]);   // linke Stirn der Fassade
+    M.panel(front, [X1, 0, FZ], [0, 0, TZ * -1 - FZ], [0, HB, 0], 2, 14, sc(STONE2, 3), [X1 - 20, HB / 2, -35]);   // rechte Stirn
+    for (let x = X0 + 14; x < X1 - 6; x += 30) PS2.box(front, x, 0, FZ - 4, 10, HB - 22, 8, STONE2, { top: LIGHT }); // Strebepfeiler
+    for (let x = X0 + 6; x <= X1 - 6; x += 15) PS2.box(front, x, 112, FZ - 6, 6, 8, 10, STONE2);                    // Pechnasen (Konsolen)
+    PS2.box(front, (X0 + X1) / 2, 120, FZ - 7, L + 8, 20, 12, STONE, { top: LIGHT });                                  // Brüstung darüber
+    for (let x = X0 + 2; x <= X1 - 2; x += 14) { PS2.box(front, x, HB, FZ + 4, 8, 12, 10, STONE, { top: LIGHT }); PS2.cone(front, x, HB + 12, FZ + 4, 1.4, 9, 4, IRON); } // Zinnen mit Eisendornen
+    for (const [x, y] of [[X0 + 34, 26], [X0 + 92, 26], [X1 - 34, 26], [X0 + 64, 70], [X1 - 64, 70], [(X0 + X1) / 2, 132]]) { // Schießscharten glühen rot
+      PS2.box(front, x, y, FZ - 0.6, 4, 18, 1, [12, 4, 6]); PS2.box(front, x, y + 3, FZ - 1.2, 2, 12, 1, RED, { e: 0.9 });
+    }
+    { const cx = (X0 + X1) / 2, cy = 84, z = FZ - 6; // Totenkopf über dem verborgenen Torweg
+      PS2.prism(front, cx, cy, z, 13, 15, 10, BONE, { rTop: 11 }); PS2.cone(front, cx, cy + 15, z, 11, 7, 10, BONE);
+      PS2.box(front, cx, cy - 7, z, 16, 8, 14, BONE); for (let k = -3; k <= 3; k++) PS2.box(front, cx + k * 2.2, cy - 9, z - 7.5, 1.6, 4, 1, [240, 236, 220]);
+      for (const ex of [-5, 5]) { PS2.box(front, cx + ex, cy + 5, z - 11.5, 6, 6, 2, [16, 6, 8]); PS2.box(front, cx + ex, cy + 6.5, z - 12.6, 2.4, 2.6, 1, RED, { e: 1 }); }
+      PS2.cone(front, cx, cy - 1, z - 11, 2, 4, 3, [30, 16, 18]);
+    }
+    for (const x of [X0 + 18, X1 - 18]) { PS2.box(front, x, 58, FZ - 3, 3, 10, 4, IRON); PS2.cone(front, x, 68, FZ - 4, 3, 8, 6, [255, 150, 50], { e: 1 }); } // Fackeln
+    // --- Torweg innen: Rückwand mit Fackeln, Spitzgewölbe, Gurtbögen ---
+    M.panel(back, [X0, 0, TZ], [L, 0, 0], [0, TS, 0], 8, 6, sc(INNER, 4), [(X0 + X1) / 2, TS / 2, 60]);
+    M.panel(back, [X0, TS, TZ], [L, 0, 0], [0, TH - TS, -TZ], 8, 1, sc(INNER, 5), [(X0 + X1) / 2, 130, 40]);
+    M.panel(back, [X0, TS, -TZ], [L, 0, 0], [0, TH - TS, TZ], 8, 1, sc(INNER, 6), [(X0 + X1) / 2, 130, -40]);
+    for (let x = X0 + 24; x < X1; x += 48) { PS2.beam(back, x, 0, TZ - 2, x, TS, TZ - 2, 6, 4, STONE2); PS2.beam(back, x, TS, TZ - 2, x, TH, 0, 5, 5, STONE2); }
+    for (const x of [X0 + 50, X1 - 50]) { PS2.box(back, x, 50, TZ - 2, 3, 8, 3, IRON); PS2.cone(back, x, 58, TZ - 3, 2.6, 7, 6, [255, 150, 50], { e: 1 }); }
+    // Schnittkanten der vorderen Mauer: Sturz über dem Torweg und Laibungen an beiden Enden – rahmen den Tunnel, wenn die Fassade durchsichtig ist
+    M.panel(back, [X0, TH, -TZ - 1], [L, 0, 0], [0, 26, 0], 8, 2, sc(STONE2, 11), [(X0 + X1) / 2, TH + 10, 0]);
+    for (let x = X0 + 10; x < X1; x += 16) PS2.box(back, x, TH + 3, -TZ - 2.5, 2, 2, 1, [150, 144, 168]);
+    for (const X of [X0, X1 - 10]) M.panel(back, [X, 0, -TZ - 1], [10, 0, 0], [0, TH, 0], 1, 8, sc(LIGHT, 12), [X + 5, TH / 2, 0]);
+    // --- Stirnseiten: Eingang (links) und Ausgang (rechts) mit Spitzbogen und hellen Bogensteinen ---
+    for (const [X, s2] of [[X0, -1], [X1, 1]]) {
+      const ins = [X - s2 * 30, 60, 30];
+      M.panel(back, [X, 0, TZ], [0, 0, 92 - TZ], [0, HB, 0], 3, 14, sc(STONE, X === X0 ? 7 : 8), ins);            // hinterer Teil
+      M.panel(back, [X, TH, -TZ], [0, 0, 2 * TZ], [0, HB - TH, 0], 2, 3, sc(STONE, 9), ins);                         // über dem Bogen
+      PS2.face(back, [PS2.vtx(back, X, TS, -TZ), PS2.vtx(back, X, TH, 0), PS2.vtx(back, X, TH, -TZ)], STONE, ins);   // Bogenzwickel
+      PS2.face(back, [PS2.vtx(back, X, TH, 0), PS2.vtx(back, X, TS, TZ), PS2.vtx(back, X, TH, TZ)], STONE, ins);
+      const v = (y, z) => [X + s2 * 0.6, y, z];                                                                       // Bogensteine
+      for (const [p0, p1] of [[v(0, -TZ - 4), v(TS, -TZ - 4)], [v(0, TZ + 4), v(TS, TZ + 4)], [v(TS, -TZ - 4), v(TH + 5, 0)], [v(TS, TZ + 4), v(TH + 5, 0)]]) PS2.beam(back, p0[0], p0[1], p0[2], p1[0], p1[1], p1[2], 3, 5, LIGHT);
+      PS2.box(back, X + s2 * 2, TH + 2, 0, 4, 10, 8, BONE); PS2.box(back, X + s2 * 4.2, TH + 6, -2, 1, 2, 2, RED, { e: 1 }); PS2.box(back, X + s2 * 4.2, TH + 6, 2, 1, 2, 2, RED, { e: 1 }); // Schädel-Schlussstein
+      for (let x = X - 8; x <= X + 8; x += 16) for (let z = 26; z < 92; z += 14) { PS2.box(back, X, HB, z, 6, 12, 8, STONE, { top: LIGHT }); }
+    }
+    PS2.box(back, (X0 + X1) / 2, HB - 4, 60, L, 4, 64, STONE2, { top: [70, 64, 84] }); // Wehrgang oben
+    // --- zwei Rundtürme dahinter (weit über das Bild hinaus), mit Zinnenkranz, Dornen und rot glühenden Fenstern ---
+    for (const [tx, tz, r, h] of [[X0 - 30, 140, 52, 196], [X1 + 36, 136, 58, 206]]) {
+      const n = 14, rows = 12, ring = [];
+      for (let j = 0; j <= rows; j++) { const row = []; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; row.push(PS2.vtx(back, tx + Math.cos(a) * r, h * j / rows, tz + Math.sin(a) * r)); } ring.push(row); }
+      for (let j = 0; j < rows; j++) for (let i = 0; i < n; i++) PS2.face(back, [ring[j][i], ring[j][(i + 1) % n], ring[j + 1][(i + 1) % n], ring[j + 1][i]], M.stoneCol(i, j, tx, STONE), [tx, h * (j + 0.5) / rows, tz]);
+      for (let i = 0; i < n; i += 2) { const a = (i + 0.5) / n * Math.PI * 2, x = tx + Math.cos(a) * (r + 2), z = tz + Math.sin(a) * (r + 2); PS2.box(back, x, h, z, 10, 13, 10, STONE, { top: LIGHT }); PS2.cone(back, x, h + 13, z, 1.6, 10, 4, IRON); }
+      for (const [a, y] of [[-1.8, 70], [-1.4, 120], [-2.1, 160], [-1.6, 30]]) { const x = tx + Math.cos(a) * (r + 0.6), z = tz + Math.sin(a) * (r + 0.6); PS2.box(back, x, y, z, 5, 16, 2, [12, 4, 6]); PS2.box(back, x, y + 3, z - 0.8, 2.6, 10, 1, RED, { e: 0.9 }); }
+    }
+    return { back, front };
+  }
+  portcullisMesh() { // Fallgatter am Ein- und Ausgang, frontal in der Schnittebene: Stäbe, Querbänder, lange Spitzen; gy = hochgezogen
+    const m = PS2.mesh(), G = this.geo(), bot = this.gy, IRON = [118, 112, 132], IRON2 = [214, 210, 228], z = -G.TZ + 2;
+    for (const X of [G.gx0, G.gx1]) {
+      for (let x = X - 16; x <= X + 16; x += 6.4) { PS2.beam(m, x, bot + 6, z, x, bot + 150, z, 3.6, 3.6, IRON); PS2.cone(m, x, bot + 7, z, 2.2, -9, 4, IRON2); PS2.beam(m, x - 0.9, bot + 8, z - 2, x - 0.9, bot + 150, z - 2, 0.8, 0.8, IRON2); } // Stäbe mit Glanzkante, lange Spitzen
+      for (let y = bot + 30; y < bot + 150; y += 34) PS2.beam(m, X - 18, y, z + 1, X + 18, y, z + 1, 3, 2, [70, 66, 84]);                              // wenige Querbänder dahinter
+    }
+    return m;
+  }
+  persp3() { const w = View.w, dv = View.lite ? 3 : 2; return { w, dv, Wb: Math.ceil(w / dv), Hb: Math.ceil(208 / dv), cam: { x: W.cam.x + w / 2, y: this.hy - (W.cam.y + 60), z: -200, yaw: 0, pitch: 0, f: 200 / dv, near: 30, hy: 60 / 208 } }; }
+  renderPart(which) {
+    const P = this.persp3(), key = Math.round(W.cam.x / P.dv) + '|' + Math.round(W.cam.y / P.dv) + '|' + P.Wb + (which === 'back' ? '|' + Math.round(this.gy) : '');
+    this.bufs = this.bufs || {};
+    let B = this.bufs[which];
+    if (!B || B.c.width !== P.Wb) { B = this.bufs[which] = { c: Sprites.canvas(P.Wb, P.Hb), key: null }; B.x = B.c.getContext('2d', { willReadFrequently: true }); }
+    if (B.key !== key) {
+      if (!this.meshes) this.meshes = this.buildMeshes();
+      B.key = key; B.x.clearRect(0, 0, P.Wb, P.Hb);
+      const list = which === 'back' ? [this.meshes.back, this.portcullisMesh()] : [this.meshes.front];
+      PS2.render(B.x, P.Wb, P.Hb, list, P.cam, Gatehouse.ENV);
+    }
+    return B;
+  }
+  proj(x, y3, z) { const VX = View.w / 2, k = 200 / (200 + z); return [VX + (x - W.cam.x - VX) * k, 60 + (this.hy - y3 - W.cam.y - 60) * k, k]; }
+  draw(ctx) { // hinter dem Helden: Türme, Torweg, Stirnseiten, Fallgatter – dann Zugbrücke, Ketten, Seil
     const cx = W.cam.x, cy = W.cam.y, fx = Math.round(this.x - cx);
-    if (fx > View.w + 80 || fx + this.w < -150) return;
-    this.drawSide(ctx, this.hx, -1); this.drawSide(ctx, this.hx + GH.A, 1);
-    this.drawTower(ctx, this.hx - GH.L / 2, GH.L / 2, GH.L / 2, 10, 210, [[-0.5, 70, 10], [0.6, 120, 9]]);
-    this.drawTower(ctx, this.hx + GH.A + GH.R / 2, GH.R / 2, GH.R / 2, 0, this.hy + 2, [[-0.35, 52, 10], [0.25, 104, 10], [0.9, 60, 9], [-1.1, 96, 9]]);
+    if (fx > View.w + 120 || fx + this.w < -200) return;
+    const B = this.renderPart('back');
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, B.c.width, B.c.height, 0, 0, View.w, 208); ctx.restore();
     const tp = this.tip(); // Kette von der Mauer zur Brückenspitze
-    [[this.hx + 4, 74], [this.hx + 8, 82]].forEach(([kx, ky], j) => {
+    [[this.hx - 6, 74], [this.hx - 6, 84]].forEach(([kx, ky], j) => {
       const n = Math.ceil(Math.hypot(tp.x - kx, tp.y - ky) / 3);
       for (let i = 0; i <= n; i++) { ctx.fillStyle = (i + j) % 2 ? '#2c2c38' : '#8c8898'; ctx.fillRect(Math.round(kx + (tp.x - kx) * i / n - cx) - 1, Math.round(ky + (tp.y - ky) * i / n - cy) - 1, 3, 3); }
     });
     const w = this.winch, wx = w.cx + 3, wy = w.y + 9, slack = this.state === 'up' ? 4 : 22; // Seil zur Winde
     ctx.fillStyle = '#a8784c';
     for (let i = 0; i <= 60; i++) { const k = i / 60, sx = wx + (tp.x - wx) * k, sy = wy + (tp.y - wy) * k + Math.sin(k * Math.PI) * slack; ctx.fillRect(Math.round(sx - cx), Math.round(sy - cy), 1, 1); }
-    this.drawBridge(ctx, cx, cy); // Zugbrücke: schwerer Bohlenkörper mit Eisenbändern, dreht um das Scharnier
-    this.drawTowerDeco(ctx);
-    this.drawPassage(ctx); // der dunkle Durchgang liegt immer hinter dem Helden
-    if (!this.inside()) this.drawFrontParts(ctx);
+    this.drawBridge(ctx, cx, cy);
   }
-  drawFront(ctx) { if (this.inside()) this.drawFrontParts(ctx); } // Held im Torbau: Torfront mit Pfeilern, Gitter und Fackeln liegt vor ihm
-  inside() { const p = W.player; return p.cx > this.hx - 6 && p.cx < this.hx + GH.A + 6; } // ab dem ersten Pfeiler bis hinter den letzten
-  // Mauerwerk aus den Bodenblöcken des Burghofs (64 x 256, im Verband versetzt), etwas dunkler als der Boden
+  drawFront(ctx) { // vor dem Helden: die Fassade – drinnen (und kurz danach) nur noch als Schnittansicht
+    const fx = Math.round(this.x - W.cam.x);
+    if (fx > View.w + 160 || fx + this.w < -240) return;
+    const G = this.geo(), p = W.player, inside = p.cx > G.X0 - 110 && p.cx < G.X1 + 90; // schon beim Herankommen Schnittansicht: Gatter und Torweg sichtbar
+    this.fade = (this.fade ?? 1) + ((inside ? 0.1 : 1) - (this.fade ?? 1)) * 0.14;
+    const B = this.renderPart('front');
+    ctx.save(); ctx.globalAlpha = this.fade; ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, B.c.width, B.c.height, 0, 0, View.w, 208);
+    for (const bx of [G.X0 + 47, G.X1 - 47]) { // Banner an der Fassade
+      const [sx, sy, k] = this.proj(bx, 108, G.FZ - 8);
+      ctx.save(); ctx.globalAlpha = this.fade * this.fade; ctx.translate(Math.round(sx - 11 * k), Math.round(sy)); ctx.scale(k * 0.9, k * 0.75); this.drawBanner(ctx, 0, 0); ctx.restore();
+    }
+    ctx.restore();
+  }
+  inside() { const G = this.geo(), p = W.player; return p.cx > G.X0 && p.cx < G.X1; }
+  // Mauerwerk aus den Bodenblöcken des Burghofs (für andere Bauten, z. B. den Steinüberhang)
   static stoneTex() {
     if (Gatehouse.ST) return Gatehouse.ST;
     const t = Tiles.build('courtyard'), c = Sprites.canvas(64, 256), x = c.getContext('2d');
     for (let r = 0; r < 16; r++) for (let k = -1; k < 4; k++) x.drawImage(t.ground[(r * 3 + k + 4) % 4], k * 16 + (r % 2 ? 8 : 0), r * 16);
     x.fillStyle = 'rgba(14,8,26,0.3)'; x.fillRect(0, 0, 64, 256);
     return (Gatehouse.ST = c);
-  }
-  static persp() { const w = View.w; return { w, VX: w / 2, VY: 60, f: 200, camX: W.cam.x + w / 2, camY: W.cam.y + 60 }; }
-  // Zylinderturm: Mittelpunkt (tc, tz), Radius r, Oberkante (ohne Zinnen) und Fuß; Fenster [Winkel, y, Höhe]
-  drawTower(ctx, tc, tz, r, yTop, yBot, wins) {
-    const { w, VX, VY, f, camX, camY } = Gatehouse.persp(), tex = Gatehouse.stoneTex(), TW = tex.width, step = View.lite ? 2 : 1, top0 = yTop - 9;
-    const xa = Math.max(0, Math.floor(VX + (tc - r - camX) * (camX > tc - r ? f / (f + tz) : 1) - 2)), xb = Math.min(w, Math.ceil(VX + (tc + r - camX) * (camX < tc + r ? f / (f + tz) : 1) + 2));
-    for (let X = xa; X < xb; X += step) {
-      const d = (X + step / 2 - VX) / f, A = camX + d * f - tc, b = A * d - tz, a2 = d * d + 1, D = b * b - a2 * (A * A + tz * tz - r * r);
-      if (D < 0) continue;
-      const Z = (-b - Math.sqrt(D)) / a2; if (Z < -150) continue;
-      const nx = (A + d * Z) / r, nz = (Z - tz) / r, arc = Math.atan2(nx, -nz) * r, k = f / (f + Z);
-      const top = yTop - ((((arc % 14) + 14) % 14) < 8 ? 9 : 0); // Zinnen rundherum
-      const y0 = VY + (top - camY) * k, y1 = VY + (yBot - camY) * k;
-      if (y1 <= 0 || y0 >= 208) continue;
-      ctx.drawImage(tex, Math.floor(((arc % TW) + TW) % TW), top - top0, 1, yBot - top, X, y0, step, y1 - y0);
-      const lit = Math.max(0, -nx * 0.6 - nz * 0.8); // Licht von vorn links
-      ctx.fillStyle = `rgba(8,4,18,${(0.7 * Math.pow(1 - lit, 1.3)).toFixed(2)})`; ctx.fillRect(X, y0, step, y1 - y0);
-      if (nx > 0.78) { ctx.fillStyle = `rgba(150,104,196,${((nx - 0.78) * 1.4).toFixed(2)})`; ctx.fillRect(X, y0, step, y1 - y0); } // Mondsaum rechts
-      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(X, VY + (yTop + 5 - camY) * k, step, 2 * k); // Gesims unter den Zinnen
-      ctx.fillStyle = 'rgba(214,204,236,0.3)'; ctx.fillRect(X, y0, step, 1);
-    }
-    for (const [th, wy, wh] of wins) { // Schießscharten: rot glühend, wandern mit der Rundung
-      const px = tc + Math.sin(th) * r, pz = tz - Math.cos(th) * r, nX = Math.sin(th), nZ = -Math.cos(th);
-      if (nX * (camX - px) + nZ * (-f - pz) <= 0) continue; // Rückseite
-      const k = f / (f + pz), sx = VX + (px - camX) * k, sy = VY + (wy - camY) * k, ww = Math.max(1, 3.2 * k * Math.max(0.25, -nZ * 0.9 + Math.abs(nX) * 0.1));
-      ctx.fillStyle = '#0c0408'; ctx.fillRect(sx - ww / 2 - 1, sy - 1, ww + 2, wh * k + 2);
-      ctx.fillStyle = (this.t >> 4) % 7 ? '#c81818' : '#fc4040'; ctx.fillRect(sx - ww / 2, sy, ww, wh * k);
-    }
-  }
-  // Seitenwand des Torbaus (Ebene x = X0, z 0..48), sichtbar nur von der Seite, auf die sie zeigt
-  drawSide(ctx, X0, dir) {
-    const { VX, VY, f, camX, camY } = Gatehouse.persp(), tex = Gatehouse.stoneTex(), D = 48;
-    if ((camX - X0) * dir <= 0) return;
-    const sa = VX + (X0 - camX), sb = VX + (X0 - camX) * f / (f + D), lo = Math.floor(Math.min(sa, sb)), hi = Math.ceil(Math.max(sa, sb));
-    for (let X = Math.max(0, lo); X < Math.min(View.w, hi); X++) {
-      const q = X + 0.5 - VX; if (Math.abs(q) < 0.5) continue;
-      const Z = (X0 - camX) * f / q - f; if (Z < 0 || Z > D) continue;
-      const k = f / (f + Z), y0 = VY + (14 - camY) * k, y1 = VY + (this.hy - camY) * k;
-      ctx.drawImage(tex, Math.floor(Z) % 64, 14, 1, this.hy - 14, X, y0, 1, y1 - y0);
-      ctx.fillStyle = `rgba(8,4,18,${(0.5 + Z / D * 0.25).toFixed(2)})`; ctx.fillRect(X, y0, 1, y1 - y0);
-    }
-  }
-  // Torfront (Ebene z = 0): Mauerwerk mit Zinnen und Bogensteinen, Spitzbogen offen – dahinter der Durchgang in die Tiefe
-  static front() {
-    if (Gatehouse.FR) return Gatehouse.FR;
-    const c = Sprites.canvas(GH.A, 200), x = c.getContext('2d'), tex = Gatehouse.stoneTex();
-    x.drawImage(tex, 0, 0, 64, 200, 0, 0, 64, 200); x.drawImage(tex, 0, 0, 16, 200, 64, 0, 16, 200);
-    x.clearRect(0, 0, GH.A, 14); for (let X = 0; X < GH.A; X += 13) x.drawImage(tex, X, 14, 8, 10, X, 4, 8, 10); x.clearRect(0, 0, GH.A, 4); // Zinnen
-    x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(0, 22, GH.A, 3); x.fillStyle = 'rgba(214,204,236,0.25)'; x.fillRect(0, 21, GH.A, 1); // Gesims
-    const g = x.createLinearGradient(0, 0, GH.A, 0); g.addColorStop(0, 'rgba(8,4,18,0.35)'); g.addColorStop(0.15, 'rgba(8,4,18,0)'); g.addColorStop(0.85, 'rgba(8,4,18,0)'); g.addColorStop(1, 'rgba(8,4,18,0.45)');
-    x.fillStyle = g; x.fillRect(0, 0, GH.A, 200); // Kanten abgedunkelt (Pilaster)
-    const arch = (grow) => { const a0 = GH.IN - grow, aw = GH.SPAN + grow * 2; x.beginPath(); x.moveTo(a0, 176); x.lineTo(a0, GH.SPRING); x.arc(a0 + aw, GH.SPRING, aw, Math.PI, Math.PI * 4 / 3); x.arc(a0, GH.SPRING, aw, Math.PI * 5 / 3, Math.PI * 2); x.lineTo(a0 + aw, 176); x.closePath(); };
-    arch(4); x.fillStyle = 'rgba(200,190,224,0.18)'; x.fill(); // Bogensteine heller
-    x.globalCompositeOperation = 'destination-out'; x.fillStyle = '#000'; arch(0); x.fill(); x.globalCompositeOperation = 'source-over';
-    return (Gatehouse.FR = c);
-  }
-  drawPassage(ctx) { // Durchgang: dunkle Tiefe, Innenwände und Gewölbe spaltenweise in Perspektive
-    const { VX, VY, f, camX, camY } = Gatehouse.persp(), tex = Gatehouse.stoneTex(), D = 48, cx = W.cam.x, cy = W.cam.y;
-    const ax = this.archX - cx, aw = GH.SPAN;
-    ctx.save(); ctx.beginPath(); ctx.moveTo(ax, this.hy - cy); ctx.lineTo(ax, GH.SPRING - cy);
-    ctx.arc(ax + aw, GH.SPRING - cy, aw, Math.PI, Math.PI * 4 / 3); ctx.arc(ax, GH.SPRING - cy, aw, Math.PI * 5 / 3, Math.PI * 2);
-    ctx.lineTo(ax + aw, this.hy - cy); ctx.closePath(); ctx.clip();
-    const g = ctx.createLinearGradient(0, GH.SPRING - 60 - cy, 0, this.hy - cy); g.addColorStop(0, '#05030a'); g.addColorStop(1, '#140c1c');
-    ctx.fillStyle = g; ctx.fillRect(ax, GH.SPRING - 70 - cy, aw, this.hy - GH.SPRING + 70);
-    for (const [X0, dir] of [[this.archX, 1], [this.archX + aw, -1]]) { // Innenwände
-      if ((camX - X0) * dir <= 0) continue;
-      const sa = VX + (X0 - camX), sb = VX + (X0 - camX) * f / (f + D), lo = Math.floor(Math.min(sa, sb)), hi = Math.ceil(Math.max(sa, sb));
-      for (let X = Math.max(0, lo); X < Math.min(View.w, hi); X++) {
-        const q = X + 0.5 - VX; if (Math.abs(q) < 0.5) continue;
-        const Z = (X0 - camX) * f / q - f; if (Z < 0 || Z > D) continue;
-        const k = f / (f + Z), y0 = VY + (GH.SPRING - 40 - camY) * k, y1 = VY + (this.hy - camY) * k;
-        ctx.drawImage(tex, Math.floor(Z * 1.3) % 64, 60, 1, this.hy - GH.SPRING + 40, X, y0, 1, y1 - y0);
-        ctx.fillStyle = `rgba(4,2,10,${(0.55 + Z / D * 0.4).toFixed(2)})`; ctx.fillRect(X, y0, 1, y1 - y0);
-      }
-    }
-    const kb = f / (f + D), bx0 = VX + (this.archX - camX) * kb, bx1 = VX + (this.archX + aw - camX) * kb, by = VY + (this.hy - camY) * kb; // Ausgang hinten: schwacher Mondschein
-    ctx.fillStyle = 'rgba(60,40,90,0.35)'; ctx.fillRect(bx0, VY + (GH.SPRING - 30 - camY) * kb, bx1 - bx0, by - (VY + (GH.SPRING - 30 - camY) * kb));
-    ctx.restore();
-  }
-  drawFrontParts(ctx) {
-    const cx = W.cam.x, cy = W.cam.y;
-    // Fallgitter im Bogen: dicke Stäbe, Querbänder, lange Spitzen – wird in die Mauer gezogen
-    const ax = this.archX - cx, aw = GH.SPAN, bot = this.hy - cy - Math.round(this.gy);
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(ax, this.hy - cy); ctx.lineTo(ax, GH.SPRING - cy);
-    ctx.arc(ax + aw, GH.SPRING - cy, aw, Math.PI, Math.PI * 4 / 3); ctx.arc(ax, GH.SPRING - cy, aw, Math.PI * 5 / 3, Math.PI * 2); // Spitzbogen: zwei Kreisbögen bis zum Scheitel
-    ctx.lineTo(ax + aw, this.hy - cy); ctx.closePath(); ctx.clip();
-    for (let y = bot - 8; y > bot - 190; y -= 13) { ctx.fillStyle = '#1c1824'; ctx.fillRect(ax, y - 3, aw, 4); ctx.fillStyle = '#6c6878'; ctx.fillRect(ax, y - 3, aw, 1); }
-    for (let x = ax + 3; x < ax + aw - 1; x += 8) {
-      ctx.fillStyle = '#16121c'; ctx.fillRect(x, bot - 190, 3, 184);
-      ctx.fillStyle = '#7c7888'; ctx.fillRect(x, bot - 190, 1, 184);
-      ctx.fillStyle = '#4c4858'; ctx.fillRect(x, bot - 6, 3, 2); ctx.fillRect(x + 1, bot - 4, 1, 4); // Spitzen
-      ctx.fillStyle = '#9c98a8'; ctx.fillRect(x + 1, bot - 1, 1, 1);
-    }
-    ctx.restore();
-    ctx.drawImage(Gatehouse.front(), Math.round(this.hx - cx), Math.round(-cy));
-    // Totenkopf-Schlussstein mit glühenden Augen
-    const ex = Math.round(this.archCx - cx), ey = Math.round(48 - cy), glow = 0.6 + 0.4 * Math.sin(this.t * 0.07);
-    ctx.fillStyle = '#d8d4c4'; ctx.fillRect(ex - 7, ey - 4, 14, 11); ctx.fillStyle = '#a8a494'; ctx.fillRect(ex - 7, ey + 5, 14, 2); ctx.fillRect(ex - 4, ey + 7, 8, 3);
-    ctx.fillStyle = '#16121c'; ctx.fillRect(ex - 6, ey - 1, 5, 4); ctx.fillRect(ex + 1, ey - 1, 5, 4); ctx.fillRect(ex - 1, ey + 4, 2, 2);
-    ctx.fillStyle = `rgba(252,${Math.round(40 + 60 * glow)},40,1)`; ctx.fillRect(ex - 5, ey, 3, 3); ctx.fillRect(ex + 2, ey, 3, 3);
-    ctx.fillStyle = '#fce0a8'; ctx.fillRect(ex - 4, ey + 1, 1, 1); ctx.fillRect(ex + 3, ey + 1, 1, 1);
-    // Fackeln links und rechts vom Bogen
-    [this.hx + 6, this.hx + GH.A - 6].forEach((tx, i) => {
-      const x = Math.round(tx - cx), y = Math.round(126 - cy), fl = ((this.t >> 2) + i) % 3;
-      ctx.fillStyle = '#3c2410'; ctx.fillRect(x - 1, y + 5, 3, 8); ctx.fillStyle = '#8c8898'; ctx.fillRect(x - 3, y + 5, 7, 2);
-      ctx.fillStyle = '#d82800'; ctx.fillRect(x - 2, y - 2 + (fl === 1 ? 1 : 0), 5, 7);
-      ctx.fillStyle = '#f87800'; ctx.fillRect(x - 1, y - 1 + (fl === 2 ? 1 : 0), 3, 5);
-      ctx.fillStyle = '#fcd040'; ctx.fillRect(x, y + 1, 1, 3);
-    });
-  }
-  drawTowerDeco(ctx) { // Banner und Käfig hängen vorn am rechten Turm
-    const cx = W.cam.x, cy = W.cam.y;
-    const bx = Math.round(this.hx + GH.A + 36 - cx);
-    this.drawBanner(ctx, bx, Math.round(-cy) + 6);
-    const pg = ctx.createLinearGradient(0, Math.round(3 - cy), 0, Math.round(8 - cy)); pg.addColorStop(0, '#8c6030'); pg.addColorStop(0.5, '#4c2c10'); pg.addColorStop(1, '#1c0c04'); // runde Stange
-    ctx.fillStyle = pg; ctx.fillRect(bx - 3, Math.round(3 - cy), 28, 5);
-    for (const ex of [bx - 6, bx + 24]) { const fg = ctx.createRadialGradient(ex + 1.5, Math.round(4 - cy), 0.5, ex + 2, Math.round(5 - cy), 4); fg.addColorStop(0, '#fcf0a0'); fg.addColorStop(0.5, '#c89020'); fg.addColorStop(1, '#5c3c08'); ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(ex + 2, Math.round(5 - cy), 3.2, 0, Math.PI * 2); ctx.fill(); } // Goldknäufe
-    const sw = Math.sin(this.t * 0.03) * 0.12, kx = this.hx + GH.A + GH.R - 22, ky = 30; // Käfig mit Skelett, schwingt an einer Kette
-    ctx.save(); ctx.translate(Math.round(kx - cx), Math.round(ky - cy)); ctx.rotate(sw);
-    ctx.fillStyle = '#4c4858'; for (let y = 0; y < 22; y += 3) ctx.fillRect(0, y, 1, 2);
-    ctx.fillStyle = '#e8e4d8'; ctx.fillRect(-3, 26, 6, 5); ctx.fillStyle = '#16121c'; ctx.fillRect(-2, 28, 1, 1); ctx.fillRect(1, 28, 1, 1); // Schädel
-    ctx.fillStyle = '#c8c4b8'; ctx.fillRect(-1, 31, 2, 9); ctx.fillRect(-3, 33, 6, 1); ctx.fillRect(-3, 36, 6, 1); ctx.fillRect(-2, 40, 1, 6); ctx.fillRect(1, 40, 1, 6);
-    ctx.fillStyle = '#26222e'; for (let x = -7; x <= 7; x += 3) ctx.fillRect(x, 22, 1, 28); ctx.fillRect(-7, 22, 15, 2); ctx.fillRect(-7, 48, 15, 2); ctx.fillRect(-3, 20, 7, 2);
-    ctx.restore();
   }
   // Zugbrücke im PS1/PS2-Look: die Bohlen-Vorderseite dreht um das Scharnier, dazu Deck, Kanten und Unterseite als
   // Flächen zum selben Fluchtpunkt wie die Bodenblöcke (Mitte, y 60; Tiefe 10 %) – nur die zum Betrachter gewandten
@@ -1649,9 +1632,8 @@ class Crawl extends Ent {
       ctx.fillStyle = g; ctx.fillRect(X, Y, w, 16);
       return;
     }
-    const g = ctx.createLinearGradient(X, 0, X + w, 0); g.addColorStop(0, '#000000'); g.addColorStop(0.15, '#0a0606'); g.addColorStop(0.85, '#0a0606'); g.addColorStop(1, '#000000');
+    const g = ctx.createLinearGradient(0, Y, 0, Y + 16); g.addColorStop(0, 'rgba(10,4,2,0.5)'); g.addColorStop(0.45, 'rgba(10,4,2,0.14)'); g.addColorStop(1, 'rgba(10,4,2,0.32)'); // offene Luke: nur weicher Schatten, kein Balken
     ctx.fillStyle = g; ctx.fillRect(X, Y, w, 16);
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(X, Y + 16, w, 2);
     if (this.stone) { // gemauerter Bogen mit Schlussstein
       ctx.fillStyle = '#4c4858'; ctx.fillRect(X - 2, Y - 2, w + 4, 3); ctx.fillStyle = '#8c88a0'; ctx.fillRect(X - 2, Y - 2, w + 4, 1);
       for (let k = 0; k < w; k += 8) { ctx.fillStyle = '#2c2838'; ctx.fillRect(X + k, Y - 2, 1, 3); }

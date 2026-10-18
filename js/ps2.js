@@ -56,7 +56,7 @@ const PS2 = (() => {
   }
   function beam(m, x0, y0, z0, x1, y1, z1, w, h, col, o = {}) { // Balken zwischen zwei Punkten (Strebebogen, Brücke)
     let dx = x1 - x0, dy = y1 - y0, dz = z1 - z0; const L = Math.hypot(dx, dy, dz) || 1; dx /= L; dy /= L; dz /= L;
-    let sx = dz, sz = -dx; const sl = Math.hypot(sx, sz) || 1; sx /= sl; sz /= sl; // seitlich (waagerecht)
+    let sx = dz, sz = -dx; const sl = Math.hypot(sx, sz); if (sl < 1e-6) { sx = 1; sz = 0; } else { sx /= sl; sz /= sl; } // seitlich (waagerecht); senkrechte Balken: Seite entlang x
     const ux = -sz * dy, uy = sz * dx - sx * dz, uz = sx * dy; // oben
     const C = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], hw = w / 2, hh = h / 2, P = [];
     for (const [px, py, pz] of [[x0, y0, z0], [x1, y1, z1]]) for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) P.push(vtx(m, px + sx * a * hw + ux * b * hh, py + uy * b * hh, pz + sz * a * hw + uz * b * hh));

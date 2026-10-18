@@ -181,7 +181,7 @@ const Levels = (() => {
     .fill(44, 10, 45, 10, '=')
     .candle(3, 9).candle(11, 9, 'W').candle(31, 9).candle(33, 9, 'H').candle(29, 7)
     .candle(35, 9, '1').candle(41, 9).candle(47, 9, 'W').candle(53, 9, '$').candle(59, 9).candle(68, 9, 'H')
-    .enemy('raven', 29, 8).enemy('raven', 45, 9)
+    .enemy('raven', 45, 9)
     .chest(61, 10)
     .fill(64, 1, 66, 9, '#')                                           // eingestürzter Mauerbogen: darunter nur eine Kachel Luft – rutschen
     .prop('crawl', { x0: 64, x1: 66, row: 10, style: 'stone' })
