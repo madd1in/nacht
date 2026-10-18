@@ -149,6 +149,153 @@ class Statue extends Ent {
   }
 }
 
+// ---------------- Wald: Rastfeuer, Leiche mit Fund, Fallbaum, Hinterhalt, Nebelwand ----------------
+// Rastfeuer: Kontrollpunkt wie die Statue. Glimmt, bis man es erreicht – dann lodert es auf, heilt ganz, und das Bild hält
+// kurz inne (Schriftzug in der Mitte).
+class Campfire extends Statue {
+  constructor(d) { super(d); this.x = d.x * T - 4; this.w = 24; this.y = (d.y + 1) * T - 16; this.h = 16; }
+  activate(fresh) {
+    this.active = true;
+    W.checkpoint = { stage: W.stage, room: W.roomIdx, cx: this.cx, feet: this.y + this.h };
+    if (!fresh) return;
+    const p = W.player; p.hp = p.maxHp;
+    Audio8.sfx('checkpoint', this.cx); Audio8.sfx('whoosh', this.cx); Input.rumble(0.4, 0.3, 300);
+    Game.rest();
+    for (let i = 0; i < 26; i++) W.spawn(new Particle(this.cx + rnd(-6, 6), this.y + rnd(4, 12), rnd(-0.7, 0.7), rnd(-2.6, -0.8), ['#f8b800', '#fc7460', '#fce0a8'][i % 3], 50, 1, 0.02));
+  }
+  update() {
+    super.update();
+    if (this.active && this.t % 9 === 0) W.spawn(new Particle(this.cx + rnd(-4, 4), this.y + 2, rnd(-0.2, 0.2), rnd(-1.2, -0.5), Math.random() < 0.5 ? '#f8b800' : '#fc7460', 40, 1, 0)); // Funken
+  }
+  glow(L, cx, cy, flick) {
+    const x = this.cx - cx, y = this.y - cy + 4;
+    L.push(this.active ? { x, y: y - 4, r: 58 + flick(this.x) * 2, c: [252, 140, 40], a: 0.75 } : { x, y, r: 18 + flick(this.x), c: [220, 40, 20], a: 0.4 });
+  }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), t = this.t;
+    ctx.fillStyle = '#2c2830'; for (const [sx, sy] of [[1, 12], [5, 14], [10, 15], [15, 14], [19, 12], [3, 9], [20, 9]]) ctx.fillRect(x + sx, y + sy - 1, 4, 3); // Steinkranz
+    ctx.fillStyle = '#6c6470'; for (const [sx, sy] of [[1, 12], [5, 14], [10, 15], [15, 14], [19, 12]]) ctx.fillRect(x + sx, y + sy - 1, 3, 1);
+    ctx.fillStyle = '#3c2414'; ctx.fillRect(x + 4, y + 11, 16, 3); ctx.fillStyle = '#5c3c20'; ctx.fillRect(x + 6, y + 9, 12, 2); ctx.fillRect(x + 4, y + 11, 16, 1); // Scheite
+    if (!this.active) { // Glut
+      ctx.fillStyle = (t >> 4) % 2 ? '#a81c08' : '#d83c10'; ctx.fillRect(x + 8, y + 9, 2, 1); ctx.fillRect(x + 13, y + 10, 2, 1); ctx.fillRect(x + 11, y + 8, 1, 1);
+      ctx.fillStyle = 'rgba(120,120,130,0.35)'; for (let i = 0; i < 3; i++) { const k = ((t * 0.4 + i * 20) % 60) / 60; ctx.fillRect(x + 11 + Math.round(Math.sin(k * 6 + i) * 2), y + 7 - Math.round(k * 22), 1, 2); } // Rauchfaden
+      return;
+    }
+    for (let i = 0; i < 9; i++) { // Flammenzungen
+      const fx = x + 6 + i * 1.5, h = 6 + Math.round(5 * Math.abs(Math.sin(t * 0.21 + i * 1.7)) + 3 * Math.sin(t * 0.07 + i)), w = 2;
+      ctx.fillStyle = '#d82800'; ctx.fillRect(Math.round(fx), y + 10 - h, w, h);
+      ctx.fillStyle = '#fc7460'; ctx.fillRect(Math.round(fx), y + 10 - Math.round(h * 0.7), w, Math.round(h * 0.7));
+      ctx.fillStyle = '#fce0a8'; ctx.fillRect(Math.round(fx), y + 10 - Math.round(h * 0.35), 1, Math.round(h * 0.35));
+    }
+  }
+}
+// Toter Wanderer, an einen Baum gesunken; über ihm schimmert ein Fund, den man aufheben kann
+class Relic extends Ent {
+  constructor(d) { super(d.x * T, (d.y + 1) * T - 16, 20, 16); this.kind = 'prop'; this.loot = d.loot || 'heartB'; this.taken = false; }
+  update() {
+    this.t++;
+    const p = W.player;
+    if (!this.taken && p.alive && Phys.overlap(this, p)) {
+      this.taken = true;
+      W.spawn(new Item(this.loot, p.cx, p.cy)); Audio8.sfx('bigItem', this.cx);
+      for (let i = 0; i < 16; i++) W.spawn(new Particle(this.cx + rnd(-4, 4), this.y - 6, rnd(-1, 1), rnd(-1.8, -0.4), i % 2 ? '#fcfcfc' : '#fce0a8', 40, 1, 0));
+    }
+  }
+  glow(L, cx, cy) { if (!this.taken) L.push({ x: this.cx - cx, y: this.y - cy - 6, r: 28 + Math.sin(this.t * 0.08) * 4, c: [252, 236, 200], a: 0.6 }); }
+  draw(ctx) {
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y);
+    ctx.fillStyle = '#2a2420'; ctx.fillRect(x + 2, y + 6, 9, 10); ctx.fillRect(x + 9, y + 13, 10, 3); // Mantel, ausgestreckte Beine
+    ctx.fillStyle = '#3c342c'; ctx.fillRect(x + 3, y + 7, 7, 1); ctx.fillRect(x + 10, y + 13, 8, 1);
+    ctx.fillStyle = '#d8d0b8'; ctx.fillRect(x + 4, y + 1, 5, 5); ctx.fillStyle = '#1c1414'; ctx.fillRect(x + 5, y + 3, 1, 1); ctx.fillRect(x + 7, y + 3, 1, 1); // Schädel, zur Seite gesunken
+    ctx.fillStyle = '#b8b098'; ctx.fillRect(x + 10, y + 10, 4, 1); ctx.fillRect(x + 18, y + 14, 2, 2); // Knochenhand, Stiefel
+    if (this.taken) return;
+    const gy = y - 8 + Math.round(Math.sin(this.t * 0.06) * 2), gx = x + 10;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, 9); g.addColorStop(0, 'rgba(255,250,230,0.9)'); g.addColorStop(0.4, 'rgba(255,220,150,0.35)'); g.addColorStop(1, 'rgba(255,200,120,0)');
+    ctx.fillStyle = g; ctx.fillRect(gx - 9, gy - 9, 18, 18);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(gx - 1, gy - 1, 2, 2);
+    for (let i = 0; i < 4; i++) { const k = ((this.t * 0.012 + i * 0.25) % 1); ctx.fillStyle = `rgba(255,240,200,${(1 - k).toFixed(2)})`; ctx.fillRect(gx + Math.round(Math.sin(k * 9 + i) * 4), gy - Math.round(k * 16), 1, 1); }
+    ctx.restore();
+  }
+}
+// Toter Baum am Bach: anpeitschen → er kippt, schlägt quer über das Wasser und wird zur Brücke (Abkürzung)
+class FellTree extends Ent {
+  constructor(d) {
+    super(d.x * T - 5, (d.row - d.len) * T, 26, d.len * T); this.kind = 'candle'; this.d = d; // etwas breiter als der Stamm: leicht zu treffen
+    this.ang = 0; this.av = 0; this.state = 'stand';
+  }
+  hit() { if (this.state !== 'stand') return; this.state = 'fall'; this.av = 0.004; Audio8.sfx('crack', this.cx); Audio8.sfx('whoosh', this.cx); W.sparks(this.cx, this.y + this.h - 30, 6); }
+  update() {
+    this.t++;
+    if (this.state !== 'fall') return;
+    this.av += 0.0035; this.ang += this.av;
+    if (this.ang >= Math.PI / 2) {
+      this.ang = Math.PI / 2; this.state = 'down';
+      const d = this.d; for (let c = d.x + 1; c <= d.x + d.len; c++) W.room.grid[d.row][c] = '='; // liegt jetzt als Steg über dem Bach
+      W.shake = Math.max(W.shake, 12); Input.rumble(0.9, 0.7, 450); Audio8.sfx('boom', this.cx + d.len * 8); Audio8.sfx('wall', this.cx + d.len * 8);
+      for (let c = d.x + 1; c <= d.x + d.len; c++) { W.dust(c * T + 8, d.row * T, 2); if (c % 2) W.spawn(new Particle(c * T + 8, (d.row + 1) * T, rnd(-1, 1), rnd(-3.4, -1.2), '#7cc8e8', 36, 2, 0.2)); }
+    }
+  }
+  static bark(len) {
+    if (FellTree.B && FellTree.B.height === len) return FellTree.B;
+    const c = Sprites.canvas(14, len), x = c.getContext('2d');
+    for (let Y = 0; Y < len; Y++) { const w = Math.round(6 + 4 * (Y / len)); x.fillStyle = '#3c2a1a'; x.fillRect(7 - w, Y, w * 2, 1); x.fillStyle = '#6c4e30'; x.fillRect(7 - w + 1, Y, 2, 1); x.fillStyle = '#1c120a'; x.fillRect(7 + w - 2, Y, 2, 1); if (Y % 7 === 3) { x.fillStyle = '#20160c'; x.fillRect(7 - w + 3, Y, w, 1); } }
+    for (const [by, dir] of [[len * 0.18, 1], [len * 0.32, -1], [len * 0.5, 1]]) for (let i = 0; i < 6; i++) { x.fillStyle = '#2c1e12'; x.fillRect(Math.max(0, Math.min(13, 7 + dir * (4 + i))), Math.round(by - i * 0.8), 1, 2); } // Aststummel
+    return (FellTree.B = c);
+  }
+  draw(ctx) {
+    const d = this.d, bx = Math.round(d.x * T + 8 - W.cam.x), by = Math.round(d.row * T - W.cam.y);
+    ctx.fillStyle = '#3c2a1a'; ctx.fillRect(bx - 8, by - 6, 16, 6); ctx.fillStyle = '#6c4e30'; ctx.fillRect(bx - 8, by - 6, 16, 1); // Stumpf mit Wurzeln
+    ctx.fillStyle = '#2c1e12'; ctx.fillRect(bx - 11, by - 2, 4, 2); ctx.fillRect(bx + 7, by - 2, 4, 2);
+    if (this.state === 'down') return;
+    ctx.save(); ctx.translate(bx, by - 4); ctx.rotate(this.ang); ctx.drawImage(FellTree.bark(d.len * T), -7, -d.len * T); ctx.restore();
+    if (this.state === 'stand' && (this.t >> 5) % 2 === 0) { ctx.fillStyle = '#c8c0a8'; ctx.fillRect(bx - 1, by - 40, 3, 1); ctx.fillRect(bx, by - 41, 1, 3); } // Kerbe im Holz: hier anschlagen
+  }
+}
+// Hinterhalt: sobald der Held die Stelle passiert, brechen Ghule rings um ihn aus dem Laub
+class Ambush extends Ent {
+  constructor(d) { super(d.x * T, 0, 1, 1); this.kind = 'prop'; this.n = d.n || 3; this.fired = false; }
+  update() {
+    if (this.fired) return;
+    const p = W.player;
+    if (!p.alive || p.cx < this.x || p.feet < 9 * T) return; // nur unten auf dem Waldboden
+    this.fired = true; W.shake = Math.max(W.shake, 6); Input.rumble(0.5, 0.4, 250); Audio8.sfx('growl', p.cx);
+    [70, -64, 118, -110].slice(0, this.n).forEach((dx, i) => {
+      const x = p.cx + dx, col = Math.floor(x / T); let row = Math.floor(p.feet / T);
+      while (row < W.room.h && !Phys.solidTile(col, row)) row++;
+      if (row >= W.room.h || x < 16 || x > W.room.w * T - 16) return;
+      W.spawn(new Ghoul(x - 5, row * T, dx > 0 ? -1 : 1));
+      for (let k = 0; k < 6; k++) W.spawn(new Particle(x + rnd(-6, 6), row * T, rnd(-0.8, 0.8), rnd(-2.4, -0.6), k % 2 ? '#3a2c1c' : '#2c5c24', 30, 2, 0.15)); // Laub und Erde fliegen
+    });
+  }
+  draw() {}
+}
+// Nebelwand vor dem Burggraben: milchig wabernd; hindurch geht es nur langsam, das Bild wird weiß
+class FogWall extends Ent {
+  constructor(d) { super(d.x * T, 0, 2 * T, W.room.h * T); this.kind = 'prop'; this.push = 0; }
+  update() {
+    this.t++;
+    const p = W.player, inside = p.alive && Phys.overlap(this, p);
+    if (inside) { p.x -= p.vx * 0.62; if (this.push < 0.05) Audio8.sfx('whoosh', this.cx); }
+    this.push += ((inside ? 1 : 0) - this.push) * 0.08;
+  }
+  glow(L, cx, cy) { L.push({ x: this.cx - cx, y: 120 - cy, r: 70, c: [220, 230, 240], a: 0.35 }); }
+  draw(ctx) {
+    const x0 = Math.round(this.x - W.cam.x), t = this.t;
+    if (x0 > View.w + 40 || x0 < -80) return;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 22; i++) {
+      const ph = (t * (0.004 + (i % 4) * 0.0015) + i * 0.137) % 1, y = 208 - ph * 240, x = x0 + 16 + Math.sin(t * 0.02 + i * 1.3) * 10 + Math.sin(ph * 9 + i) * 6, r = 14 + (i % 5) * 4;
+      const a = 0.16 * Math.sin(ph * Math.PI), g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, `rgba(220,226,236,${a.toFixed(3)})`); g.addColorStop(1, 'rgba(200,210,226,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    const band = ctx.createLinearGradient(x0 - 10, 0, x0 + 42, 0); band.addColorStop(0, 'rgba(200,210,226,0)'); band.addColorStop(0.5, `rgba(210,220,232,${(0.16 + 0.04 * Math.sin(t * 0.05)).toFixed(3)})`); band.addColorStop(1, 'rgba(200,210,226,0)');
+    ctx.fillStyle = band; ctx.fillRect(x0 - 10, 0, 52, 208);
+    ctx.restore();
+    if (this.push > 0.02) { ctx.fillStyle = `rgba(226,232,240,${(this.push * 0.45).toFixed(3)})`; ctx.fillRect(0, 0, View.w, 208); }
+  }
+}
+
 // ---------------- Schatztruhe (mit Peitsche öffnen) ----------------
 class Chest extends Ent {
   constructor(d) { super(d.x * T, (d.y + 1) * T - 11, 16, 11); this.kind = 'candle'; this.loot = d.loot; this.opened = false; }

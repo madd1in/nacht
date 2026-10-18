@@ -72,6 +72,11 @@ const W = {
         case 'cargo': this.spawn(new Cargo(d)); break;
         case 'gate': this.spawn(new Gatehouse(d)); break;
         case 'stake': this.spawn(new SkullStake(d)); break;
+        case 'campfire': this.spawn(new Campfire(d)); break;
+        case 'relic': this.spawn(new Relic(d)); break;
+        case 'felltree': this.spawn(new FellTree(d)); break;
+        case 'ambush': this.spawn(new Ambush(d)); break;
+        case 'fogwall': this.spawn(new FogWall(d)); break;
         case 'zip': this.spawn(new Zipline(d)); break;
         case 'sign': this.spawn(new ShipSign(d)); break;
         case 'grog': this.spawn(new Grog(d)); break;
@@ -692,7 +697,8 @@ const W = {
       const x = e.cx - cx, y = e.cy - cy;
       if (x < -48 || x > View.w + 48 || y < -60 || y > 270) continue;
       if (darkRoom && e.kind === 'enemy') L.push({ x, y, r: 30, c: [150, 140, 230], a: 0.3 });
-      if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + (e.blood ? 10 + Math.sin(f * 0.15) * 4 : 0) + flick(e.x), c: e.blood ? [232, 24, 48] : [248, 140, 40], a: e.blood ? 0.65 : 0.5 });
+      if (e.glow) e.glow(L, cx, cy, flick); // Rastfeuer, Fund, Nebelwand
+      else if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + (e.blood ? 10 + Math.sin(f * 0.15) * 4 : 0) + flick(e.x), c: e.blood ? [232, 24, 48] : [248, 140, 40], a: e.blood ? 0.65 : 0.5 });
       else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
       else if (e instanceof Gatehouse) e.lights(L, this.cam.x, this.cam.y, flick);
       else if (e instanceof FallingChandelier) e.lights(L, this.cam.x, this.cam.y, flick);

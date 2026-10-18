@@ -141,8 +141,11 @@ const Levels = (() => {
     .start(3, 28).exit(94).noDoor().done();
 
   // ======================= STAGE 1: Der Wald vor der Burg =======================
-  // Von der Mole geht es durch einen dichten Wald zum Burggraben: Bach mit Trittsteinen, Wurzeltreppen auf eine Anhöhe,
-  // ein umgestürzter Riesenstamm, Astwege über dem Waldboden, Panther lauern auf den Ästen, Ghule steigen aus dem Laub.
+  // Von der Mole geht es durch einen dichten Wald zum Burggraben. Aufgebaut wie ein Weg, den man sich erkämpft:
+  // ein einzelner Ritter bewacht die Anhöhe vor dem umgestürzten Riesenstamm (drunter durchrutschen oder hinüber – oben
+  // liegt ein Toter mit einem Fund), dahinter ein Rastfeuer. Am zweiten Bach steht ein toter Baum: anpeitschen, und er
+  // wird zur Brücke. Unten am Waldboden lauert ein Hinterhalt, oben führt ein Astweg mit Truhe vorbei. Zuletzt eine
+  // Nebelwand, durch die man sich zum Burggraben schiebt.
   const wd = room(104, 'forest')
     .ground(0, 13).ground(18, 30).fill(14, 12, 17, 12, '~')            // Bach: breiter Graben mit Wasser
     .fill(22, 8, 27, 8, '=')                                             // Ast über dem Weg
@@ -150,17 +153,22 @@ const Levels = (() => {
     .fill(37, 5, 41, 6, '=')                                             // umgestürzter Riesenstamm auf der Anhöhe
     .stair(47, 10, 3, -1).ground(45, 60)                                 // wieder hinunter
     .fill(52, 7, 57, 7, '=')                                             // Ast, auf dem ein Panther lauert
-    .fill(61, 12, 70, 12, '~').fill(64, 10, 64, 12, '#').fill(67, 10, 67, 12, '#') // zweiter Bach mit Trittsteinen
+    .fill(61, 12, 70, 12, '~').fill(64, 11, 64, 12, '#').fill(67, 11, 67, 12, '#') // zweiter Bach mit Trittsteinen
+    .prop('felltree', { x: 60, row: 11, len: 10 })                       // toter Baum: wird zur Brücke
     .ground(71, 103)
     .stair(72, 10, 4, 1).fill(76, 7, 85, 7, '=').stair(89, 10, 4, -1)  // Astweg über dem Waldboden
-    .prop('stake', { x: 96, y: 10 }).prop('stake', { x: 100, y: 10 })   // Schädel auf Pfählen: die Burg ist nah
-    .candle(5, 9, 'H').candle(10, 9).candle(20, 9, 'W').candle(25, 6).candle(33, 6).candle(43, 6, 'H')
-    .candle(50, 9).candle(56, 5, '$').candle(59, 9, '1').candle(70, 9).candle(80, 5, 'H').candle(84, 5)
-    .candle(92, 9, 'W').candle(98, 9)
-    .enemy('raven', 24, 7).enemy('bat', 38, 2).enemy('panther', 55, 6).enemy('raven', 82, 6).enemy('ghost', 88, 5)
-    .statue(50, 10)
-    .chest(94, 10)
-    .zone('ghoul', 72, 98, { interval: 140, max: 2 })
+    .prop('stake', { x: 94, y: 10 }).prop('stake', { x: 97, y: 10 })    // Schädel auf Pfählen: die Burg ist nah
+    .candle(5, 9, 'H').candle(10, 9).candle(20, 9, 'W').candle(25, 6).candle(32, 6).candle(43, 6, 'H')
+    .candle(53, 9).candle(56, 5, '$').candle(58, 9, '1').candle(71, 9).candle(80, 5, 'H')
+    .candle(92, 9, 'W')
+    .enemy('raven', 24, 7).enemy('knight', 35, 7).enemy('bat', 38, 2).enemy('panther', 55, 6).enemy('raven', 82, 6).enemy('ghost', 88, 5)
+    .prop('relic', { x: 39, y: 4, loot: 'oneUp' })                       // oben auf dem Riesenstamm
+    .prop('campfire', { x: 49, y: 10 })                                  // Rastfeuer hinter dem Wächter
+    .prop('ambush', { x: 77, n: 3 })                                     // Hinterhalt am Waldboden
+    .chest(84, 6)                                                        // Belohnung für den Astweg
+    .prop('relic', { x: 90, y: 10, loot: 'heartB' })
+    .prop('fogwall', { x: 99 })
+    .zone('ghoul', 86, 98, { interval: 220, max: 1 })
     .music('stage1')
     .start(2, 10).exit(102).noDoor().done();
 

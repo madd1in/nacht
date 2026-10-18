@@ -188,6 +188,7 @@ const I18N = (() => {
     continueQ: { de: 'WEITERSPIELEN?', en: 'CONTINUE?', fr: 'CONTINUER ?', es: '¿CONTINUAR?', ja: 'コンティニュー？', zh: '继续？' },
     hurry: { de: 'BEEILUNG!', en: 'HURRY UP!', fr: 'VITE !', es: '¡DEPRISA!', ja: '急げ！', zh: '快点！' },
     rage: { de: 'BLUTRAUSCH!', en: 'BLOOD RAGE!', fr: 'RAGE DE SANG !', es: '¡FURIA!', ja: '血の狂乱！', zh: '血之狂怒！' },
+    restLit: { de: 'RASTFEUER ENTFACHT', en: 'REST FIRE KINDLED', fr: 'FEU DE REPOS ALLUME', es: 'FUEGO DE DESCANSO', ja: '休息の火が灯った', zh: '营火已点燃' },
     checkpoint: { de: 'CHECKPOINT', en: 'CHECKPOINT', fr: 'SAUVEGARDE', es: 'GUARDADO', ja: 'チェックポイント', zh: '检查点' },
     pressStart: { de: 'START DRÜCKEN', en: 'PRESS START', fr: 'APPUIE SUR START', es: 'PULSA START', ja: 'スタートを押せ', zh: '按开始键' },
     // ---------------- Abspann ----------------

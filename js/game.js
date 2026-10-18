@@ -327,6 +327,16 @@ const Game = {
     ctx.globalAlpha = 1;
   },
   announce(i) { this.annT = 72; this.annIdx = i; Audio8.sfx('announce'); },
+  rest() { this.restT = 170; }, // Rastfeuer entfacht: Schriftzug, das Bild hält kurz inne
+  drawRest(ctx) { // dunkles Band quer durchs Bild, darin der Schriftzug in Glut – blendet weich ein und aus
+    const k = this.restT, a = k > 140 ? (170 - k) / 30 : k < 40 ? k / 40 : 1;
+    ctx.save(); ctx.globalAlpha = a;
+    const g = ctx.createLinearGradient(0, 70, 0, 130); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.3, 'rgba(0,0,0,0.7)'); g.addColorStop(0.7, 'rgba(0,0,0,0.7)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 70, View.w, 60);
+    const txt = tr('restLit');
+    this.big(ctx, txt, View.cx, 92, Font.width(txt) * 2 > View.w - 24 ? 1 : 2, ['#fcfcfc', '#fce0a8', '#f8b800', '#fc7460', '#e83c20', '#a80020', '#580008'], null, '#000');
+    ctx.restore();
+  },
 
   // Bestzeit pro Stage (getrennt für den Leicht-Modus), dauerhaft im Browser gespeichert
   recordTime() {
@@ -468,6 +478,7 @@ const Game = {
       if (this.readyT > 80) this.readyT = 0;
     }
     if (this.annT > 0) this.annT--;
+    if (this.restT > 0) this.restT--;
     if (this.shoutT > 0) this.shoutT--;
     if (this.noteT > 0) this.noteT--;
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; } // Zeitlupe
@@ -528,6 +539,7 @@ const Game = {
         if (this.state === 'play' && W.boss && this.bossName > 0 && this.bossName < 150) this.drawBossBanner(ctx);
         if (this.state === 'play' && this.readyT > 0) this.drawReady(ctx);
         if (this.state === 'play' && this.annT > 0) this.drawAnnounce(ctx);
+        if (this.state === 'play' && this.restT > 0) this.drawRest(ctx);
         if (this.state === 'play' && this.shoutT > 0) this.drawShout(ctx);
         if (this.state === 'play') this.drawTut(ctx);
         if (this.state === 'play' && this.noteT > 0) this.drawNote(ctx);
