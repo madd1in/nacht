@@ -2580,24 +2580,6 @@ const Tiles = (() => {
     }
     ctx.setTransform(M);
   }
-  // Eine Reihe Bodenblöcke an Bildposition (X, Y) mit derselben Perspektive wie die Kacheln (Fluchtpunkt, Tiefe K):
-  // Vorderseiten, Oberseite zum Fluchtpunkt, freie Seitenflächen – z. B. als Sockel, auf dem das Torhaus steht
-  function run3d(ctx, theme, X, Y, n) {
-    const t = build(theme), VX = View.w / 2, VY = 60, K = 0.9, M = ctx.getTransform();
-    const face = (img, X0, Y0, ux, uy, vx2, vy2, tone) => {
-      const a = ux / 16, b = uy / 16, c = vx2 / 16, d = vy2 / 16;
-      ctx.setTransform(M.a * a + M.c * b, M.b * a + M.d * b, M.a * c + M.c * d, M.b * c + M.d * d, M.a * X0 + M.c * Y0 + M.e, M.b * X0 + M.d * Y0 + M.f);
-      ctx.drawImage(toned(img, tone), 0, 0);
-    };
-    for (let k = 0; k < n; k++) {
-      const x = X + k * 16, img = t.groundTop[k % 4];
-      if (k === 0 && x > VX) face(img, x, Y, 0, 16, (VX - x) * (1 - K), (VY - Y) * (1 - K), 1);
-      if (k === n - 1 && x + 16 < VX) face(img, x + 16, Y, 0, 16, (VX - x - 16) * (1 - K), (VY - Y) * (1 - K), 1);
-    }
-    if (Y > VY) for (let k = 0; k < n; k++) { const x = X + k * 16; face(t.groundTop[k % 4], x, Y, 16, 0, (VX - x) * (1 - K), (VY - Y) * (1 - K), 0); }
-    ctx.setTransform(M);
-    for (let k = 0; k < n; k++) ctx.drawImage(t.groundTop[k % 4], X + k * 16, Y);
-  }
   // getönte Kopien der Kacheln (0 = Oberseite aufgehellt, 1 = Seite, 2 = Unterseite), einmal erzeugt
   const tonedC = new Map();
   function toned(img, tone) {
@@ -2669,5 +2651,5 @@ const Tiles = (() => {
     }
   }
 
-  return { build, drawBg, drawTiles, drawFront, layer, drawLayer, shipLights, drawCloud7, run3d };
+  return { build, drawBg, drawTiles, drawFront, layer, drawLayer, shipLights, drawCloud7 };
 })();

@@ -131,6 +131,11 @@ const HEROES = (() => {
     return { sx, sy, ex, ey, hx: ex + Math.sin(R(a1 + a2)) * FORE, hy: ey + Math.cos(R(a1 + a2)) * FORE };
   };
 
+  // Vorgerenderte 3D-Figuren (Blender): Atlas je Held, Bild je Pose (Schlüssel = Hash der Pose). Fehlt ein Bild,
+  // wird die Figur wie bisher aus dem Rig gemalt. REC sammelt beim Export die Gelenke jeder Pose für Blender.
+  const R3D = {};
+  let REC = null;
+  const poseKey = (pose) => { const s = JSON.stringify(pose); let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
   // pose: { legs:[[th,kn] vorne,[th,kn] hinten], fa/ba: Arm, lean, bob, air, flare, blink, hurt, coil, capeOpen }
   function frame(def, pose, S = 1) {
     const G = painter(S), { P, plot, capsule, disc, poly, shadeIdx } = G, lr = def.legR || 1;
@@ -142,6 +147,19 @@ const HEROES = (() => {
     const shF = [CX + 2.6 + lean, 11.8 + ty], shB = [CX - 2.6 + lean, 11.8 + ty];
     const fA = armGeo(pose.fa, shF[0], shF[1]), bA = armGeo(pose.ba, shB[0], shB[1]);
     const ar = def.arm.r, armsHidden = def.cape && !pose.capeOpen;
+    if (S === 1 && (REC || R3D[def.id])) {
+      const key = poseKey(pose);
+      if (REC) REC.push({ key, lean, ty, hipY, flare: pose.flare || 0, coil: !!pose.coil, hurt: !!pose.hurt, blink: !!pose.blink, legs: pose.legs,
+        fL: [fL.hx, fL.hy, fL.kx, fL.ky, fL.ax, fL.ay], bL: [bL.hx, bL.hy, bL.kx, bL.ky, bL.ax, bL.ay],
+        fA: [fA.sx, fA.sy, fA.ex, fA.ey, fA.hx, fA.hy], bA: [bA.sx, bA.sy, bA.ex, bA.ey, bA.hx, bA.hy], head: [Math.round(12 + lean), ty] });
+      const A = R3D[def.id], r = A && A.map[key];
+      if (r) { // gerendertes 3D-Bild statt Pixelmalerei
+        G.x.drawImage(A.img, r[0], r[1], FW, FH, 0, 0, FW, FH);
+        const spr = Sprites.fromCanvas(G.c);
+        spr.mx = MX; spr.hand = [fA.hx, fA.hy]; spr.drop = yOff;
+        return spr;
+      }
+    }
 
     const drawArm = (A, bias) => {
       const limb = def.sleeve || def.skin;
@@ -394,5 +412,17 @@ const HEROES = (() => {
   list.forEach(d => { built[d.id] = build(d); });
   Sprites.S.heroes = built;
   Sprites.S.hero = built.henrik;
-  return { list, get: (id) => built[id] || built.henrik };
+  // Gelenke aller Posen eines Helden (für den Blender-Export)
+  function exportRig(id) { const d = list.find(x => x.id === id); REC = []; build(d); const out = REC; REC = null; const seen = new Set(); return out.filter(r => !seen.has(r.key) && seen.add(r.key)); }
+  // 3D-Atlas laden: danach die Frames des Helden neu bauen (der Held holt sie sich beim nächsten Start/Wechsel)
+  function load3d(id, url, map) {
+    const img = new Image();
+    img.onload = () => {
+      R3D[id] = { img, map }; const d = list.find(x => x.id === id);
+      built[id] = build(d); Sprites.S.heroes = built; Sprites.S.hero = built.henrik;
+      if (typeof W !== 'undefined' && W.player && W.player.def && W.player.def.id === id) { W.player.H = built[id]; }
+    };
+    img.src = url;
+  }
+  return { list, get: (id) => built[id] || built.henrik, exportRig, load3d };
 })();
