@@ -516,7 +516,10 @@ const W = {
     const order = ['prop', 'candle', 'platform', 'item', 'enemy', 'boss', 'sub', 'eproj', 'fx'];
     if (this.room.wrap) this.drawOnTower(ctx, order);
     else if (bend) this.drawBent(ctx, order);
-    else order.forEach(k => { for (const e of this.ents) if (e.kind === k) e.draw(ctx); if (k === 'boss') this.player.draw(ctx, this.cam); });
+    else order.forEach(k => { // Gegner, Bosse und Held gemeinsam: Kontaktschatten und Tiefe passend zu den 3D-Kacheln
+      if (k === 'enemy') { this.drawActors(ctx); return; }
+      if (k !== 'boss') for (const e of this.ents) if (e.kind === k) e.draw(ctx);
+    });
     for (const e of this.ents) if (e.drawFront && !e.dead) e.drawFront(ctx); // Bauwerke, die vor dem Helden liegen (Torhaus beim Durchgehen)
     this.drawReflections(ctx, sx, sy);
     if ((theme === 'throne' || theme === 'gallery') && !View.lite) this.drawFloorMirror(ctx, sx, sy);
@@ -535,6 +538,34 @@ const W = {
     ctx.restore();
   },
 
+  // 2D-Figuren in der 3D-Kachelwelt: Kontaktschatten auf den Blockoberseiten und eine dunkle Silhouette, die wie die
+  // Flanken der Blöcke zum selben Fluchtpunkt läuft (Mitte, y 60) – die Sprites bekommen Körper. Gegner und Held werden
+  // dafür in einer eigenen Ebene gesammelt; Bosse (mit Leuchthöfen) liegen darunter ohne Silhouette.
+  drawActors(ctx) {
+    const w = View.w, p = this.player;
+    for (const e of this.ents) if ((e.kind === 'enemy' || e.kind === 'boss') && !e.dead) this.contactShadow(ctx, e);
+    if (p.alive) this.contactShadow(ctx, p);
+    for (const e of this.ents) if (e.kind === 'boss') e.draw(ctx);
+    if (View.lite || this.room.theme === 'vortex') { for (const e of this.ents) if (e.kind === 'enemy') e.draw(ctx); p.draw(ctx, this.cam); return; }
+    if (!this.actC || this.actC.width !== w) { this.actC = Sprites.canvas(w, 208); this.actX = this.actC.getContext('2d'); this.silC = Sprites.canvas(w, 208); this.silX = this.silC.getContext('2d'); }
+    const a = this.actX; a.clearRect(0, 0, w, 208); a.imageSmoothingEnabled = false;
+    for (const e of this.ents) if (e.kind === 'enemy') e.draw(a);
+    p.draw(a, this.cam);
+    const sx = this.silX; sx.globalCompositeOperation = 'source-over'; sx.clearRect(0, 0, w, 208); sx.drawImage(this.actC, 0, 0);
+    sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgba(8,4,16,0.8)'; sx.fillRect(0, 0, w, 208); sx.globalCompositeOperation = 'source-over';
+    const VX = w / 2, VY = 60;
+    for (const k of [0.97, 0.98, 0.99]) ctx.drawImage(this.silC, VX * (1 - k), VY * (1 - k), w * k, 208 * k);
+    ctx.drawImage(this.actC, 0, 0);
+  },
+  contactShadow(ctx, e) { // weicher Schatten auf dem Boden darunter, blasser und kleiner, je höher die Figur ist
+    const feet = e.y + e.h, col = Math.floor(e.cx / T);
+    let fy = -1;
+    for (let r = Math.floor((feet - 1) / T), n = 0; n < 6; r++, n++) if (r >= 0 && r < this.room.h && Phys.solidTile(col, r)) { fy = r * T; break; }
+    if (fy < 0 || fy < feet - 3) return;
+    const d = fy - feet, al = 0.45 * (1 - d / 72); if (al <= 0.03) return;
+    const rx = Math.max(5, e.w * 0.8) * (1 - d / 180);
+    ctx.fillStyle = `rgba(6,2,12,${al.toFixed(2)})`; ctx.beginPath(); ctx.ellipse(e.cx - this.cam.x, fy - this.cam.y - 3, rx, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+  },
   // Turm: jede Figur wird an ihren Platz auf dem Zylinder gerückt (Kamera kurz verschoben); wer hinter dem Turm ist, bleibt unsichtbar
   drawOnTower(ctx, order) {
     const cam = this.cam, cx0 = cam.x, cy0 = cam.y, room = this.room, TW = PS2.Tower;

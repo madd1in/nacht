@@ -474,10 +474,7 @@ class Gatehouse extends Ent {
     const w = this.winch, wx = w.cx + 3, wy = w.y + 9, slack = this.state === 'up' ? 4 : 22; // Seil zur Winde
     ctx.fillStyle = '#a8784c';
     for (let i = 0; i <= 60; i++) { const k = i / 60, sx = wx + (tp.x - wx) * k, sy = wy + (tp.y - wy) * k + Math.sin(k * Math.PI) * slack; ctx.fillRect(Math.round(sx - cx), Math.round(sy - cy), 1, 1); }
-    ctx.save(); // Zugbrücke: schwere Bohlen mit Eisenbändern, dreht um das Scharnier
-    ctx.translate(Math.round(this.hx - cx), Math.round(this.hy - cy)); ctx.rotate(this.ang);
-    ctx.drawImage(Gatehouse.plank(this.len), -this.len, 0);
-    ctx.restore();
+    this.drawBridge(ctx, cx, cy); // Zugbrücke: schwerer Bohlenkörper mit Eisenbändern, dreht um das Scharnier
     if (!this.inside()) this.drawFrontParts(ctx);
   }
   drawFront(ctx) { if (this.inside()) this.drawFrontParts(ctx); } // Held im Torhaus: Torbau liegt vor ihm
@@ -499,6 +496,11 @@ class Gatehouse extends Ent {
     }
     ctx.restore();
     ctx.drawImage(A.front, fx, Math.round(-cy));
+    const c0 = Math.ceil((this.archX + GH.SPAN) / T), c1 = Math.floor((this.hx + GH.A + GH.R) / T); // Sockel aus Bodenblöcken: Torhaus und Boden aus einem Guss
+    const px0 = c0 * T - cx, py0 = this.hy - T - cy, pw = (c1 - c0) * T;
+    Tiles.run3d(ctx, 'courtyard', px0, py0, c1 - c0);
+    const sg = ctx.createLinearGradient(0, py0 - 12, 0, py0 + 16); sg.addColorStop(0, 'rgba(10,4,22,0.55)'); sg.addColorStop(1, 'rgba(10,4,22,0.2)'); // im Schatten des Torbaus
+    ctx.fillStyle = sg; ctx.fillRect(px0, py0 - 12, pw, 28);
     // glühende Augen im Totenkopf-Schlussstein
     const ex = Math.round(this.archCx - cx), ey = Math.round(48 - cy), glow = 0.6 + 0.4 * Math.sin(this.t * 0.07);
     ctx.fillStyle = `rgba(252,${Math.round(40 + 60 * glow)},40,1)`; ctx.fillRect(ex - 5, ey, 3, 3); ctx.fillRect(ex + 2, ey, 3, 3);
@@ -514,19 +516,12 @@ class Gatehouse extends Ent {
       ctx.fillStyle = '#f87800'; ctx.fillRect(x - 1, y - 1 + (fl === 2 ? 1 : 0), 3, 5);
       ctx.fillStyle = '#fcd040'; ctx.fillRect(x, y + 1, 1, 3);
     });
-    // langes Banner am rechten Turm, flattert unten im Wind
+    // langes Banner am rechten Turm: Stoffnetz, das im Wind Wellen in die Tiefe schlägt
     const bx = Math.round(this.hx + GH.A + 50 - cx);
-    for (let c = 0; c < 22; c++) {
-      const len = 104 - Math.abs(c - 11) * 0.8;
-      for (let y = 0; y < len; y += 2) {
-        const o = Math.round(Math.sin(this.t * 0.09 - y * 0.05 + c * 0.2) * (y / len) * 3);
-        const u = Math.abs(c - 10.5), v = y - 44; // Wappen: goldene Fledermaus
-        const crest = (u < 1.6 && v > -7 && v < 9) || (u > 0.6 && u < 2.6 && v > -10 && v <= -6) || (u < 10 && v > -2 - u * 0.45 && v < 3 - u * 0.2 - ((Math.floor(u / 3.3) % 2) ? 0 : 2.5));
-        ctx.fillStyle = crest ? '#f8b800' : c === 0 || c === 21 ? '#5c0010' : (c + (y >> 3)) % 7 ? '#a80020' : '#880018';
-        ctx.fillRect(bx + c + o, Math.round(-cy) + 6 + y, 1, 2);
-      }
-    }
-    ctx.fillStyle = '#3c2410'; ctx.fillRect(bx - 2, Math.round(4 - cy), 26, 3); ctx.fillStyle = '#c89020'; ctx.fillRect(bx - 3, Math.round(4 - cy), 2, 3); ctx.fillRect(bx + 23, Math.round(4 - cy), 2, 3);
+    this.drawBanner(ctx, bx, Math.round(-cy) + 6);
+    const pg = ctx.createLinearGradient(0, Math.round(3 - cy), 0, Math.round(8 - cy)); pg.addColorStop(0, '#8c6030'); pg.addColorStop(0.5, '#4c2c10'); pg.addColorStop(1, '#1c0c04'); // runde Stange
+    ctx.fillStyle = pg; ctx.fillRect(bx - 3, Math.round(3 - cy), 28, 5);
+    for (const ex of [bx - 6, bx + 24]) { const fg = ctx.createRadialGradient(ex + 1.5, Math.round(4 - cy), 0.5, ex + 2, Math.round(5 - cy), 4); fg.addColorStop(0, '#fcf0a0'); fg.addColorStop(0.5, '#c89020'); fg.addColorStop(1, '#5c3c08'); ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(ex + 2, Math.round(5 - cy), 3.2, 0, Math.PI * 2); ctx.fill(); } // Goldknäufe
     // Käfig mit Skelett, schwingt an einer Kette vom Turm
     const sw = Math.sin(this.t * 0.03) * 0.12, kx = this.hx + GH.A + GH.R - 14, ky = 30;
     ctx.save(); ctx.translate(Math.round(kx - cx), Math.round(ky - cy)); ctx.rotate(sw);
@@ -535,6 +530,53 @@ class Gatehouse extends Ent {
     ctx.fillStyle = '#c8c4b8'; ctx.fillRect(-1, 31, 2, 9); ctx.fillRect(-3, 33, 6, 1); ctx.fillRect(-3, 36, 6, 1); ctx.fillRect(-2, 40, 1, 6); ctx.fillRect(1, 40, 1, 6);
     ctx.fillStyle = '#26222e'; for (let x = -7; x <= 7; x += 3) ctx.fillRect(x, 22, 1, 28); ctx.fillRect(-7, 22, 15, 2); ctx.fillRect(-7, 48, 15, 2); ctx.fillRect(-3, 20, 7, 2);
     ctx.restore();
+  }
+  // Zugbrücke im PS1/PS2-Look: die Bohlen-Vorderseite dreht um das Scharnier, dazu Deck, Kanten und Unterseite als
+  // Flächen zum selben Fluchtpunkt wie die Bodenblöcke (Mitte, y 60; Tiefe 10 %) – nur die zum Betrachter gewandten
+  drawBridge(ctx, cx, cy) {
+    const a = this.ang, L = this.len, H = 14, ca = Math.cos(a), sa = Math.sin(a), ox = this.hx - cx, oy = this.hy - cy;
+    const P = [[-L, 0], [0, 0], [0, H], [-L, H]].map(([u, v]) => [ox + u * ca - v * sa, oy + u * sa + v * ca]);
+    const VX = View.w / 2, VY = 60, K = 0.9, Q = P.map(([x, y]) => [VX + (x - VX) * K, VY + (y - VY) * K]);
+    const mx = (P[0][0] + P[2][0]) / 2, my = (P[0][1] + P[2][1]) / 2, lerp = (A, B, t) => [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t];
+    const quad = (pts, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) ctx.lineTo(q[0], q[1]); ctx.closePath(); ctx.fill(); };
+    const line = (A, B, col, w = 1) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); };
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 1) % 4, ex = (P[i][0] + P[j][0]) / 2, ey = (P[i][1] + P[j][1]) / 2;
+      let nx = P[j][1] - P[i][1], ny = -(P[j][0] - P[i][0]);
+      if (nx * (ex - mx) + ny * (ey - my) < 0) { nx = -nx; ny = -ny; }
+      if (nx * (VX - ex) + ny * (VY - ey) <= 0) continue; // Fläche zeigt vom Betrachter weg
+      const f = [P[i], P[j], Q[j], Q[i]];
+      if (i === 0) { // Deck: Bohlen quer, Eisenbänder, Lichtkante vorn
+        const g = ctx.createLinearGradient(ex, ey, (Q[i][0] + Q[j][0]) / 2, (Q[i][1] + Q[j][1]) / 2); g.addColorStop(0, '#9c6838'); g.addColorStop(1, '#5c3818');
+        quad(f, g);
+        for (let u = 8; u < L; u += 8) line(lerp(P[0], P[1], u / L), lerp(Q[0], Q[1], u / L), 'rgba(28,14,4,0.8)');
+        for (let u = 4; u < L; u += 24) { line(lerp(P[0], P[1], u / L), lerp(Q[0], Q[1], u / L), '#2c2c38', 2.4); line(lerp(P[0], P[1], (u + 1) / L), lerp(Q[0], Q[1], (u + 1) / L), '#8c8898', 0.8); }
+        line(P[0], P[1], '#c08c50', 1);
+      } else quad(f, i === 2 ? '#140802' : '#2c1606'); // Unterseite fast schwarz, Stirnseiten dunkles Holz
+    }
+    ctx.save(); ctx.translate(Math.round(ox), Math.round(oy)); ctx.rotate(a); ctx.drawImage(Gatehouse.plank(L), -L, 0); ctx.restore();
+  }
+  // Banner als Stoffnetz (PS2): Gitter aus Vierecken, das im Wind in die Tiefe schwingt; jedes Viereck nach seiner Neigung
+  // zum Licht schattiert (Falten hell/dunkel), die Farbe kommt aus dem Wappenmuster (goldene Fledermaus auf Rot)
+  drawBanner(ctx, bx, by) {
+    const NU = 11, NV = View.lite ? 18 : 28, t = this.t, Wd = 22, vtx = [];
+    const zf = (u, v, len) => Math.sin(t * 0.09 - v * 0.05 + u * 0.2) * (v / len) * 7 + Math.sin(t * 0.13 - v * 0.09) * (v / len) * 2;
+    for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) {
+      const u = i / NU * Wd, len = 104 - Math.abs(u - 11) * 0.8, v = j / NV * len, z = zf(u, v, len);
+      vtx.push({ u, v, z, x: bx + u + z * 0.35 + Math.sin(t * 0.09 - v * 0.05) * (v / len) * 2, y: by + v - Math.abs(z) * 0.15 });
+    }
+    const crest = (c, y) => { const u = Math.abs(c - 10.5), v = y - 44; return (u < 1.6 && v > -7 && v < 9) || (u > 0.6 && u < 2.6 && v > -10 && v <= -6) || (u < 10 && v > -2 - u * 0.45 && v < 3 - u * 0.2 - ((Math.floor(u / 3.3) % 2) ? 0 : 2.5)); };
+    const Lx = -0.45, Ly = -0.5, Lz = 0.74;
+    ctx.lineWidth = 0.6;
+    for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) {
+      const a = vtx[j * (NU + 1) + i], b = vtx[j * (NU + 1) + i + 1], c = vtx[(j + 1) * (NU + 1) + i + 1], d = vtx[(j + 1) * (NU + 1) + i];
+      const du = (b.z - a.z + c.z - d.z) / 2 / (b.u - a.u || 1), dv = (d.z - a.z + c.z - b.z) / 2 / (d.v - a.v || 1);
+      const nl = Math.hypot(du, dv, 1), lit = 0.42 + 0.78 * Math.max(0, (-du * Lx - dv * Ly + Lz) / nl); // Lambert auf der gewellten Fläche
+      const uc = (a.u + b.u) / 2, vc = (a.v + d.v) / 2;
+      const base = crest(uc, vc) ? [248, 184, 0] : (i === 0 || i === NU - 1) ? [92, 0, 16] : (Math.floor(uc) + (vc >> 3)) % 7 ? [168, 0, 32] : [136, 0, 24];
+      ctx.fillStyle = ctx.strokeStyle = `rgb(${Math.min(255, base[0] * lit) | 0},${Math.min(255, base[1] * lit) | 0},${Math.min(255, base[2] * lit) | 0})`;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fill(); ctx.stroke(); // Kontur schließt Fugen
+    }
   }
   static plank(len) {
     if (Gatehouse.pl && Gatehouse.pl.width === len) return Gatehouse.pl;
@@ -549,23 +591,18 @@ class Gatehouse extends Ent {
   // dunkler werdende Kopien ergeben massive Seitenflächen, die sich beim Vorbeigehen drehen
   static depthLayers() {
     if (Gatehouse.DL) return Gatehouse.DL;
-    const A = Gatehouse.art(), Wd = A.back.width, Hd = A.back.height, N = 9, out = [];
-    for (let i = 0; i < N; i++) {
+    const A = Gatehouse.art(), Wd = A.back.width, Hd = A.back.height, N = 6, out = [], tile = Tiles.build('courtyard').ground[0];
+    for (let i = 0; i < N; i++) { // Seitenflächen aus demselben Stein wie die Bodenblöcke, nach hinten dunkler (wie deren Flanken)
       const t = Sprites.canvas(Wd, Hd), y = t.getContext('2d'), k = i / (N - 1);
       y.drawImage(A.back, 0, 0); y.drawImage(A.front, 0, 0);
-      y.globalCompositeOperation = 'source-in';
-      const g = y.createLinearGradient(0, 0, Wd, 0); // Fackelschein vorn warm, hinten kaltes Mondlicht
-      g.addColorStop(0, `rgb(${Math.round(92 - 66 * k)},${Math.round(62 - 44 * k)},${Math.round(80 - 48 * k)})`);
-      g.addColorStop(1, `rgb(${Math.round(42 - 26 * k)},${Math.round(34 - 22 * k)},${Math.round(58 - 30 * k)})`);
-      y.fillStyle = g; y.fillRect(0, 0, Wd, Hd);
-      y.globalCompositeOperation = 'source-atop'; y.fillStyle = 'rgba(0,0,0,0.35)'; // Quaderfugen auf den Seitenflächen
-      for (let Y = 0; Y < Hd; Y += 8) y.fillRect(0, Y, Wd, 1);
+      y.globalCompositeOperation = 'source-in'; y.fillStyle = y.createPattern(tile, 'repeat'); y.fillRect(0, 0, Wd, Hd);
+      y.globalCompositeOperation = 'source-atop'; y.fillStyle = `rgba(6,2,14,${(0.5 + 0.3 * k).toFixed(2)})`; y.fillRect(0, 0, Wd, Hd);
       out.push(t);
     }
     return (Gatehouse.DL = out);
   }
   drawDepth(ctx, fx, fy) {
-    const L = Gatehouse.depthLayers(), n = View.lite ? 5 : L.length, vx = View.w / 2, vy = 104, w = L[0].width, h = L[0].height, D = 0.2;
+    const L = Gatehouse.depthLayers(), n = View.lite ? 3 : L.length, vx = View.w / 2, vy = 60, w = L[0].width, h = L[0].height, D = 0.1; // wie die Kacheln: Fluchtpunkt (Mitte, 60), Tiefe 10 %
     for (let i = n; i >= 1; i--) {
       const s = 1 - D * i / n, img = L[Math.min(L.length - 1, Math.round((i - 1) / Math.max(1, n - 1) * (L.length - 1)))];
       ctx.drawImage(img, vx + (fx - vx) * s, vy + (fy - vy) * s, w * s, h * s);
@@ -1435,6 +1472,11 @@ class Crawl extends Ent {
   draw(ctx) {
     const X = Math.round(this.x - W.cam.x), Y = Math.round(this.y - W.cam.y), w = this.w;
     if (X > View.w || X + w < 0) return;
+    if (this.stone) { // Steinüberhang: offen, nur ein weicher Schatten unter der Unterkante und auf dem Boden
+      const g = ctx.createLinearGradient(0, Y, 0, Y + 16); g.addColorStop(0, 'rgba(6,2,12,0.45)'); g.addColorStop(0.45, 'rgba(6,2,12,0.12)'); g.addColorStop(1, 'rgba(6,2,12,0.3)');
+      ctx.fillStyle = g; ctx.fillRect(X, Y, w, 16);
+      return;
+    }
     const g = ctx.createLinearGradient(X, 0, X + w, 0); g.addColorStop(0, '#000000'); g.addColorStop(0.15, '#0a0606'); g.addColorStop(0.85, '#0a0606'); g.addColorStop(1, '#000000');
     ctx.fillStyle = g; ctx.fillRect(X, Y, w, 16);
     ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(X, Y + 16, w, 2);
