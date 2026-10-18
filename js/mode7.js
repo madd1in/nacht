@@ -434,5 +434,6 @@ const Mode7 = (() => {
     ctx.restore();
   }
 
-  return { drawTunnel, tubeProject, drawMap, drawOcean, wave, mosaic, drawFire };
+  const mapData = () => { if (!map) makeMap(); return { map, mapH, MS, POINTS, trees }; };
+  return { drawTunnel, tubeProject, drawMap, drawOcean, wave, mosaic, drawFire, mapData };
 })();

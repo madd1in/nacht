@@ -569,6 +569,69 @@ const PS2 = (() => {
     }
   }
 
+  // ---------------- Kapitelkarte: die Weltkarte als 3D-Landschaft ----------------
+  // Gelände aus der Höhenkarte der Mode-7-Karte (Farben übernommen), in Stücken gebaut, nachts im Mondlicht; an den Kapitel-
+  // plätzen stehen Burgen als Low-Poly-Modelle (Burghof, Gruft, Bergfried, Sonnenkathedrale, Schloss des Grafen), dazwischen
+  // der Weg über das Land und Tannen. Die Kamera kreist um das aktuelle Kapitel, die Burg dort leuchtet.
+  let world = null, wmBuf = null;
+  const WENV = { sun: null, sunC: [0.6, 0.62, 0.95], amb: [0.7, 0.66, 0.8], sky: [0.12, 0.12, 0.2], fog: [52, 30, 80], fogD: 0.0042 };
+  { const v = [-0.5, 0.75, 0.45], l = Math.hypot(...v); WENV.sun = v.map(c => c / l); }
+  function buildWorld() {
+    const D = Mode7.mapData(), MS = D.MS, HS = 70, N = 48, cs = MS / N, chunks = [];
+    const H = (x, y) => { const h = D.mapH[((Math.round(y) % MS + MS) % MS) * MS + ((Math.round(x) % MS + MS) % MS)]; return Math.max(0.285, h) * HS; };
+    const colAt = (x, y) => { const c = D.map[((y | 0) & 255) * MS + ((x | 0) & 255)]; return [c & 255, (c >> 8) & 255, (c >> 16) & 255]; };
+    for (let cj = 0; cj < N / 8; cj++) for (let ci = 0; ci < N / 8; ci++) { // Geländestücke 8 x 8 Zellen
+      const m = mesh(), idx = [];
+      for (let j = 0; j <= 8; j++) for (let i = 0; i <= 8; i++) { const x = (ci * 8 + i) * cs, y = (cj * 8 + j) * cs; idx.push(vtx(m, x, H(x, y), y)); }
+      for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) {
+        const a = idx[j * 9 + i], b = a + 1, c = idx[(j + 1) * 9 + i + 1], d = idx[(j + 1) * 9 + i];
+        const col = colAt((ci * 8 + i + 0.5) * cs, (cj * 8 + j + 0.5) * cs).map(v => Math.min(255, v * 1.15));
+        face(m, [a, d, c], col, null, { two: true }); face(m, [a, c, b], col, null, { two: true });
+      }
+      for (const f of m.f) if (f.n[1] < 0) f.n = f.n.map(v => -v); // Normalen nach oben
+      m.cx = (ci * 8 + 4) * cs; m.cz = (cj * 8 + 4) * cs; chunks.push(m);
+    }
+    const props = mesh(), glow = [];
+    const STONE = [150, 144, 170], STONE2 = [110, 104, 132], ROOF = [150, 30, 44], DARKR = [60, 40, 70], GOLDM = [250, 210, 110], WHITE = [236, 230, 220];
+    D.POINTS.forEach(([px, py], k) => {
+      const y0 = H(px, py) - 0.5, B = (dx, dz, w, h, d, col, o) => box(props, px + dx, y0, py + dz, w, h, d, col, o);
+      if (k === 0) { B(0, 0, 16, 5, 16, STONE2, { top: STONE }); for (const [a, b] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) { prism(props, px + a, y0, py + b, 2.4, 10, 6, STONE, { top: STONE2 }); cone(props, px + a, y0 + 10, py + b, 3, 5, 6, ROOF); } prism(props, px, y0, py, 3.6, 15, 8, STONE); cone(props, px, y0 + 15, py, 4.4, 7, 8, ROOF); }
+      else if (k === 1) { B(0, 0, 10, 6, 7, STONE2, { top: STONE }); gable(props, px, y0 + 6, py, 7.4, 10.6, 3.5, DARKR); for (let g = 0; g < 6; g++) B(-12 + (g % 3) * 3.5, (g < 3 ? -6 : 6), 1.6, 2.4, 0.8, STONE); }
+      else if (k === 2) { prism(props, px, y0, py, 4.2, 26, 8, STONE, { rTop: 3.8 }); cone(props, px, y0 + 26, py, 5, 9, 8, ROOF); for (const a of [-7, 7]) { prism(props, px + a, y0, py, 2.2, 11, 6, STONE2); cone(props, px + a, y0 + 11, py, 2.6, 4, 6, ROOF); } }
+      else if (k === 3) { B(0, 0, 7, 9, 18, WHITE); gable(props, px, y0 + 9, py, 18, 7.4, 4, [120, 130, 170]); for (const a of [-4.5, 4.5]) { prism(props, px + a, y0, py - 9, 2, 16, 8, WHITE); cone(props, px + a, y0 + 16, py - 9, 2.3, 9, 8, [120, 130, 170]); cone(props, px + a, y0 + 25, py - 9, 0.5, 2, 4, GOLDM); } prism(props, px, y0 + 9, py + 2, 2.4, 8, 8, WHITE); cone(props, px, y0 + 17, py + 2, 2.8, 11, 8, GOLDM); }
+      else { B(0, 0, 14, 9, 12, DARKR, { top: [80, 60, 90] }); for (const [a, b, h] of [[-7, -6, 16], [7, -6, 14], [0, 5, 22]]) { prism(props, px + a, y0, py + b, 2.6, h, 6, [70, 54, 84]); cone(props, px + a, y0 + h, py + b, 3.1, 6, 6, [110, 20, 30]); } for (let w = 0; w < 4; w++) box(props, px - 1 + (w % 2) * 2, y0 + 10 + w * 3, py + 2.2, 0.8, 1.4, 0.4, [255, 60, 40], { e: 0.6 }); }
+      glow.push([px, y0, py]);
+    });
+    D.trees.slice(0, 70).forEach(([x, y, s]) => { const y0 = H(x, y); prism(props, x, y0, y, 0.5 * s, 2 * s, 4, [60, 40, 30], { cap: false }); cone(props, x, y0 + 1.6 * s, y, 2.2 * s, 6 * s, 5, [24, 64, 40]); });
+    for (let k = 1; k < D.POINTS.length; k++) { // Weg: Balken über das Gelände
+      const [ax, ay] = D.POINTS[k - 1], [bx, by] = D.POINTS[k];
+      for (let i = 0; i < 12; i++) { const t0 = i / 12, t1 = (i + 1) / 12, x0 = ax + (bx - ax) * t0, z0 = ay + (by - ay) * t0 + Math.sin(t0 * 9) * 6, x1 = ax + (bx - ax) * t1, z1 = ay + (by - ay) * t1 + Math.sin(t1 * 9) * 6; beam(props, x0, H(x0, z0) + 0.3, z0, x1, H(x1, z1) + 0.3, z1, 1.6, 0.4, [170, 140, 96]); }
+    }
+    return { chunks, props, glow, H };
+  }
+  function drawWorldMap(ctx, w, t, stage) {
+    if (!world) world = buildWorld();
+    const D = Mode7.mapData(), P = D.POINTS[Math.max(0, Math.min(D.POINTS.length - 1, stage))], ang = t * 0.006 + stage * 1.3;
+    const lite = View.lite, Wb = Math.ceil(w / 2), Hb = 104;
+    if (!wmBuf || wmBuf.c.width !== Wb) { wmBuf = { c: Sprites.canvas(Wb, Hb) }; wmBuf.x = wmBuf.c.getContext('2d'); }
+    const x = wmBuf.x, fx = Math.sin(ang), fz = -Math.cos(ang), R = 150, cx = P[0] - fx * R, cz = P[1] - fz * R, cy = world.H(P[0], P[1]) + 78;
+    const cam = { x: cx, y: cy, z: cz, yaw: Math.atan2(fx, fz), pitch: -0.36, f: Wb * 1.1, near: 3, hy: 0.3 };
+    if (!(wmBuf.done && (lite ? t % 3 : t & 1))) { // die Karte dreht sich langsam: jedes zweite (Sparmodus: dritte) Bild genügt
+      const g = x.createLinearGradient(0, 0, 0, Hb); g.addColorStop(0, '#0a0418'); g.addColorStop(0.3, '#2a1446'); g.addColorStop(0.42, '#46245c'); g.addColorStop(1, '#28143c');
+      x.fillStyle = g; x.fillRect(0, 0, Wb, Hb);
+      for (let i = 0; i < 50; i++) { const sx = ((i * 89 - ang * 120) % Wb + Wb) % Wb, sy = (i * 37) % (Hb * 0.3); x.fillStyle = i % 5 ? 'rgba(200,200,240,0.7)' : '#fff'; x.fillRect(sx, sy, 1, 1); }
+      const mx = (((Wb * 0.7 - ang * 60) % (Wb * 1.6)) + Wb * 1.6) % (Wb * 1.6) - Wb * 0.3, mg = x.createRadialGradient(mx, 12, 0, mx, 12, 18); // Blutmond
+      mg.addColorStop(0, '#f86040'); mg.addColorStop(0.3, '#c82830'); mg.addColorStop(0.36, 'rgba(160,30,50,0.5)'); mg.addColorStop(1, 'rgba(120,20,40,0)'); x.fillStyle = mg; x.fillRect(mx - 18, 0, 36, 32);
+      const vis = world.chunks.filter(m => { const a = (m.cx - cx) * fx + (m.cz - cz) * fz, b = Math.abs((m.cx - cx) * -fz + (m.cz - cz) * fx); return a > -20 && a < 330 && b < a * 0.75 + 40; }); // nur Stücke im Blickfeld
+      render(x, Wb, Hb, vis.concat([world.props]), cam, WENV);
+      x.save(); x.globalCompositeOperation = 'lighter'; // Fackelschein an den Burgen, das aktuelle Kapitel leuchtet
+      world.glow.forEach(([gx, gy, gz], i) => { const [sx, sy, sz] = project(cam, Wb, Hb, gx, gy + 6, gz); if (sz < 4) return; const r = (i === stage ? 26 : 10) * 30 / sz * (i === stage ? 1 + 0.15 * Math.sin(t * 0.15) : 1), gg = x.createRadialGradient(sx, sy, 0, sx, sy, r); gg.addColorStop(0, i === stage ? 'rgba(255,200,90,0.55)' : 'rgba(255,140,60,0.3)'); gg.addColorStop(1, 'rgba(255,120,40,0)'); x.fillStyle = gg; x.fillRect(sx - r, sy - r, r * 2, r * 2); });
+      x.restore();
+      wmBuf.done = true;
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(wmBuf.c, 0, 0, Wb, Hb, 0, 32, w, 208); ctx.restore();
+  }
+
   const prewarm = () => { if (!city) city = buildCity(); };
-  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, Tower, ENV, prewarm, dayNight };
+  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, Tower, ENV, prewarm, dayNight };
 })();

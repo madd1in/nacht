@@ -858,7 +858,7 @@ const Game = {
 
   drawCard(ctx) {
     const cx = View.cx;
-    Mode7.drawMap(ctx, View.w, this.t, W.stage); // Mode-7-Weltkarte im Hintergrund
+    (PS2.drawWorldMap || Mode7.drawMap)(ctx, View.w, this.t, W.stage); // Weltkarte im Hintergrund: PS2-3D-Landschaft
     ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.fillRect(0, 78, View.w, 124); // leichter, damit Karte und Burgen durchscheinen
     ctx.fillStyle = '#c89020'; ctx.fillRect(0, 78, View.w, 1); ctx.fillRect(0, 201, View.w, 1);
     const st = W.stageDef;
