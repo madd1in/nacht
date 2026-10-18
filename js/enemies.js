@@ -146,7 +146,7 @@ class Candle extends Ent {
     W.spawn(new Item(rollDrop(this.drop), this.cx, this.cy));
   }
   draw(ctx) {
-    if (this.torch === 'gas') { Expo.drawLamp(ctx, Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y), this.t); return; } // Gaslaterne (Weltausstellung)
+    if (this.torch === 'gas') { Expo.drawLamp(ctx, Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y), this.t); return; } // Gaslaterne (Wintergarten)
     const s = (this.torch ? Sprites.S.torch : Sprites.S.candle)[Math.floor(this.t / 8) % 2];
     Sprites.draw(ctx, this.blood ? Candle.redOf(s) : s, Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y));
   }

@@ -81,6 +81,7 @@ class Player {
     this.reset(40, 176);
   }
   reset(fx, fy) {
+    this.limo = false;
     this.h = 28; this.x = fx - this.w / 2; this.y = fy - this.h;
     this.vx = 0; this.vy = 0; this.face = 1; this.onGround = true;
     this.state = 'normal'; this.atkT = 0; this.atkSub = false; this.crouch = false; this.crouchAtk = false;
@@ -862,6 +863,7 @@ class Player {
     }
     ctx.globalAlpha = 1;
     this.drawScarf(ctx, cam);
+    if (this.limo && typeof LimoStand !== 'undefined') LimoStand.bottle(ctx, Math.round(this.cx - cam.x) - 4, Math.round(this.y - cam.y) - 15 + (Math.floor(this.t / 16) % 2)); // Limonade für die durstige Pflanze
     if (this.state === 'zip' && this.chicken) RubberChicken.paint(ctx, Math.round(this.cx - cam.x) - 6, Math.round(this.feet - 41 - cam.y), this.face < 0); // Huhn als Griff
     if (this.state === 'swing' && this.ring) { // Seil/Peitsche zum Ankerring
       const hx = this.cx + this.face * 3 - cam.x, hy = this.feet - 34 - cam.y, rx = this.ring.cx - cam.x, ry = this.ring.cy - cam.y;

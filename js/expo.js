@@ -1,4 +1,4 @@
-// Weltausstellung: ein Glaspalast wie die großen Gewächshäuser des 19. Jahrhunderts (PS2-3D) – grün lackierte Gusseisen-
+// Der Wintergarten: ein Glaspalast wie die großen Gewächshäuser des 19. Jahrhunderts (PS2-3D) – grün lackierte Gusseisen-
 // Rippen, Glasgewölbe, Galerie, Palmen und Gaslaternen. Fleischfressende Pflanzen als Gegner (Schnappfalle und Kannen-
 // pflanze, in Blender vorgerendert) und die Menschenfalle als Boss: drei Fangköpfe auf langen Hälsen, in Echtzeit-3D.
 'use strict';
@@ -19,20 +19,30 @@ const Expo = (() => {
   }
 
   // ---------------- Glaspalast (Hintergrund) ----------------
-  // Spielebene bei z = 200 wie die Kacheln; Rückwand aus Glas bei z = 540 mit Galerie davor, darüber ein Tonnengewölbe aus
-  // Bogenrippen und Pfetten, dazwischen Glas (durchscheinend, der Nachthimmel scheint durch). Alles wiederholt sich alle
-  // P Einheiten, gerendert wird mit der Kamera modulo P – so reicht ein Stück Halle für beliebig lange Räume.
-  const P = 960, BAY = 120, ZB = 540, YW = 150, ZC = 230, RV = 310;
+  // Spielebene bei z = 200 wie die Kacheln; Rückwand aus Glas bei z = 540, davor drei Galerien übereinander, darüber ein
+  // riesiges Tonnengewölbe aus Bogenrippen und Pfetten (Scheitel gut 600 Einheiten über dem Boden), dazwischen Glas. Aus dem
+  // Gewölbe hängen Gaskronen an langen Ketten, Palmen wachsen bis unter die oberste Galerie, und durch die Glasfelder fällt
+  // das Mondlicht in schrägen Bahnen bis auf den Fliesenboden. Alles wiederholt sich alle P Einheiten, gerendert wird mit
+  // der Kamera modulo P – so reicht ein Stück Halle für beliebig lange (und hohe) Räume.
+  const P = 960, BAY = 120, ZB = 540, YW = 330, ZC = 240, RV = 300, ZG = 490, TIERS = [92, 196, 290];
   const IRON = [58, 138, 90], IRON2 = [40, 104, 66], GLASS = [176, 232, 228], STONE = [204, 192, 164], STONE2 = [150, 138, 112],
     PALM = [62, 122, 50], PALM2 = [92, 152, 58], TRUNK = [124, 100, 68], TRUNK2 = [100, 80, 54], CREAM = [176, 168, 146], TERRA = [150, 80, 54], DARKT = [64, 60, 66],
     BRASS = [206, 164, 72], LAMPC = [255, 222, 150], FERN = [70, 132, 60];
-  const ENV = { static: true, sun: null, sunC: [0.5, 0.68, 0.92], amb: [0.46, 0.5, 0.54], sky: [0.16, 0.2, 0.26], fog: [36, 58, 74], fogD: 0.0012 };
+  const ENV = { static: true, sun: null, sunC: [0.5, 0.68, 0.92], amb: [0.42, 0.47, 0.54], sky: [0.16, 0.2, 0.28], fog: [30, 50, 70], fogD: 0.0011 };
   { const v = [0.25, 0.9, -0.35], l = Math.hypot(...v); ENV.sun = v.map(c => c / l); }
   const vault = (t) => [ZC + RV * Math.cos(t), YW + RV * Math.sin(t)];
-  let hall = null, lamps = [];
+  const vaultY = (z) => YW + RV * Math.sin(Math.acos(clamp((z - ZC) / RV, -1, 1))); // Höhe des Gewölbes über der Tiefe z
+  const LX = -0.4, LZ = 0.12; // Mondlicht: fällt von rechts oben schräg nach links unten (und leicht in die Halle hinein)
+  const rng = (seed) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; }; // je Element eigener Zufall → Halle bleibt periodisch
+  let hall = null, lamps = [], shafts = [];
+  function bar(m, x0, y0, z0, x1, y1, z1, w, col) { // dünne Strebe als flaches Band zur Kamera hin (1 Fläche statt 6 wie beim Balken)
+    let sx = y1 - y0, sy = -(x1 - x0); const l = Math.hypot(sx, sy); if (l < 1e-6) { sx = 1; sy = 0; } else { sx /= l; sy /= l; }
+    const h = w / 2;
+    face(m, [vtx(m, x0 + sx * h, y0 + sy * h, z0), vtx(m, x1 + sx * h, y1 + sy * h, z1), vtx(m, x1 - sx * h, y1 - sy * h, z1), vtx(m, x0 - sx * h, y0 - sy * h, z0)], col, [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2 + 60], { two: true });
+  }
   function palm(m, x, z, k, rnd) {
-    let px = x, py = 0, pz = z; const lean = (rnd() - 0.5) * 0.5;
-    for (let i = 0; i < 6; i++) { const nx = px + lean * 7 * k, ny = py + 21 * k; beam(m, px, py, pz, nx, ny, pz, (8 - i * 0.7) * k, (8 - i * 0.7) * k, i % 2 ? TRUNK : TRUNK2); px = nx; py = ny; }
+    let px = x, py = 0, pz = z; const lean = (rnd() - 0.5) * 0.5, n = k > 1.8 ? 8 : 6;
+    for (let i = 0; i < n; i++) { const nx = px + lean * 7 * k, ny = py + 21 * k, r = (8 - i * 3.5 / (n - 1)) * k; beam(m, px, py, pz, nx, ny, pz, r, r, i % 2 ? TRUNK : TRUNK2); px = nx; py = ny; }
     for (let f = 0; f < 9; f++) { // Wedel: gebogene Blattbänder, die nach außen hängen
       const a = f / 9 * Math.PI * 2 + rnd() * 0.4, ca = Math.cos(a), sa = Math.sin(a), L = (54 + rnd() * 16) * k;
       const pts = [[0, 3], [0.35, 12], [0.7, 7], [1, -12]].map(([t, h]) => [px + ca * L * t, py + h * k, pz + sa * L * t * 0.7]);
@@ -45,69 +55,173 @@ const Expo = (() => {
   function lamp(m, x, z) { // Gaslaterne: Mast, Messingkopf, leuchtende Glaskugel
     prism(m, x, 0, z, 1.8, 64, 6, IRON2, { cap: false }); box(m, x, 60, z, 7, 3, 7, BRASS);
     cone(m, x, 70, z, 5.5, 7, 6, LAMPC, { e: 1 }); cone(m, x, 70, z, 5.5, -7, 6, LAMPC, { e: 1 }); cone(m, x, 77, z, 3.5, 5, 6, IRON2);
-    lamps.push([x, 70, z]);
+    lamps.push([x, 70, z, 1]);
+  }
+  function crown(m, x, z) { // Gaskrone: hängt an langer Kette aus dem Gewölbe, Messingreif mit sechs Glaskugeln
+    const y = 392, top = vaultY(z);
+    bar(m, x, y + 12, z, x, top, z, 1.8, IRON2);
+    for (const a of [0, 2.1, 4.2]) bar(m, x, y + 40, z, x + Math.cos(a) * 20, y + 7, z + Math.sin(a) * 20, 1.2, IRON2); // Tragketten
+    prism(m, x, y + 4, z, 22, 3, 8, BRASS); prism(m, x, y - 10, z, 4, 16, 6, BRASS, { rTop: 2 });
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2, lx = x + Math.cos(a) * 22, lz = z + Math.sin(a) * 22; cone(m, lx, y + 9, lz, 3.6, 6, 6, LAMPC, { e: 1 }); cone(m, lx, y + 9, lz, 3.6, -5, 6, LAMPC, { e: 1 }); }
+    lamps.push([x, y + 8, z, 1.9]);
   }
   function bed(m, x, z, rnd) { // Pflanzbeet aus Sandstein mit Farnen
     box(m, x, 0, z, 70, 12, 34, STONE2, { top: [70, 96, 52] });
     for (let i = 0; i < 6; i++) cone(m, x - 28 + i * 11 + rnd() * 4, 12, z - 8 + rnd() * 16, 9 + rnd() * 4, 12 + rnd() * 8, 5, i % 2 ? FERN : PALM2, { rot: rnd() * 3 });
   }
+  // Halle in Abschnitte (CH Einheiten breit) und zwei Tiefenebenen zerlegt: unsichtbare Abschnitte werden gar nicht erst
+  // projiziert, und die hintere Ebene (Rückwand, Galerien, unteres Gewölbe) bewegt sich nur etwa 0,4-mal so schnell wie die
+  // Spielebene – sie wird entsprechend seltener neu gerastert
+  const X0 = -960, X1 = P + 960, CH = 240, NC = Math.ceil((X1 - X0) / CH), ZF = 450;
   function buildHall() {
-    const m = mesh(); lamps = [];
-    const X0 = -1200, X1 = P + 1200, MX = (X0 + X1) / 2, LEN = X1 - X0;
+    lamps = []; shafts = [];
+    const L = { far: { all: mesh(), ch: Array.from({ length: NC }, mesh) }, near: { all: mesh(), ch: Array.from({ length: NC }, mesh) } };
+    const M = (x, z) => { const l = z >= ZF ? L.far : L.near; return x === null ? l.all : l.ch[clamp(Math.floor((x - X0) / CH), 0, NC - 1)]; };
+    const MX = (X0 + X1) / 2, LEN = X1 - X0; // reicht bei Kamera modulo P bis zur Rückwand über die ganze Bildbreite
     for (let z = 200; z < ZB; z += 40) for (let x = X0; x < X1; x += 40) { // Fliesenboden: gedämpftes Schachbrett mit Terrakotta-Bordüren
-      const i = Math.round(x / 40), j = Math.round(z / 40), col = j % 4 === 1 ? TERRA : (i + j) & 1 ? CREAM : DARKT;
+      const i = Math.round(x / 40), j = Math.round(z / 40), col = j % 4 === 1 ? TERRA : (i + j) & 1 ? CREAM : DARKT, m = M(x + 20, z + 20);
       face(m, [vtx(m, x, 0, z), vtx(m, x, 0, z + 40), vtx(m, x + 40, 0, z + 40), vtx(m, x + 40, 0, z)], col, null, { two: true });
     }
-    box(m, MX, 0, ZB + 8, LEN, 26, 16, STONE2, { top: STONE }); // Rückwand: Sockel, Pfosten, Riegel, Glas
-    for (let x = X0; x <= X1; x += BAY / 2) prism(m, x, 26, ZB, 3.2, YW - 26, 6, x % BAY ? IRON2 : IRON, { cap: false });
-    for (const y of [26, 86, 120, YW]) beam(m, X0, y, ZB, X1, y, ZB, 5, 5, IRON2);
-    for (let x = X0; x < X1; x += BAY / 2) for (const [y0, y1] of [[26, 86], [86, 120], [120, YW]]) face(m, [vtx(m, x, y0, ZB), vtx(m, x + BAY / 2, y0, ZB), vtx(m, x + BAY / 2, y1, ZB), vtx(m, x, y1, ZB)], GLASS, null, { two: true, a: 0.2 });
+    // Rückwand: Sockel, Pfosten, Riegel, Glas – fast so hoch wie ein Kirchenschiff
+    const RIEGEL = [26, 86, 150, 196, 250, 290, YW];
+    { const m = M(null, ZB); box(m, MX, 0, ZB + 8, LEN, 26, 16, STONE2, { top: STONE }); for (const y of RIEGEL) beam(m, X0, y, ZB, X1, y, ZB, 5, 5, IRON2, { open: true }); }
+    for (let x = X0; x <= X1; x += BAY / 2) prism(M(x, ZB), x, 26, ZB, 3.2, YW - 26, 6, x % BAY ? IRON2 : IRON, { cap: false });
+    for (let x = X0; x < X1; x += BAY / 2) for (let k = 1; k < RIEGEL.length; k++) { const m = M(x + BAY / 4, ZB); face(m, [vtx(m, x, RIEGEL[k - 1], ZB), vtx(m, x + BAY / 2, RIEGEL[k - 1], ZB), vtx(m, x + BAY / 2, RIEGEL[k], ZB), vtx(m, x, RIEGEL[k], ZB)], GLASS, null, { two: true, a: 0.2 }); }
     const TH = [0, 0.18, 0.36, 0.54, 0.72, 0.9, 1.1, 1.3, 1.55, 1.8]; // Gewölbe
     for (let x = X0; x <= X1; x += BAY) {
-      for (let k = 1; k < TH.length; k++) { const [z0, y0] = vault(TH[k - 1]), [z1, y1] = vault(TH[k]); beam(m, x, y0, z0, x, y1, z1, 6, 9, IRON); }
-      beam(m, x, YW - 34, ZB, x, YW, ZB - 34, 3, 3, IRON2); // Zwickel-Strebe
+      for (let k = 1; k < TH.length; k++) { const [z0, y0] = vault(TH[k - 1]), [z1, y1] = vault(TH[k]); beam(M(x, (z0 + z1) / 2), x, y0, z0, x, y1, z1, 7, 10, IRON, { open: true }); }
+      bar(M(x, ZB), x, YW - 40, ZB, x, YW, ZB - 40, 3, IRON2); // Zwickel-Strebe
     }
-    for (const t of TH) { const [z, y] = vault(t); beam(m, X0, y, z, X1, y, z, 4, 4, IRON2); }
+    for (const t of TH) { const [z, y] = vault(t); beam(M(null, z), X0, y, z, X1, y, z, 4, 4, IRON2, { open: true }); }
     for (let x = X0; x < X1; x += BAY) for (let k = 1; k < TH.length; k++) {
-      const [z0, y0] = vault(TH[k - 1]), [z1, y1] = vault(TH[k]);
+      const [z0, y0] = vault(TH[k - 1]), [z1, y1] = vault(TH[k]), m = M(x + BAY / 2, (z0 + z1) / 2);
       face(m, [vtx(m, x, y0, z0), vtx(m, x + BAY, y0, z0), vtx(m, x + BAY, y1, z1), vtx(m, x, y1, z1)], GLASS, null, { two: true, a: 0.14 });
     }
-    const ZG = 490, YG = 92; // Galerie vor der Rückwand: Säulen, Laufgang, Brüstung mit Andreaskreuzen
-    box(m, MX, YG, ZG, LEN, 4, 34, IRON2);
-    for (let x = X0; x <= X1; x += BAY) { prism(m, x, 0, ZG - 15, 3.2, YG, 6, IRON, { cap: false }); box(m, x, YG - 6, ZG - 15, 9, 6, 9, IRON2); }
-    beam(m, X0, YG + 16, ZG - 16, X1, YG + 16, ZG - 16, 2.5, 2.5, IRON);
-    for (let x = X0; x < X1; x += BAY / 2) { beam(m, x, YG + 4, ZG - 16, x + BAY / 2, YG + 16, ZG - 16, 1.5, 1.5, IRON2); beam(m, x, YG + 16, ZG - 16, x + BAY / 2, YG + 4, ZG - 16, 1.5, 1.5, IRON2); }
-    for (let o = X0 - P; o < X1 + P; o += P) { // Pflanzen und Laternen: in jedem Abschnitt gleich (Periode P)
-      let s = 77; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
-      for (const [dx, dz, k] of [[90, 330, 1.15], [420, 430, 1.35], [700, 300, 1.0], [860, 450, 1.25]]) { const x = o + dx; if (x > X0 - 60 && x < X1 + 60) palm(m, x, dz, k, rnd); else for (let i = 0; i < 40; i++) rnd(); }
-      for (const dx of [250, 560, 940]) { const x = o + dx; if (x > X0 && x < X1) lamp(m, x, 280); }
-      for (const [dx, dz] of [[330, 250], [620, 360]]) { const x = o + dx; if (x > X0 && x < X1) bed(m, x, dz, rnd); else for (let i = 0; i < 18; i++) rnd(); }
+    // drei Galerien übereinander vor der Rückwand: durchgehende Säulen, Laufgänge, Brüstungen (unten mit Andreaskreuzen)
+    for (let x = X0; x <= X1; x += BAY) prism(M(x, ZG), x, 0, ZG - 15, 3.4, TIERS[2] + 30, 6, IRON, { cap: false });
+    TIERS.forEach((YG, n) => {
+      const ma = M(null, ZG); box(ma, MX, YG, ZG, LEN, 4, 34, IRON2); beam(ma, X0, YG + 16, ZG - 16, X1, YG + 16, ZG - 16, 2.5, 2.5, IRON, { open: true });
+      for (let x = X0; x <= X1; x += BAY) { const m = M(x, ZG); box(m, x, YG - 6, ZG - 15, 9, 6, 9, IRON2); bar(m, x, YG - 22, ZG - 15, x + 16, YG, ZG - 15, 2, IRON2); bar(m, x, YG - 22, ZG - 15, x - 16, YG, ZG - 15, 2, IRON2); } // Kapitelle mit Konsolen
+      const st = n ? BAY : BAY / 2;
+      for (let x = X0; x < X1; x += st) { const m = M(x + st / 2, ZG); bar(m, x, YG + 4, ZG - 16, x + st, YG + 16, ZG - 16, 1.8, IRON2); bar(m, x, YG + 16, ZG - 16, x + st, YG + 4, ZG - 16, 1.8, IRON2); }
+    });
+    for (let o = -2 * P; o < 3 * P; o += P) { // Pflanzen, Laternen, Gaskronen, Mondlicht: in jedem Abschnitt gleich (Periode P); alles vorn
+      let j = 0;
+      for (const [dx, dz, k] of [[90, 330, 1.6], [420, 430, 2.3], [700, 300, 1.35], [860, 450, 2.0]]) { const x = o + dx, r = rng(1000 + j++); if (x > X0 - 160 && x < X1 + 160) palm(M(x, 0), x, dz, k, r); }
+      for (const dx of [250, 560, 940]) { const x = o + dx; if (x > X0 && x < X1) lamp(M(x, 0), x, 280); }
+      for (const [dx, dz] of [[330, 250], [620, 360]]) { const x = o + dx, r = rng(2000 + j++); if (x > X0 && x < X1) bed(M(x, 0), x, dz, r); }
+      for (const [dx, dz] of [[200, 300], [680, 380]]) { const x = o + dx; if (x > X0 - 40 && x < X1 + 40) crown(M(x, 0), x, dz); }
+      // Mondlicht: je Glasfeld des Gewölbes eine schräge Lichtbahn (drei Streifen zwischen den Sprossen) bis auf den Boden
+      for (const dx of [130, 370, 610, 850]) {
+        const x = o + dx, [z, y] = vault(1.32); if (x < X0 - 300 || x > X1 + 300) continue;
+        shafts.push({ x, y, z, w: 96, ph: (dx * 7 + o) * 0.013 });
+      }
     }
-    return m;
+    return L;
   }
   const bufs = {};
-  function drawHall(ctx, cam) {
+  // Mondlicht-Streifen eines Glasfelds als Lichtband vom Gewölbe bis zum Boden, darunter das Fensterbild auf den Fliesen
+  function drawShafts(x, c3, Wb, Hb, dv, out) {
+    x.save(); x.globalCompositeOperation = 'lighter';
+    for (const s of shafts) {
+      const bx = s.x + LX * s.y, bz = s.z + LZ * s.y;
+      if (Math.max(s.x, bx) + s.w < c3.x - 900 || Math.min(s.x, bx) > c3.x + 900) continue;
+      for (let k = 0; k < 3; k++) {
+        const x0 = s.x + k * s.w / 3 + 3, x1 = x0 + s.w / 3 - 6;
+        const T0 = project(c3, Wb, Hb, x0, s.y, s.z), T1 = project(c3, Wb, Hb, x1, s.y, s.z);
+        const B0 = project(c3, Wb, Hb, x0 + LX * s.y, 0, bz), B1 = project(c3, Wb, Hb, x1 + LX * s.y, 0, bz);
+        if (T0[2] < 20 || B0[2] < 20) continue;
+        if (Math.max(T0[0], T1[0], B0[0], B1[0]) < 0 || Math.min(T0[0], T1[0], B0[0], B1[0]) > Wb || Math.min(T0[1], B0[1]) > Hb || Math.max(T0[1], B0[1]) < 0) continue;
+        const a = 0.16 + 0.05 * Math.sin(s.ph + k);
+        const g = x.createLinearGradient(T0[0], T0[1], B0[0], B0[1]);
+        g.addColorStop(0, 'rgba(150,190,255,0)'); g.addColorStop(0.12, `rgba(160,200,255,${a.toFixed(3)})`); g.addColorStop(0.75, `rgba(150,196,240,${(a * 0.7).toFixed(3)})`); g.addColorStop(1, `rgba(150,196,240,${(a * 0.35).toFixed(3)})`);
+        x.fillStyle = g; x.beginPath(); x.moveTo(T0[0], T0[1]); x.lineTo(T1[0], T1[1]); x.lineTo(B1[0], B1[1]); x.lineTo(B0[0], B0[1]); x.closePath(); x.fill();
+        out.push([(T0[0] + T1[0]) / 2 * dv, (T0[1] + T1[1]) / 2 * dv, (B0[0] + B1[0]) / 2 * dv, (B0[1] + B1[1]) / 2 * dv, s.ph + k]);
+        x.fillStyle = 'rgba(170,205,255,0.22)'; // Fensterbild auf dem Boden: zwei Scheiben übereinander
+        for (const [z0, z1] of [[bz - 34, bz - 3], [bz + 3, bz + 34]]) {
+          const p = [[x0 + LX * s.y, z0], [x1 + LX * s.y, z0], [x1 + LX * s.y, z1], [x0 + LX * s.y, z1]].map(([px, pz]) => project(c3, Wb, Hb, px, 0.5, pz));
+          if (p.some(q => q[2] < 20)) continue;
+          x.beginPath(); x.moveTo(p[0][0], p[0][1]); for (let i = 1; i < 4; i++) x.lineTo(p[i][0], p[i][1]); x.closePath(); x.fill();
+        }
+      }
+    }
+    x.restore();
+  }
+  function layerBuf(name, Wb, Hb) {
+    let B = bufs[name];
+    if (!B || B.c.width !== Wb) { B = bufs[name] = { c: Sprites.canvas(Wb, Hb), key: null, dust: [], np: 0 }; B.x = B.c.getContext('2d', CPU); }
+    return B;
+  }
+  function visible(l, camX) { // Abschnitte, die bis zur Rückwand ins Bild reichen können
+    const half = View.w / 2 * 580 / 200 + 180, out = [l.all];
+    for (let k = 0; k < NC; k++) { const a = X0 + k * CH; if (a + CH > camX - half && a < camX + half) out.push(l.ch[k]); }
+    return out;
+  }
+  function drawHall(ctx, cam, frame = 0) {
     if (!hall) hall = buildHall();
     const w = View.w, dv = View.lite ? 3 : 2, Wb = Math.ceil(w / dv), Hb = Math.ceil(208 / dv);
-    let B = bufs.h;
-    if (!B || B.c.width !== Wb) { B = bufs.h = { c: Sprites.canvas(Wb, Hb), key: null }; B.x = B.c.getContext('2d', CPU); }
-    const floorPx = W.room ? (W.room.h - 2) * T : 176, camX = (((cam.x + w / 2) % P) + P) % P, camY = floorPx - cam.y - 83;
-    const key = Math.round(camX / dv) + '|' + Math.round(camY / dv) + '|' + Wb;
-    if (B.key !== key) {
-      B.key = key; B.x.clearRect(0, 0, Wb, Hb);
-      const c3 = { x: camX, y: camY, z: 0, yaw: 0, pitch: 0, f: 200 / dv, near: 20, hy: 0.4 };
-      render(B.x, Wb, Hb, [hall], c3, ENV);
-      B.x.save(); B.x.globalCompositeOperation = 'lighter'; // Lichthöfe der Gaslaternen
-      for (const [lx, ly, lz] of lamps) {
-        const [sx, sy, sz] = project(c3, Wb, Hb, lx, ly, lz); if (sz < 20 || sx < -30 || sx > Wb + 30) continue;
-        const r = 5200 / sz / dv, g = B.x.createRadialGradient(sx, sy, 0, sx, sy, r); g.addColorStop(0, 'rgba(255,206,130,0.55)'); g.addColorStop(1, 'rgba(255,160,80,0)');
-        B.x.fillStyle = g; B.x.fillRect(sx - r, sy - r, r * 2, r * 2);
+    const floorPx = W.room ? (W.room.h - 2) * T : 176, camX = (((cam.x + w / 2) % P) + P) % P;
+    // sehr hohe Räume (Kuppel): oberhalb der untersten Kameraposition steigt die 3D-Kamera langsamer, damit sie unter dem
+    // Gewölbe bleibt – unten liegt der Hallenboden weiter genau auf dem Raumboden
+    const rb = floorPx - Math.max(0, (W.room ? W.room.h * T : 208) - View.fh) - 83, rawMax = floorPx - 83, raw = floorPx - cam.y - 83;
+    const camY = rawMax > 590 ? rb + (raw - rb) * (590 - rb) / (rawMax - rb) : raw;
+    const F = layerBuf('far', Wb, Hb), N = layerBuf('near', Wb, Hb), c3 = { x: camX, y: camY, z: 0, yaw: 0, pitch: 0, f: 200 / dv, near: 20, hy: 0.4 };
+    const kf = Math.round(camX * 0.4 / dv) + '|' + Math.round(camY * 0.4 / dv) + '|' + Wb;
+    if (F.key !== kf) { F.key = kf; F.x.clearRect(0, 0, Wb, Hb); F.np = render(F.x, Wb, Hb, visible(hall.far, camX), c3, ENV); }
+    const kn = Math.round(camX / dv) + '|' + Math.round(camY / dv) + '|' + Wb;
+    if (N.key !== kn) {
+      N.key = kn; N.x.clearRect(0, 0, Wb, Hb); N.dust = [];
+      N.np = render(N.x, Wb, Hb, visible(hall.near, camX), c3, ENV);
+      drawShafts(N.x, c3, Wb, Hb, dv, N.dust);
+      N.x.save(); N.x.globalCompositeOperation = 'lighter'; // Lichthöfe der Gaslaternen und Gaskronen
+      for (const [lx, ly, lz, ls] of lamps) {
+        const [sx, sy, sz] = project(c3, Wb, Hb, lx, ly, lz), r = 5200 * ls / sz / dv; if (sz < 20 || sx < -r || sx > Wb + r || sy < -r || sy > Hb + r) continue;
+        const g = N.x.createRadialGradient(sx, sy, 0, sx, sy, r); g.addColorStop(0, 'rgba(255,206,130,0.55)'); g.addColorStop(1, 'rgba(255,160,80,0)');
+        N.x.fillStyle = g; N.x.fillRect(sx - r, sy - r, r * 2, r * 2);
       }
-      B.x.restore();
+      N.x.restore();
     }
-    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(F.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.drawImage(N.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
+    ctx.fillStyle = 'rgba(214,232,255,0.55)'; // Staub schwebt in den Lichtbahnen
+    for (const [tx, ty, bx, by, ph] of N.dust) for (let k = 0; k < 4; k++) {
+      const u = (frame * 0.0016 + k * 0.25 + ph * 0.37) % 1, px = tx + (bx - tx) * u + Math.sin(frame * 0.02 + k * 2 + ph) * 3, py = ty + (by - ty) * u;
+      if (px >= 0 && px < w && py >= 0 && py < 208) ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+    }
+  }
+  // Mondlicht vor der Spielebene: schräge Bahnen mit Sprossenschatten fallen über Held, Galerien und Gegner; ziehende
+  // Wolken lassen sie langsam auf- und abschwellen
+  function drawFrontLight(ctx, cam, frame) {
+    const w = View.w, floor = (W.room.h - 2) * T - cam.y, SL = -LX, SP = 368;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let k = Math.floor((cam.x - 160) / SP); k <= Math.floor((cam.x + w + 120 + SL * W.room.h * T) / SP); k++) {
+      const xf = k * SP + 40 - cam.x, cloud = 0.55 + 0.45 * Math.sin(frame * 0.004 + k * 1.9);
+      const yTop = Math.max(0, -cam.y), yBot = Math.min(208, floor + 8); if (yBot <= yTop) continue;
+      const g = ctx.createLinearGradient(0, yTop, 0, yBot), a = 0.13 * cloud;
+      g.addColorStop(0, `rgba(160,200,255,${a.toFixed(3)})`); g.addColorStop(1, `rgba(140,190,240,${(a * 0.45).toFixed(3)})`);
+      ctx.fillStyle = g;
+      for (const [o, wd] of [[0, 15], [19, 15], [38, 12]]) { // drei Scheiben, dazwischen die Sprossen
+        const xa = xf + o + SL * (floor - yTop), xb = xf + o + SL * (floor - yBot);
+        if (Math.max(xa, xb) + wd < 0 || Math.min(xa, xb) > w) continue;
+        ctx.beginPath(); ctx.moveTo(xa, yTop); ctx.lineTo(xa + wd, yTop); ctx.lineTo(xb + wd, yBot); ctx.lineTo(xb, yBot); ctx.closePath(); ctx.fill();
+      }
+      if (floor < 214 && floor > -4) { ctx.fillStyle = `rgba(170,210,255,${(0.2 * cloud).toFixed(3)})`; for (const [o, wd] of [[0, 15], [19, 15], [38, 12]]) ctx.fillRect(Math.round(xf + o), Math.round(floor), wd, 2); }
+      ctx.fillStyle = 'rgba(220,236,255,0.5)';
+      for (let d = 0; d < 5; d++) { const u = (frame * 0.0021 + d * 0.2 + k * 0.31) % 1, yy = yTop + (yBot - yTop) * u, xx = xf + 22 + SL * (floor - yy) + Math.sin(frame * 0.03 + d * 1.7 + k) * 16; if (xx >= 0 && xx < w) ctx.fillRect(Math.round(xx), Math.round(yy), 1, 1); }
+    }
+    ctx.restore();
   }
   const prewarm = () => { if (!hall) hall = buildHall(); };
+
+  // Kleines PS2-Objekt in einen eigenen Puffer rendern: Kamera weit weg und etwas erhöht (fast orthografisch, Oberseiten
+  // sichtbar), 1 Einheit = 1 Pixel, Ursprung unten in der Mitte des Puffers
+  const PENV = { sun: null, sunC: [0.62, 0.72, 0.9], amb: [0.38, 0.4, 0.48], sky: [0.2, 0.22, 0.28], fog: [0, 0, 0], fogD: 0 };
+  { const v = [0.55, 0.75, -0.45], l = Math.hypot(...v); PENV.sun = v.map(c => c / l); }
+  function propRender(buf, w, h, list, env = PENV) {
+    if (!buf.c || buf.c.width !== w || buf.c.height !== h) { buf.c = Sprites.canvas(w, h); buf.x = buf.c.getContext('2d', CPU); }
+    buf.x.clearRect(0, 0, w, h);
+    render(buf.x, w, h, list, { x: 0, y: h / 2 + 500, z: -1500, yaw: 0, pitch: 0, f: 1500, near: 100, hy: 0.5 - 500 / h }, env);
+    return buf.c;
+  }
 
   // Gaslaterne statt Kerze (Ausstellungshallen): Mast mit Schnörkel, Glaskugel mit Flamme
   function drawLamp(ctx, x, y, t) {
@@ -120,7 +234,8 @@ const Expo = (() => {
     ctx.fillStyle = '#e8c870'; ctx.fillRect(x + 3, y + 1, 1, 6); ctx.fillRect(x + 8, y + 1, 1, 6);
   }
 
-  return { S, drawHall, drawLamp, prewarm };
+  const stats = () => ({ far: bufs.far ? bufs.far.np : 0, near: bufs.near ? bufs.near.np : 0 });
+  return { S, drawHall, drawLamp, drawFrontLight, prewarm, propRender, stats };
 })();
 
 // ---------------- Schnappfalle: steht im Topf, reißt das Maul auf, sobald der Held davor steht, und schnellt vor ----------------
@@ -355,5 +470,178 @@ class ThornRoot extends Ent {
     if (this.t < 36) { ctx.fillStyle = (this.t >> 2) & 1 ? '#5c4024' : '#3a2814'; ctx.fillRect(x - 8, fy - 2, 16, 2); return; }
     const h = this.height();
     for (let y = 0; y < h; y++) { const wdt = Math.max(1, Math.round(6 * (1 - y / 52))); ctx.fillStyle = y % 6 < 3 ? '#3c7c2c' : '#2c5c20'; ctx.fillRect(x - wdt, fy - y, wdt * 2, 1); if (y % 8 === 4) { ctx.fillStyle = '#e8f0a0'; ctx.fillRect(x - wdt - 2, fy - y, 2, 1); ctx.fillRect(x + wdt, fy - y - 2, 2, 1); } }
+  }
+}
+
+// ---------------- Easteregg: die durstige Pflanze ----------------
+// Unten in der Kuppel steht ein großer Kübel mit Messingschild „NICHT FÜTTERN“. Die Pflanze darin reißt das Maul auf, sobald
+// jemand vorbeikommt – sie hat Durst. Wer ihr die Limonade vom Erfrischungsstand bringt, sieht sie gierig trinken, rülpsen und
+// als Riesenranke durch die Kuppel schießen: Sie sprengt den Boden der versiegelten Sternwarte, ihre Blätter tragen den Helden
+// hinauf zu Fernrohr, Truhe und 1UP. (Gruß an ein altes Gruselvillen-Abenteuer mit einer sehr durstigen Zimmerpflanze.)
+class VineLeaf extends Ent { // Blattspreite als Plattform (gezeichnet von der Pflanze)
+  constructor(x, y) { super(x, y, 28, 6); this.kind = 'platform'; this.solid = false; this.dx = 0; this.dy = 0; this.pop = 0; }
+  update() {}
+  draw() {}
+}
+class ThirstyPlant extends Ent {
+  constructor(d) {
+    super(d.x * T - 14, (d.y + 1) * T - 34, 28, 34);
+    this.kind = 'prop'; this.d = d; this.state = 'thirst'; this.st = 0; this.g = 0; this.noteCd = 0; this.open = 0.15; this.look = 1; this.broke = false;
+    this.sx = d.x * T; this.base = (d.y + 1) * T; this.full = this.base - d.top * T - 16; // Stammfuß (Welt) und volle Rankenlänge
+    const y0 = this.base - 38, y1 = d.hole[3] * T + 2, n = Math.round((y0 - y1) / 36); // Blätter alle ~36 px: ein normaler Sprung reicht
+    this.leaves = Array.from({ length: n + 1 }, (_, i) => { // abwechselnd links und rechts; direkt unter dem Loch mittig (sonst stößt der Kopf an)
+      const y = Math.round(y0 - (y0 - y1) * i / n), side = y < (d.hole[3] + 1) * T + 64 ? 0 : i % 2 ? 1 : -1, l = new VineLeaf(this.sx - 14 + side * 16, y);
+      l.side = side; return l;
+    });
+    this.body = {}; this.head = {}; this.bodyKey = '';
+  }
+  ease(g) { return 1 - Math.pow(1 - g, 2.2); }
+  len() { return this.state === 'grow' || this.state === 'grown' ? 14 + (this.full - 14) * this.ease(this.g) : 14; }
+  wob(h) { return Math.sin(h * 0.021 + 0.6) * Math.min(7, h * 0.08); } // Rankenschwung: kaum am Fuß, mehr nach oben
+  update() {
+    this.t++; this.st++; if (this.noteCd > 0) this.noteCd--;
+    const p = W.player, near = p.alive && Math.abs(p.cx - this.sx) < 36 && Math.abs(p.feet - this.base) < 20;
+    if (this.state === 'thirst') {
+      this.look = p.cx < this.sx ? -1 : 1;
+      this.open += ((near ? 0.55 + 0.4 * Math.sin(this.t * 0.25) : 0.12 + 0.06 * Math.sin(this.t * 0.05)) - this.open) * 0.2;
+      if (near && p.limo) { p.limo = false; this.state = 'drink'; this.st = 0; Game.note('plantDrink'); }
+      else if (near && !this.noteCd) { Game.note('plantThirst'); Audio8.sfx('growl', this.sx); this.noteCd = 420; }
+    } else if (this.state === 'drink') { // gierig trinken, dann ein gewaltiger Rülpser
+      this.open = this.st < 70 ? 0.3 + 0.22 * Math.sin(this.st * 0.45) : Math.min(1, this.open + 0.1);
+      if (this.st % 16 === 1 && this.st < 64) Audio8.sfx('glug', this.sx);
+      if (this.st === 78) { Audio8.sfx('burp', this.sx); W.shake = 5; for (let i = 0; i < 8; i++) W.spawn(new Particle(this.sx + this.look * 8, this.base - 34, rnd(-0.6, 0.6) + this.look * 0.6, rnd(-1.4, -0.4), '#e8f8c0', 34, 1, -0.01)); }
+      if (this.st > 116) { this.state = 'grow'; this.st = 0; Audio8.sfx('rise', this.sx); Input.rumble(0.6, 0.5, 900); }
+    } else if (this.state === 'grow') { // schießt hoch, Blätter klappen nacheinander auf, oben birst der Boden der Sternwarte
+      this.g = Math.min(1, this.st / 210); this.open = 0.45 + 0.35 * Math.sin(this.st * 0.2);
+      if (this.st % 18 === 0) { W.shake = Math.max(W.shake, 3); Audio8.sfx('creak', this.sx); }
+      const tip = this.base - 16 - this.len();
+      for (const l of this.leaves) if (l.solid === false && tip < l.y - 10) { l.solid = true; l.pop = 1; Audio8.sfx('flap', l.cx); }
+      if (!this.broke && tip < (this.d.hole[3] + 1) * T) this.breakFloor();
+      if (this.g >= 1) { this.state = 'grown'; this.st = 0; }
+    } else {
+      this.look = p.cx < this.sx ? -1 : 1;
+      this.open += ((p.alive && Math.abs(p.cy - (this.base - 16 - this.len())) < 70 ? 0.7 : 0.25 + 0.1 * Math.sin(this.t * 0.06)) - this.open) * 0.1;
+    }
+    for (const l of this.leaves) if (l.pop > 0 && l.pop < 12) l.pop++;
+  }
+  breakFloor() {
+    this.broke = true; const [x0, x1, y0, y1] = this.d.hole;
+    for (let r = y0; r <= y1; r++) for (let c = x0; c <= x1; c++) W.room.grid[r][c] = '.';
+    Audio8.sfx('crash'); Audio8.sfx('shatter'); W.shake = 16; Input.rumble(1, 0.8, 500);
+    for (let i = 0; i < 28; i++) W.spawn(new Particle(rnd(x0 * T, (x1 + 1) * T), rnd(y0 * T, (y1 + 1) * T), rnd(-1.6, 1.6), rnd(-2.6, 0.4), ['#6c6c78', '#3c3c44', '#b8e8f0', '#58a868'][i % 4], 60, 2, 0.15));
+    Game.note('plantBreak');
+  }
+  bodyMesh(len) {
+    const m = PS2.mesh(), TER = [168, 88, 56], TER2 = [128, 64, 44], SOIL = [52, 36, 26], ST = [72, 132, 52], ST2 = [52, 104, 42], LEAF = [84, 156, 60], LEAF2 = [60, 124, 48], RIB = [150, 196, 96];
+    PS2.prism(m, 0, 0, 0, 10, 15, 8, TER, { rTop: 13.5, top: SOIL }); // Terrakotta-Kübel mit wulstigem Rand
+    PS2.prism(m, 0, 13, 0, 15, 4, 8, TER2, { cap: false });
+    const N = Math.max(2, Math.ceil(len / 22)), ring = [];
+    for (let s = 0; s <= N; s++) { // Stamm: gewundene Röhre, unten dick, oben dünn
+      const u = s / N, y = 15 + len * u, x = this.wob(y - 15), r = 4 - 1.5 * u + (len > 40 ? 2.5 * (1 - u) : 0), row = [];
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; row.push(PS2.vtx(m, x + Math.cos(a) * r, y, Math.sin(a) * r)); }
+      ring.push(row);
+    }
+    for (let s = 0; s < N; s++) for (let k = 0; k < 6; k++) PS2.face(m, [ring[s][k], ring[s][(k + 1) % 6], ring[s + 1][(k + 1) % 6], ring[s + 1][k]], (s + k) % 2 ? ST : ST2, null, { two: true });
+    for (const l of this.leaves) { // breite, flache Blattspreiten mit Stiel und Mittelrippe; außen hängen sie etwas
+      if (!l.pop) continue;
+      const k = Math.min(1, l.pop / 10), y = this.base - l.y, side = l.side || 1, cx = l.side * 16, rx = 15 * k, rz = 10 * k;
+      const c = PS2.vtx(m, cx, y + 1, 0), pts = [];
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, ex = Math.cos(a); pts.push(PS2.vtx(m, cx + ex * rx, y - (ex * side > 0.3 ? 3 * k : 0) + 0.5, Math.sin(a) * rz)); }
+      for (let i = 0; i < 10; i++) PS2.face(m, [c, pts[i], pts[(i + 1) % 10]], i % 2 ? LEAF : LEAF2, null, { two: true });
+      PS2.beam(m, this.wob(y - 15), y - 3, 0, cx + side * rx * 0.85, y + 0.8, 0, 1.3, 1.3, RIB);
+    }
+    return m;
+  }
+  headMesh(L) { // Fangkopf wie bei der Menschenfalle: zwei Kieferschalen, innen roter Schlund, Wimpernzähne
+    const m = PS2.mesh(), G = [70, 138, 56], R = [200, 40, 56], RD = [130, 20, 36], CIL = [232, 240, 160];
+    const hx = 0, hy = 30, dirA = this.look > 0 ? 0.55 : Math.PI - 0.55, op = 0.15 + this.open * 0.95;
+    for (const sgn of [1, -1]) {
+      const ang = dirA + sgn * op / 2, ca = Math.cos(ang), sa = Math.sin(ang), ox = -sa * sgn, oy = ca * sgn, jx = hx + ca * L * 0.55, jy = hy + sa * L * 0.55;
+      ManTrap.sphere(m, jx + ox * 1.5, jy + oy * 1.5, 0, L * 0.62, L * 0.33, L * 0.62, 8, 6, () => G, ang, -sgn);
+      ManTrap.sphere(m, jx - ox * 0.4, jy - oy * 0.4, 0, L * 0.54, L * 0.15, L * 0.54, 8, 4, () => (sgn > 0 ? R : RD), ang, sgn);
+      for (let k = 0; k < 6; k++) {
+        const t = 0.3 + k * 0.12, tx = hx + ca * L * t, ty = hy + sa * L * t, zz = (k % 2 ? 1 : -1) * L * 0.28;
+        PS2.face(m, [PS2.vtx(m, tx - ca, ty - sa, zz), PS2.vtx(m, tx + ca, ty + sa, zz), PS2.vtx(m, tx + ox * L * 0.42 + ca * 2, ty + oy * L * 0.42 + sa * 2, zz)], CIL, null, { two: true });
+      }
+    }
+    return m;
+  }
+  draw(ctx) {
+    const sx = Math.round(this.sx - W.cam.x), by = Math.round(this.base - W.cam.y), len = this.len(), H = Math.ceil(len) + 24;
+    this.plate(ctx, sx, by);
+    if (sx < -70 || sx > View.w + 70 || by - H - 40 > 214 || by < -8) return;
+    const key = Math.round(len) + '|' + this.leaves.reduce((a, l) => a + l.pop, 0);
+    if (key !== this.bodyKey) { this.bodyKey = key; Expo.propRender(this.body, 100, H, [this.bodyMesh(len)]); }
+    ctx.drawImage(this.body.c, sx - 50, by - H);
+    const grown = this.state === 'grow' || this.state === 'grown', L = 13 + (grown ? 9 * this.ease(this.g) : 0);
+    const tx = sx + Math.round(this.wob(len)), ty = by - 15 - Math.round(len);
+    if (ty > -40 && ty < 250) {
+      if (!this.head.c || (this.t & 1)) Expo.propRender(this.head, 72, 72, [this.headMesh(L)]);
+      ctx.drawImage(this.head.c, tx - 36, ty - 42);
+    }
+  }
+  plate(ctx, sx, by) { // Messingschild am Pfosten rechts neben dem Kübel
+    const s = tr('plateFeed'), w = Font.width(s) + 8, x = sx + 20, y = by - 30;
+    if (x > View.w || x + w < 0 || y > 214 || y < -20) return;
+    ctx.fillStyle = '#1c1408'; ctx.fillRect(x + 4, y + 10, 2, 20);
+    ctx.fillStyle = '#4c3810'; ctx.fillRect(x, y, w, 11); ctx.fillStyle = '#c09440'; ctx.fillRect(x + 1, y + 1, w - 2, 9); ctx.fillStyle = '#f0d478'; ctx.fillRect(x + 1, y + 1, w - 2, 1);
+    Font.draw(ctx, s, x + 4, y + 2, '#3c2408');
+  }
+}
+
+// Erfrischungsstand der Ausstellung: Holztheke unter gestreiftem Sonnendach, auf der Theke eine Flasche Limonade
+class LimoStand extends Ent {
+  constructor(d) { super(d.x * T - 30, (d.y + 1) * T - 24, 60, 24); this.kind = 'prop'; this.taken = false; this.buf = {}; }
+  update() {
+    this.t++;
+    const p = W.player;
+    if (!this.taken && p.alive && p.cx > this.x + 6 && p.cx < this.x + this.w - 6 && Math.abs(p.feet - (this.y + this.h)) < 18) {
+      this.taken = true; p.limo = true; Audio8.sfx('item', this.cx); W.sparks(this.cx, this.y, 6); Game.note('limoNote');
+    }
+  }
+  mesh() {
+    const m = PS2.mesh(), WOOD = [124, 78, 44], WOOD2 = [156, 104, 60], WOOD3 = [88, 52, 30], IRON = [48, 104, 66], RED = [184, 44, 44], CREAM = [226, 214, 182], GL = [70, 150, 80];
+    PS2.box(m, 0, 0, 4, 60, 24, 16, WOOD, { top: WOOD2 });
+    PS2.box(m, 0, 4, -4.4, 52, 14, 1, WOOD3);
+    PS2.box(m, 0, 24, 10, 56, 5, 4, WOOD3); // Rückwand-Bord mit Flaschen
+    for (let i = 0; i < 7; i++) PS2.prism(m, -21 + i * 7, 29, 10, 1.8, 7, 6, GL, { rTop: 0.9 });
+    for (const x of [-28, 28]) PS2.prism(m, x, 24, 10, 1.4, 32, 6, IRON, { cap: false });
+    for (let i = 0; i < 8; i++) { // Sonnendach: rot-weiß gestreift, nach vorn geneigt
+      const x0 = -32 + i * 8, v = (x, y, z) => PS2.vtx(m, x, y, z);
+      PS2.face(m, [v(x0, 58, 12), v(x0 + 8, 58, 12), v(x0 + 8, 48, -10), v(x0, 48, -10)], i % 2 ? CREAM : RED, null, { two: true });
+      PS2.face(m, [v(x0, 48, -10), v(x0 + 8, 48, -10), v(x0 + 8, 44, -11), v(x0, 44, -11)], i % 2 ? RED : CREAM, null, { two: true }); // Volant
+    }
+    PS2.box(m, 0, 58, 12, 50, 11, 2, WOOD3);
+    return m;
+  }
+  draw(ctx) {
+    const x = Math.round(this.cx - W.cam.x), y = Math.round(this.y + this.h - W.cam.y);
+    if (x < -50 || x > View.w + 50 || y < -10 || y > 290) return;
+    if (!this.buf.c) Expo.propRender(this.buf, 76, 76, [this.mesh()]);
+    ctx.drawImage(this.buf.c, x - 38, y - 76);
+    Font.draw(ctx, tr('limoSign'), x, y - 66, '#f8d878', { align: 'center' });
+    if (!this.taken) LimoStand.bottle(ctx, x - 4, y - 36 + (Math.floor(this.t / 30) % 2));
+  }
+  static bottle(ctx, x, y) { // Bügelflasche aus grünem Glas mit Etikett
+    const R = (c, a, b, w, h) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+    R('#1c3c1c', 2, 0, 3, 4); R('#e8e8f0', 2, 0, 3, 1); R('#1c3c1c', 1, 4, 5, 8); R('#48a848', 2, 4, 3, 7); R('#b8f0a0', 2, 5, 1, 5);
+    R('#f8e8a8', 1, 7, 5, 3); R('#d82800', 2, 8, 3, 1);
+  }
+}
+
+// Fernrohr in der Sternwarte: Messingrohr auf dreibeinigem Stativ, auf den Blutmond gerichtet
+class Telescope extends Ent {
+  constructor(d) { super(d.x * T - 6, (d.y + 1) * T - 30, 28, 30); this.kind = 'prop'; this.seen = false; this.buf = {}; }
+  update() { const p = W.player; if (!this.seen && p.alive && Phys.overlap(this, p)) { this.seen = true; Game.note('scopeNote'); Audio8.sfx('select'); } }
+  draw(ctx) {
+    const x = Math.round(this.cx - W.cam.x), y = Math.round(this.y + this.h - W.cam.y);
+    if (x < -40 || x > View.w + 40 || y < -10 || y > 250) return;
+    if (!this.buf.c) {
+      const m = PS2.mesh(), BR = [206, 164, 72], BR2 = [150, 112, 44], WD = [96, 60, 34];
+      for (const [fx, fz] of [[-10, -6], [10, -6], [0, 9]]) PS2.beam(m, fx, 0, fz, 0, 20, 0, 1.6, 1.6, WD);
+      PS2.beam(m, -11, 17, 0, 15, 33, 0, 6, 6, BR); PS2.beam(m, 13, 32, 0, 18, 35, 0, 7.5, 7.5, BR2); PS2.beam(m, -14, 15, 0, -11, 17, 0, 3, 3, BR2);
+      Expo.propRender(this.buf, 52, 52, [m]);
+    }
+    ctx.drawImage(this.buf.c, x - 26, y - 52);
   }
 }

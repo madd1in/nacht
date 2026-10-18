@@ -75,6 +75,9 @@ const W = {
         case 'campfire': this.spawn(new Campfire(d)); break;
         case 'snapper': this.spawn(new Snapper(d.x, d.y)); break;
         case 'pitcher': this.spawn(new Pitcher(d.x, d.y)); break;
+        case 'thirsty': { const pl = this.spawn(new ThirstyPlant(d)); pl.leaves.forEach(l => this.platforms.push(this.spawn(l))); break; }
+        case 'limo': this.spawn(new LimoStand(d)); break;
+        case 'scope': this.spawn(new Telescope(d)); break;
         case 'relic': this.spawn(new Relic(d)); break;
         case 'felltree': this.spawn(new FellTree(d)); break;
         case 'ambush': this.spawn(new Ambush(d)); break;

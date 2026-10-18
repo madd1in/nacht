@@ -1066,12 +1066,12 @@ const Game = {
   sectionList() {
     if (this.secList) return this.secList;
     const NAMES = { ship: 'SCHIFF', forest: 'WALD', courtyard: 'BURGHOF', foyer: 'EINGANGSHALLE', hall: 'HALLE', crypt: 'GRUFT', cave: 'HÖHLE', tower: 'UHRTURM', library: 'BIBLIOTHEK',
-      glass: 'GLASTURM', gallery: 'GALERIE', bridge: 'BRÜCKE', vortex: 'STRUDEL', throne: 'THRONSAAL', cathedral: 'SONNENKATHEDRALE', spire: 'SONNENTURM', expo: 'WELTAUSSTELLUNG' };
+      glass: 'GLASTURM', gallery: 'GALERIE', bridge: 'BRÜCKE', vortex: 'STRUDEL', throne: 'THRONSAAL', cathedral: 'SONNENKATHEDRALE', spire: 'SONNENTURM', expo: 'WINTERGARTEN' };
     const L = [];
     Levels.STAGES.forEach((st, s) => {
       L.push({ head: true, s, label: (s + 1) + '  ' + tr(st.nameKey) });
       st.rooms.forEach((r, i) => {
-        let n = NAMES[r.theme] || r.theme.toUpperCase();
+        let n = r.label || NAMES[r.theme] || r.theme.toUpperCase();
         if (r.bell) n = 'GLOCKENTURM'; else if (r.ents.some(e => e.type === 'tut')) n += ' (TUTORIAL)'; else if (r.ents.some(e => e.type === 'gate')) n += ' MIT TOR';
         if (r.arena) n += '  - BOSS'; else if (r.mini) n += '  - ZWISCHENGEGNER';
         L.push({ s, r: i, label: (s + 1) + '-' + (i + 1) + '  ' + n });

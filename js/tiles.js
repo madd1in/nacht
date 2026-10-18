@@ -1571,7 +1571,7 @@ const Tiles = (() => {
       L.push({ name: 'stacks', custom: drawStacks3D, par: 1, c: C(1, 1) }); // PS2-3D: frei stehende Regale ragen aus den Pilastern
       L.push({ name: 'books', custom: drawBookFlock, par: 0.7, c: C(1, 1) }); // in der Ferne kreisen Bücherschwärme
     } else if (theme === 'expo') {
-      // Weltausstellung: Nachthimmel hinter Glas, der Blutmond als Low-Poly-Kugel, davor der Glaspalast in PS2-3D
+      // Wintergarten: Nachthimmel hinter Glas, der Blutmond als Low-Poly-Kugel, davor der Glaspalast in PS2-3D
       const sky = C(640, 208), x = sky.getContext('2d');
       smooth(x, 640, 208, ['#02030a', '#060a1a', '#0c1428', '#121c36', '#182444', '#1e2c4c', '#243450', '#2a3a52', '#2c3c50']);
       for (let i = 0; i < 120; i++) { const b = rand(); px(x, b < 0.2 ? '#fcfcfc' : '#8c9cbc', ri(0, 639), ri(0, 140)); }
@@ -2822,6 +2822,7 @@ const Tiles = (() => {
     ctx.globalAlpha = frontA;
     for (let x = -off; x < View.w; x += 640) ctx.drawImage(c, x, 0);
     ctx.globalAlpha = 1;
+    if (room.theme === 'expo') Expo.drawFrontLight(ctx, cam, W.frame); // Mondlicht durch das Glasdach fällt über die Spielebene
   }
 
   const DECO_SOLID = new Set(['#', '=', 'X', 'Y']);

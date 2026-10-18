@@ -60,6 +60,7 @@ const Levels = (() => {
       wheel(x, y) { r.wheel = { x, y }; return api; },
       dock(x, x0, x1, row) { r.dock = { x, x0, x1, row }; return api; },
       music(name) { r.music = name; return api; },
+      label(name) { r.label = name; return api; }, // Name in der Abschnittswahl
       atSea() { r.atSea = true; return api; }, // Schiff in voller Fahrt (Rollen, ziehendes Meer) ohne Anlegen
       noDoor() { r.noDoor = true; return api; },
       wrap() { r.wrap = true; return api; }, // Turmmantel: rechter und linker Rand sind verbunden
@@ -448,35 +449,70 @@ const Levels = (() => {
     .candle(4, 8, 'H').candle(12, 8).candle(16, 8, 'W').candle(20, 8, 'H')
     .start(2, 10).arena('warden').done();
 
-  // ======================= STAGE 5: Die Weltausstellung =======================
-  // Ein Glaspalast wie die großen Gewächshäuser des 19. Jahrhunderts: grün lackierte Stahlrippen, Glasgewölbe, Palmen,
-  // Galerien aus Gusseisen und Gaslaternen. Die ausgestellten fleischfressenden Pflanzen sind ausgebrochen.
-  // Palmenhaus: drei Galerien übereinander, Wendeltreppen, Schnappfallen in Töpfen, Kannenpflanzen spucken von oben
-  const ex1 = room(100, 'expo', 20)
-    .ground(0, 99, 18)
-    .stair(9, 17, 5, 1).fill(14, 13, 34, 13, '=')                     // erste Galerie
-    .stair(25, 12, 5, 1).fill(30, 8, 52, 8, '=')                      // obere Galerie
-    .fill(58, 12, 72, 12, '=').stair(78, 17, 6, -1)                   // dritte Galerie mit Treppe hinunter
-    .enemy('snapper', 20, 17).enemy('snapper', 44, 17).enemy('snapper', 68, 17).enemy('snapper', 41, 7)
-    .enemy('pitcher', 17, 12).enemy('pitcher', 63, 11).enemy('pitcher', 88, 17).enemy('pitcher', 49, 7)
-    .candle(4, 17, 'H').candle(28, 17).candle(36, 17, 'W').candle(56, 17, '$').candle(84, 17).candle(94, 17, 'H')
-    .candle(22, 12).candle(33, 7, 'H').candle(46, 7).candle(70, 11, '1')
-    .enemy('bat', 50, 3).enemy('bat', 80, 4)
-    .statue(52, 17)
-    .music('expo')
-    .start(2, 17).exit(98).done();
-  // Halle der Maschinen: Seerosenbecken (Blätter tragen nur kurz), ein riesiges Zahnrad als Ausstellungsstück, Laufgänge
-  const ex2 = room(96, 'expo')
+  // ======================= STAGE 5: Der Wintergarten =======================
+  // Ein Glaspalast wie die großen Gewächshäuser des 19. Jahrhunderts: grün lackierte Stahlrippen, ein Glasgewölbe hoch wie
+  // ein Kirchenschiff, drei Galerien aus Gusseisen übereinander, Palmen, Gaskronen – und durch das Glas fällt Mondlicht.
+  // Die ausgestellten fleischfressenden Pflanzen sind ausgebrochen.
+  // Palmenhaus: in der Mitte ein Becken voller Verdauungssaft – hinüber geht es nur oben. Im Zickzack treppauf über drei
+  // Galerien, über bröckelnde Simse über das Becken, ganz oben unter dem Gewölbe eine Schatzgalerie, dann die lange Treppe hinab.
+  const ex1 = room(100, 'expo', 30)
+    .ground(0, 37, 28).fill(38, 28, 61, 29, '~').ground(62, 99, 28)      // Boden (Oberkante Reihe 28), Becken in der Mitte
+    .stair(8, 27, 5, 1).fill(13, 23, 31, 23, '=')                         // erste Galerie
+    .stair(31, 22, 5, -1).fill(12, 18, 26, 18, '=')                       // zweite Galerie, zurück nach links
+    .stair(14, 17, 5, 1).fill(19, 13, 40, 13, '=')                        // dritte Galerie bis an das Becken
+    .crumble(43, 13).crumble(47, 12).crumble(51, 13).crumble(55, 12)     // bröckelnde Simse über dem Becken
+    .fill(59, 13, 72, 13, '=')                                            // Galerie jenseits des Beckens
+    .stair(64, 12, 7, -1).fill(44, 6, 57, 6, '=')                         // ganz oben unter dem Gewölbe: Schatzgalerie
+    .stair(87, 27, 15, -1)                                                // lange Treppe hinab
+    .enemy('snapper', 18, 27).enemy('snapper', 30, 27).enemy('pitcher', 34, 27)
+    .enemy('pitcher', 20, 22).enemy('snapper', 25, 22).enemy('snapper', 20, 17).enemy('pitcher', 36, 12).enemy('snapper', 28, 12)
+    .enemy('snapper', 68, 12).enemy('pitcher', 52, 5)
+    .enemy('snapper', 70, 27).enemy('pitcher', 77, 27).enemy('snapper', 84, 27).enemy('pitcher', 93, 27)
+    .enemy('bat', 48, 9).enemy('bat', 56, 10).enemy('bat', 30, 7).enemy('bat', 80, 8)
+    .candle(4, 27, 'H').candle(12, 27).candle(26, 27, 'W').candle(16, 22).candle(29, 22, 'H').candle(13, 17, '1').candle(24, 17)
+    .candle(26, 12, 'H').candle(38, 12).candle(61, 12).candle(70, 12, 'W').candle(45, 5, '$').candle(56, 5, 'H')
+    .candle(66, 27, '$').candle(90, 27).candle(95, 27, 'H')
+    .chest(50, 5, 'big')
+    .statue(22, 12)
+    .music('expo').label('PALMENHAUS')
+    .start(2, 27).exit(98).done();
+  // Halle der Maschinen: Seerosenbecken (Blätter tragen nur kurz), ein riesiges Zahnrad als Ausstellungsstück, Laufgänge;
+  // das Zahnrad hebt bis zu einem Laufsteg hoch unter den Galerien
+  const ex2 = room(96, 'expo', 18)
     .ground(0, 18).ground(24, 46).ground(52, 95)
-    .fill(19, 12, 23, 12, '~').fill(47, 12, 51, 12, '~').crumble(20, 11).crumble(48, 11)
-    .cog(34.5, 6, 44, 4, 0.011)
-    .fill(58, 7, 68, 7, '=').stair(54, 10, 4, 1).fill(76, 8, 84, 8, '=')
-    .enemy('snapper', 12, 10).enemy('snapper', 44, 10).enemy('snapper', 63, 6).enemy('snapper', 90, 10)
-    .enemy('pitcher', 28, 10).enemy('pitcher', 80, 7).enemy('pitcher', 72, 10)
-    .candle(4, 10).candle(15, 10, 'H').candle(27, 10).candle(40, 10, 'W').candle(57, 10).candle(66, 6, 'H').candle(86, 10, '2')
-    .statue(53, 10)
-    .music('expo')
-    .start(2, 10).exit(94).done();
+    .fill(19, 17, 23, 17, '~').fill(47, 17, 51, 17, '~').crumble(20, 16).crumble(48, 16)
+    .cog(34.5, 11, 44, 4, 0.011)
+    .fill(37, 6, 46, 6, '=')
+    .fill(58, 12, 68, 12, '=').stair(54, 15, 4, 1).fill(76, 13, 84, 13, '=')
+    .enemy('snapper', 12, 15).enemy('snapper', 44, 15).enemy('snapper', 63, 11).enemy('snapper', 90, 15)
+    .enemy('pitcher', 28, 15).enemy('pitcher', 80, 12).enemy('pitcher', 72, 15).enemy('pitcher', 44, 5)
+    .candle(4, 15).candle(15, 15, 'H').candle(27, 15).candle(40, 15, 'W').candle(57, 15).candle(66, 11, 'H').candle(86, 15, '2')
+    .candle(39, 5, '$').candle(42, 5, 'H')
+    .statue(53, 15)
+    .music('expo').label('MASCHINENHALLE')
+    .start(2, 15).exit(94).done();
+  // Aufstieg in die Kuppel: senkrecht hinauf über Treppen, Aufzüge und bröckelnde Simse. Unten ein Erfrischungsstand und ein
+  // großer Kübel mit Messingschild „NICHT FÜTTERN“ – die Pflanze darin hat Durst. Wer ihr die Limonade bringt, bekommt
+  // eine Riesenranke bis hinauf in die versiegelte Sternwarte oben links (Fernrohr, Truhe, 1UP).
+  const exk = room(30, 'expo', 56)
+    .ground(0, 29)                                                        // Boden (Oberkante Reihe 54)
+    .fill(0, 0, 9, 9, '#').fill(1, 4, 8, 7, '.')                          // versiegelte Sternwarte
+    .prop('limo', { x: 26, y: 53 })
+    .prop('thirsty', { x: 5, y: 53, top: 5, hole: [4, 5, 8, 9] })
+    .prop('scope', { x: 1.5, y: 7 }).chest(7, 7, 'life').candle(2, 5, '$')
+    .stair(19, 53, 5, 1).fill(24, 49, 29, 49, '=')
+    .stair(28, 48, 5, -1).fill(12, 44, 23, 44, '=')
+    .elevator(10, 44, 33).fill(12, 33, 21, 33, '=')
+    .stair(20, 32, 5, 1).fill(25, 28, 29, 28, '=')
+    .crumble(21, 26).crumble(17, 24).crumble(13, 22).fill(10, 20, 13, 20, '=')
+    .stair(13, 19, 6, 1).fill(19, 14, 26, 14, '=')
+    .elevator(27, 14, 4).fill(11, 4, 26, 4, '=')
+    .enemy('snapper', 16, 43).enemy('pitcher', 20, 43).enemy('pitcher', 14, 32).enemy('snapper', 20, 13).enemy('pitcher', 24, 13)
+    .enemy('bat', 16, 38).enemy('bat', 22, 18).enemy('bat', 7, 26)
+    .candle(14, 52, 'H').candle(26, 47).candle(13, 43, '$').candle(16, 32).candle(28, 27, 'H').candle(11, 19).candle(23, 13, 'W').candle(16, 3, 'H')
+    .statue(18, 32)
+    .music('expo').label('KUPPEL')
+    .start(16, 53).exitAt(12, 0, 22, 3).done();
   // Kuppel: in der Mitte der riesige Pflanzkübel – die Menschenfalle
   const exb = room(46, 'expo')
     .ground(0, 45, 11)
@@ -556,7 +592,7 @@ const Levels = (() => {
     { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
     { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
     { id: 'sun', nameKey: 'stageSun', bossKey: 'bossKnight', voice: 'stageSun', name: 'DIE SONNENKATHEDRALE', music: 'sun', time: 720, rooms: [sa, sp, sk], boss: 'SONNENWÄCHTER' },
-    { id: 'expo', nameKey: 'stageExpo', bossKey: 'bossTrap', voice: 'stageExpo', name: 'DIE WELTAUSSTELLUNG', music: 'expo', time: 720, rooms: [ex1, ex2, exb], boss: 'MENSCHENFALLE' },
+    { id: 'expo', nameKey: 'stageExpo', bossKey: 'bossTrap', voice: 'stageExpo', name: 'DER WINTERGARTEN', music: 'expo', time: 900, rooms: [ex1, ex2, exk, exb], boss: 'MENSCHENFALLE' },
     { id: 3, nameKey: 'stage4', bossKey: 'boss4', voice: 'stage4', name: 'DER THRON DER NACHT', music: 'chapel', time: 660, rooms: [vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
   ];
 

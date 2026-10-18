@@ -61,7 +61,7 @@ const PS2 = (() => {
     const C = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], hw = w / 2, hh = h / 2, P = [];
     for (const [px, py, pz] of [[x0, y0, z0], [x1, y1, z1]]) for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) P.push(vtx(m, px + sx * a * hw + ux * b * hh, py + uy * b * hh, pz + sz * a * hw + uz * b * hh));
     for (let k = 0; k < 4; k++) { const j = (k + 1) % 4; face(m, [P[k], P[j], P[4 + j], P[4 + k]], col, C, o); }
-    face(m, [P[0], P[1], P[2], P[3]], col, C, o); face(m, [P[4], P[5], P[6], P[7]], col, C, o);
+    if (!o.open) { face(m, [P[0], P[1], P[2], P[3]], col, C, o); face(m, [P[4], P[5], P[6], P[7]], col, C, o); } // open: ohne Stirnflächen (Rippen, lange Riegel)
   }
 
   // ---------------- Rendern ----------------
@@ -626,7 +626,7 @@ const PS2 = (() => {
       else if (k === 1) { B(0, 0, 10, 6, 7, STONE2, { top: STONE }); gable(props, px, y0 + 6, py, 7.4, 10.6, 3.5, DARKR); for (let g = 0; g < 6; g++) B(-12 + (g % 3) * 3.5, (g < 3 ? -6 : 6), 1.6, 2.4, 0.8, STONE); }
       else if (k === 2) { prism(props, px, y0, py, 4.2, 26, 8, STONE, { rTop: 3.8 }); cone(props, px, y0 + 26, py, 5, 9, 8, ROOF); for (const a of [-7, 7]) { prism(props, px + a, y0, py, 2.2, 11, 6, STONE2); cone(props, px + a, y0 + 11, py, 2.6, 4, 6, ROOF); } }
       else if (k === 3) { B(0, 0, 7, 9, 18, WHITE); gable(props, px, y0 + 9, py, 18, 7.4, 4, [120, 130, 170]); for (const a of [-4.5, 4.5]) { prism(props, px + a, y0, py - 9, 2, 16, 8, WHITE); cone(props, px + a, y0 + 16, py - 9, 2.3, 9, 8, [120, 130, 170]); cone(props, px + a, y0 + 25, py - 9, 0.5, 2, 4, GOLDM); } prism(props, px, y0 + 9, py + 2, 2.4, 8, 8, WHITE); cone(props, px, y0 + 17, py + 2, 2.8, 11, 8, GOLDM); }
-      else if (k === 4) { // Weltausstellung: Glaspalast mit grünen Rippen und Mittelkuppel
+      else if (k === 4) { // Wintergarten: Glaspalast mit grünen Rippen und Mittelkuppel
         const GL = [170, 226, 230], IR = [50, 130, 84];
         B(0, 0, 26, 7, 9, GL, { top: GL }); gable(props, px, y0 + 7, py, 9, 26, 4, GL, { rot: Math.PI / 2 });
         for (let r = -12; r <= 12; r += 4) box(props, px + r, y0, py - 4.6, 0.6, 9.5, 0.6, IR);
