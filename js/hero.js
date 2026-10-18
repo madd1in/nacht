@@ -60,15 +60,15 @@ const HEROES = (() => {
     iconPal: { 1: '#08040c', 2: '#241c30', r: '#c81c1c', a: '#9c5430', s: '#d88c5c', L: '#f4bc8c', e: '#000' },
   };
   const MONSTERS = {
-    skel: { head: 'skull', headPal: { w: '#9c9478', W: '#e8e0c8', k: '#140c08' }, skin: RAMP.bone, arm: { r: 1.05 }, thigh: RAMP.bone, boot: RAMP.bone,
+    skel: { id: 'skel', head: 'skull', headPal: { w: '#9c9478', W: '#e8e0c8', k: '#140c08' }, skin: RAMP.bone, arm: { r: 1.05 }, thigh: RAMP.bone, boot: RAMP.bone,
       legR: 0.55, torso: 'ribs' },
-    knight: { head: 'helmet', headPal: { s: '#3c3c58', S: '#a4a4c4', k: '#08080c', r: '#d82800', R: '#7c0c00' }, skin: RAMP.steel, arm: { r: 2.0, bracer: RAMP.gold },
+    knight: { id: 'knight', head: 'helmet', headPal: { s: '#3c3c58', S: '#a4a4c4', k: '#08080c', r: '#d82800', R: '#7c0c00' }, skin: RAMP.steel, arm: { r: 2.0, bracer: RAMP.gold },
       thigh: RAMP.steel, boot: RAMP.steel, flap: RAMP.steel, flapTrim: RAMP.gold, torso: 'armor', pauldron: true, belt: true, legR: 1.1, shield: true },
-    ghoul: { head: 'zombie', headPal: { 1: '#140c08', 2: '#3c2c1c', g: '#3c5428', G: '#88a45c', k: '#0c1408', r: '#e82020', m: '#200808' }, skin: RAMP.zombie, arm: { r: 1.5 },
+    ghoul: { id: 'ghoul', head: 'zombie', headPal: { 1: '#140c08', 2: '#3c2c1c', g: '#3c5428', G: '#88a45c', k: '#0c1408', r: '#e82020', m: '#200808' }, skin: RAMP.zombie, arm: { r: 1.5 },
       thigh: RAMP.rags, boot: RAMP.zombie, flap: RAMP.rags, flapTrim: RAMP.rags, torso: 'rags', legR: 0.9 },
-    fish: { head: 'fish', headPal: { g: '#145c40', G: '#58b478', w: '#fcfcfc', k: '#000', r: '#d82800', R: '#7c0c00', m: '#0c1c14' }, skin: RAMP.fish, arm: { r: 1.6 },
+    fish: { id: 'fish', head: 'fish', headPal: { g: '#145c40', G: '#58b478', w: '#fcfcfc', k: '#000', r: '#d82800', R: '#7c0c00', m: '#0c1c14' }, skin: RAMP.fish, arm: { r: 1.6 },
       thigh: RAMP.fish, boot: RAMP.fish, torso: 'scales', legR: 1 },
-    count: { head: 'count', headPal: { 1: '#08040c', p: '#c8c0d8', P: '#8c84a4', L: '#f0ecfc', r: '#fc2020', m: '#580810', w: '#fcfcfc' }, skin: RAMP.pale, sleeve: RAMP.noble,
+    count: { id: 'count', head: 'count', headPal: { 1: '#08040c', p: '#c8c0d8', P: '#8c84a4', L: '#f0ecfc', r: '#fc2020', m: '#580810', w: '#fcfcfc' }, skin: RAMP.pale, sleeve: RAMP.noble,
       arm: { r: 1.6 }, thigh: RAMP.noble, boot: RAMP.noble, torso: 'suit', cape: true, legR: 0.95 },
   };
 
@@ -147,16 +147,17 @@ const HEROES = (() => {
     const shF = [CX + 2.6 + lean, 11.8 + ty], shB = [CX - 2.6 + lean, 11.8 + ty];
     const fA = armGeo(pose.fa, shF[0], shF[1]), bA = armGeo(pose.ba, shB[0], shB[1]);
     const ar = def.arm.r, armsHidden = def.cape && !pose.capeOpen;
-    if (S === 1 && (REC || R3D[def.id])) {
+    const rid = def.id + '@' + S;
+    if (REC || R3D[rid]) {
       const key = poseKey(pose);
-      if (REC) REC.push({ key, lean, ty, hipY, flare: pose.flare || 0, coil: !!pose.coil, hurt: !!pose.hurt, blink: !!pose.blink, legs: pose.legs,
+      if (REC) REC.push({ id: def.id, S, key, lean, ty, hipY, flare: pose.flare || 0, coil: !!pose.coil, hurt: !!pose.hurt, blink: !!pose.blink, legs: pose.legs,
         fL: [fL.hx, fL.hy, fL.kx, fL.ky, fL.ax, fL.ay], bL: [bL.hx, bL.hy, bL.kx, bL.ky, bL.ax, bL.ay],
         fA: [fA.sx, fA.sy, fA.ex, fA.ey, fA.hx, fA.hy], bA: [bA.sx, bA.sy, bA.ex, bA.ey, bA.hx, bA.hy], head: [Math.round(12 + lean), ty] });
-      const A = R3D[def.id], r = A && A.map[key];
+      const A = R3D[rid], r = A && A.map[key];
       if (r) { // gerendertes 3D-Bild statt Pixelmalerei
-        G.x.drawImage(A.img, r[0], r[1], FW, FH, 0, 0, FW, FH);
+        G.x.drawImage(A.img, r[0], r[1], FW * S, FH * S, 0, 0, FW * S, FH * S);
         const spr = Sprites.fromCanvas(G.c);
-        spr.mx = MX; spr.hand = [fA.hx, fA.hy]; spr.drop = yOff;
+        spr.mx = MX * S; spr.hand = [fA.hx, fA.hy]; spr.drop = yOff;
         return spr;
       }
     }
@@ -397,7 +398,7 @@ const HEROES = (() => {
       cast: frame(M.count, { legs: [[8, 4], [-8, 4]], fa: { a: [166, 12] }, ba: { a: [-166, -12] }, capeOpen: true, lean: -1 }, 2), // Arme hoch: Blutregen, Fledermäuse
     };
     // Sonnenwächter: derselbe Ritter in Goldrüstung mit weißem Federbusch, doppelte Auflösung (überragt den Helden)
-    const SUN = { ...M.knight, headPal: { s: '#8c5c00', S: '#fcd860', k: '#1c0c00', r: '#fcfcfc', R: '#c8a050' }, skin: RAMP.gold, thigh: RAMP.gold, boot: RAMP.gold, flap: RAMP.gold, flapTrim: RAMP.steel, arm: { r: 2.0, bracer: RAMP.steel } };
+    const SUN = { ...M.knight, id: 'sunknight', headPal: { s: '#8c5c00', S: '#fcd860', k: '#1c0c00', r: '#fcfcfc', R: '#c8a050' }, skin: RAMP.gold, thigh: RAMP.gold, boot: RAMP.gold, flap: RAMP.gold, flapTrim: RAMP.steel, arm: { r: 2.0, bracer: RAMP.steel } };
     S.gknight = {
       walk: walk2(SUN, k => ({ fa: { a: [55, 25] }, ba: { a: [k ? -20 : 10, 60] } }), 2),
       thrust: frame(SUN, { legs: [[26, 6], [-18, 4]], fa: { a: [92, 0] }, ba: { a: [40, 40] }, lean: 1 }, 2), // Lanze vor, Ansturm
@@ -412,15 +413,23 @@ const HEROES = (() => {
   list.forEach(d => { built[d.id] = build(d); });
   Sprites.S.heroes = built;
   Sprites.S.hero = built.henrik;
-  // Gelenke aller Posen eines Helden (für den Blender-Export)
-  function exportRig(id) { const d = list.find(x => x.id === id); REC = []; build(d); const out = REC; REC = null; const seen = new Set(); return out.filter(r => !seen.has(r.key) && seen.add(r.key)); }
-  // 3D-Atlas laden: danach die Frames des Helden neu bauen (der Held holt sie sich beim nächsten Start/Wechsel)
-  function load3d(id, url, map) {
+  // Gelenke aller Posen (für den Blender-Export): ein Held per id, oder alle Gegner aus dem Rig ('monsters')
+  function exportRig(id) {
+    REC = [];
+    if (id === 'monsters') buildMonsters(); else build(list.find(x => x.id === id));
+    const out = REC; REC = null; const seen = new Set();
+    return out.filter(r => { const k = r.id + '@' + r.S + ':' + r.key; return !seen.has(k) && seen.add(k); });
+  }
+  // 3D-Atlas laden (je Figur und Auflösung): danach Helden bzw. Gegner neu bauen
+  function load3d(id, url, map, S = 1) {
     const img = new Image();
     img.onload = () => {
-      R3D[id] = { img, map }; const d = list.find(x => x.id === id);
-      built[id] = build(d); Sprites.S.heroes = built; Sprites.S.hero = built.henrik;
-      if (typeof W !== 'undefined' && W.player && W.player.def && W.player.def.id === id) { W.player.H = built[id]; }
+      R3D[id + '@' + S] = { img, map };
+      const d = list.find(x => x.id === id);
+      if (d) {
+        built[id] = build(d); Sprites.S.heroes = built; Sprites.S.hero = built.henrik;
+        if (typeof W !== 'undefined' && W.player && W.player.def && W.player.def.id === id) { W.player.H = built[id]; }
+      } else buildMonsters();
     };
     img.src = url;
   }
