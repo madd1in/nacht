@@ -424,16 +424,59 @@ const Tiles = (() => {
   // Rosette im Thronsaal: Lage in der Wandebene (512 px breit, Parallaxe 0.5) + Buntglas mit Bleiruten
   const ROSE = { x: 459, y: 64, r: 30 };
   const LIB_WIN = [296, 24, 48, 98]; // Bibliothek: Bogenfenster in der Wandebene (x, Oberkante, Breite, Höhe) – wie STORM_WINS.library
+  // Buntglas: Juwelfarben, jedes Glasstück zur Mitte hin heller (dickes Glas im Gegenlicht), Bleiruten dunkel mit Glanzkante
+  const JEWEL = { ruby: [176, 16, 44], sapph: [24, 56, 200], emer: [16, 144, 80], amber: [232, 160, 24], amet: [112, 48, 192], azure: [40, 160, 224], gold: [248, 200, 64], rose: [224, 80, 140] };
+  const glassPx = (x, col, k, X, Y) => px(x, `rgb(${Math.min(255, col[0] * k) | 0},${Math.min(255, col[1] * k) | 0},${Math.min(255, col[2] * k) | 0})`, X, Y);
+  // Rosette mit Maßwerk: goldene Mitte, zwölf Blütenblätter (je zweigeteilt), Kranz aus 24 Rundfenstern
   function roseGlass(x, rx, ry, rr) {
+    const LEAD = '#120810';
     for (let y = -rr; y <= rr; y++) for (let X = -rr; X <= rr; X++) {
-      const d = Math.hypot(X, y);
+      const d = Math.hypot(X + 0.5, y + 0.5);
       if (d > rr) continue;
-      const a = (Math.atan2(y, X) + Math.PI) / (Math.PI * 2), seg = Math.floor(a * 12), ring = Math.floor(d / rr * 3);
-      const glass = [['#f8b800', '#a80020', '#0058f8'], ['#0058f8', '#d82800', '#00a800'], ['#a80020', '#6844fc', '#f8b800']][ring % 3][seg % 3];
-      const lead = Math.abs(a * 12 - Math.round(a * 12)) < 0.06 || Math.abs(d / rr * 3 - Math.round(d / rr * 3)) < 0.08;
-      px(x, lead ? '#140810' : glass, rx + X, ry + y);
+      const a = (Math.atan2(y + 0.5, X + 0.5) + Math.PI) / (Math.PI * 2), q = d / rr;
+      if (d > rr - 1.2) { px(x, LEAD, rx + X, ry + y); continue; }
+      if (q < 0.17) { const k = 1.25 - q * 2; if (Math.abs(q - 0.15) * rr < 0.6) px(x, LEAD, rx + X, ry + y); else glassPx(x, JEWEL.gold, k, rx + X, ry + y); continue; }
+      const t = a * 12, ti = Math.floor(t), tf = t - ti, lobe = 0.68 - Math.pow(Math.abs(tf - 0.5) * 2, 2) * 0.12;
+      if (q < lobe) { // Blütenblatt
+        const edge = Math.min(tf, 1 - tf) * 2 * Math.PI * d / 12, mid = Math.abs(tf - 0.5) * 2 * Math.PI * d / 12;
+        if (edge < 0.7 || Math.abs(q - lobe) * rr < 0.8 || (mid < 0.5 && q > 0.3)) { px(x, LEAD, rx + X, ry + y); continue; }
+        const col = ti % 2 ? JEWEL.ruby : JEWEL.sapph, k = 0.75 + (1 - Math.abs(tf - 0.25 - (tf > 0.5 ? 0.5 : 0)) * 3) * 0.25 + (0.5 - Math.abs(q - 0.42)) * 0.5;
+        glassPx(x, col, k, rx + X, ry + y); continue;
+      }
+      const ri = Math.floor(a * 24), ra = (ri + 0.5) / 24 * Math.PI * 2 - Math.PI, cxr = Math.cos(ra) * rr * 0.84, cyr = Math.sin(ra) * rr * 0.84, dr = Math.hypot(X + 0.5 - cxr, y + 0.5 - cyr), rR = rr * 0.12;
+      if (Math.abs(dr - rR) < 0.6 || Math.abs(q - lobe) * rr < 0.6) { px(x, LEAD, rx + X, ry + y); continue; }
+      if (dr < rR) { glassPx(x, ri % 2 ? JEWEL.emer : JEWEL.amber, 1.2 - dr / rR * 0.45, rx + X, ry + y); continue; }
+      glassPx(x, JEWEL.amet, 0.55 + (1 - q) * 0.6, rx + X, ry + y);
     }
-    px(x, '#f8b800', rx - 3, ry - 3, 6, 6);
+  }
+  // Fenster-Mosaik: Voronoi-Glasstücke mit Bleiruten, Juwelenbordüre, Medaillon mit Kreuzstern; pal = Glasfarben
+  function glassMosaic(x, X0, Y0, w, h, inside, pal, sd) {
+    const cs = 6, gx = Math.ceil(w / cs) + 2, gy = Math.ceil(h / cs) + 2, P = [];
+    for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) P.push([X0 + (i - 1 + 0.15 + hn(i, j, sd) * 0.7) * cs, Y0 + (j - 1 + 0.15 + hn(i, j, sd + 7) * 0.7) * cs]);
+    const mx = X0 + w / 2, my = Y0 + Math.min(h * 0.36, w * 0.9), mr = w * 0.36, LEAD = '#120810';
+    for (let Y = Y0; Y < Y0 + h; Y++) for (let X = X0; X < X0 + w; X++) {
+      if (!inside(X, Y)) continue;
+      if (!inside(X - 3, Y) || !inside(X + 3, Y) || !inside(X, Y - 3) || !inside(X, Y + 3)) { // Bordüre: Juwelen zwischen Bleistegen
+        const b = !inside(X - 1, Y) || !inside(X + 1, Y) || !inside(X, Y - 1) || !inside(X, Y + 1) || ((X + Y) % 5 === 0);
+        if (b) px(x, LEAD, X, Y); else glassPx(x, Math.floor((X + Y) / 5) % 2 ? JEWEL.gold : JEWEL.ruby, 1.0, X, Y);
+        continue;
+      }
+      const dm = Math.hypot(X + 0.5 - mx, Y + 0.5 - my);
+      if (Math.abs(dm - mr) < 0.9) { px(x, LEAD, X, Y); continue; }
+      if (Math.abs(dm - mr + 1.6) < 0.7) { glassPx(x, JEWEL.gold, 1.1, X, Y); continue; }
+      if (dm < mr && (Math.abs(X + 0.5 - mx) < 1 || Math.abs(Y + 0.5 - my) < 1)) { px(x, Math.abs(X + 0.5 - mx) < 0.5 || Math.abs(Y + 0.5 - my) < 0.5 ? LEAD : '#f8d060', X, Y); continue; } // Kreuzstern
+      const ci = Math.floor((X - X0) / cs) + 1, cj = Math.floor((Y - Y0) / cs) + 1;
+      let d1 = 1e9, d2 = 1e9, best = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = ci + di, jj = cj + dj; if (ii < 0 || jj < 0 || ii >= gx || jj >= gy) continue;
+        const q = P[jj * gx + ii], dd = Math.hypot(X + 0.5 - q[0], Y + 0.5 - q[1]);
+        if (dd < d1) { d2 = d1; d1 = dd; best = jj * gx + ii; } else if (dd < d2) d2 = dd;
+      }
+      if (d2 - d1 < 0.85) { px(x, LEAD, X, Y); continue; }
+      const inner = dm < mr, set = inner ? pal.inner : pal.outer, col = set[Math.floor(hn(best, 3, sd) * set.length)];
+      const k = 0.62 + Math.min(1, (d2 - d1) / cs) * 0.5 + (1 - (Y - Y0) / h) * 0.18 + hn(X >> 1, Y >> 1, sd + 3) * 0.08;
+      glassPx(x, col, k, X, Y);
+    }
   }
   // Mode-7: das Glas der Rosette dreht sich (in der Wutphase des Grafen schneller)
   let roseC = null, roseAng = 0, roseF = 0;
@@ -1670,13 +1713,8 @@ const Tiles = (() => {
       } else {
         // Thronsaal im ruhigen Rhythmus: vier gleich breite Joche zwischen Bündelpfeilern – Spitzbogenfenster, Ahnenbild (eigene
         // Ebene), Spitzbogenfenster, große Rosette; über jedem Joch eine Samt-Draperie
-        [59, 315].forEach((wx, wi) => archWindow(x, wx, 40, 32, 92, (X0, Y0, w, h, inside) => {
-          for (let y = Y0; y < Y0 + h; y++) for (let X = X0; X < X0 + w; X++) {
-            if (!inside(X, y)) continue;
-            const lead = (X - X0) % 8 === 0 || (y - Y0) % 12 === 0, cell = Math.floor((X - X0) / 8) + Math.floor((y - Y0) / 12);
-            px(x, lead ? '#140810' : (wi ? ['#0058f8', '#6844fc', '#00a8a8', '#a80020'] : ['#a80020', '#f8b800', '#d82800', '#6844fc'])[cell % 4], X, y);
-          }
-        }));
+        [59, 315].forEach((wx, wi) => archWindow(x, wx, 40, 32, 92, (X0, Y0, w, h, inside) => glassMosaic(x, X0, Y0, w, h, inside,
+          wi ? { outer: [JEWEL.sapph, JEWEL.azure, JEWEL.amet, JEWEL.sapph], inner: [JEWEL.ruby, JEWEL.amber, JEWEL.rose] } : { outer: [JEWEL.ruby, JEWEL.amet, JEWEL.ruby, JEWEL.amber], inner: [JEWEL.sapph, JEWEL.azure, JEWEL.emer] }, 11 + wi * 5)));
         const { x: rx, y: ry, r: rr } = ROSE; // Rosette: Steinrahmen hier, das Glas dreht sich als eigene Ebene (drawRose)
         for (let y = -rr - 4; y <= rr + 4; y++) for (let X = -rr - 4; X <= rr + 4; X++) {
           const d = Math.hypot(X, y);
@@ -1692,7 +1730,8 @@ const Tiles = (() => {
       }
       if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); else [0, 256].forEach(cx => pillar(x, cx, 22, 208)); // Halle: ruhiger Rhythmus – Fenster, Ahnenbild, Pfeiler, Fenster
       add('wall', c, 0.5, { vtile });
-      L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) });
+      if (theme === 'throne') L.push({ name: 'hall3d', custom: drawThroneHall, par: 1, c: C(1, 1) }); // PS2-3D-Halle: Marmorboden, Säulen, Lichtbahnen
+      else L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) });
       if (theme === 'throne') { // Kronleuchter vorne
         const n = C(512, 208), x2 = n.getContext('2d');
         [100, 360].forEach(cx => {
@@ -1973,6 +2012,88 @@ const Tiles = (() => {
       const X0 = 262 - off + k * 512;
       if (X0 > View.w || X0 + 16 < 0) continue;
       for (let i = 0; i < 22; i++) { const y = (((i * 37 + frame * 3.2 - oy) % 208) + 208) % 208, len = 5 + (i % 4) * 3; ctx.fillRect(X0 + (i * 5) % 16, Math.round(y), 1, len); }
+    }
+  }
+
+  // ---------------- Thronsaal als 3D-Halle (PS2) ----------------
+  // Dieselbe Perspektive wie die Kacheln (Fluchtpunkt Bildmitte/y 60, f = 200): die Rückwand mit Fenstern, Rosette und Ahnenbild
+  // liegt bei z = 200 (Parallaxe 0.5), davor läuft ein polierter Marmorboden in die Tiefe, der die Fenster farbig spiegelt;
+  // bei z = 100 stehen runde Säulen aus rotem Marmor mit Goldringen (spaltenweise per Sehstrahl getroffen), und aus den
+  // Fenstern fallen farbige Lichtbahnen schräg nach vorn auf den Boden.
+  const HALL = { f: 200, VY: 60, Zw: 200, Zc: 100, sp: 256, off: 64, r: 17 };
+  const HALL_WIN = [[59, 91, [200, 60, 120]], [315, 347, [70, 90, 230]], [433, 485, [230, 160, 60]]]; // Fenster/Rosette in Wandkoordinaten + Glasfarbe
+  let hallBuf = null, hallMarble = null;
+  function hallMarbleTex() { // roter Marmor mit hellen Adern, Goldringe: Kapitell (v 96–112) und Basis (v 236–252, steht auf dem Boden)
+    if (hallMarble) return hallMarble;
+    const c = C(64, 256), x = c.getContext('2d');
+    for (let Y = 0; Y < 256; Y++) for (let X = 0; X < 64; X++) {
+      const vein = Math.abs(Math.sin(X * 0.19 + Y * 0.045 + hn(X >> 3, Y >> 4, 13) * 5)) < 0.07, n = hn(X >> 1, Y >> 1, 3);
+      px(x, vein ? '#e87888' : n > 0.75 ? '#a82838' : n > 0.3 ? '#8c1c2c' : '#741424', X, Y);
+    }
+    for (const [yb, hb] of [[96, 5], [104, 3], [109, 3], [236, 4], [242, 10]]) { px(x, '#f0b830', 0, yb, 64, hb); px(x, '#fcf0a0', 0, yb, 64, 1); px(x, '#7c5000', 0, yb + hb - 1, 64, 1); }
+    return (hallMarble = c);
+  }
+  function drawThroneHall(ctx, cam, frame) {
+    const room = W.room; if (!room) return;
+    const w = View.w, VX = w / 2, { f, VY, Zw, Zc, sp, off, r } = HALL, camX = cam.x + VX, camY = cam.y + VY, Yf = (room.h - 2) * T, flash = FX.stormOn(W.storm) ? 1 : 0;
+    const wallX = (u) => camX + ((u - ((cam.x * 0.5) % 512 + 512) % 512) - VX) * 2; // Wandkoordinate (sichtbare Kopie) → Welt-x
+    // --- Boden: Zeile für Zeile in die Tiefe (halbe Auflösung), Schachbrett aus rotem und schwarzem Marmor, gespiegelte Fenster
+    const yTop = Math.max(0, Math.floor(VY + (Yf - camY) * f / (f + Zw))), yBot = Math.min(208, Math.ceil(VY + (Yf - camY)));
+    if (yBot > yTop) {
+      const bw = Math.ceil(w / 2), bh = Math.ceil((yBot - yTop) / 2);
+      if (!hallBuf || hallBuf.w !== bw || hallBuf.h !== bh) { const c = C(bw, bh), x = c.getContext('2d'), img = x.createImageData(bw, bh); hallBuf = { w: bw, h: bh, c, x, img, d: new Int32Array(img.data.buffer) }; }
+      const d = hallBuf.d, offW = ((cam.x * 0.5) % 512 + 512) % 512;
+      for (let j = 0; j < bh; j++) {
+        const y = yTop + j * 2 + 1, Z = f * (Yf - camY) / Math.max(0.5, y - VY) - f, row = j * bw;
+        if (Z < -1 || Z > Zw + 4) { d.fill(0, row, row + bw); continue; }
+        const sc = (f + Z) / f, fog = Math.max(0, Math.min(1, Z / Zw)), kf = 1 - fog * 0.5;
+        for (let i = 0; i < bw; i++) {
+          const X = camX + (i * 2 + 1 - VX) * sc, u = Math.floor(X / 32), v = Math.floor(Z / 22), dark = (u + v) & 1;
+          let R = dark ? 22 : 96, G = dark ? 5 : 20, B = dark ? 12 : 32;
+          if (!dark && Math.abs(Math.sin(X * 0.05 + Z * 0.13)) < 0.05) { R = 150; G = 50; B = 70; } // Adern
+          const uw = ((VX + (X - camX) * 0.5 + offW) % 512 + 512) % 512; // welche Wandstelle spiegelt sich hier (Fenster fast senkrecht darüber)
+          for (const [a, b, tint] of HALL_WIN) if (uw > a && uw < b) { const k = (0.15 + 0.55 * fog) * (1 - Math.abs((uw - (a + b) / 2) / ((b - a) / 2)) * 0.6); R += tint[0] * k; G += tint[1] * k; B += tint[2] * k; }
+          R *= kf; G *= kf; B *= kf;
+          if (flash) { R += 50; G += 50; B += 80; }
+          d[row + i] = (255 << 24) | (Math.min(255, B | 0) << 16) | (Math.min(255, G | 0) << 8) | Math.min(255, R | 0);
+        }
+      }
+      hallBuf.x.putImageData(hallBuf.img, 0, 0);
+      ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(hallBuf.c, 0, 0, bw, bh, 0, yTop, bw * 2, bh * 2); ctx.restore();
+      const sk = ctx.createLinearGradient(0, yTop - 2, 0, yTop + 6); sk.addColorStop(0, 'rgba(0,0,0,0.7)'); sk.addColorStop(1, 'rgba(0,0,0,0)'); // Sockelschatten an der Wand
+      ctx.fillStyle = sk; ctx.fillRect(0, yTop - 2, w, 8);
+    }
+    // --- Lichtbahnen: von jedem sichtbaren Fenster schräg nach vorn auf den Boden (additiv)
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const offW = ((cam.x * 0.5) % 512 + 512) % 512;
+    for (let k = -1; k <= Math.ceil(w / 512) + 1; k++) for (const [a, b, tint] of HALL_WIN.slice(0, 2)) {
+      const x0 = a - offW + k * 512, x1 = b - offW + k * 512; if (x1 < -120 || x0 > w + 120) continue;
+      const Xa = camX + (x0 - VX) * 2, Xb = camX + (x1 - VX) * 2, Zl = 30, kl = f / (f + Zl), ytop = VY + (40 - camY) * 0.5, yfl = VY + (Yf - camY) * kl;
+      const fa = VX + (Xa + 60 - camX) * kl, fb = VX + (Xb + 60 - camX) * kl;
+      const g = ctx.createLinearGradient(0, ytop, 0, yfl); g.addColorStop(0, `rgba(${tint.join(',')},0.16)`); g.addColorStop(1, `rgba(${tint.join(',')},0.03)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x0 + 2, ytop); ctx.lineTo(x1 - 2, ytop); ctx.lineTo(fb, yfl); ctx.lineTo(fa, yfl); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    // --- Säulen: Zylinder (Radius r) bei z = Zc, Abstand sp
+    const tex = hallMarbleTex(), kC = f / (f + Zc);
+    const i0 = Math.floor((camX - (VX + 40) / kC - off) / sp), i1 = Math.ceil((camX + (VX + 40) / kC - off) / sp);
+    for (let i = i0; i <= i1; i++) {
+      const tc = off + i * sp, tz = Zc, xa = Math.max(0, Math.floor(VX + (tc - r - camX) * f / (f + tz - r)) - 1), xb = Math.min(w, Math.ceil(VX + (tc + r - camX) * f / (f + tz - r)) + 1);
+      for (let X = xa; X < xb; X++) {
+        const dd = (X + 0.5 - VX) / f, A = camX + dd * f - tc, bq = A * dd - tz, a2 = dd * dd + 1, D = bq * bq - a2 * (A * A + tz * tz - r * r);
+        if (D < 0) continue;
+        const Z = (-bq - Math.sqrt(D)) / a2, nx = (A + dd * Z) / r, nz = (Z - tz) / r, k = f / (f + Z), arc = Math.atan2(nx, -nz) * r;
+        const yb = VY + (Yf - camY) * k, y0 = Math.max(0, VY + (Yf - 260 - camY) * k); if (yb <= 0) continue;
+        const v0 = Math.max(0, 256 - (Yf - (camY + (y0 - VY) / k)));
+        ctx.drawImage(tex, Math.floor(((arc % 64) + 64) % 64), v0, 1, 256 - v0, X, y0, 1, yb - y0);
+        const lit = Math.max(0, -nx * 0.5 - nz * 0.6) * 0.9 + Math.max(0, nz) * 0.35; // vorn links Kerzenlicht, hinten Fensterlicht als Saum
+        ctx.fillStyle = `rgba(14,2,8,${(0.62 * (1 - Math.min(1, lit))).toFixed(2)})`; ctx.fillRect(X, y0, 1, yb - y0);
+        if (Math.abs(nx) > 0.82) { ctx.fillStyle = `rgba(${nx > 0 ? '120,90,230' : '230,120,170'},${((Math.abs(nx) - 0.82) * 1.6).toFixed(2)})`; ctx.fillRect(X, y0, 1, yb - y0); } // farbiger Glassaum
+        if (flash) { ctx.fillStyle = 'rgba(200,200,255,0.25)'; ctx.fillRect(X, y0, 1, yb - y0); }
+      }
+      const fx = VX + (tc - camX) * kC, fy = VY + (Yf - camY) * kC; // Spiegelbild der Säule im polierten Boden
+      const rg = ctx.createLinearGradient(0, fy, 0, fy + 26 * kC); rg.addColorStop(0, 'rgba(120,20,40,0.45)'); rg.addColorStop(1, 'rgba(120,20,40,0)');
+      ctx.fillStyle = rg; ctx.fillRect(fx - r * kC, fy, r * 2 * kC, 26 * kC);
     }
   }
 

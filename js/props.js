@@ -1090,8 +1090,39 @@ const PORTRAITS = (() => {
     if (v === 0) for (let y = 0; y < 44; y++) R('#06040a', 18 + y * 0.55, 74 + y * 0.6, 1, 1); // Riss in der Leinwand
     return c;
   };
+  // Ölgemälde: die Pixelmalerei wird weich ineinander vermalt, Pinselstriche folgen einem Strichfeld, warmer Firnis mit
+  // dunklem Rand, feines Craquelé, Glanzlicht auf dem Lack; der Goldrahmen bekommt eine plastische Kante (Licht oben links)
+  const oil = (c) => {
+    const x = c.getContext('2d'), M = 9, w = FW - M * 2, h = FH - M * 2;
+    const soft = Sprites.canvas(w, h), sx = soft.getContext('2d'), half = Sprites.canvas(Math.ceil(w / 2), Math.ceil(h / 2)), hx = half.getContext('2d');
+    hx.imageSmoothingEnabled = true; hx.drawImage(c, M, M, w, h, 0, 0, half.width, half.height);
+    sx.imageSmoothingEnabled = true; sx.drawImage(half, 0, 0, half.width, half.height, 0, 0, w, h);
+    x.save(); x.globalAlpha = 0.55; x.drawImage(soft, M, M); x.restore(); // vermalte Farbe, Details bleiben durchscheinend
+    let sd = 7; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+    x.save(); x.beginPath(); x.rect(M, M, w, h); x.clip(); x.lineCap = 'round';
+    for (let i = 0; i < 260; i++) { // Pinselstriche
+      const px0 = M + rnd() * w, py0 = M + rnd() * h, a = Math.sin(px0 * 0.08) * 1.2 + Math.cos(py0 * 0.06) * 0.8, len = 2 + rnd() * 4, light = rnd() < 0.5;
+      x.strokeStyle = light ? 'rgba(255,240,210,0.07)' : 'rgba(20,8,4,0.09)'; x.lineWidth = 1;
+      x.beginPath(); x.moveTo(px0, py0); x.lineTo(px0 + Math.cos(a) * len, py0 + Math.sin(a) * len); x.stroke();
+    }
+    x.globalCompositeOperation = 'multiply'; x.fillStyle = 'rgba(255,214,150,0.22)'; x.fillRect(M, M, w, h); // gealterter Firnis
+    x.globalCompositeOperation = 'source-over';
+    const vg = x.createRadialGradient(FW / 2, FH * 0.42, w * 0.3, FW / 2, FH * 0.42, w * 0.95); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(10,4,2,0.55)');
+    x.fillStyle = vg; x.fillRect(M, M, w, h);
+    x.strokeStyle = 'rgba(16,8,4,0.18)'; // Craquelé
+    for (let i = 0; i < 40; i++) { let px0 = M + rnd() * w, py0 = M + rnd() * h; x.beginPath(); x.moveTo(px0, py0); for (let k = 0; k < 4; k++) { px0 += (rnd() - 0.5) * 9; py0 += (rnd() - 0.5) * 9; x.lineTo(px0, py0); } x.stroke(); }
+    const sh = x.createLinearGradient(M, M, M + w * 0.6, M + h * 0.45); sh.addColorStop(0, 'rgba(255,250,235,0.16)'); sh.addColorStop(0.5, 'rgba(255,250,235,0.04)'); sh.addColorStop(1, 'rgba(255,250,235,0)');
+    x.fillStyle = sh; x.fillRect(M, M, w, h); // Lackglanz
+    x.restore();
+    x.save(); // plastischer Rahmen: Lichtkante oben/links, Schatten unten/rechts, Innenschatten auf der Leinwand
+    x.fillStyle = 'rgba(255,248,210,0.35)'; x.fillRect(0, 0, FW, 2); x.fillRect(0, 0, 2, FH);
+    x.fillStyle = 'rgba(30,14,0,0.45)'; x.fillRect(0, FH - 2, FW, 2); x.fillRect(FW - 2, 0, 2, FH);
+    x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(M, M, w, 2); x.fillRect(M, M, 2, h);
+    x.restore();
+    return c;
+  };
   // Augen: linke obere Ecke der Augäpfel (6×4), Mund: Mitte und Höhe
-  return { FW, FH, art: [mk(0), mk(1), mk(2)], eyes: [[cx - 11, fy - 2], [cx + 5, fy - 2]], mouth: [cx, fy + 14] };
+  return { FW, FH, art: [mk(0), mk(1), mk(2)].map(oil), eyes: [[cx - 11, fy - 2], [cx + 5, fy - 2]], mouth: [cx, fy + 14] };
 })();
 class Portrait extends Ent {
   // d: wx, wy = Lage in der Wandebene (Parallaxe 0.5, wiederholt sich alle 512 px wie Fenster und Vorhänge), v = erstes Motiv;
