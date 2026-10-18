@@ -174,20 +174,69 @@ const PS2 = (() => {
     if (!buf || buf.c.width !== w || buf.c.height !== h) { buf = { c: Sprites.canvas(w, h), key: null }; buf.x = buf.c.getContext('2d'); }
     return buf;
   }
-  // Himmel im ewigen Sonnenuntergang, Sonne mit Lichthof und Strahlenkranz (hinter der Stadt)
+  // Zeitraffer: Tag und Nacht wechseln ständig (ein Tag = DAY Bilder). Je Tageszeit: Zenit, Mitte, Horizont, Dunst,
+  // Sonnenlicht, Umgebungslicht, Wolkenfarbe. Die Sonne zieht über den Himmel, nachts scheint der Mond mit Sternen.
+  const DAY = 1500;
+  const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const PH = [
+    [0.00, '#060818', '#141838', '#2c2850', [34, 32, 70], [0.42, 0.48, 0.8], [0.2, 0.2, 0.32], '#3c4068'],   // Mitternacht
+    [0.17, '#141838', '#4c3c70', '#b0687c', [120, 80, 110], [0.7, 0.45, 0.5], [0.26, 0.22, 0.3], '#8c6880'], // Morgengrauen
+    [0.25, '#3c5ca8', '#c08aa0', '#fcb478', [236, 170, 140], [1.1, 0.72, 0.5], [0.4, 0.32, 0.34], '#fcc8b0'], // Morgenrot
+    [0.40, '#3c78d8', '#8cbcf0', '#e8eef4', [196, 214, 236], [1.12, 1.08, 1.0], [0.56, 0.56, 0.62], '#fcfcfc'], // Mittag
+    [0.58, '#5c80c0', '#c8b4b0', '#fcd28c', [252, 196, 132], [1.12, 0.84, 0.52], [0.5, 0.42, 0.4], '#fce8d0'], // goldener Nachmittag
+    [0.72, '#3c2c68', '#c85c5c', '#fc8c3c', [236, 120, 80], [1.08, 0.5, 0.3], [0.36, 0.24, 0.28], '#fca070'], // Sonnenuntergang
+    [0.83, '#0c0c2c', '#2c1c4c', '#6c2c4c', [70, 40, 80], [0.5, 0.42, 0.7], [0.22, 0.18, 0.3], '#5c4060'],   // Dämmerung
+    [1.00, '#060818', '#141838', '#2c2850', [34, 32, 70], [0.42, 0.48, 0.8], [0.2, 0.2, 0.32], '#3c4068'],
+  ];
+  let TOD = null;
+  function dayNight(frame) {
+    const t = (frame % DAY) / DAY;
+    let i = 0; while (i < PH.length - 2 && PH[i + 1][0] <= t) i++;
+    const a = PH[i], b = PH[i + 1], k = (t - a[0]) / (b[0] - a[0]), mix = (u, v) => u.map((c, j) => c + (v[j] - c) * k);
+    const col = (j) => mix(hex(a[j]), hex(b[j])).map(Math.round);
+    const sunAng = (t - 0.22) / 0.56 * Math.PI, sunUp = t > 0.22 && t < 0.78, el = sunUp ? Math.sin(sunAng) : -0.2;
+    const dir = sunUp ? [-0.9 + (t - 0.22) / 0.56 * 1.8, 0.12 + Math.max(0, el) * 0.9, 0.75] : [0.6 - ((t + 0.22) % 1) * 1.2, 0.5, 0.7]; // Mond nachts
+    const l = Math.hypot(...dir);
+    return TOD = { t, zen: col(1), mid: col(2), hor: col(3), fog: mix(a[4], b[4]), sunC: mix(a[5], b[5]), amb: mix(a[6], b[6]), cloud: col(7), dir: dir.map(c => c / l), sunUp,
+      night: Math.max(0, Math.min(1, t < 0.25 ? 1 - Math.max(0, (t - 0.12) / 0.13) : t > 0.75 ? (t - 0.75) / 0.1 : 0)) };
+  }
+  const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+  // Himmel mit Sonne bzw. Mond und Sternen, im Zeitraffer jagende Wolken (oben Bänke, unten ein Wolkenmeer)
   function sky(x, W, H, cam, t) {
+    const D = TOD || dayNight(t);
     const g = x.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#5c80c0'); g.addColorStop(0.32, '#c8b4b0'); g.addColorStop(0.55, '#fcd28c'); g.addColorStop(0.75, '#fcac60'); g.addColorStop(1, '#f89c58');
+    g.addColorStop(0, rgb(D.zen)); g.addColorStop(0.45, rgb(D.mid)); g.addColorStop(0.62, rgb(D.hor)); g.addColorStop(1, rgb(D.hor));
     x.fillStyle = g; x.fillRect(0, 0, W, H);
+    if (D.night > 0.05) { // Sterne drehen sich langsam
+      x.fillStyle = `rgba(255,255,255,${(D.night * 0.9).toFixed(2)})`;
+      for (let i = 0; i < 70; i++) { const sx = ((i * 97.3 + t * 0.05 - cam.yaw * 60) % W + W) % W, sy = (i * 53.7) % (H * 0.55); x.fillRect(sx, sy, i % 7 ? 1 : 2, 1); }
+    }
     const [sx, sy, sz] = project(cam, W, H, cam.x + ENV.sun[0] * 9000, cam.y + ENV.sun[1] * 9000, cam.z + ENV.sun[2] * 9000);
     if (sz > 0) {
-      const R = W * 0.6, rg = x.createRadialGradient(sx, sy, 0, sx, sy, R);
-      rg.addColorStop(0, 'rgba(255,250,220,0.95)'); rg.addColorStop(0.05, 'rgba(255,236,170,0.8)'); rg.addColorStop(0.25, 'rgba(255,200,120,0.32)'); rg.addColorStop(1, 'rgba(255,190,110,0)');
+      const R = W * (D.sunUp ? 0.6 : 0.3), rg = x.createRadialGradient(sx, sy, 0, sx, sy, R);
+      if (D.sunUp) { rg.addColorStop(0, 'rgba(255,250,220,0.95)'); rg.addColorStop(0.05, 'rgba(255,236,170,0.8)'); rg.addColorStop(0.25, rgb(D.hor, 0.35)); rg.addColorStop(1, rgb(D.hor, 0)); }
+      else { rg.addColorStop(0, 'rgba(240,244,255,1)'); rg.addColorStop(0.06, 'rgba(220,228,255,0.9)'); rg.addColorStop(0.1, 'rgba(160,170,230,0.25)'); rg.addColorStop(1, 'rgba(120,130,200,0)'); }
       x.fillStyle = rg; x.fillRect(0, 0, W, H);
     }
-    x.fillStyle = 'rgba(255,240,220,0.22)'; // zarte Wolkenbänder
-    for (let i = 0; i < 5; i++) { const y = H * (0.18 + i * 0.07), o = ((t * 0.04 * (i + 1) - cam.yaw * 120 * (i + 1)) % (W * 2) + W * 2) % (W * 2) - W * 0.5; x.fillRect(o, y, W * 0.7, 1 + (i & 1)); x.fillRect(o - W * 1.1, y + 3, W * 0.5, 1); }
+    const cl = D.cloud; // Wolkenbänke oben: weiche Ellipsen, rasen im Zeitraffer vorbei
+    for (let i = 0; i < 9; i++) {
+      const sp = 0.9 + (i % 3) * 0.5, y = H * (0.08 + (i * 37 % 40) / 100), rw = W * (0.18 + (i % 4) * 0.06), rh = H * (0.03 + (i % 3) * 0.012);
+      const cx = ((i * 131 + t * sp - cam.yaw * 90 * (1 + i % 3)) % (W + rw * 2) + W + rw * 2) % (W + rw * 2) - rw;
+      const gg = x.createRadialGradient(cx, y, 0, cx, y, rw); gg.addColorStop(0, rgb(cl, 0.55)); gg.addColorStop(0.6, rgb(cl, 0.25)); gg.addColorStop(1, rgb(cl, 0));
+      x.save(); x.translate(cx, y); x.scale(1, rh / rw); x.translate(-cx, -y); x.fillStyle = gg; x.fillRect(cx - rw, y - rw, rw * 2, rw * 2); x.restore();
+    }
     return [sx, sy, sz];
+  }
+  function cloudSea(x, W, H, t) { // Wolkenmeer unter der Stadt, strömt im Zeitraffer auf den Betrachter zu
+    const D = TOD, cl = D.cloud, y0 = H * 0.7;
+    for (let r = 0; r < 7; r++) {
+      const k = ((r + (t * 0.012) % 1) / 7), y = y0 + k * k * H * 0.34, sc = 0.4 + k * 1.6, a = 0.18 + k * 0.4;
+      for (let i = 0; i < 6; i++) {
+        const rw = W * 0.12 * sc, cx = ((i * 97 + r * 53 + t * 0.4 * sc) % (W + rw * 2)) - rw;
+        const gg = x.createRadialGradient(cx, y, 0, cx, y, rw); gg.addColorStop(0, rgb(cl, a)); gg.addColorStop(1, rgb(cl, 0));
+        x.save(); x.translate(cx, y); x.scale(1, 0.32); x.translate(-cx, -y); x.fillStyle = gg; x.fillRect(cx - rw, y - rw, rw * 2, rw * 2); x.restore();
+      }
+    }
   }
   function rays(x, W, H, sun, t) { // Lichtstrahlen und Glanz über der Stadt (additiv)
     const [sx, sy, sz] = sun;
@@ -207,13 +256,16 @@ const PS2 = (() => {
     const room = W_room(), maxY = Math.max(1, room.h * T - 208), climb = 1 - cam.y / maxY;
     const theta = opts.theta ?? (0.55 + cam.x * 0.0011), R = opts.R ?? 780, hgt = opts.hgt ?? (140 + climb * (opts.rise ?? 140));
     const c3 = { x: Math.sin(theta) * R + (opts.cx || 0), y: hgt, z: -Math.cos(theta) * R + (opts.cz || 0), yaw: -theta, pitch: opts.pitch ?? 0.1, f: W * 0.92, near: 6, hy: 0.56 };
-    const key = (theta * 600 | 0) + '|' + (hgt | 0) + '|' + (frame >> 3) + '|' + W;
+    const key = (theta * 600 | 0) + '|' + (hgt | 0) + '|' + (frame >> 2) + '|' + W;
     if (B.key !== key) {
       B.key = key;
+      const D = dayNight(frame); // Licht der Tageszeit auf die Stadt
+      ENV.sun = D.dir; ENV.sunC = D.sunC; ENV.amb = D.amb; ENV.fog = D.fog; ENV.sky = [0.12 + D.amb[0] * 0.2, 0.12 + D.amb[1] * 0.2, 0.18 + D.amb[2] * 0.2];
       const x = B.x, sun = sky(x, W, H, c3, frame);
       render(x, W, H, city, c3, ENV);
-      rays(x, W, H, sun, frame);
-      const g = x.createLinearGradient(0, H * 0.62, 0, H); g.addColorStop(0, 'rgba(252,196,132,0)'); g.addColorStop(1, 'rgba(252,186,120,0.55)'); // Dunst über dem Abgrund
+      if (D.sunUp) rays(x, W, H, sun, frame);
+      cloudSea(x, W, H, frame);
+      const g = x.createLinearGradient(0, H * 0.62, 0, H); g.addColorStop(0, rgb(D.fog, 0)); g.addColorStop(1, rgb(D.fog, 0.55)); // Dunst über dem Abgrund
       x.fillStyle = g; x.fillRect(0, H * 0.62, W, H * 0.38);
     }
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, W, H, 0, 0, w, 208); ctx.restore();
@@ -518,5 +570,5 @@ const PS2 = (() => {
   }
 
   const prewarm = () => { if (!city) city = buildCity(); };
-  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, Tower, ENV, prewarm };
+  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, Tower, ENV, prewarm, dayNight };
 })();

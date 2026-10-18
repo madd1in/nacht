@@ -48,11 +48,11 @@ const FX = (() => {
   }
 
   // lights: [{x, y, r, c:[r,g,b], a}] in Bildschirmkoordinaten (Spielfeld).
-  function render(ctx, lights, theme, amb) { // amb: Dunkelheit überschreiben (Gewitter: dunkel ↔ Blitz)
+  function render(ctx, lights, theme, amb, tint) { // amb: Dunkelheit überschreiben (Gewitter: dunkel ↔ Blitz), tint: Farbe der Dunkelheit
     if (!vignette || lc.width !== View.w) { lc.width = View.w; vignette = makeVignette(View.w); }
     lx.globalCompositeOperation = 'source-over';
     lx.clearRect(0, 0, View.w, 208);
-    lx.fillStyle = `rgba(${TINT[theme] || '0,0,0'},${amb ?? AMB[theme] ?? 0.3})`;
+    lx.fillStyle = `rgba(${tint || TINT[theme] || '0,0,0'},${amb ?? AMB[theme] ?? 0.3})`;
     lx.fillRect(0, 0, View.w, 208);
     lx.drawImage(vignette, 0, 0);
     lx.globalCompositeOperation = 'destination-out';
