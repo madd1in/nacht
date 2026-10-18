@@ -140,6 +140,30 @@ const Levels = (() => {
     .dock(62, 74, 80, 29).music('sea')
     .start(3, 28).exit(94).noDoor().done();
 
+  // ======================= STAGE 1: Der Wald vor der Burg =======================
+  // Von der Mole geht es durch einen dichten Wald zum Burggraben: Bach mit Trittsteinen, Wurzeltreppen auf eine Anhöhe,
+  // ein umgestürzter Riesenstamm, Astwege über dem Waldboden, Panther lauern auf den Ästen, Ghule steigen aus dem Laub.
+  const wd = room(104, 'forest')
+    .ground(0, 13).ground(18, 30).fill(14, 12, 17, 12, '~')            // Bach: breiter Graben mit Wasser
+    .fill(22, 8, 27, 8, '=')                                             // Ast über dem Weg
+    .stair(28, 10, 3, 1).ground(31, 44, 8)                               // Wurzeltreppe auf die Anhöhe
+    .fill(37, 5, 41, 6, '=')                                             // umgestürzter Riesenstamm auf der Anhöhe
+    .stair(47, 10, 3, -1).ground(45, 60)                                 // wieder hinunter
+    .fill(52, 7, 57, 7, '=')                                             // Ast, auf dem ein Panther lauert
+    .fill(61, 12, 70, 12, '~').fill(64, 10, 64, 12, '#').fill(67, 10, 67, 12, '#') // zweiter Bach mit Trittsteinen
+    .ground(71, 103)
+    .stair(72, 10, 4, 1).fill(76, 7, 85, 7, '=').stair(89, 10, 4, -1)  // Astweg über dem Waldboden
+    .prop('stake', { x: 96, y: 10 }).prop('stake', { x: 100, y: 10 })   // Schädel auf Pfählen: die Burg ist nah
+    .candle(5, 9, 'H').candle(10, 9).candle(20, 9, 'W').candle(25, 6).candle(33, 6).candle(43, 6, 'H')
+    .candle(50, 9).candle(56, 5, '$').candle(59, 9, '1').candle(70, 9).candle(80, 5, 'H').candle(84, 5)
+    .candle(92, 9, 'W').candle(98, 9)
+    .enemy('raven', 24, 7).enemy('bat', 38, 2).enemy('panther', 55, 6).enemy('raven', 82, 6).enemy('ghost', 88, 5)
+    .statue(50, 10)
+    .chest(94, 10)
+    .zone('ghoul', 72, 98, { interval: 140, max: 2 })
+    .music('stage1')
+    .start(2, 10).exit(102).noDoor().done();
+
   // ======================= STAGE 1: Der Burghof =======================
   const r11 = room(72, 'courtyard')
     .ground(0, 7).ground(16, 71).fill(8, 12, 15, 12, '~')              // Burggraben vor dem Torhaus
@@ -482,7 +506,7 @@ const Levels = (() => {
     .start(2, 10).arena('count').done();
 
   const STAGES = [
-    { id: 0, nameKey: 'stage1', bossKey: 'boss1', voice: 'stage1', name: 'DER BURGHOF', music: 'stage1', time: 700, rooms: [r09, r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
+    { id: 0, nameKey: 'stage1', bossKey: 'boss1', voice: 'stage1', name: 'DER BURGHOF', music: 'stage1', time: 700, rooms: [r09, r10, wd, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
     { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
     { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
     { id: 'sun', nameKey: 'stageSun', bossKey: 'bossKnight', voice: 'stageSun', name: 'DIE SONNENKATHEDRALE', music: 'sun', time: 720, rooms: [sa, sp, sk], boss: 'SONNENWÄCHTER' },

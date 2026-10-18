@@ -659,7 +659,51 @@ const PS2 = (() => {
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(wmBuf.c, 0, 0, Wb, Hb, 0, 32, w, 208); ctx.restore();
   }
 
+  // ---------------- Wald zwischen Mole und Burg (PS2) ----------------
+  // Drei Tiefen in echter Perspektive (Spielebene liegt bei z = 200): hinten eine dichte Tannenwand im Mondnebel, in der
+  // Mitte Tannen und Laubbäume (Kronen aus groben Doppelkegeln), vorn mächtige Stämme mit Wurzeltellern und Moospolstern,
+  // deren Kronen über dem Bildrand verschwinden. Kaltes Mondlicht von rechts oben, grünlicher Dunst. Halbe Auflösung,
+  // neu gerendert nur, wenn die Kamera weiterzieht.
+  const WDENV = { static: true, sun: null, sunC: [0.72, 0.94, 1.02], amb: [0.3, 0.36, 0.36], sky: [0.14, 0.2, 0.2], fog: [46, 86, 90], fogD: 0.0021 }; // heller Dunst: die Baumreihen staffeln sich als Silhouetten
+  { const v = [0.55, 0.72, -0.42], l = Math.hypot(...v); WDENV.sun = v.map(c => c / l); }
+  let woods = null; const wdBuf = [null, null, null];
+  function buildWoods() {
+    let s = 4711; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+    const B = [mesh(), mesh(), mesh()], PINE = [30, 66, 56], PINE2 = [42, 82, 64], BARK = [66, 50, 44], BARK2 = [86, 66, 54], LEAF = [46, 80, 40], LEAF2 = [64, 98, 44], MOSS = [56, 104, 56];
+    const pine = (m, x, z, k) => { prism(m, x, 0, z, 2.4 * k, 18 * k, 4, BARK, { cap: false }); for (let t = 0; t < 4; t++) cone(m, x, (10 + t * 12) * k, z, (16 - t * 3.4) * k, (22 - t * 2.5) * k, 6, t % 2 ? PINE2 : PINE, { rot: rnd() * 3 }); };
+    const oak = (m, x, z, k) => { // Laubbaum: Stamm, Krone aus Doppelkegeln
+      prism(m, x, 0, z, 3.4 * k, 36 * k, 6, BARK, { cap: false, rTop: 2.4 * k });
+      for (let i = 0; i < 6; i++) {
+        const a = rnd() * 6.28, r = (4 + rnd() * 11) * k, y = (32 + rnd() * 20) * k, cx = x + Math.cos(a) * r, cz = z + Math.sin(a) * r * 0.6, R = (10 + rnd() * 7) * k;
+        cone(m, cx, y, cz, R, R * 0.85, 6, i % 2 ? LEAF : LEAF2, { rot: rnd() * 3 }); cone(m, cx, y, cz, R, -R * 0.65, 6, LEAF, { rot: rnd() * 3 });
+      }
+    };
+    const giant = (m, x, z, k) => { // Riesenstamm mit Wurzeltellern und Moos, ein Ast ragt ins Bild
+      prism(m, x, -4, z, 13 * k, 280, 8, BARK2, { cap: false, rTop: 9 * k, rot: rnd() });
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + rnd() * 0.5, L = (26 + rnd() * 14) * k; beam(m, x + Math.cos(a) * 8 * k, 12 * k, z + Math.sin(a) * 8 * k, x + Math.cos(a) * L, -2, z + Math.sin(a) * L, 5 * k, 4 * k, i % 2 ? BARK : BARK2); }
+      for (let i = 0; i < 3; i++) box(m, x + (rnd() - 0.5) * 8 * k, (30 + i * 46 + rnd() * 20) * k, z - 11.5 * k, 9 * k, 4 * k, 3 * k, MOSS);
+      const a = (rnd() - 0.5) * 2.4; beam(m, x, 150 * k, z, x + Math.cos(a) * 70 * k, 178 * k, z - 12 * k, 4.5 * k, 4.5 * k, BARK);
+    };
+    for (let i = 0; i < 90; i++) pine(B[0], -900 + rnd() * 4600, 820 + rnd() * 620, 2.1 + rnd() * 1.4);
+    for (let i = 0; i < 44; i++) (rnd() < 0.55 ? pine : oak)(B[1], -700 + rnd() * 4300, 380 + rnd() * 320, 1.4 + rnd() * 0.7);
+    for (let i = 0; i < 18; i++) giant(B[2], -500 + i * 250 + rnd() * 120, 240 + rnd() * 60, 1 + rnd() * 0.4);
+    return B;
+  }
+  function drawWoods(ctx, cam, frame, band) {
+    if (!woods) woods = buildWoods();
+    const w = View.w, lite = View.lite, dv = lite ? 3 : 2, Wb = Math.ceil(w / dv), Hb = Math.ceil(208 / dv);
+    let B = wdBuf[band];
+    if (!B || B.c.width !== Wb) { B = wdBuf[band] = { c: Sprites.canvas(Wb, Hb), key: null }; B.x = B.c.getContext('2d', CPU2D); }
+    const key = Math.round(cam.x / dv) + '|' + Math.round(cam.y / dv) + '|' + Wb;
+    if (B.key !== key) { // Boden der Spielebene (z = 200) liegt auf Bildzeile 176 wie die Kacheln
+      B.key = key; B.x.clearRect(0, 0, Wb, Hb);
+      render(B.x, Wb, Hb, [woods[band]], { x: cam.x + w / 2, y: 93 - cam.y, z: 0, yaw: 0, pitch: 0, f: 200 / dv, near: 20, hy: 0.4 }, WDENV);
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
+  }
+  const prewarmWoods = () => { if (!woods) woods = buildWoods(); };
+
   const prewarm = () => { if (!city) city = buildCity(); };
   const prewarmMap = () => { if (!world) world = buildWorld(); }; // Ladebildschirm: Kartenlandschaft vorab bauen
-  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, Tower, ENV, prewarm, prewarmMap, dayNight };
+  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
 })();

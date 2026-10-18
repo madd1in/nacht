@@ -31,7 +31,7 @@ const W = {
     this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200; this.tubeRot = 0; this.tubeRotS = 0;
     this.sail = def.dock || def.atSea ? 1 : 0; this.roll = 0; this.rollAmp = 0; this.heave = 0; this.docked = 0; this.dockT = 0; this.rogue = null; this.kraken = null; this.gust = 0;
     this.spawners = def.zones.map(z => new Spawner(z));
-    const torch = def.theme === 'courtyard';
+    const torch = def.theme === 'courtyard' || def.theme === 'forest';
     def.ents.forEach(d => {
       switch (d.type) {
         case 'candle': this.spawn(new Candle(d.x, d.y, d.drop, torch)); break;

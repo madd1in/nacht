@@ -626,6 +626,10 @@ const Audio8 = (() => {
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 5200; hp.connect(lp); lp.connect(out);
       ambLfo(nodes, out.gain, 0.13, 0.01);
       if (theme === 'bridge') { const bp = ambNoise(nodes, out, 'bandpass', 380, 5); ambLfo(nodes, bp.frequency, 0.09, 240); level = 0.034; }
+    } else if (theme === 'forest') { // Wind rauscht in den Kronen, schwillt an und ab
+      const bp = ambNoise(nodes, out, 'bandpass', 1600, 0.8); ambLfo(nodes, bp.frequency, 0.05, 500);
+      ambNoise(nodes, out, 'lowpass', 300);
+      ambLfo(nodes, out.gain, 0.08, 0.012); level = 0.026;
     } else if (theme === 'foyer') { // Eingangshalle: Regen an den hohen Fenstern, Wind heult durch zerbrochene Scheiben
       const hp = ambNoise(nodes, out, 'highpass', 900), lp = ac.createBiquadFilter();
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 4200; hp.connect(lp); lp.connect(out);
@@ -684,6 +688,10 @@ const Audio8 = (() => {
     if (theme === 'tower' && ambT % 32 === 0) { // Uhrwerk: Tick-Tack
       tone('triangle', ambT % 64 ? 1250 : 940, 0, 0.035, 0.035, 0, t);
       noise(0.025, 0.03, 'highpass', 4200, 0, t);
+    } else if (theme === 'forest') { // Grillen zirpen, ab und zu ruft ein Käuzchen (zweimal), irgendwo knackt ein Ast
+      if (ambT % 26 < 6 && ambT % 2 === 0) tone('sine', 4300 + (ambT % 52 < 26 ? 0 : 160), 0, 0.03, 0.006, 0, t);
+      if (Math.random() < 0.0018) { tone('sine', 430, 390, 0.32, 0.03, 0, t); tone('sine', 410, 360, 0.5, 0.03, 0, t + 0.45); }
+      if (Math.random() < 0.0012) noise(0.06, 0.04, 'bandpass', 1800, 0, t);
     } else if (theme === 'cave' && Math.random() < 0.006) drip(null, 0.6);
     else if (theme === 'crypt' && Math.random() < 0.0025) { // ferne Ketten
       for (let i = 0; i < 5; i++) noise(0.05, 0.035, 'bandpass', 3000 + Math.random() * 2000, 0, t + i * 0.07 + Math.random() * 0.03);
