@@ -1265,4 +1265,160 @@ class TentacleBoss extends Boss {
   }
 }
 
-const BOSSES = { gbat: GiantBat, giant: GiantSkeleton, medusa: Medusa, count: Count, tentacle: TentacleBoss };
+// ---------------- Der Sonnenwächter: Riesenritter in Goldrüstung auf dem Dach der Sonnenkathedrale ----------------
+// Stürzt aus dem Sonnenlicht in die Arena. Lanzenansturm quer durch die Arena (darüber hinweg per Doppelsprung, auf die
+// Simse oder an die Wand – Wandhängen), Sprung mit Schockwellen am Boden (darüberspringen), Lanze gen Himmel: Sonnen-
+// blitze schlagen an markierten Stellen ein. Nach dem Ansturm prallt er gegen die Mauer und ist kurz benommen.
+class SunWave extends EProj { // Schockwelle aus Sonnenfeuer, läuft am Boden entlang
+  constructor(x, floorY, dir) { super('sunwave', x, floorY, dir * 2.7, 0, 0, 2); this.x = x - 6; this.y = floorY - 14; this.w = 12; this.h = 14; this.unstoppable = true; this.dir = dir; }
+  update() {
+    this.t++;
+    if (Phys.moveX(this, this.vx) || this.t > 230) { this.dead = true; W.sparks(this.cx, this.y + 10, 5); return; }
+    if (this.t % 3 === 0) W.spawn(new Particle(this.cx - this.dir * 4, this.y + 12, rnd(-0.3, 0.3), rnd(-1.4, -0.5), this.t % 2 ? '#fce0a8' : '#f8b800', 18, 1, 0.02));
+    const p = W.player; if (p.alive && Phys.overlap(this, p)) p.hurt(this.dmg, this.cx);
+  }
+  draw(ctx) {
+    const x = Math.round(this.cx - W.cam.x), y = Math.round(this.y + this.h - W.cam.y), k = (this.t >> 2) & 1;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x, y - 6, 1, x, y - 6, 16); g.addColorStop(0, 'rgba(255,240,180,0.85)'); g.addColorStop(1, 'rgba(255,170,60,0)');
+    ctx.fillStyle = g; ctx.fillRect(x - 16, y - 22, 32, 24); ctx.restore();
+    for (let i = 0; i < 4; i++) { // züngelnde Flammenkämme
+      const h = 8 + ((i + k) % 3) * 3, fx = x - this.dir * (i * 3 - 4);
+      ctx.fillStyle = i % 2 ? '#f8b800' : '#fcfcfc'; ctx.fillRect(fx - 1, y - h, 3, h);
+      ctx.fillStyle = '#fc7400'; ctx.fillRect(fx - 1, y - 2, 3, 2);
+    }
+  }
+}
+class SunBolt extends Ent { // Sonnenblitz: erst ein flackernder Markierungsstrahl, dann schlägt die Lichtsäule ein
+  constructor(x, floorY, delay) { super(x - 9, floorY - 240, 18, 240); this.kind = 'eproj'; this.unstoppable = true; this.delay = delay; this.floorY = floorY; this.hitAt = delay + 48; }
+  update() {
+    this.t++;
+    const a = this.t - this.hitAt;
+    if (a === 0) { Audio8.sfx('thunder'); W.shake = Math.max(W.shake, 9); W.flash = Math.max(W.flash, 2); W.spawn(new Shock(this.cx, this.floorY, 34, '#fce0a8', 3)); W.sparks(this.cx, this.floorY - 2, 10); Input.rumble(0.4, 0.4, 160); }
+    if (a >= 0 && a < 14) { const p = W.player; if (p.alive && p.x < this.x + this.w && p.x + p.w > this.x && p.y < this.floorY) p.hurt(3, this.cx); }
+    if (a > 24) this.dead = true;
+  }
+  draw(ctx) {
+    if (this.t < this.delay) return;
+    const x = Math.round(this.cx - W.cam.x), fy = Math.round(this.floorY - W.cam.y), a = this.t - this.hitAt;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    if (a < 0) { // Vorwarnung: dünner Strahl und glühender Fleck am Boden, flackert schneller kurz vor dem Einschlag
+      const on = (this.t >> (a > -16 ? 1 : 2)) & 1;
+      ctx.fillStyle = `rgba(255,230,150,${on ? 0.5 : 0.22})`; ctx.fillRect(x - 1, 0, 2, fy);
+      const g = ctx.createRadialGradient(x, fy, 0, x, fy, 14); g.addColorStop(0, 'rgba(255,240,170,0.9)'); g.addColorStop(1, 'rgba(255,170,60,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - 14, fy - 8, 28, 10);
+    } else { // Einschlag: breite Lichtsäule mit weißem Kern, wird schmaler
+      const w = Math.max(2, 18 - a * 0.9), g = ctx.createLinearGradient(x - w, 0, x + w, 0);
+      g.addColorStop(0, 'rgba(255,170,60,0)'); g.addColorStop(0.3, 'rgba(255,214,120,0.75)'); g.addColorStop(0.5, 'rgba(255,255,240,1)'); g.addColorStop(0.7, 'rgba(255,214,120,0.75)'); g.addColorStop(1, 'rgba(255,170,60,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - w, 0, w * 2, fy);
+      const r = 26 - a, g2 = ctx.createRadialGradient(x, fy, 0, x, fy, Math.max(4, r)); g2.addColorStop(0, 'rgba(255,255,230,0.95)'); g2.addColorStop(1, 'rgba(255,180,80,0)');
+      ctx.fillStyle = g2; ctx.fillRect(x - r, fy - r, r * 2, r);
+    }
+    ctx.restore();
+  }
+}
+class SunWarden extends Boss {
+  constructor(ax, aw) {
+    super(ax + aw - 80, -110, 24, 64, 30, 3);
+    this.ax = ax; this.aw = aw; this.state = 'fall'; this.face = -1; this.score = 6000; this.seq = 0; this.floorY = 0;
+    this.nameKey = 'bossKnight'; this.voice = 'bossKnight';
+  }
+  go(s) { this.state = s; this.timer = 0; }
+  update() {
+    this.tick();
+    if (this.dying) return this.updateDeath(130);
+    const p = W.player, dx = p.cx - this.cx, half = this.hp <= this.maxHp / 2;
+    if (this.state === 'fall') { // stürzt aus dem Licht herab
+      this.vx = 0;
+      if (this.onGround) {
+        this.floorY = this.y + this.h; this.go('land');
+        W.shake = 26; Audio8.sfx('boom'); Audio8.sfx('wall'); Input.rumble(1, 0.8, 500);
+        W.spawn(new Shock(this.cx, this.floorY, 130, '#fce0a8', 5)); W.debris(this.cx, this.floorY - 2, '#e8c070', 12);
+      }
+    } else if (this.state === 'land' || this.state === 'stun') {
+      this.vx = 0;
+      if (this.state === 'stun' && this.timer % 20 === 0) W.spawn(new Particle(this.cx + rnd(-6, 6), this.y + 4, 0, -0.4, '#fce0a8', 30, 1, 0)); // Sternchen
+      if (this.timer > (this.state === 'land' ? 56 : half ? 46 : 70)) this.go('walk');
+    } else if (this.state === 'walk') {
+      this.face = Math.sign(dx) || this.face;
+      const ad = Math.abs(dx);
+      this.vx = (ad < 70 ? -this.face * 0.7 : ad > 130 ? this.face * 0.8 : 0) * (half ? 1.35 : 1);
+      if (this.timer > (half ? 46 : 76)) this.go(['charge', 'leap', 'bolts'][this.seq++ % 3]);
+    } else if (this.state === 'charge') { // Ausholen (blitzt), dann Ansturm mit gesenkter Lanze bis an die Mauer
+      if (this.timer < 36) { this.vx = 0; this.face = Math.sign(dx) || this.face; if (this.timer === 1) { Audio8.sfx('roar'); W.spawn(new Shock(this.cx, this.cy, 40, '#fce0a8', 3)); } }
+      else { this.vx = this.face * (half ? 4.6 : 3.8); if (this.timer % 3 === 0) W.dust(this.cx - this.face * 10, this.y + this.h, 2); if (this.timer % 10 === 0) Audio8.sfx('whoosh'); }
+    } else if (this.state === 'leap') {
+      if (this.timer === 1) { this.vy = -6.4; this.vx = clamp(dx / 52, -2.6, 2.6); this.onGround = false; Audio8.sfx('djump'); }
+      else if (this.onGround && this.timer > 6) { // Aufprall: Schockwellen nach beiden Seiten
+        this.vx = 0; W.shake = 16; Audio8.sfx('boom'); Input.rumble(0.7, 0.5, 300);
+        this.floorY = this.y + this.h;
+        for (const d of [-1, 1]) W.spawn(new SunWave(this.cx + d * 14, this.floorY, d));
+        if (half) setTimeout(() => { if (!this.dead && !this.dying) for (const d of [-1, 1]) W.spawn(new SunWave(this.cx + d * 14, this.floorY, d)); }, 500);
+        W.spawn(new Shock(this.cx, this.floorY, 70, '#fce0a8', 4));
+        this.go('walk');
+      }
+    } else if (this.state === 'bolts') { // Lanze gen Himmel: Sonnenblitze dort, wo der Held steht – und links und rechts davon
+      this.vx = 0;
+      if (this.timer === 14) {
+        Audio8.sfx('holy'); W.flash = 4;
+        const n = half ? 5 : 3, gap = half ? 44 : 56;
+        for (let i = 0; i < n; i++) {
+          const x = clamp(p.cx + (i - (n - 1) / 2) * gap, this.ax + 12, this.ax + this.aw - 12);
+          W.spawn(new SunBolt(x, this.floorY, Math.abs(i - (n - 1) / 2) * 10));
+        }
+      }
+      if (this.timer > 110) this.go('walk');
+    }
+    const wall = this.physics();
+    const atEdge = this.x <= this.ax + 4 || this.x + this.w >= this.ax + this.aw - 4;
+    if (this.state === 'charge' && this.timer >= 36 && (wall || atEdge)) { // Aufprall an der Mauer: Steine regnen, Ritter benommen
+      W.shake = 20; Audio8.sfx('wall'); Audio8.sfx('boom'); Input.rumble(0.9, 0.6, 400);
+      W.debris(this.cx + this.face * 14, this.cy, '#e8c070', 10);
+      for (let i = 0; i < (half ? 3 : 2); i++) W.spawn(new EProj('rock', this.ax + rnd(20, this.aw - 20), W.cam.y - 8 - i * 34, 0, 0.5, 0.12));
+      this.go('stun');
+    }
+    if (this.x < this.ax + 4) this.x = this.ax + 4;
+    if (this.x + this.w > this.ax + this.aw - 4) this.x = this.ax + this.aw - 4 - this.w;
+    this.touch();
+  }
+  // Lanzenspitze (Weltkoordinaten) – für Zeichnen und Treffer
+  lance() {
+    const st = this.state, f = this.face, top = this.y + this.h - 72;
+    if (st === 'bolts' && this.timer >= 8) return [this.cx + f * 8, top + 30, this.cx + f * 10, top - 30];
+    if ((st === 'charge' && this.timer >= 36) || (st === 'leap' && !this.onGround)) return [this.cx - f * 10, top + 26, this.cx + f * 52, top + 28];
+    if (st === 'charge' || st === 'stun' || st === 'land') return [this.cx - f * 4, top + 44, this.cx + f * 36, top + 30];
+    return [this.cx + f * 6, top + 52, this.cx + f * 22, top - 6]; // aufrecht gehalten
+  }
+  draw(ctx) {
+    if (this.dying && (this.dying & 2)) return;
+    const G = Sprites.S.gknight, st = this.state, cx = W.cam.x, cy = W.cam.y;
+    const charging = (st === 'charge' && this.timer >= 36) || (st === 'leap' && !this.onGround);
+    const s = charging ? G.thrust : st === 'bolts' && this.timer >= 8 ? G.raise : st === 'charge' || st === 'stun' || st === 'land' ? G.crouch : G.walk[this.vx ? Math.floor(this.t / 10) % 2 : 0];
+    // Sonnenaura: goldener Schein hinter dem Ritter (stärker beim Ausholen und beim Blitzruf)
+    const aura = st === 'bolts' || (st === 'charge' && this.timer < 36) ? 1 : 0.45, ax = this.cx - cx, ay = this.cy - cy;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(ax, ay, 4, ax, ay, 58); g.addColorStop(0, `rgba(255,220,140,${0.38 * aura})`); g.addColorStop(1, 'rgba(255,160,60,0)');
+    ctx.fillStyle = g; ctx.fillRect(ax - 58, ay - 58, 116, 116); ctx.restore();
+    const [x0, y0, x1, y1] = this.lance(), lx0 = x0 - cx, ly0 = y0 - cy, lx1 = x1 - cx, ly1 = y1 - cy;
+    const drawLance = () => {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#5c3800'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(lx0, ly0); ctx.lineTo(lx1, ly1); ctx.stroke();
+      ctx.strokeStyle = '#f0c040'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(lx0, ly0); ctx.lineTo(lx1, ly1); ctx.stroke();
+      ctx.strokeStyle = '#fcf0a0'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(lx0, ly0 - 0.8); ctx.lineTo(lx1, ly1 - 0.8); ctx.stroke();
+      const a = Math.atan2(ly1 - ly0, lx1 - lx0), L = 11; // Spitze
+      ctx.fillStyle = '#e8e8fc'; ctx.beginPath(); ctx.moveTo(lx1 + Math.cos(a) * L, ly1 + Math.sin(a) * L);
+      ctx.lineTo(lx1 + Math.cos(a + 1.9) * 3.5, ly1 + Math.sin(a + 1.9) * 3.5); ctx.lineTo(lx1 + Math.cos(a - 1.9) * 3.5, ly1 + Math.sin(a - 1.9) * 3.5); ctx.fill();
+      ctx.fillStyle = '#8c8cb0'; ctx.beginPath(); ctx.moveTo(lx1 + Math.cos(a) * L, ly1 + Math.sin(a) * L); ctx.lineTo(lx1 + Math.cos(a - 1.9) * 3.5, ly1 + Math.sin(a - 1.9) * 3.5); ctx.lineTo(lx1, ly1); ctx.fill();
+      if ((this.t >> 2) % 6 === 0 || st === 'bolts') { ctx.fillStyle = '#fcfcfc'; ctx.fillRect(Math.round(lx1 + Math.cos(a) * L) - 1, Math.round(ly1 + Math.sin(a) * L) - 1, 2, 2); } // Glanz auf der Spitze
+    };
+    if (!charging) drawLance(); // aufrecht: hinter dem Körper
+    const wind = st === 'charge' && this.timer < 36 && (this.timer & 4);
+    this.spr(ctx, s, this.face < 0, 0, 0, this.flash || wind);
+    if (charging) { // Ansturm: Lanze vor dem Körper, Fahrtwind-Schlieren
+      drawLance();
+      if (st === 'charge') { ctx.fillStyle = 'rgba(255,240,200,0.5)'; for (let i = 0; i < 4; i++) ctx.fillRect(Math.round(this.cx - cx - this.face * (20 + i * 9)), Math.round(this.y - cy + 14 + i * 11), -this.face * 14, 1); }
+    }
+  }
+}
+
+const BOSSES = { gbat: GiantBat, giant: GiantSkeleton, medusa: Medusa, count: Count, tentacle: TentacleBoss, warden: SunWarden };

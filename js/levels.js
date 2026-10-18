@@ -62,6 +62,7 @@ const Levels = (() => {
       music(name) { r.music = name; return api; },
       atSea() { r.atSea = true; return api; }, // Schiff in voller Fahrt (Rollen, ziehendes Meer) ohne Anlegen
       noDoor() { r.noDoor = true; return api; },
+      wrap() { r.wrap = true; return api; }, // Turmmantel: rechter und linker Rand sind verbunden
       done() {
         if (r.door) { // Tür auf dem ersten Boden unterhalb der Ausgangszone
           for (let y = r.exit.y0; y < h; y++) if ('#='.includes(r.grid[y][r.door.x])) { r.door.base = y; break; }
@@ -340,7 +341,82 @@ const Levels = (() => {
     .zone('skull', 2, 30, { interval: 420, max: 1 })
     .start(2, 39).exitAt(27, 0, 30, 5).done();
 
-  // ======================= STAGE 4: Der Thron der Nacht =======================
+  // ======================= STAGE 4: Die Sonnenkathedrale =======================
+  // Hoch über einer Stadt aus Licht: Strebebögen über dem Abgrund, dahinter dreht sich die PS2-3D-Kathedrale weg.
+  // Ankerringe über Schluchten, Wandsprung-Schacht zwischen Strebepfeiler und Turm, Dash-Sprung über den Abgrund,
+  // unter einer eingestürzten Mauer hindurchrutschen, Kanten packen – dann der Aufstieg rund um den Sonnenturm.
+  const sa = room(128, 'cathedral', 18)
+    .ground(0, 13, 16)                                                       // Vorplatz
+    .ring(18, 11)                                                            // Schlucht mit Ankerring
+    .ground(23, 35, 16)
+    .fill(31, 3, 32, 12, '#')                                                // Strebepfeiler: darunter durch in den Schacht
+    .fill(36, 5, 40, 17, '#')                                                // Turm: Wandsprung zwischen Pfeiler und Turm
+    .fill(41, 5, 54, 5, '=')                                                 // Strebebogen über dem Abgrund
+    .fill(62, 5, 70, 17, '#')                                                // nach der Dash-Lücke: Turmdach
+    .fill(71, 15, 100, 17, '#')                                              // Kathedralenterrasse
+    .fill(80, 0, 86, 13, '#')                                                // eingestürzte Mauer: nur rutschend darunter durch
+    .prop('crawl', { x0: 80, x1: 86, row: 14, style: 'stone' })
+    .fill(96, 12, 100, 14, '#')                                              // Absatz: Kante packen
+    .ring(104, 8).crumble(107, 11).ring(110, 8)                              // zwei Ringe über der zweiten Schlucht, dazwischen ein bröckelnder Stein
+    .fill(115, 12, 127, 17, '#')
+    .prop('hint', { x: 9, y: 12, w: 4, h: 4, key: 'hintRing' })
+    .prop('hint', { x: 33, y: 9, w: 3, h: 7, key: 'hintWall' })
+    .prop('hint', { x: 49, y: 2, w: 4, h: 3, key: 'hintDash' })
+    .prop('hint', { x: 75, y: 12, w: 4, h: 3, key: 'hintSlide' })
+    .prop('hint', { x: 92, y: 12, w: 3, h: 3, key: 'hintLedge' })
+    .statue(26, 15).statue(66, 4).statue(120, 11)
+    .candle(4, 13).candle(9, 13, 'H').candle(18, 7, '$').candle(28, 13).candle(30, 13, 'W').candle(38, 2, 'H')
+    .candle(45, 2).candle(52, 2, 'H').candle(65, 2, '2').candle(74, 12).candle(78, 12, 'H').candle(90, 12, '$').candle(94, 12)
+    .candle(98, 9, 'H').candle(108, 5, 'W').candle(121, 9).candle(125, 9, 'H')
+    .enemy('knight', 30, 15).enemy('raven', 47, 4).enemy('raven', 68, 4).enemy('skel', 90, 14).enemy('knight', 95, 14)
+    .enemy('ghost', 112, 4)
+    .zone('skull', 41, 70, { interval: 640, max: 1 })
+    .music('sun')
+    .start(2, 15).exit(124).done();
+
+  // Sonnenturm: der Raum ist der abgewickelte Turmmantel (wrap) – rechts hinaus ist links wieder herein. Der Aufstieg
+  // windet sich um den Turm: Stufen, Kante packen, Wandsprung zwischen Strebepfeilern, Dash über die Lücke (über die Naht),
+  // unter einem Gesims hindurchrutschen, Ankerringe, zweiter Schacht – oben das Portal zum Dach.
+  const sp = room(56, 'spire', 64)
+    .ground(0, 55, 62)
+    .fill(6, 60, 10, 60, '=').fill(13, 58, 17, 58, '=').fill(20, 55, 24, 55, '=')
+    .fill(27, 53, 37, 53, '=')                                               // Sims bis in den Schacht
+    .fill(34, 40, 34, 50, '#').fill(38, 38, 38, 53, '#')                     // Strebepfeiler: Wandsprung-Schacht (x 35–37)
+    .fill(38, 37, 43, 37, '=')                                               // oben: Sims (Kante packen)
+    .fill(51, 37, 55, 37, '=').fill(0, 35, 4, 35, '=')                       // Dash-Lücke, dann über die Naht
+    .fill(7, 33, 16, 33, '=')
+    .fill(10, 25, 13, 31, '#').prop('crawl', { x0: 10, x1: 13, row: 32, style: 'stone' }) // Gesims: rutschen
+    .ring(21, 28)
+    .fill(25, 31, 29, 31, '=')
+    .fill(32, 28, 35, 28, '=').fill(38, 25, 41, 25, '=')
+    .fill(42, 24, 47, 24, '=')                                               // zweiter Schacht
+    .fill(44, 10, 44, 21, '#').fill(48, 8, 48, 24, '#')
+    .fill(48, 7, 53, 7, '=')
+    .ring(1, 3)                                                              // über die Naht schwingen
+    .fill(5, 6, 13, 6, '=')
+    .prop('hint', { x: 35, y: 46, w: 3, h: 6, key: 'hintWall' })
+    .prop('hint', { x: 39, y: 34, w: 4, h: 3, key: 'hintDash' })
+    .prop('hint', { x: 6, y: 30, w: 3, h: 3, key: 'hintSlide' })
+    .prop('hint', { x: 15, y: 30, w: 2, h: 3, key: 'hintRing' })
+    .statue(40, 36).statue(50, 6)
+    .candle(8, 58).candle(15, 56, 'H').candle(22, 53).candle(29, 51, '$').candle(36, 44, 'H').candle(42, 35)
+    .candle(53, 35, 'W').candle(2, 33, 'H').candle(15, 31).candle(21, 24, '$').candle(28, 29, 'H').candle(34, 26)
+    .candle(40, 23, 'H').candle(46, 16).candle(52, 5, 'H').candle(6, 4, 'U').candle(8, 4)
+    .enemy('bat', 18, 50).enemy('raven', 30, 52).enemy('skel', 41, 36).enemy('ghost', 2, 30).enemy('knight', 27, 30)
+    .enemy('bat', 36, 22).enemy('raven', 52, 6).enemy('bat', 8, 3)
+    .wrap().music('sun')
+    .start(2, 61).exitAt(9, 0, 12, 5).done();
+
+  // Dach der Sonnenkathedrale: Arena des Sonnenwächters (Simse zum Ausweichen, Mauer rechts für Wandsprünge)
+  const sk = room(46, 'cathedral', 13)
+    .ground(0, 45, 11)
+    .fill(45, 0, 45, 10, '#')
+    .fill(28, 7, 30, 7, '=').fill(38, 7, 40, 7, '=')
+    .statue(8, 10)
+    .candle(4, 8, 'H').candle(12, 8).candle(16, 8, 'W').candle(20, 8, 'H')
+    .start(2, 10).arena('warden').done();
+
+  // ======================= STAGE 5: Der Thron der Nacht =======================
   // Seelenstrudel: schwebende Steine über dem Nichts, Ankerringe, rotierender Mode-7-Tunnel
   const vx = room(64, 'vortex')
     .ground(0, 7).ground(57, 63)
@@ -406,10 +482,11 @@ const Levels = (() => {
     .start(2, 10).arena('count').done();
 
   const STAGES = [
-    { name: 'DER BURGHOF', music: 'stage1', time: 700, rooms: [r09, r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
-    { name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
-    { name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
-    { name: 'DER THRON DER NACHT', music: 'chapel', time: 660, rooms: [vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
+    { id: 0, nameKey: 'stage1', bossKey: 'boss1', voice: 'stage1', name: 'DER BURGHOF', music: 'stage1', time: 700, rooms: [r09, r10, r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
+    { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
+    { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
+    { id: 'sun', nameKey: 'stageSun', bossKey: 'bossKnight', voice: 'stageSun', name: 'DIE SONNENKATHEDRALE', music: 'sun', time: 720, rooms: [sa, sp, sk], boss: 'SONNENWÄCHTER' },
+    { id: 3, nameKey: 'stage4', bossKey: 'boss4', voice: 'stage4', name: 'DER THRON DER NACHT', music: 'chapel', time: 660, rooms: [vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
   return { STAGES };

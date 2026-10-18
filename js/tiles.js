@@ -25,6 +25,8 @@ const Tiles = (() => {
     bridge: { a: ['#d4cce4', '#9c94b4', '#6c6488', '#40385c', '#120e1c'], b: ['#c8c0d8', '#948cac', '#645c80', '#3c3454', '#100c18'], moss: ['#1c4c34', '#2c7448', '#58a868'] },
     library: { a: ['#e8b070', '#a86c34', '#7c4820', '#4c2810', '#180a04'], b: ['#c8884c', '#8c5428', '#5c3014', '#3c1c08', '#140804'] },
     ship: { a: ['#e8b070', '#b87c44', '#8a5428', '#5a3214', '#1e0c04'], b: ['#dcb47c', '#a8783c', '#7a4c20', '#4a2a0c', '#160802'] },
+    cathedral: { a: ['#fcf4dc', '#ecd4a4', '#c8a468', '#8c6c3c', '#3c2814'], b: ['#fce8b0', '#e8c070', '#b8883c', '#7c5420', '#2c1808'] },
+    spire: { a: ['#fcf0d4', '#e8cc98', '#c09c60', '#846438', '#382412'], b: ['#fce8b0', '#e8c070', '#b8883c', '#7c5420', '#2c1808'] },
   };
 
   // ---------------- Kacheln ----------------
@@ -1764,6 +1766,10 @@ const Tiles = (() => {
       for (let i = 0; i < 5; i++) { const cx = ri(0, 500), len = ri(20, 60); for (let y = 0; y < len; y += 3) px(x, y % 6 ? '#3c3c4c' : '#6c6c7c', cx, y, 2, 2); }
       add('wall', c, 0.5, { vtile: true });
       L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) }); // Säulen in der Tiefe (PS1-Look)
+    } else if (theme === 'cathedral') { // Sonnenkathedrale: PS2-3D-Stadt im ewigen Sonnenuntergang, dreht sich beim Laufen weg
+      L.push({ name: 'city', custom: (cx2, cam, f) => PS2.drawCathedral(cx2, cam, f), par: 0, c: C(1, 1) });
+    } else if (theme === 'spire') { // Sonnenturm: die Stadt kreist um den Turm, an dem der Held emporsteigt
+      L.push({ name: 'city', custom: (cx2, cam, f) => PS2.drawSpireBg(cx2, cam, f), par: 0, c: C(1, 1) });
     } else if (theme === 'gallery') { // Marmorgalerie: alles im Säulengang wird live in Perspektive gezeichnet
       L.push({ name: 'colonnade', custom: drawColonnade, par: 1, c: C(1, 1) });
     } else if (theme === 'bridge') { // Brücke zum Bergfried: Sturmhimmel mit Blutmond, der Bergfried mit erleuchteten Fenstern,
@@ -1822,14 +1828,14 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }) }[theme];
+    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }), cathedral: (o) => marble(p.a, o), spire: (o) => marble(p.a, o) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
       : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true }))
-      : theme === 'glass' || theme === 'gallery' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true }))
+      : theme === 'glass' || theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true }))
       : theme === 'library' ? [0, 1, 2, 3].map(() => parquet({ top: true }))
       : theme === 'foyer' ? [checker({ top: true }), checker({ top: true, crack: true }), checker({ top: true }), checker({ top: true })] : ground;
-    const alt = theme === 'gallery' ? [balcony(), balcony(), balcony()] : theme === 'throne' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+    const alt = theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [balcony(), balcony(), balcony()] : theme === 'throne' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
@@ -2537,6 +2543,7 @@ const Tiles = (() => {
   }
   function drawTiles(ctx, room, cam, frame) {
     const t = build(room.theme), g = room.grid;
+    if (room.wrap) { PS2.Tower.draw(ctx, room, cam, frame, t); return; } // Turmmantel als Zylinder
     const x0 = Math.floor(cam.x / T), x1 = x0 + Math.ceil(View.w / T) + 1;
     const y0 = Math.max(0, Math.floor(cam.y / T)), y1 = Math.min(room.h - 1, y0 + 14);
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);

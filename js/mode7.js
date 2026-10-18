@@ -83,7 +83,7 @@ const Mode7 = (() => {
   // schrumpfen (wie in Mario Kart); am Horizont dreht sich ein Bergpanorama mit, darüber Mond und Sterne.
   const MS = 256;
   let map = null, mapH = null, trees = null, pano = null;
-  const POINTS = [[52, 214], [112, 152], [168, 98], [222, 38]];
+  const POINTS = [[52, 214], [112, 152], [168, 98], [200, 70], [222, 38]];
   function makeMap() {
     map = new Int32Array(MS * MS); mapH = new Float32Array(MS * MS);
     const hh = (x, y, s) => { let n = Math.imul(x * 374761393 + y * 668265263 + s * 1442695041, 1274126177); n ^= n >>> 13; n = Math.imul(n, 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
@@ -121,10 +121,17 @@ const Mode7 = (() => {
       if (kind === 0) { R(D, 4, 30, 32, 14); R(S, 5, 30, 30, 14); for (let i = 4; i < 36; i += 3) R(S, i, 28, 2, 2); tower(2, 22, 8, 22, true); tower(30, 22, 8, 22, true); tower(15, 14, 10, 30, true); R('#140c08', 17, 36, 6, 8); R('#3c2810', 17, 36, 6, 1); } // Burghof mit Tor
       else if (kind === 1) { R(D, 6, 26, 28, 18); R(S, 7, 26, 26, 18); for (let i = 0; i < 16; i++) R(S, 20 - i, 26 - Math.floor(i * 0.7), i * 2, 1); R('#140c08', 16, 34, 8, 10); R('#58f898', 19, 36, 2, 2); for (const gx of [1, 35]) { R(S, gx, 36, 4, 8); R(L, gx + 1, 34, 2, 2); R(L, gx, 37, 4, 1); } } // Gruft mit Grabsteinen
       else if (kind === 2) { tower(13, 6, 14, 38, true); tower(3, 26, 8, 18, false); tower(29, 26, 8, 18, false); R('#fcd040', 19, 14, 2, 3); R('#fcd040', 19, 22, 2, 3); } // Bergfried
+      else if (kind === 4) { // Sonnenkathedrale: goldene Turmhelme, Rosette, Strebebögen
+        const G = '#e8c070', GL = '#fcf0b0', GD = '#8c6420';
+        R(GD, 8, 24, 24, 20); R(G, 9, 24, 22, 20); R(GL, 9, 24, 1, 20);
+        for (const [tx, h] of [[4, 30], [30, 30], [16, 40]]) { R(GD, tx, 44 - h, 7, h); R(G, tx + 1, 44 - h, 5, h); for (let i = 0; i < 8; i++) R(i < 2 ? '#fcfcfc' : G, tx + 3 - Math.floor(i / 3), 44 - h - 8 + i, 1 + 2 * Math.floor(i / 3), 1); }
+        R('#fcf0b0', 18, 28, 4, 4); R('#f8b800', 19, 29, 2, 2); R('#3c2410', 17, 37, 6, 7);
+        for (const bx of [1, 36]) { R(G, bx, 34, 3, 10); for (let i = 0; i < 4; i++) R(GL, bx + (bx < 20 ? 3 + i : -1 - i), 34 - i, 1, 1); }
+      }
       else { R(D, 7, 22, 26, 22); R(S, 8, 22, 24, 22); tower(1, 16, 7, 28, true); tower(32, 16, 7, 28, true); tower(14, 12, 12, 32, true); for (const wy of [18, 26, 34]) { R('#e82828', 19, wy, 2, 3); R('#801010', 19, wy + 2, 2, 1); } R('#e82828', 4, 24, 1, 2); R('#e82828', 35, 24, 1, 2); R('#140c08', 17, 38, 6, 6); } // Schloss des Grafen mit blutroten Fenstern
     });
     const tree = mk(12, 20, (R) => { for (let r = 0; r < 17; r++) { const w = Math.max(1, Math.round(r / 17 * 11) - (r % 4 === 3 ? 2 : 0)); R(r % 4 === 0 ? '#1c4c28' : '#0c2c18', 6 - (w >> 1), r, w, 1); if (w > 2) R('#2c6c38', 6 - (w >> 1), r, 1, 1); } R('#2c1c10', 5, 17, 2, 3); });
-    return { castles: [castle(0), castle(1), castle(2), castle(3)], tree };
+    return { castles: [castle(0), castle(1), castle(2), castle(4), castle(3)], tree };
   })();
   let M = null;
   function drawMap(ctx, w, t, stage) {

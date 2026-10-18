@@ -7,11 +7,13 @@ const SOLID = new Set(['#', '=', 'X', 'Y', '^', 'G', 'B']); // G: unsichtbar fes
 const Phys = {
   tile(cx, cy) {
     const r = W.room;
+    if (r.wrap) cx = ((cx % r.w) + r.w) % r.w; // Turmmantel: rundherum geschlossen
     if (cy < 0 || cy >= r.h || cx < 0 || cx >= r.w) return '.';
     return r.grid[cy][cx];
   },
   solidTile(cx, cy) {
     const r = W.room;
+    if (r.wrap) cx = ((cx % r.w) + r.w) % r.w;
     if (cx < 0 || cx >= r.w) return true;
     if (cy < 0 || cy >= r.h) return false;
     return SOLID.has(r.grid[cy][cx]);
@@ -442,7 +444,7 @@ class Player {
     if (r1 - r0 < 1) return 0;
     for (const d of [1, -1]) {
       const c = d > 0 ? Math.floor((this.x + this.w + 1.5) / T) : Math.floor((this.x - 1.5) / T);
-      if (c < 0 || c >= W.room.w) continue;
+      if (!W.room.wrap && (c < 0 || c >= W.room.w)) continue;
       let ok = true;
       for (let r = r0; r <= r1 && ok; r++) ok = Phys.solidTile(c, r) && Phys.tile(c, r) !== '^';
       if (ok) return d;
@@ -458,7 +460,7 @@ class Player {
   tryLedge(mx) {
     if (!mx || this.ledgeCool > 0 || this.atkT || this.vy < -0.4 || this.h !== 28 || this.dangle || this.state !== 'normal') return false;
     const c = mx > 0 ? Math.floor((this.x + this.w + 1.5) / T) : Math.floor((this.x - 1.5) / T);
-    if (c < 0 || c >= W.room.w) return false;
+    if (!W.room.wrap && (c < 0 || c >= W.room.w)) return false;
     const edgeX = mx > 0 ? c * T : (c + 1) * T;
     if (Math.abs((mx > 0 ? this.x + this.w : this.x) - edgeX) > 2) return false;
     for (let r = Math.floor((this.y - 8) / T); r <= Math.floor((this.y + 10) / T); r++) {
@@ -526,6 +528,7 @@ class Player {
   }
 
   clampRoom() {
+    if (W.room.wrap && !W.camLock) return; // um den Turm herum gibt es keinen Rand
     const lock = W.camLock && W.arenaW;
     const minX = lock ? W.arenaX : 0;
     const maxX = lock ? W.arenaX + W.arenaW : W.room.w * T;

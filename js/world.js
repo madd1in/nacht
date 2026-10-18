@@ -105,6 +105,7 @@ const W = {
   // Räume schmaler als das Bild werden mittig gezeigt (Ränder als Mauer gezeichnet)
   camXFor(p) {
     const rw = this.room.w * T;
+    if (this.room.wrap) return Math.round(p.cx + this.look - View.w / 2); // Turm: Kamera folgt frei, der Mantel dreht sich
     if (rw <= View.w) return -Math.floor((View.w - rw) / 2);
     return Math.round(clamp(p.cx + this.look - View.w / 2, 0, rw - View.w));
   },
@@ -380,6 +381,22 @@ const W = {
     this.spawn(new Item('orb', clamp(b.cx, this.cam.x + 24, this.cam.x + View.w - 24), Math.min(b.cy, 140)));
   },
 
+  // Turmaufstieg: der Raum ist der abgewickelte Turmmantel. Der Held bleibt im Umfang [0, C); jede Figur liegt auf der
+  // Kopie, die ihm am nächsten ist – so stimmen Treffer, Verfolgung und Zeichnen auch über die Naht hinweg
+  wrapAround() {
+    const C = this.room.w * T, p = this.player;
+    const sh = Math.floor(p.x / C) * C;
+    if (sh) {
+      p.x -= sh; this.cam.x -= sh;
+      if (p.trail) for (const t of p.trail) t.x -= sh;
+      if (p.scarf) for (const s of p.scarf) s.x -= sh;
+    }
+    for (const e of this.ents) {
+      if (e.dead || e.noWrap) continue;
+      const k = Math.round((p.cx - (e.x + e.w / 2)) / C);
+      if (k) { e.x += k * C; if (e.x0 !== undefined && typeof e.x0 === 'number' && e.kind !== 'prop') e.x0 += k * C; }
+    }
+  },
   stageClear() { this.cleared = true; Game.startClear(); },
   playerDied() { Game.onPlayerDeath(); },
 
@@ -436,6 +453,7 @@ const W = {
     this.platforms.forEach(p => p.update());
     this.player.update();
     this.player.updateScarf();
+    if (this.room.wrap) this.wrapAround();
     this.updateCam();
     FX.updateAmbient(this.room.theme, this.cam);
     if (this.stopT > 0) this.stopT--;
@@ -492,10 +510,13 @@ const W = {
     for (const e of this.ents) if (e.drawBack && !e.dead && !(e instanceof Portrait)) e.drawBack(ctx); // Kulissen vor den Kacheln (Thron mit Baldachin)
     const flashOn = storm && FX.stormOn(storm), dark = STORMY[theme];
     if (flashOn && dark && theme !== 'glass') this.drawCastShadows(ctx); // Blitz in dunklen Sälen: alles wirft harte Schlagschatten an die Wand
-    this.drawDoor(ctx);
-    Tiles.drawTiles(ctx, this.room, this.cam, this.frame);
+    if (!this.room.wrap) this.drawDoor(ctx);
+    const bend = theme === 'glass'; // Glasturm von innen: Plattformen wölben sich zu den Rändern hin zum Betrachter
+    if (bend) this.drawTilesBent(ctx); else Tiles.drawTiles(ctx, this.room, this.cam, this.frame);
     const order = ['prop', 'candle', 'platform', 'item', 'enemy', 'boss', 'sub', 'eproj', 'fx'];
-    order.forEach(k => { for (const e of this.ents) if (e.kind === k) e.draw(ctx); if (k === 'boss') this.player.draw(ctx, this.cam); });
+    if (this.room.wrap) this.drawOnTower(ctx, order);
+    else if (bend) this.drawBent(ctx, order);
+    else order.forEach(k => { for (const e of this.ents) if (e.kind === k) e.draw(ctx); if (k === 'boss') this.player.draw(ctx, this.cam); });
     for (const e of this.ents) if (e.drawFront && !e.dead) e.drawFront(ctx); // Bauwerke, die vor dem Helden liegen (Torhaus beim Durchgehen)
     this.drawReflections(ctx, sx, sy);
     if ((theme === 'throne' || theme === 'gallery') && !View.lite) this.drawFloorMirror(ctx, sx, sy);
@@ -514,6 +535,42 @@ const W = {
     ctx.restore();
   },
 
+  // Turm: jede Figur wird an ihren Platz auf dem Zylinder gerückt (Kamera kurz verschoben); wer hinter dem Turm ist, bleibt unsichtbar
+  drawOnTower(ctx, order) {
+    const cam = this.cam, cx0 = cam.x, cy0 = cam.y, room = this.room, TW = PS2.Tower;
+    const put = (e) => { // Bildposition auf dem Zylinder; Füße rücken mit der perspektivischen Stauchung zur Bildmitte
+      const sx = TW.place(room, cam, e); if (sx === null) return false;
+      const fy = e.y + e.h; cam.x = e.cx - sx; cam.y = fy - (TW.H0 + (fy - cy0 - TW.H0) * TW.k); return true;
+    };
+    order.forEach(k => {
+      for (const e of this.ents) if (e.kind === k && put(e)) { e.draw(ctx); cam.x = cx0; cam.y = cy0; }
+      if (k === 'boss') { const p = this.player; if (put(p)) { const c2 = { x: cam.x, y: cam.y }; cam.x = cx0; cam.y = cy0; p.draw(ctx, c2); } }
+    });
+    cam.x = cx0; cam.y = cy0;
+  },
+  // Umgekehrte Turmkrümmung (Innenansicht eines Zylinders): je weiter eine Bildspalte von der Mitte entfernt ist, desto näher
+  // liegt die Wand – alles dort wird von der Augenhöhe weg gestreckt. Kacheln spaltenweise, Figuren mit gleicher Streckung.
+  bendK(sx) { const r = View.w * 0.58, s = clamp((sx - View.w / 2) / r, -0.98, 0.98); return 1 + (1 - Math.sqrt(1 - s * s)) / 2.8; },
+  drawTilesBent(ctx) {
+    const vw = View.w, H0 = 104;
+    if (!this.bendC || this.bendC.width !== vw) { this.bendC = Sprites.canvas(vw, 208); this.bendX = this.bendC.getContext('2d'); }
+    const bx = this.bendX; bx.clearRect(0, 0, vw, 208);
+    Tiles.drawTiles(bx, this.room, this.cam, this.frame);
+    const st = View.lite ? 4 : 2;
+    for (let X = 0; X < vw; X += st) {
+      const k = this.bendK(X + st / 2), s0 = H0 - H0 / k, s1 = H0 + (208 - H0) / k;
+      ctx.drawImage(this.bendC, X, s0, st, s1 - s0, X, 0, st, 208);
+    }
+  },
+  drawBent(ctx, order) {
+    const cam = this.cam, cy0 = cam.y;
+    const put = (e) => { const fy = e.y + e.h, k = this.bendK(e.cx - cam.x); cam.y = fy - (104 + (fy - cy0 - 104) * k); };
+    order.forEach(k => {
+      for (const e of this.ents) if (e.kind === k) { put(e); e.draw(ctx); cam.y = cy0; }
+      if (k === 'boss') { const p = this.player; put(p); const c2 = { x: cam.x, y: cam.y }; cam.y = cy0; p.draw(ctx, c2); }
+    });
+    cam.y = cy0;
+  },
   stormWindows() { // sichtbare Fenster der Wandebene in Bildkoordinaten (Wand mit Parallaxe 0.5, senkrecht gekachelt)
     const wins = STORM_WINS[this.room.theme], L = wins && Tiles.layer(this.room.theme, 'wall'), out = [];
     if (!L) return out;

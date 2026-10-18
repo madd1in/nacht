@@ -235,6 +235,11 @@ const Audio8 = (() => {
   const S3B = { Em: ['e2', 'e3'], C: ['c2', 'c3'], D: ['d2', 'd3'], B: ['b1', 'b2'], Am: ['a1', 'a2'] };
   const S3C = ['Em', 'Em', 'C', 'D', 'Em', 'Em', 'B', 'B', 'Am', 'Am', 'Em', 'Em', 'C', 'D', 'B', 'B'];
 
+  // Sonnenkathedrale – Sonnensturm (h-Moll, 188 BPM): Heldenmelodie über galoppierendem Oktavbass, Chor-Fläche, im B-Teil 32tel
+  const SU = { Bm: ['b3', 'd4', 'f#4'], G: ['g3', 'b3', 'd4'], D: ['d4', 'f#4', 'a4'], A: ['a3', 'c#4', 'e4'], Em: ['e4', 'g4', 'b4'], F: ['f#3', 'a#3', 'c#4'] };
+  const SU_B = { Bm: ['b1', 'b2'], G: ['g1', 'g2'], D: ['d2', 'd3'], A: ['a1', 'a2'], Em: ['e2', 'e3'], F: ['f#1', 'f#2'] };
+  const SU_C = ['Bm', 'G', 'D', 'A', 'Bm', 'G', 'Em', 'F', 'G', 'A', 'Bm', 'Bm', 'Em', 'G', 'F', 'F'];
+
   // Krakenkampf – Seemannslied als Bosslied (d-Moll, 6/8, 12 Schritte pro Takt): Galopp im Bass, Tritonus-Schatten
   const KR = { Dm: ['d4', 'f4', 'a4'], Bb: ['a#3', 'd4', 'f4'], A: ['a3', 'c#4', 'e4'], Gm: ['g3', 'a#3', 'd4'], C: ['c4', 'e4', 'g4'] };
   const KR_B = { Dm: ['d2', 'd3'], Bb: ['a#1', 'a#2'], A: ['a1', 'a2'], Gm: ['g1', 'g2'], C: ['c2', 'c3'] };
@@ -375,6 +380,21 @@ const Audio8 = (() => {
       tri: rep(CH_C.map(c => { const lo = CH_B[c]; return drive(lo, lo.replace(/\d/, d => +d + 1)); }).join(' '), 2), // Orgelpedal in 16teln
       pad: rep(CH_C.map(c => CH[c].join('+') + ':16').join(' '), 2),
       dr: rep([PFOUR, DK, FOUR, FILLS, PFOUR, DK, DK, FILLP].join(' '), 2) + ' ' + sectionB(), // galoppierende Kick schon im Choral-Teil
+    },
+    // Sonnenkathedrale und Sonnenturm: aufsteigende Heldenmelodie, Galopp im Bass, im B-Teil rauschende 32tel
+    sun: {
+      bpm: 188, loop: true, echo: { delay: 3, vol: 0.3 },
+      p1: contrastLead(SU_C, SU, [
+        'b5:2 f#5:1 b5:1 d6:2 c#6:2 b5:2 f#5:2 d5:2 f#5:2', 'g5:2 d5:1 g5:1 b5:2 a5:2 g5:2 d5:2 b4:2 d5:2',
+        'a5:2 d6:2 f#6:3 e6:1 d6:2 c#6:2 d6:2 a5:2', 'e6:4 c#6:2 a5:2 e5:4 a5:2 c#6:2',
+        'b5:2 b5:1 b5:1 d6:2 f#6:2 b6:4 a6:2 f#6:2', 'g6:3 f#6:1 e6:2 d6:2 b5:2 d6:2 g6:4',
+        'e6:2 g6:2 b6:2 g6:2 e6:2 b5:2 g5:2 e6:2', 'f#6:4 e6:2 c#6:2 a#5:4 f#5:4',
+        'd6:2 b5:2 g5:2 b5:2 d6:3 e6:1 g6:4', 'e6:2 c#6:2 a5:2 c#6:2 e6:3 f#6:1 a6:4',
+        'b6:4 a6:2 f#6:2 d6:2 f#6:2 b6:4', 'a6:2 f#6:2 d6:2 b5:2 f#5:4 b5:4',
+        'g6:2 f#6:2 e6:2 b5:2 g5:2 b5:2 e6:4', 'd6:2 e6:2 f#6:2 g6:2 b6:4 a6:2 g6:2',
+        'f#6:2 a#6:2 c#7:4 a#6:2 f#6:2 c#6:2 a#5:2', 'c#6:4 a#5:2 f#5:2 c#6:4 f#6:4',
+      ]),
+      p2: chordArps2(SU_C, SU), tri: chordBass(SU_C, SU_B, gallop), pad: chordPad(SU_C, SU), dr: section() + ' ' + sectionB(),
     },
     // Bibliothek und Uhrturm: Cembalo-Toccata mit Ohrwurm-Melodie, im B-Teil 32tel-Arpeggien und galoppierende Kick
     library: {

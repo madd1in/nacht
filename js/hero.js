@@ -378,6 +378,14 @@ const HEROES = (() => {
       open: frame(M.count, { legs: [[12, 4], [-12, 4]], fa: { a: [128, 22] }, ba: { a: [-128, -22] }, capeOpen: true }, 2),
       cast: frame(M.count, { legs: [[8, 4], [-8, 4]], fa: { a: [166, 12] }, ba: { a: [-166, -12] }, capeOpen: true, lean: -1 }, 2), // Arme hoch: Blutregen, Fledermäuse
     };
+    // Sonnenwächter: derselbe Ritter in Goldrüstung mit weißem Federbusch, doppelte Auflösung (überragt den Helden)
+    const SUN = { ...M.knight, headPal: { s: '#8c5c00', S: '#fcd860', k: '#1c0c00', r: '#fcfcfc', R: '#c8a050' }, skin: RAMP.gold, thigh: RAMP.gold, boot: RAMP.gold, flap: RAMP.gold, flapTrim: RAMP.steel, arm: { r: 2.0, bracer: RAMP.steel } };
+    S.gknight = {
+      walk: walk2(SUN, k => ({ fa: { a: [55, 25] }, ba: { a: [k ? -20 : 10, 60] } }), 2),
+      thrust: frame(SUN, { legs: [[26, 6], [-18, 4]], fa: { a: [92, 0] }, ba: { a: [40, 40] }, lean: 1 }, 2), // Lanze vor, Ansturm
+      raise: frame(SUN, { legs: STANCE, fa: { a: [172, 0] }, ba: { a: [30, 40] } }, 2),                     // Lanze gen Himmel
+      crouch: frame(SUN, { legs: [[14, 22], [-14, 22]], fa: { a: [70, 40] }, ba: { a: [-10, 60] }, lean: 1 }, 2), // Ausholen / benommen
+    };
   }
   buildMonsters();
 

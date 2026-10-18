@@ -152,7 +152,7 @@ const Game = {
     Audio8.stop();
     this.prewarmStage(s);
     this.go('card');
-    Voice.say('stage' + (s + 1));
+    Voice.say(Levels.STAGES[s].voice || 'stage' + (s + 1));
   },
 
   nextRoom() {
@@ -328,7 +328,7 @@ const Game = {
 
   // Bestzeit pro Stage (getrennt für den Leicht-Modus), dauerhaft im Browser gespeichert
   recordTime() {
-    const key = 'nachtmahr.best' + W.stage + (Options.easy ? 'e' : ''), t = W.stageFrames;
+    const key = 'nachtmahr.best' + (W.stageDef.id ?? W.stage) + (Options.easy ? 'e' : ''), t = W.stageFrames;
     let best = 0;
     try { best = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) { best = 0; }
     this.clearTime = t; this.newBest = !best || t < best; this.bestTime = this.newBest ? t : best;
@@ -736,6 +736,7 @@ const Game = {
     rooms.forEach(r => r.ents.forEach(e => { if (e.type === 'gears') jobs.push(() => buildGearTrain(e.list)); }));
     if (rooms.some(r => r.arena && r.arena.boss === 'count')) jobs.push(() => COUNT_ART.get());
     if (rooms.some(r => r.arena && r.arena.boss === 'medusa')) jobs.push(() => MEDUSA_ART.get());
+    if (rooms.some(r => r.theme === 'cathedral' || r.theme === 'spire')) jobs.push(() => PS2.prewarm());
     this.warmJobs = jobs;
   },
   big(ctx, text, cx, y, scale, colors, shadow, outline) {
@@ -815,7 +816,7 @@ const Game = {
     const slide = t < 20 ? (20 - t) * 12 : t > 130 ? (t - 130) * -12 : 0;
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 40, View.w, 22);
     ctx.fillStyle = '#c89020'; ctx.fillRect(0, 40, View.w, 1); ctx.fillRect(0, 61, View.w, 1);
-    this.big(ctx, tr((W.boss && W.boss.nameKey) || 'boss' + (W.stage + 1)), cx + slide, 44, 2, ['#fce0a8', '#fce0a8', '#f8b800', '#f8b800', '#c89020', '#9c6400', '#6c4000'], null, '#000');
+    this.big(ctx, tr((W.boss && W.boss.nameKey) || W.stageDef.bossKey), cx + slide, 44, 2, ['#fce0a8', '#fce0a8', '#f8b800', '#f8b800', '#c89020', '#9c6400', '#6c4000'], null, '#000');
   },
 
   drawCard(ctx) {
@@ -825,18 +826,19 @@ const Game = {
     ctx.fillStyle = '#c89020'; ctx.fillRect(0, 78, View.w, 1); ctx.fillRect(0, 201, View.w, 1);
     const st = W.stageDef;
     Font.draw(ctx, tr('stageNo', W.stage + 1), cx, 86, '#d0c0a0', { align: 'center', shadow: '#000' });
-    const nm = tr('stage' + (W.stage + 1));
+    const nm = tr(st.nameKey);
     const z = Math.max(1, 3 - this.t / 8); // fliegt aus der Tiefe heran, dreht sich dann langsam
     this.big3d(ctx, nm, cx, 100, Font.width(nm) * 3 > View.w - 16 ? 2 : 3, LOGO, Math.sin(this.t * 0.035) * 0.28 + (z > 1 ? (z - 1) * 0.6 : 0), 5, 1 / z);
     const n = Levels.STAGES.length;
+    const gap = n > 4 ? 38 : 48;
     for (let i = 0; i < n; i++) {
-      const x = cx - 56 + i * 48;
+      const x = cx - Math.round((n - 1) * gap / 2) - 4 + i * gap;
       ctx.fillStyle = i < W.stage ? '#7c7c7c' : i === W.stage ? ((this.t >> 3) & 1 ? '#d82800' : '#f8b800') : '#3c3c3c';
       ctx.fillRect(x, 150, 8, 8);
-      if (i < n - 1) { ctx.fillStyle = '#3c3c3c'; ctx.fillRect(x + 12, 153, 32, 2); }
+      if (i < n - 1) { ctx.fillStyle = '#3c3c3c'; ctx.fillRect(x + 12, 153, gap - 16, 2); }
     }
     Font.draw(ctx, tr('lives', Math.max(0, W.lives)), cx, 176, '#e0e0e0', { align: 'center', shadow: '#000' });
-    Font.draw(ctx, tr('bossIs', tr('boss' + (W.stage + 1))), cx, 190, '#b0b0b0', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('bossIs', tr(st.bossKey)), cx, 190, '#b0b0b0', { align: 'center', shadow: '#000' });
   },
 
   drawClear(ctx) {
