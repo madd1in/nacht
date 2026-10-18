@@ -448,7 +448,45 @@ const Levels = (() => {
     .candle(4, 8, 'H').candle(12, 8).candle(16, 8, 'W').candle(20, 8, 'H')
     .start(2, 10).arena('warden').done();
 
-  // ======================= STAGE 5: Der Thron der Nacht =======================
+  // ======================= STAGE 5: Die Weltausstellung =======================
+  // Ein Glaspalast wie die großen Gewächshäuser des 19. Jahrhunderts: grün lackierte Stahlrippen, Glasgewölbe, Palmen,
+  // Galerien aus Gusseisen und Gaslaternen. Die ausgestellten fleischfressenden Pflanzen sind ausgebrochen.
+  // Palmenhaus: drei Galerien übereinander, Wendeltreppen, Schnappfallen in Töpfen, Kannenpflanzen spucken von oben
+  const ex1 = room(100, 'expo', 20)
+    .ground(0, 99, 18)
+    .stair(9, 17, 5, 1).fill(14, 13, 34, 13, '=')                     // erste Galerie
+    .stair(25, 12, 5, 1).fill(30, 8, 52, 8, '=')                      // obere Galerie
+    .fill(58, 12, 72, 12, '=').stair(78, 17, 6, -1)                   // dritte Galerie mit Treppe hinunter
+    .enemy('snapper', 20, 17).enemy('snapper', 44, 17).enemy('snapper', 68, 17).enemy('snapper', 41, 7)
+    .enemy('pitcher', 17, 12).enemy('pitcher', 63, 11).enemy('pitcher', 88, 17).enemy('pitcher', 49, 7)
+    .candle(4, 17, 'H').candle(28, 17).candle(36, 17, 'W').candle(56, 17, '$').candle(84, 17).candle(94, 17, 'H')
+    .candle(22, 12).candle(33, 7, 'H').candle(46, 7).candle(70, 11, '1')
+    .enemy('bat', 50, 3).enemy('bat', 80, 4)
+    .statue(52, 17)
+    .music('expo')
+    .start(2, 17).exit(98).done();
+  // Halle der Maschinen: Seerosenbecken (Blätter tragen nur kurz), ein riesiges Zahnrad als Ausstellungsstück, Laufgänge
+  const ex2 = room(96, 'expo')
+    .ground(0, 18).ground(24, 46).ground(52, 95)
+    .fill(19, 12, 23, 12, '~').fill(47, 12, 51, 12, '~').crumble(20, 11).crumble(48, 11)
+    .cog(34.5, 6, 44, 4, 0.011)
+    .fill(58, 7, 68, 7, '=').stair(54, 10, 4, 1).fill(76, 8, 84, 8, '=')
+    .enemy('snapper', 12, 10).enemy('snapper', 44, 10).enemy('snapper', 63, 6).enemy('snapper', 90, 10)
+    .enemy('pitcher', 28, 10).enemy('pitcher', 80, 7).enemy('pitcher', 72, 10)
+    .candle(4, 10).candle(15, 10, 'H').candle(27, 10).candle(40, 10, 'W').candle(57, 10).candle(66, 6, 'H').candle(86, 10, '2')
+    .statue(53, 10)
+    .music('expo')
+    .start(2, 10).exit(94).done();
+  // Kuppel: in der Mitte der riesige Pflanzkübel – die Menschenfalle
+  const exb = room(46, 'expo')
+    .ground(0, 45, 11)
+    .fill(45, 0, 45, 10, '#')
+    .fill(28, 7, 31, 7, '=').fill(38, 7, 41, 7, '=')
+    .statue(8, 10)
+    .candle(4, 10, 'H').candle(12, 10).candle(16, 10, 'W').candle(20, 10, 'H')
+    .start(2, 10).arena('mantrap').done();
+
+  // ======================= STAGE 6: Der Thron der Nacht =======================
   // Seelenstrudel: schwebende Steine über dem Nichts, Ankerringe, rotierender Mode-7-Tunnel
   const vx = room(64, 'vortex')
     .ground(0, 7).ground(57, 63)
@@ -518,6 +556,7 @@ const Levels = (() => {
     { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
     { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
     { id: 'sun', nameKey: 'stageSun', bossKey: 'bossKnight', voice: 'stageSun', name: 'DIE SONNENKATHEDRALE', music: 'sun', time: 720, rooms: [sa, sp, sk], boss: 'SONNENWÄCHTER' },
+    { id: 'expo', nameKey: 'stageExpo', bossKey: 'bossTrap', voice: 'stageExpo', name: 'DIE WELTAUSSTELLUNG', music: 'expo', time: 720, rooms: [ex1, ex2, exb], boss: 'MENSCHENFALLE' },
     { id: 3, nameKey: 'stage4', bossKey: 'boss4', voice: 'stage4', name: 'DER THRON DER NACHT', music: 'chapel', time: 660, rooms: [vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
   ];
 

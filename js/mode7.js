@@ -83,7 +83,7 @@ const Mode7 = (() => {
   // schrumpfen (wie in Mario Kart); am Horizont dreht sich ein Bergpanorama mit, darüber Mond und Sterne.
   const MS = 256;
   let map = null, mapH = null, trees = null, pano = null;
-  const POINTS = [[52, 214], [112, 152], [168, 98], [200, 70], [222, 38]];
+  const POINTS = [[52, 214], [112, 152], [168, 98], [200, 70], [238, 58], [222, 38]];
   function makeMap() {
     map = new Int32Array(MS * MS); mapH = new Float32Array(MS * MS);
     const hh = (x, y, s) => { let n = Math.imul(x * 374761393 + y * 668265263 + s * 1442695041, 1274126177); n ^= n >>> 13; n = Math.imul(n, 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
@@ -181,7 +181,7 @@ const Mode7 = (() => {
       objs.push({ z, sx, sy, sc, img, glow });
     };
     trees.forEach(([x, y, s]) => add(x, y, BILL.tree, 0.25 * s));
-    POINTS.forEach(([x, y], i) => add(x, y, BILL.castles[i], 0.45, i === clamp(stage, 0, POINTS.length - 1)));
+    POINTS.forEach(([x, y], i) => add(x, y, BILL.castles[Math.min(i, BILL.castles.length - 1)], 0.45, i === clamp(stage, 0, POINTS.length - 1)));
     objs.sort((a, b) => b.z - a.z);
     for (const o of objs) {
       const wd = o.img.width * o.sc * 2, ht = o.img.height * o.sc * 2, X = o.sx * 2 - wd / 2, Y = 32 + o.sy * 2 - ht;

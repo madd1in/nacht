@@ -30,8 +30,8 @@ const FX = (() => {
     return c;
   }
 
-  const AMB = { forest: 0.36, cathedral: 0.06, spire: 0.05, gallery: 0.38, bridge: 0.26, library: 0.5, foyer: 0.6, glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
-  const TINT = { forest: '0,12,18', cathedral: '40,10,0', spire: '40,10,0', gallery: '10,6,30', bridge: '18,0,34', library: '20,8,2', foyer: '8,4,26', glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
+  const AMB = { expo: 0.3, forest: 0.36, cathedral: 0.06, spire: 0.05, gallery: 0.38, bridge: 0.26, library: 0.5, foyer: 0.6, glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3 };
+  const TINT = { expo: '0,12,30', forest: '0,12,18', cathedral: '40,10,0', spire: '40,10,0', gallery: '10,6,30', bridge: '18,0,34', library: '20,8,2', foyer: '8,4,26', glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14' };
   const lc = Sprites.canvas(256, 208), lx = lc.getContext('2d');
   let vignette = null;
 
@@ -92,7 +92,7 @@ const FX = (() => {
 
   // ---------------- Nebel ----------------
   const fogCache = {};
-  const FOG = { forest: [60, 116, 100, 0.42], bridge: [130, 90, 170, 0.42], ship: [90, 110, 180, 0.3], vortex: [160, 60, 220, 0.45], courtyard: [120, 70, 170, 0.5], cave: [70, 110, 60, 0.32], crypt: [90, 120, 220, 0.42], tower: [110, 110, 130, 0.22] };
+  const FOG = { expo: [150, 200, 180, 0.24], forest: [60, 116, 100, 0.42], bridge: [130, 90, 170, 0.42], ship: [90, 110, 180, 0.3], vortex: [160, 60, 220, 0.45], courtyard: [120, 70, 170, 0.5], cave: [70, 110, 60, 0.32], crypt: [90, 120, 220, 0.42], tower: [110, 110, 130, 0.22] };
   function fogStrip(theme) {
     if (fogCache[theme]) return fogCache[theme];
     const f = FOG[theme];
@@ -182,6 +182,9 @@ const FX = (() => {
     spire: { max: 20, rate: 0.18, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 200, vx: 0.2, vy: -0.1, life: 360, col: Math.random() < 0.3 ? '#fcfcfc' : '#fce0a8', kind: 'mote' }) },
     glass: { max: 26, rate: 0.25, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 208, vx: 0.05, vy: -0.08, life: 320, col: ['#fc7460', '#a4e4fc', '#fce0a8', '#c8a0fc'][Math.floor(Math.random() * 4)], kind: 'mote' }) }, // bunter Staub im Glaslicht
     ship: { max: 16, rate: 0.18, make: (c) => ({ x: c.x + View.w + 4, y: c.y + 96 + Math.random() * 100, vx: -1.5 - Math.random(), vy: -0.15, life: 260, col: '#c8e4fc', kind: 'spray' }) }, // Gischt im Wind
+    expo: { max: 24, rate: 0.2, make: (c) => Math.random() < 0.25 // feuchte Luft: Tropfen vom Glas, Pollen schweben im Laternenlicht
+      ? ({ x: c.x + Math.random() * View.w, y: c.y, vx: 0, vy: 2.4, life: 120, col: '#a8e0f0', kind: 'drip' })
+      : ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 200, vx: 0.08, vy: -0.05, life: 340, col: Math.random() < 0.5 ? '#e8f8a0' : '#fce0a8', kind: 'mote' }) },
     forest: { max: 22, rate: 0.16, make: (c) => Math.random() < 0.7 // Glühwürmchen und aufsteigende Leuchtsporen
       ? ({ x: c.x + Math.random() * View.w, y: c.y + 90 + Math.random() * 90, vx: 0, vy: 0, life: 260, col: '#d8fc38', kind: 'firefly' })
       : ({ x: c.x + Math.random() * View.w, y: c.y + 150 + Math.random() * 50, vx: 0, vy: -0.22, life: 240, col: '#78f8b8', kind: 'spore' }) },

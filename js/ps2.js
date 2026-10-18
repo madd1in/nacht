@@ -21,7 +21,7 @@ const PS2 = (() => {
       fx /= idx.length; fy /= idx.length; fz /= idx.length;
       if (nx * (fx - center[0]) + ny * (fy - center[1]) + nz * (fz - center[2]) < 0) { nx = -nx; ny = -ny; nz = -nz; }
     }
-    m.f.push({ i: idx, c: col, n: [nx, ny, nz], e: o.e || 0, two: !!o.two });
+    m.f.push({ i: idx, c: col, n: [nx, ny, nz], e: o.e || 0, two: !!o.two, a: o.a || 1 }); // a < 1: Glas (durchscheinend)
   }
   function box(m, cx, y0, cz, w, h, d, col, o = {}) {
     const hw = w / 2, hd = d / 2, rot = o.rot || 0, cs = Math.cos(rot), sn = Math.sin(rot);
@@ -112,7 +112,7 @@ const PS2 = (() => {
           if (env.static) { fc._l = lc; fc._env = env; }
         }
         const k = 1 - Math.exp(-zm * fd);
-        p.z = zm; p.n = nv; p.col = css(lc[0] * (1 - k) + F[0] * k, lc[1] * (1 - k) + F[1] * k, lc[2] * (1 - k) + F[2] * k);
+        p.z = zm; p.n = nv; p.a = fc.a; p.col = css(lc[0] * (1 - k) + F[0] * k, lc[1] * (1 - k) + F[1] * k, lc[2] * (1 - k) + F[2] * k);
         np++;
       }
     }
@@ -120,7 +120,8 @@ const PS2 = (() => {
     x.lineWidth = 0.7; x.lineJoin = 'round';
     for (const p of polys) {
       const q = p.pts, n2 = p.n * 2; x.fillStyle = p.col; x.strokeStyle = p.col;
-      x.beginPath(); x.moveTo(q[0], q[1]); for (let k = 2; k < n2; k += 2) x.lineTo(q[k], q[k + 1]); x.closePath(); x.fill(); x.stroke(); // Kontur schließt Fugen
+      x.beginPath(); x.moveTo(q[0], q[1]); for (let k = 2; k < n2; k += 2) x.lineTo(q[k], q[k + 1]); x.closePath();
+      if (p.a < 1) { x.globalAlpha = p.a; x.fill(); x.globalAlpha = 1; } else { x.fill(); x.stroke(); } // Kontur schließt Fugen (nicht bei Glas)
     }
     return np;
   }
@@ -625,6 +626,12 @@ const PS2 = (() => {
       else if (k === 1) { B(0, 0, 10, 6, 7, STONE2, { top: STONE }); gable(props, px, y0 + 6, py, 7.4, 10.6, 3.5, DARKR); for (let g = 0; g < 6; g++) B(-12 + (g % 3) * 3.5, (g < 3 ? -6 : 6), 1.6, 2.4, 0.8, STONE); }
       else if (k === 2) { prism(props, px, y0, py, 4.2, 26, 8, STONE, { rTop: 3.8 }); cone(props, px, y0 + 26, py, 5, 9, 8, ROOF); for (const a of [-7, 7]) { prism(props, px + a, y0, py, 2.2, 11, 6, STONE2); cone(props, px + a, y0 + 11, py, 2.6, 4, 6, ROOF); } }
       else if (k === 3) { B(0, 0, 7, 9, 18, WHITE); gable(props, px, y0 + 9, py, 18, 7.4, 4, [120, 130, 170]); for (const a of [-4.5, 4.5]) { prism(props, px + a, y0, py - 9, 2, 16, 8, WHITE); cone(props, px + a, y0 + 16, py - 9, 2.3, 9, 8, [120, 130, 170]); cone(props, px + a, y0 + 25, py - 9, 0.5, 2, 4, GOLDM); } prism(props, px, y0 + 9, py + 2, 2.4, 8, 8, WHITE); cone(props, px, y0 + 17, py + 2, 2.8, 11, 8, GOLDM); }
+      else if (k === 4) { // Weltausstellung: Glaspalast mit grünen Rippen und Mittelkuppel
+        const GL = [170, 226, 230], IR = [50, 130, 84];
+        B(0, 0, 26, 7, 9, GL, { top: GL }); gable(props, px, y0 + 7, py, 9, 26, 4, GL, { rot: Math.PI / 2 });
+        for (let r = -12; r <= 12; r += 4) box(props, px + r, y0, py - 4.6, 0.6, 9.5, 0.6, IR);
+        prism(props, px, y0 + 7, py, 5.5, 3, 8, IR); cone(props, px, y0 + 10, py, 5.8, 6, 8, GL); cone(props, px, y0 + 16, py, 0.8, 2.5, 4, GOLDM);
+      }
       else { B(0, 0, 14, 9, 12, DARKR, { top: [80, 60, 90] }); for (const [a, b, h] of [[-7, -6, 16], [7, -6, 14], [0, 5, 22]]) { prism(props, px + a, y0, py + b, 2.6, h, 6, [70, 54, 84]); cone(props, px + a, y0 + h, py + b, 3.1, 6, 6, [110, 20, 30]); } for (let w = 0; w < 4; w++) box(props, px - 1 + (w % 2) * 2, y0 + 10 + w * 3, py + 2.2, 0.8, 1.4, 0.4, [255, 60, 40], { e: 0.6 }); }
       glow.push([px, y0, py]);
     });
@@ -646,8 +653,8 @@ const PS2 = (() => {
       const g = x.createLinearGradient(0, 0, 0, Hb); g.addColorStop(0, '#0a0418'); g.addColorStop(0.3, '#2a1446'); g.addColorStop(0.42, '#46245c'); g.addColorStop(1, '#28143c');
       x.fillStyle = g; x.fillRect(0, 0, Wb, Hb);
       for (let i = 0; i < 50; i++) { const sx = ((i * 89 - ang * 120) % Wb + Wb) % Wb, sy = (i * 37) % (Hb * 0.3); x.fillStyle = i % 5 ? 'rgba(200,200,240,0.7)' : '#fff'; x.fillRect(sx, sy, 1, 1); }
-      const mx = (((Wb * 0.7 - ang * 60) % (Wb * 1.6)) + Wb * 1.6) % (Wb * 1.6) - Wb * 0.3, mg = x.createRadialGradient(mx, 12, 0, mx, 12, 18); // Blutmond
-      mg.addColorStop(0, '#f86040'); mg.addColorStop(0.3, '#c82830'); mg.addColorStop(0.36, 'rgba(160,30,50,0.5)'); mg.addColorStop(1, 'rgba(120,20,40,0)'); x.fillStyle = mg; x.fillRect(mx - 18, 0, 36, 32);
+      const mx = (((Wb * 0.7 - ang * 60) % (Wb * 1.6)) + Wb * 1.6) % (Wb * 1.6) - Wb * 0.3; // Blutmond (Low-Poly-Kugel)
+      drawMoon(x, mx, 12, 6, t);
       const vis = world.chunks.filter(m => { const a = (m.cx - cx) * fx + (m.cz - cz) * fz, b = Math.abs((m.cx - cx) * -fz + (m.cz - cz) * fx); return a > -20 && a < 330 && b < a * 0.75 + 40; }) // nur Stücke im Blickfeld
         .map(m => ((m.cx - cx) ** 2 + (m.cz - cz) ** 2 > 215 * 215 ? m.lo : m)); // ferne Stücke gröber
       render(x, Wb, Hb, vis.concat([world.props]), cam, WENV);
@@ -703,7 +710,52 @@ const PS2 = (() => {
   }
   const prewarmWoods = () => { if (!woods) woods = buildWoods(); };
 
+  // ---------------- Mond als Low-Poly-Kugel (PS2) ----------------
+  // Facettierte Kugel, Krater als eingedrückte Mulden mit hellem Wall, dunkle Meere; Licht von links oben vorn, dreht sich
+  // langsam um die eigene Achse. Dazu ein weicher Schein. Gerendert in eine kleine Kachel, nur alle paar Bilder neu.
+  const MOON = { craters: null, cache: new Map() };
+  function moonMesh(rot) {
+    if (!MOON.craters) { let s = 31; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; MOON.craters = Array.from({ length: 11 }, () => { const u = rnd() * 6.283, v = Math.acos(rnd() * 2 - 1); return [Math.sin(v) * Math.cos(u), Math.cos(v), Math.sin(v) * Math.sin(u), 0.18 + rnd() * 0.3]; }); }
+    const m = mesh(), SEG = 18, RINGS = 12, rows = [], cr = Math.cos(rot), sr = Math.sin(rot);
+    const lit = (x, y, z) => { // Höhe und Farbe an einem Punkt der Kugel (Krater mit Wall, Meere)
+      let h = 1, dark = 0;
+      for (const [cx, cy, cz, r] of MOON.craters) { const d = Math.acos(Math.max(-1, Math.min(1, x * cx + y * cy + z * cz))) / r; if (d < 1) { h -= 0.08 * (1 - d * d); dark = Math.max(dark, 0.5 * (1 - d * 0.6)); } else if (d < 1.3) h += 0.03 * (1 - (d - 1) / 0.3); }
+      const mare = Math.sin(x * 3.1 + 1) * Math.cos(y * 2.3) + Math.sin(z * 2.7 - 0.5) * 0.6;
+      if (mare > 0.7) dark = Math.max(dark, 0.3);
+      return [h, dark];
+    };
+    for (let j = 0; j <= RINGS; j++) {
+      const v = j / RINGS * Math.PI, row = [];
+      for (let i = 0; i < SEG; i++) {
+        const u = i / SEG * Math.PI * 2, x = Math.sin(v) * Math.cos(u), y = Math.cos(v), z = Math.sin(v) * Math.sin(u), [h] = lit(x, y, z);
+        row.push(vtx(m, (x * cr - z * sr) * h, y * h, (x * sr + z * cr) * h));
+      }
+      rows.push(row);
+    }
+    for (let j = 0; j < RINGS; j++) for (let i = 0; i < SEG; i++) {
+      const v = (j + 0.5) / RINGS * Math.PI, u = (i + 0.5) / SEG * Math.PI * 2, [, dark] = lit(Math.sin(v) * Math.cos(u), Math.cos(v), Math.sin(v) * Math.sin(u));
+      const k = 1 - dark, col = [228 * k, 70 * k + 8, 52 * k + 6];
+      face(m, [rows[j][i], rows[j][(i + 1) % SEG], rows[j + 1][(i + 1) % SEG], rows[j + 1][i]], col, [0, 0, 0], { two: false });
+    }
+    return m;
+  }
+  const MENV = { sun: null, sunC: [1.05, 0.72, 0.58], amb: [0.2, 0.09, 0.11], sky: [0.04, 0.01, 0.02], fog: [0, 0, 0], fogD: 0 }; // hartes Seitenlicht: Schattengrenze und Facetten
+  { const v = [-0.6, 0.55, -0.6], l = Math.hypot(...v); MENV.sun = v.map(c => c / l); }
+  function drawMoon(ctx, cx, cy, r, frame) {
+    const R = Math.round(r), key = R + '|' + Math.floor(frame / 10);
+    let e = MOON.cache.get(R);
+    if (!e) { const c = Sprites.canvas(R * 2 + 4, R * 2 + 4); e = { c, x: c.getContext('2d', CPU2D), key: null }; MOON.cache.set(R, e); }
+    if (e.key !== key) { // die Kugel dreht sich langsam (alle 10 Bilder ein Stück weiter)
+      e.key = key; e.x.clearRect(0, 0, e.c.width, e.c.height);
+      render(e.x, e.c.width, e.c.height, [moonMesh(frame * 0.0012)], { x: 0, y: 0, z: -6, yaw: 0, pitch: 0, f: R * 6 * 0.985, near: 1, hy: 0.5 }, MENV);
+    }
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; // Schein
+    const g = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 2.5); g.addColorStop(0, 'rgba(200,40,50,0.38)'); g.addColorStop(0.45, 'rgba(120,20,48,0.14)'); g.addColorStop(1, 'rgba(80,10,40,0)');
+    ctx.fillStyle = g; ctx.fillRect(cx - r * 2.5, cy - r * 2.5, r * 5, r * 5); ctx.restore();
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(e.c, Math.round(cx - R - 2), Math.round(cy - R - 2)); ctx.restore();
+  }
+
   const prewarm = () => { if (!city) city = buildCity(); };
   const prewarmMap = () => { if (!world) world = buildWorld(); }; // Ladebildschirm: Kartenlandschaft vorab bauen
-  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
+  return { mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
 })();

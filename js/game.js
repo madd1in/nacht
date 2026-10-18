@@ -787,6 +787,7 @@ const Game = {
     if (rooms.some(r => r.arena && r.arena.boss === 'medusa')) jobs.push(() => MEDUSA_ART.get());
     if (rooms.some(r => r.theme === 'cathedral' || r.theme === 'spire')) jobs.push(() => PS2.prewarm());
     if (rooms.some(r => r.theme === 'forest')) jobs.push(() => PS2.prewarmWoods());
+    if (rooms.some(r => r.theme === 'expo')) jobs.push(() => Expo.prewarm());
     [...new Set(rooms.map(r => r.theme))].forEach(th => jobs.push(() => FX.drawFog(this.warmCtx(), th, { x: 0, y: 0 }, 0))); // Bodennebel je Thema
     jobs.push(() => this.warmRoom());
     this.warmJobs = jobs; this.warmTotal = jobs.length; this.warmDoneT = -1;

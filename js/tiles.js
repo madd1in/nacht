@@ -26,6 +26,7 @@ const Tiles = (() => {
     library: { a: ['#e8b070', '#a86c34', '#7c4820', '#4c2810', '#180a04'], b: ['#c8884c', '#8c5428', '#5c3014', '#3c1c08', '#140804'] },
     ship: { a: ['#e8b070', '#b87c44', '#8a5428', '#5a3214', '#1e0c04'], b: ['#dcb47c', '#a8783c', '#7a4c20', '#4a2a0c', '#160802'] },
     cathedral: { a: ['#fcf4dc', '#ecd4a4', '#c8a468', '#8c6c3c', '#3c2814'], b: ['#fce8b0', '#e8c070', '#b8883c', '#7c5420', '#2c1808'] },
+    expo: { a: ['#ece0c4', '#c4b490', '#988664', '#685840', '#241a10'], b: ['#88d8a0', '#48a868', '#2c7c48', '#18502c', '#08200e'], moss: ['#2c6c2c', '#58a040', '#a0d860'] },
     forest: { a: ['#8c7454', '#5c4a34', '#3e3022', '#271d14', '#100a06'], b: ['#a08060', '#76583c', '#523a24', '#33230f', '#140c04'], moss: ['#1e4a22', '#3a7a2c', '#86c050'] },
     spire: { a: ['#fcf0d4', '#e8cc98', '#c09c60', '#846438', '#382412'], b: ['#fce8b0', '#e8c070', '#b8883c', '#7c5420', '#2c1808'] },
   };
@@ -276,6 +277,25 @@ const Tiles = (() => {
     }
     return c;
   }
+  function tilesTop() { // Viktorianische Bodenfliesen (Ausstellungshalle): cremefarben, Terrakotta-Stern, schwarze Kanten
+    const c = C(16, 16), x = c.getContext('2d');
+    px(x, '#e8dcc0', 0, 0, 16, 16);
+    for (let Y = 0; Y < 16; Y++) for (let X = 0; X < 16; X++) {
+      const dx = Math.abs(X - 7.5), dy = Math.abs(Y - 7.5);
+      if (dx + dy < 5) px(x, (dx + dy < 2.5) ? '#2c2428' : '#b4583a', X, Y);
+      else if (dx > 6.5 || dy > 6.5) px(x, (X + Y) % 2 ? '#2c2428' : '#3c3034', X, Y);
+    }
+    px(x, '#fcf4e0', 1, 1, 14, 1); px(x, 'rgba(0,0,0,0.25)', 1, 14, 14, 1);
+    return c;
+  }
+  function ironGrate() { // Laufgang aus grün lackiertem Gusseisen: Profil oben, Gitter mit Durchblick, Nieten
+    const c = C(16, 16), x = c.getContext('2d'), G = PALS.expo.b;
+    px(x, G[3], 0, 0, 16, 4); px(x, G[1], 0, 0, 16, 1); px(x, G[2], 0, 1, 16, 1); px(x, G[4], 0, 4, 16, 1);
+    for (let i = 0; i < 12; i++) { px(x, G[2], i, 5 + i % 11, 2, 1); px(x, G[2], 14 - i, 5 + i % 11, 2, 1); } // Andreaskreuz
+    px(x, G[3], 0, 5, 2, 11); px(x, G[3], 14, 5, 2, 11); px(x, G[1], 0, 5, 1, 11); px(x, G[3], 0, 14, 16, 2);
+    [2, 7, 13].forEach(X => { px(x, '#c8f0d0', X, 2, 1, 1); }); // Nieten
+    return c;
+  }
   function logTile() { // umgestürzter Stamm: Rinde mit Rillen, oben Moos
     const c = C(16, 16), x = c.getContext('2d'), m = PALS.forest.moss, Bk = PALS.forest.b;
     for (let Y = 0; Y < 16; Y++) px(x, Bk[Y < 2 ? 0 : Y < 5 ? 1 : Y < 11 ? 2 : Y < 14 ? 3 : 4], 0, Y, 16, 1);
@@ -340,6 +360,10 @@ const Tiles = (() => {
       if (v === 1) { px(x, '#6c1420', 2, 4, 9, 2); px(x, '#e8dcc0', 10, 4, 1, 2); px(x, '#1c2860', 3, 2, 7, 2); px(x, '#e8dcc0', 9, 2, 1, 2); px(x, '#c8982c', 3, 2, 1, 2); }
       else if (v === 3) { px(x, '#e8dcc0', 7, 5, 5, 1); px(x, '#c8bca0', 8, 4, 3, 1); }
       else return null;
+    } else if (theme === 'expo') { // kleine Terrakotta-Töpfe mit Farn, Messingschildchen
+      if (v === 1) { px(x, '#b8603c', 5, 3, 6, 3); px(x, '#d88458', 5, 3, 6, 1); for (let i = 0; i < 4; i++) { px(x, '#58a040', 7 - i, 2 - (i >> 1), 1, 1); px(x, '#58a040', 8 + i, 2 - (i >> 1), 1, 1); } px(x, '#a0d860', 8, 0, 1, 2); }
+      else if (v === 3) { px(x, '#8c6c2c', 10, 4, 4, 2); px(x, '#e8c870', 10, 4, 4, 1); }
+      else return null;
     } else if (theme === 'forest') { // Gras, Farn, Pilze (rote Kappen, blau leuchtende Hexenröhrlinge)
       for (let X = 0; X < 16; X++) { const h = ri(1, 3) + (v % 2); px(x, m[0], X, 6 - h, 1, h); if (h > 2) px(x, m[1], X, 6 - h, 1, 1); }
       if (v === 1) { px(x, '#e8dcc0', 4, 3, 1, 3); px(x, '#c81818', 2, 1, 5, 2); px(x, '#fcfcfc', 3, 1, 1, 1); px(x, '#e8dcc0', 11, 4, 1, 2); px(x, '#c81818', 10, 3, 3, 1); }
@@ -353,7 +377,11 @@ const Tiles = (() => {
   }
   function hanger(theme, v) { // hängende Ranken / Spinnweben unter Kanten (16x10)
     const c = C(16, 10), x = c.getContext('2d');
-    if (theme === 'forest') { // Wurzeln und Efeu unter Kanten
+    if (theme === 'expo') { // Efeu und Luftwurzeln hängen von den Laufgängen
+      if (v === 2) return null;
+      const m = PALS.expo.moss;
+      for (let X = 1; X < 16; X += 3) { const len = ri(3, v ? 9 : 6); for (let y = 0; y < len; y++) px(x, y % 3 ? m[0] : m[1], X + ((y >> 2) & 1), y); px(x, m[2], X, len - 1); }
+    } else if (theme === 'forest') { // Wurzeln und Efeu unter Kanten
       const m = PALS.forest.moss;
       for (let X = 0; X < 16; X++) {
         if (rand() > 0.5) continue;
@@ -1310,9 +1338,7 @@ const Tiles = (() => {
       smooth(x, 640, 208, ['#000000', '#02020c', '#060818', '#0c0e26', '#141436', '#1e1a44', '#2a1e4c', '#3a2250', '#4a2450']);
       for (let i = 0; i < 120; i++) { const b = rand(); px(x, b < 0.2 ? '#fcfcfc' : b < 0.6 ? '#9c9cbc' : '#5c5c7c', ri(0, 639), ri(0, 110)); }
       add('sky', sky, 0, { wrap: false });
-      const mc = C(96, 96);
-      moon(mc.getContext('2d'), 48, 48, 22);
-      add('moon', mc, 0, { wrap: false, right: 92, y: 4 });
+      L.push({ name: 'moon', custom: (c2, cam, f) => PS2.drawMoon(c2, View.w - 92, 52, 22, f), par: 0, c: C(1, 1) }); // Low-Poly-Blutmond
       const sc = C(512, 208), sx2 = sc.getContext('2d');
       for (let i = 0; i < 40; i++) {
         const cx = ri(0, 511), cy = ri(-6, 40), rx = ri(14, 34), ry = ri(6, 14);
@@ -1544,6 +1570,14 @@ const Tiles = (() => {
       add('wall', c, 0.5, { vtile: true });
       L.push({ name: 'stacks', custom: drawStacks3D, par: 1, c: C(1, 1) }); // PS2-3D: frei stehende Regale ragen aus den Pilastern
       L.push({ name: 'books', custom: drawBookFlock, par: 0.7, c: C(1, 1) }); // in der Ferne kreisen Bücherschwärme
+    } else if (theme === 'expo') {
+      // Weltausstellung: Nachthimmel hinter Glas, der Blutmond als Low-Poly-Kugel, davor der Glaspalast in PS2-3D
+      const sky = C(640, 208), x = sky.getContext('2d');
+      smooth(x, 640, 208, ['#02030a', '#060a1a', '#0c1428', '#121c36', '#182444', '#1e2c4c', '#243450', '#2a3a52', '#2c3c50']);
+      for (let i = 0; i < 120; i++) { const b = rand(); px(x, b < 0.2 ? '#fcfcfc' : '#8c9cbc', ri(0, 639), ri(0, 140)); }
+      add('sky', sky, 0, { wrap: false });
+      L.push({ name: 'moon', custom: (c2, cam, f) => PS2.drawMoon(c2, View.w - 110, 40, 18, f), par: 0, c: C(1, 1) });
+      L.push({ name: 'hall3d', custom: (c2, cam, f) => Expo.drawHall(c2, cam, f), par: 0.5, c: C(1, 1) });
     } else if (theme === 'forest') {
       // Wald zwischen Mole und Burg: Nachthimmel blitzt durch das Kronendach, Mond, darunter drei Tiefen PS2-Wald,
       // Mondlicht fällt in Bahnen zwischen den Stämmen, vorn Farn und Unterholz
@@ -1551,9 +1585,7 @@ const Tiles = (() => {
       smooth(x, 640, 208, ['#000000', '#02060a', '#06121a', '#0c1e24', '#14303a', '#1e4048', '#28505a', '#2e5a60', '#305c60']);
       for (let i = 0; i < 90; i++) { const sx = ri(0, 639), sy = ri(0, 90), b = rand(); px(x, b < 0.25 ? '#e8f4fc' : '#7c9cac', sx, sy); }
       add('sky', sky, 0, { wrap: false });
-      const mc = C(96, 96);
-      moon(mc.getContext('2d'), 48, 48, 20);
-      add('moon', mc, 0, { wrap: false, right: 96, y: -8 });
+      L.push({ name: 'moon', custom: (c2, cam, f) => PS2.drawMoon(c2, View.w - 96, 40, 20, f), par: 0, c: C(1, 1) }); // Low-Poly-Blutmond
       const cl = C(512, 208), cx = cl.getContext('2d');
       for (let i = 0; i < 8; i++) {
         const y = ri(14, 70), x0 = ri(0, 511), len = ri(60, 150), th = ri(2, 3);
@@ -1580,9 +1612,7 @@ const Tiles = (() => {
         if (b < 0.06) { px(x, '#7c7c9c', sx - 1, sy); px(x, '#7c7c9c', sx + 1, sy); px(x, '#7c7c9c', sx, sy - 1); px(x, '#7c7c9c', sx, sy + 1); }
       }
       add('sky', sky, 0, { wrap: false });
-      const mc = C(96, 96);
-      moon(mc.getContext('2d'), 48, 48, 24);
-      add('moon', mc, 0, { wrap: false, right: 70, y: -2 });
+      L.push({ name: 'moon', custom: (c2, cam, f) => PS2.drawMoon(c2, View.w - 70, 46, 24, f), par: 0, c: C(1, 1) }); // Low-Poly-Blutmond
       const sc = C(512, 208), sx2 = sc.getContext('2d'); // Sturmwolkenbank
       for (let i = 0; i < 46; i++) {
         const cx = ri(0, 511), cy = ri(-6, 34), rx = ri(14, 34), ry = ri(6, 14);
@@ -1950,15 +1980,16 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), forest: () => earth(p.a), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }), cathedral: (o) => marble(p.a, o), spire: (o) => marble(p.a, o) }[theme];
+    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), forest: () => earth(p.a), expo: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }), cathedral: (o) => marble(p.a, o), spire: (o) => marble(p.a, o) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
       : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true }))
       : theme === 'glass' || theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true }))
       : theme === 'library' ? [0, 1, 2, 3].map(() => parquet({ top: true }))
       : theme === 'forest' ? [0, 1, 2, 3].map(() => earth(p.a, { top: true }))
+      : theme === 'expo' ? [0, 1, 2, 3].map(() => tilesTop())
       : theme === 'foyer' ? [checker({ top: true }), checker({ top: true, crack: true }), checker({ top: true }), checker({ top: true })] : ground;
-    const alt = theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [balcony(), balcony(), balcony()] : theme === 'throne' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : theme === 'forest' ? [logTile(), logTile(), logTile()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+    const alt = theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [balcony(), balcony(), balcony()] : theme === 'throne' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : theme === 'forest' ? [logTile(), logTile(), logTile()] : theme === 'expo' ? [ironGrate(), ironGrate(), ironGrate()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
@@ -2710,7 +2741,17 @@ const Tiles = (() => {
       x.globalAlpha = 1;
       return c;
     }
-    if (theme === 'forest') {
+    if (theme === 'expo') { // Efeu hängt vom Gewölbe, Palmwedel ragen von den Seiten ins Bild
+      x.globalAlpha = 0.9; const lf = '#03100a';
+      for (let i = 0; i < 14; i++) { // Efeuranken mit Blattbüscheln, im Laternenlicht grün gesäumt
+        const X = ri(0, 639), len = ri(14, 40);
+        for (let y = 0; y < len; y++) {
+          const sx = X + Math.round(Math.sin(y * 0.25 + i) * 2); px(x, lf, sx, y, 1, 1);
+          if (y % 6 === 3) { const d = (y >> 1) % 2 ? 1 : -1; px(x, lf, sx + d, y - 1, 3 * d > 0 ? 3 : 1, 2); px(x, lf, sx + d * 2 - (d < 0 ? 1 : 0), y, 2, 2); px(x, '#1c4c2c', sx + d * 3, y - 1, 1, 1); }
+        }
+      }
+      x.globalAlpha = 1;
+    } else if (theme === 'forest') {
       const leaf = '#020805';
       for (let X = 0; X < 640; X++) { const h = 4 + Math.round(Math.abs(Math.sin(X * 0.17) * 5 + Math.sin(X * 0.05) * 4)); px(x, leaf, X, 208 - h, 1, h); }
       [40, 250, 470].forEach(bx => { for (let i = 0; i < 36; i++) { const h = 16 - Math.abs(18 - i) * 0.8; px(x, leaf, bx + i, 208 - h - 4, 1, h + 4); } }); // Farnbüsche

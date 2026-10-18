@@ -170,6 +170,7 @@ const Audio8 = (() => {
     step: () => { noise(0.045, 0.07, 'lowpass', 1100, 250); tone('triangle', 120, 70, 0.04, 0.05); },
     chain: () => { if (!ac) return; const t = ac.currentTime; for (let i = 0; i < 4; i++) { noise(0.03, 0.1, 'bandpass', 3400 - i * 200, 2200, t + i * 0.05); tone('square', 1900 - i * 120, 1500, 0.02, 0.025, null, t + i * 0.05); } }, // Kettenrasseln
     spin: () => noise(0.09, 0.07, 'bandpass', 1400, 2600), // wirbelndes Wurfkreuz
+    chomp: () => { noise(0.07, 0.4, 'bandpass', 1500, 500); tone('square', 240, 70, 0.09, 0.16); tone('triangle', 120, 50, 0.12, 0.2); }, // Fangblatt schnappt zu
     growl: () => { noise(0.5, 0.3, 'lowpass', 500, 160); tone('sawtooth', 110, 70, 0.45, 0.12); tone('pulse', 220, 140, 0.3, 0.05, 0.25); }, // Jaguar faucht
     shatter: () => { noise(0.5, 0.45, 'highpass', 5000, 1800); arp(['e7', 'c7', 'g6', 'e7', 'b6', 'g7'], 0.03, 'pulse', 0.06, 0.125); tone('triangle', 180, 60, 0.3, 0.3); }, // Kristall zerspringt
     clank: () => { tone('square', 340, 300, 0.07, 0.1); tone('square', 520, 470, 0.05, 0.07); noise(0.12, 0.2, 'bandpass', 2600, 1600); }, // Rüstung scheppert
@@ -256,6 +257,10 @@ const Audio8 = (() => {
   const CH = { Em: ['e4', 'g4', 'b4'], Am: ['a3', 'c4', 'e4'], B: ['b3', 'd#4', 'f#4'], C: ['c4', 'e4', 'g4'], G: ['g3', 'b3', 'd4'], D: ['d4', 'f#4', 'a4'] };
   const CH_B = { Em: 'e2', Am: 'a1', B: 'b1', C: 'c2', G: 'g1', D: 'd2' };
   const CH_C = ['Em', 'Em', 'Am', 'B', 'Em', 'C', 'Am', 'B', 'G', 'D', 'Em', 'C', 'Am', 'B', 'Em', 'B'];
+  // Weltausstellung – düsterer Walzer (d-Moll, 3/4, 12 Schritte pro Takt): Spieluhr-Melodie mit Echo, Hm-ta-ta, Streicher
+  const EX = { Dm: ['d4', 'f4', 'a4'], A: ['c#4', 'e4', 'a4'], Gm: ['d4', 'g4', 'a#4'], Bb: ['d4', 'f4', 'a#4'], C: ['e4', 'g4', 'c5'], F: ['c4', 'f4', 'a4'], E: ['e4', 'g#4', 'b4'] };
+  const EX_B = { Dm: 'd2', A: 'a1', Gm: 'g1', Bb: 'a#1', C: 'c2', F: 'f2', E: 'e2' };
+  const EX_C = ['Dm', 'Dm', 'A', 'A', 'Gm', 'Gm', 'Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'A', 'Dm', 'Gm', 'A', 'Dm', 'F', 'F', 'C', 'C', 'Bb', 'Bb', 'F', 'A', 'Dm', 'Dm', 'Gm', 'Gm', 'E', 'E', 'A', 'A'];
   // Bibliothek & Uhrturm – Cembalo-Toccata als Totentanz (a-Moll, 172 BPM): rauschende Cembalo-16tel, Oktavbass, Four-on-the-floor
   const LB = { Am: ['a3', 'c4', 'e4'], E: ['g#3', 'b3', 'e4'], Dm: ['d4', 'f4', 'a4'], G: ['g3', 'b3', 'd4'], C: ['c4', 'e4', 'g4'], F: ['f3', 'a3', 'c4'] };
   const LB_B = { Am: ['a1', 'a2'], E: ['e2', 'e3'], Dm: ['d2', 'd3'], G: ['g1', 'g2'], C: ['c2', 'c3'], F: ['f1', 'f2'] };
@@ -419,6 +424,17 @@ const Audio8 = (() => {
       ]),
       p2: LB_C.map(c => toccata(...LB[c])).join(' ') + ' ' + LB_C.map(c => arp3f(...LB[c])).join(' '),
       tri: chordBass(LB_C, LB_B, drive), pad: chordPad(LB_C, LB), dr: section() + ' ' + sectionB(),
+    },
+    expo: {
+      bpm: 168, loop: true, echo: { delay: 4, vol: 0.32 },
+      p1: ['a5:6 f5:3 d5:3', 'e5:3 f5:3 a5:6', 'c#6:6 b5:3 a5:3', 'g5:6 e5:6', 'd6:6 a#5:3 g5:3', 'a5:3 a#5:3 d6:6', 'f6:6 e6:3 d6:3', 'a5:12',
+        'f6:6 d6:3 a#5:3', 'c6:3 d6:3 f6:6', 'g6:6 f6:3 d6:3', 'e6:6 c#6:6', 'd6:4 f6:4 a6:4', 'a#6:6 a6:3 g6:3', 'e6:4 g6:4 c#6:4', 'd6:12',
+        'c6:6 a5:3 f5:3', 'g5:3 a5:3 c6:6', 'e6:6 d6:3 c6:3', 'g5:12', 'd6:6 a#5:3 f5:3', 'g5:3 a5:3 a#5:6', 'a5:4 c6:4 f6:4', 'e6:6 c#6:6',
+        'f6:6 e6:3 d6:3', 'a5:3 d6:3 f6:6', 'g6:6 f6:3 d6:3', 'a#5:6 d6:6', 'g#5:6 b5:3 d6:3', 'e6:6 d6:3 b5:3', 'c#6:4 e6:4 g6:4', 'a6:6 g6:3 e6:3'].join(' '),
+      p2: EX_C.map(c => `-:4 ${EX[c][1]}:2 -:2 ${EX[c][2]}:2 -:2`).join(' '),
+      tri: EX_C.map(c => `${EX_B[c]}:3 -:9`).join(' '),
+      pad: EX_C.map(c => EX[c].join('+') + ':12').join(' '),
+      dr: EX_C.map((c, i) => (i % 8 === 7 ? 'k:4 s:4 s:2 s:2' : 'k:4 h:4 h:4')).join(' '),
     },
     clear: {
       bpm: 150, loop: false,
@@ -626,6 +642,9 @@ const Audio8 = (() => {
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 5200; hp.connect(lp); lp.connect(out);
       ambLfo(nodes, out.gain, 0.13, 0.01);
       if (theme === 'bridge') { const bp = ambNoise(nodes, out, 'bandpass', 380, 5); ambLfo(nodes, bp.frequency, 0.09, 240); level = 0.034; }
+    } else if (theme === 'expo') { // feuchte, stille Halle: leises Rauschen der Lüftung, ein ferner Glasklang
+      ambNoise(nodes, out, 'lowpass', 900); ambDrone(nodes, out, 'sine', 196, 0.12); ambDrone(nodes, out, 'sine', 293.7, 0.08);
+      ambLfo(nodes, out.gain, 0.06, 0.008); level = 0.02;
     } else if (theme === 'forest') { // Wind rauscht in den Kronen, schwillt an und ab
       const bp = ambNoise(nodes, out, 'bandpass', 1600, 0.8); ambLfo(nodes, bp.frequency, 0.05, 500);
       ambNoise(nodes, out, 'lowpass', 300);
@@ -688,6 +707,9 @@ const Audio8 = (() => {
     if (theme === 'tower' && ambT % 32 === 0) { // Uhrwerk: Tick-Tack
       tone('triangle', ambT % 64 ? 1250 : 940, 0, 0.035, 0.035, 0, t);
       noise(0.025, 0.03, 'highpass', 4200, 0, t);
+    } else if (theme === 'expo') { // Kondenswasser tropft vom Glas, ab und zu klirrt eine Scheibe im Rahmen
+      if (Math.random() < 0.005) drip(null, 0.5);
+      if (Math.random() < 0.0015) tone('sine', 1500 + Math.random() * 900, 0, 0.6, 0.014, 0, t);
     } else if (theme === 'forest') { // Grillen zirpen, ab und zu ruft ein Käuzchen (zweimal), irgendwo knackt ein Ast
       if (ambT % 26 < 6 && ambT % 2 === 0) tone('sine', 4300 + (ambT % 52 < 26 ? 0 : 160), 0, 0.03, 0.006, 0, t);
       if (Math.random() < 0.0018) { tone('sine', 430, 390, 0.32, 0.03, 0, t); tone('sine', 410, 360, 0.5, 0.03, 0, t + 0.45); }
