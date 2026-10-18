@@ -55,16 +55,9 @@ class Chandelier extends Ent {
       ctx.fillStyle = i % 2 ? '#4c4c4c' : '#8c8c8c';
       ctx.fillRect(Math.round(lx - cx), Math.round(ly - cy), 1, 2);
     }
-    const x = Math.round(this.x - cx), y = Math.round(this.y - cy);
-    ctx.fillStyle = '#5c4c1c'; ctx.fillRect(x + 18, y - 10, 4, 10);
-    ctx.fillStyle = '#9c6400'; ctx.fillRect(x, y + 1, 40, 3); ctx.fillRect(x + 4, y + 4, 32, 2); ctx.fillRect(x + 14, y + 6, 12, 3);
-    ctx.fillStyle = '#f8b800'; ctx.fillRect(x, y, 40, 1); ctx.fillRect(x + 4, y + 4, 32, 1);
-    ctx.fillStyle = '#fce0a8'; ctx.fillRect(x + 18, y + 9, 4, 2);
-    [2, 11, 27, 36].forEach((k, i) => {
-      ctx.fillStyle = '#fce0a8'; ctx.fillRect(x + k, y - 4, 2, 4);
-      ctx.fillStyle = (W.frame + i * 5) % 12 < 6 ? '#f8b800' : '#f87800'; ctx.fillRect(x + k, y - 7, 2, 3);
-      ctx.fillStyle = '#fcfcfc'; ctx.fillRect(x + k, y - 6, 1, 1);
-    });
+    // Low-Poly-Kronleuchter (PS2): Reif als Ellipse, dreht sich langsam, neigt sich mit dem Schwung
+    ctx.save(); ctx.translate(Math.round(this.x + this.w / 2 - cx), Math.round(this.y + 2 - cy)); ctx.rotate(-this.ang);
+    PS2.drawChandelier(ctx, 0, 0, 19, { yaw: this.t * 0.012, lit: true, holder: this }); ctx.restore();
   }
 }
 
@@ -902,13 +895,9 @@ class FallingChandelier extends Ent {
       ctx.globalAlpha = 1;
       return;
     }
-    // prächtiger Kronleuchter: Krone, zwei Reifen, Kristallgehänge, brennende Kerzen
-    ctx.fillStyle = '#5c4010'; ctx.fillRect(x + 19, y - 6, 6, 6);
-    ctx.fillStyle = '#c89020'; ctx.fillRect(x + 4, y, 36, 3); ctx.fillRect(x + 10, y + 7, 24, 2); ctx.fillRect(x + 20, y - 2, 4, 14);
-    ctx.fillStyle = '#fce0a8'; ctx.fillRect(x + 4, y, 36, 1); ctx.fillRect(x + 10, y + 7, 24, 1);
-    ctx.fillStyle = '#a4b4e4'; for (let k = 0; k < 9; k++) ctx.fillRect(x + 5 + k * 4, y + 3 + (k % 2), 1, 3 + (k % 3));
-    ctx.fillStyle = '#e8f0fc'; ctx.fillRect(x + 21, y + 12, 2, 4);
-    for (let k = 0; k < 5; k++) { const kx = x + 4 + k * 8; ctx.fillStyle = '#e8e0c8'; ctx.fillRect(kx, y - 5, 2, 5); ctx.fillStyle = ((this.t >> 2) + k) % 3 ? '#fcd040' : '#f87800'; ctx.fillRect(kx, y - 8, 2, 3); }
+    // prächtiger Kronleuchter als Low-Poly-Modell (PS2): zwei Reifen, Kristallgehänge, brennende Kerzen; fällt er, kippt er
+    ctx.save(); ctx.translate(x + 22, y + 3); if (this.state === 'fall') ctx.rotate(Math.min(0.35, this.vy * 0.05));
+    PS2.drawChandelier(ctx, 0, 0, 20, { yaw: this.t * (this.state === 'fall' ? 0.05 : 0.01), tiers: 2, lit: true, holder: this }); ctx.restore();
     ctx.globalAlpha = 1;
   }
 }
@@ -1283,7 +1272,16 @@ class Portrait extends Ent {
   draw() {}
   drawBack(ctx) {
     const P = PORTRAITS, px = W.player.cx - W.cam.x, py = W.player.cy - 8 - W.cam.y, red = this.glow > 20;
+    const VX = View.w / 2, VY = 60, f = 0.055, FW = P.FW, FH = P.FH, bk = ([x, y]) => [x + (VX - x) * f, y + (VY - y) * f];
+    const quad = (pts, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) ctx.lineTo(q[0], q[1]); ctx.closePath(); ctx.fill(); };
     for (const [X, Y, v] of this.rects) {
+      // Pseudo-3D: der Rahmen steht von der Wand ab – Schatten auf der Wand, Seitenflächen laufen zum Fluchtpunkt
+      ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(X + 4, Y + 5, FW, FH);
+      const tl = [X, Y], tr = [X + FW, Y], br = [X + FW, Y + FH], bl = [X, Y + FH], btl = bk(tl), btr = bk(tr), bbr = bk(br), bbl = bk(bl);
+      if (btl[0] < X) quad([tl, bl, bbl, btl], '#4c300c');
+      if (btr[0] > X + FW) quad([tr, br, bbr, btr], '#3c2408');
+      if (btl[1] < Y) quad([tl, tr, btr, btl], '#d8a040');
+      if (bbl[1] > Y + FH) quad([bl, br, bbr, bbl], '#2c1806');
       ctx.drawImage(P.art[v], X, Y);
       const hot = red || v === 2;
       for (const [ex, ey] of P.eyes) { // Augäpfel mit Pupillen, die dem Helden folgen

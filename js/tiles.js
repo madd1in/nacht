@@ -1821,6 +1821,7 @@ const Tiles = (() => {
       }
       if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); else [0, 256].forEach(cx => pillar(x, cx, 22, 208)); // Halle: ruhiger Rhythmus – Fenster, Ahnenbild, Pfeiler, Fenster
       add('wall', c, 0.5, { vtile });
+      if (theme === 'hall') L.push({ name: 'win3d', custom: drawHallWindows, par: 0.5, c: C(1, 1) }); // tiefe Fensternischen (Pseudo-3D)
       if (theme === 'throne') L.push({ name: 'hall3d', custom: drawThroneHall, par: 1, c: C(1, 1) }); // PS2-3D-Halle: Marmorboden, Säulen, Lichtbahnen
       else L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) });
       if (theme === 'throne') { // Kronleuchter vorne
@@ -2120,6 +2121,31 @@ const Tiles = (() => {
       const X0 = 262 - off + k * 512;
       if (X0 > View.w || X0 + 16 < 0) continue;
       for (let i = 0; i < 22; i++) { const y = (((i * 37 + frame * 3.2 - oy) % 208) + 208) % 208, len = 5 + (i % 4) * 3; ctx.fillRect(X0 + (i * 5) % 16, Math.round(y), 1, len); }
+    }
+  }
+
+  // ---------------- Halle/Glockenturm: Fenster als tiefe Nischen (Pseudo-3D) ----------------
+  // Die Fenster sind in die Wandebene gemalt; hier bekommen sie Tiefe: die Scheiben liegen zurückgesetzt (zum Fluchtpunkt
+  // verkleinert neu gezeichnet), dazwischen die Laibungen – Stein, die zum Mond gewandte Seite heller, unten die Fensterbank.
+  const HALL_WINS = [64, 320];
+  function drawHallWindows(ctx, cam) {
+    const L = layer('hall', 'wall'); if (!L) return;
+    const img = L.c, Hc = img.height, VX = View.w / 2, VY = 60, f = 0.11, off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512;
+    const oy = W.room && W.room.h > 13 ? ((Math.floor(cam.y * 0.5) % Hc) + Hc) % Hc : 0;
+    const shape = (x, y, s, ox, oy2) => { const r = 16 * s; ctx.beginPath(); ctx.moveTo(ox + x * s, oy2 + (y + 72) * s); ctx.lineTo(ox + x * s, oy2 + y * s); ctx.arc(ox + (x + 16) * s, oy2 + y * s, r, Math.PI, 0); ctx.lineTo(ox + (x + 32) * s, oy2 + (y + 72) * s); ctx.closePath(); };
+    for (let k = -1; k <= Math.ceil(View.w / 512) + 1; k++) for (const ty of oy ? [-oy, Hc - oy] : [0]) for (const wx of HALL_WINS) {
+      const X = wx - off + k * 512, Y = 56 + ty;
+      if (X > View.w + 20 || X + 32 < -20 || Y > 230 || Y + 72 < -30) continue;
+      const bx = X + (VX - X - 16) * f, by = Y + (VY - Y - 36) * f, s = 1 - f; // zurückgesetzte Scheibe: zum Fluchtpunkt gerückt und kleiner
+      ctx.save(); shape(X, Y, 1, 0, 0); ctx.clip();
+      const g = ctx.createLinearGradient(X, 0, X + 32, 0), lit = X + 16 < VX; // Laibung: die dem Licht zugewandte Seite heller
+      g.addColorStop(0, lit ? '#5c5c6c' : '#2c2c38'); g.addColorStop(0.5, '#3c3c4c'); g.addColorStop(1, lit ? '#2c2c38' : '#6c6c7c');
+      ctx.fillStyle = g; ctx.fillRect(X - 2, Y - 18, 36, 92);
+      ctx.fillStyle = 'rgba(160,170,220,0.35)'; ctx.fillRect(X, Y + 68, 32, 4); // Fensterbank im Mondlicht
+      ctx.translate(bx, by); ctx.scale(s, s);
+      shape(0, 16, 1, 0, 0); ctx.clip();
+      ctx.drawImage(img, wx, 40 - ty * 0 , 32, 88, 0, 0, 32, 88);
+      ctx.restore();
     }
   }
 

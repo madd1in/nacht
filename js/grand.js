@@ -138,10 +138,9 @@ class GrandChandelier extends Ent {
       ctx.fillStyle = '#1c1c24'; ctx.fillRect(X - 2, Y, 5, 4);
       ctx.fillStyle = i % 2 ? '#5c5c6c' : '#9c9cac'; if (i % 2) ctx.fillRect(X, Y, 1, 4); else ctx.fillRect(X - 1, Y + 1, 3, 2);
     }
-    const img = GrandChandelier.frames()[Math.floor(W.frame / 7) % 4];
-    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.save(); // XXL-Kronleuchter als Low-Poly-Modell (PS2): zwei Etagen, dreht sich, schwingt mit der Kette
     ctx.translate(Math.round(sx), Math.round(sy)); ctx.rotate(-this.ang); ctx.translate(0, this.L); ctx.scale(s, s);
-    ctx.drawImage(img, -64, -30);
+    PS2.drawChandelier(ctx, 0, 2, 54, { yaw: this.t * 0.006, tiers: 2, lit: true, holder: this });
     ctx.restore();
   }
 }

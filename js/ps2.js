@@ -755,7 +755,42 @@ const PS2 = (() => {
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(e.c, Math.round(cx - R - 2), Math.round(cy - R - 2)); ctx.restore();
   }
 
+  // ---------------- Kronleuchter als Low-Poly-Modell (PS2) ----------------
+  // Messingreif (ein oder zwei Etagen) mit Armen, Nabe und Zapfen, Ketten nach oben, Kerzen mit leuchtenden Flammen,
+  // Kristalltropfen darunter. Von leicht oben gesehen (der Reif wird zur Ellipse), dreht sich langsam um die eigene Achse.
+  const CHENV = { sun: null, sunC: [0.95, 0.82, 0.6], amb: [0.46, 0.38, 0.34], sky: [0.24, 0.2, 0.18], fog: [0, 0, 0], fogD: 0 };
+  { const v = [-0.35, 0.85, -0.4], l = Math.hypot(...v); CHENV.sun = v.map(c => c / l); }
+  function chandMesh(R, yaw, tiers, lit) {
+    const m = mesh(), BR = [208, 156, 64], BR2 = [150, 104, 38], WAX = [238, 230, 210], CRY = [200, 224, 255], FL = [255, 196, 90], IRON = [70, 66, 80];
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), P = (x, y, z) => [x * cy - z * sy, y, x * sy + z * cy];
+    const ring = (r, y, n, w) => { for (let i = 0; i < n; i++) { const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2, [x0, , z0] = P(Math.cos(a0) * r, y, Math.sin(a0) * r), [x1, , z1] = P(Math.cos(a1) * r, y, Math.sin(a1) * r); beam(m, x0, y, z0, x1, y, z1, w, w * 1.3, BR); } };
+    const w = Math.max(1.4, R * 0.075);
+    ring(R, 0, 16, w); if (tiers > 1) ring(R * 0.58, -R * 0.34, 12, w * 0.8);
+    prism(m, 0, -R * 0.5, 0, R * 0.09, R * 0.78, 6, BR2, { rTop: R * 0.05 }); cone(m, 0, -R * 0.5, 0, R * 0.1, -R * 0.2, 6, BR); // Nabe und Zapfen
+    const n = R > 30 ? 10 : 6;
+    for (let i = 0; i < n; i++) {
+      const a = (i + 0.5) / n * Math.PI * 2, [ax, , az] = P(Math.cos(a) * R, 0, Math.sin(a) * R), [mx, , mz] = P(Math.cos(a) * R * 0.55, 0, Math.sin(a) * R * 0.55);
+      beam(m, 0, R * 0.12, 0, mx, R * 0.2, mz, w * 0.7, w * 0.7, BR2); beam(m, mx, R * 0.2, mz, ax, 0, az, w * 0.7, w * 0.7, BR2); // Arm mit Schwung
+      prism(m, ax, 0, az, R * 0.06, R * 0.05, 6, BR); prism(m, ax, R * 0.05, az, R * 0.035, R * 0.22, 5, WAX);       // Tülle, Kerze
+      if (lit) cone(m, ax, R * 0.27, az, R * 0.04, R * 0.13, 4, FL, { e: 1 });
+    }
+    for (let i = 0; i < n * 2; i++) { const a = i / (n * 2) * Math.PI * 2, [x, , z] = P(Math.cos(a) * R, 0, Math.sin(a) * R); cone(m, x, -w * 0.6, z, R * 0.035, -R * (i % 2 ? 0.12 : 0.18), 4, CRY); } // Kristalle
+    if (tiers > 1) for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, [x, , z] = P(Math.cos(a) * R * 0.58, 0, Math.sin(a) * R * 0.58); cone(m, x, -R * 0.36, z, R * 0.03, -R * 0.12, 4, CRY); }
+    for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.3, [x, , z] = P(Math.cos(a) * R, 0, Math.sin(a) * R); beam(m, x, 0, z, 0, R * 0.85, 0, w * 0.4, w * 0.4, IRON); } // Ketten zur Aufhängung
+    return m;
+  }
+  // (x, y) = Bildposition der Reifmitte; o: { yaw, tiers, lit, holder } – holder behält den eigenen Puffer des Objekts
+  function drawChandelier(ctx, x, y, R, o = {}) {
+    const S = 2, Wc = Math.ceil((R * 2.3 + 16) * S), Hc = Math.ceil((R * 2.1 + 16) * S), h = o.holder || o;
+    let B = h._chb;
+    if (!B || B.c.width !== Wc) { B = h._chb = { c: Sprites.canvas(Wc, Hc), k: null }; B.x = B.c.getContext('2d', CPU2D); }
+    const D = R * 9, cam = { x: 0, y: D * Math.tan(0.5), z: -D, yaw: 0, pitch: -0.5, f: D * 1.13 * S, near: 4, hy: 0.42 };
+    const key = Math.round((o.yaw || 0) * 30) + '|' + (o.lit ? 1 : 0) + '|' + R;
+    if (B.k !== key) { B.k = key; B.x.clearRect(0, 0, Wc, Hc); render(B.x, Wc, Hc, [chandMesh(R, o.yaw || 0, o.tiers || 1, o.lit)], cam, CHENV); B.p = project(cam, Wc, Hc, 0, 0, 0); }
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, Wc, Hc, x - B.p[0] / S, y - B.p[1] / S, Wc / S, Hc / S); ctx.restore();
+  }
+
   const prewarm = () => { if (!city) city = buildCity(); };
   const prewarmMap = () => { if (!world) world = buildWorld(); }; // Ladebildschirm: Kartenlandschaft vorab bauen
-  return { mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
+  return { mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawChandelier, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
 })();
