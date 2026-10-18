@@ -649,7 +649,7 @@ const Tiles = (() => {
   function shipView(cam) { const lift = Math.max(0, W.room.h * T - 208 - cam.y); return { lift, hy: SEA_Y + Math.round(lift * 0.12) }; }
   function drawSea(ctx, cam, frame) {
     const v = shipView(cam);
-    Mode7.drawOcean(ctx, View.w, frame, { camX: cam.x, sail: W.sailX || 0, calm: W.sail, rogue: W.rogue ? W.rogue.v : 0, kraken: W.kraken, flash: FX.stormOn(W.storm), lift: v.lift * 0.25, horizon: v.hy });
+    PS2.drawSea(ctx, View.w, frame, { camX: cam.x, sail: W.sailX || 0, calm: W.sail, rogue: W.rogue ? W.rogue.v : 0, kraken: W.kraken, flash: FX.stormOn(W.storm), lift: v.lift * 0.25, horizon: v.hy });
   }
   function buildCoast() {
     const c = C(260, 132), x = c.getContext('2d'), rock = '#0a0614', edge = '#1e1430', wall = '#07030e';

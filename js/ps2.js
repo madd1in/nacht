@@ -368,6 +368,155 @@ const PS2 = (() => {
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
   }
 
+  // ---------------- Schiff: Polygon-Meer und Krakenarme im PS2-Look ----------------
+  // Statt Voxel-Spalten ein facettiertes Dreiecksnetz, das an der Kamera hängt (Zeilen in die Tiefe, Spalten bis über
+  // den Bildrand): flach schattierte Dreiecke, Himmelslicht von oben, Glanzlichter vom Mond (Blinn), türkis durch-
+  // scheinende Kämme, Schaumkronen, Tiefendunst. Die Fangarme sind echte Röhren aus Polygonringen (Saugnäpfe unten),
+  // nach Tiefe mit den Wellen verschränkt gezeichnet. Halbe Auflösung, weich hochskaliert.
+  const SEA = { H: 84, HOR: 41, F: 60, CAM: 30, Z0: 22, Z1: 420 };
+  const SC = { deep: [8, 16, 48], mid: [26, 44, 104], hi: [80, 104, 186], foam: [208, 222, 252], fog: [42, 40, 88], moon: [255, 232, 238], teal: [40, 124, 152] };
+  const TCL = { d: [40, 10, 56], m: [104, 40, 128], l: [168, 92, 196], k: [240, 190, 226], kc: [120, 36, 86] };
+  const nrm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const LM = nrm([0.32, 0.4, 0.86]), LT = nrm([0.6, 0.8, -0.3]), HT = nrm([LT[0], LT[1] + 0.3, LT[2] - 1]);
+  let seaBuf = null, seaPerf = 0, seaSlow = 0, seaLo = false;
+  function seaH(u, z, t, A, rv, AR) {
+    const s = (Math.sin(z * 0.045 + t * 0.035 + Math.sin(u * 0.012 + z * 0.004) * 1.2) + 1) * 0.5, s3 = s * s * s;
+    let h = s3 * A + Math.sin(u * 0.06 + z * 0.03 - t * 0.05) * 3 + Math.sin(u * 0.11 - z * 0.07 + t * 0.08) * 1.5;
+    if (AR) { const d = z - rv, q = d / (d < 0 ? 8 : 22); h += Math.exp(-q * q) * (0.8 + 0.2 * Math.cos(u * 0.02 + t * 0.01)) * AR; }
+    return h;
+  }
+  const mixc = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+  const depthFog = (z) => Math.min(1, (z - SEA.Z0) / (SEA.Z1 - SEA.Z0) * 1.25);
+  // Fangarme: dieselbe Bahn wie bisher (auftauchen, schwanken, zuschlagen, versinken), aber als Röhre aus M-Ecken-Ringen
+  function tentaclePolys(k, t, fx, F, Wb, HOR, CAM, out) {
+    const r = Math.min(1, k.t / 90), rise = r * r * (3 - 2 * r), ts = k.sw !== undefined ? k.sw : k.t;
+    const a = k.t > 330 ? Math.min(1, (k.t - 330) / 34) : 0, ang = a * a * 1.45, sink = k.t > 370 ? (k.t - 370) / 50 : 0;
+    const N = View.lite ? 12 : 16, M = 6, q = F / fx; // x in isotropen Einheiten (Bildschirmmaß wie die Höhe)
+    const proj = (X, Y, Z) => [Wb / 2 + X * F / Z, HOR + (CAM - Y) * F / Z];
+    for (const arm of k.arms) {
+      const P = [];
+      for (let i = 0; i <= N; i++) {
+        const s = i / N, h = s * arm.len * rise;
+        const du = Math.sin(s * 3.2 + ts * 0.045 + arm.ph) * 10 * s + (s > 0.65 ? Math.sin(ts * 0.07 + arm.ph) * (s - 0.65) * 36 : 0);
+        const dz = Math.cos(s * 2 + ts * 0.03 + arm.ph) * 6 * s;
+        P.push([(arm.u + du) / q, h * Math.cos(ang) - sink * arm.len, Math.max(SEA.Z0, arm.z + dz - h * Math.sin(ang)), (1 - s * 0.85) * 6 + 1]);
+      }
+      const rings = [];
+      for (let i = 0; i <= N; i++) {
+        const p = P[i], A2 = P[Math.max(0, i - 1)], B2 = P[Math.min(N, i + 1)];
+        const T2 = nrm([B2[0] - A2[0], B2[1] - A2[1], B2[2] - A2[2]]);
+        let S = nrm([T2[1], -T2[0], 0]); if (!isFinite(S[0]) || (S[0] === 0 && S[1] === 0)) S = [1, 0, 0];
+        const D = nrm([S[1] * T2[2] - S[2] * T2[1], S[2] * T2[0] - S[0] * T2[2], S[0] * T2[1] - S[1] * T2[0]]);
+        const ring = [];
+        for (let m = 0; m < M; m++) {
+          const th = m / M * Math.PI * 2, c = Math.cos(th), sn = Math.sin(th);
+          const n = [S[0] * c + D[0] * sn, S[1] * c + D[1] * sn, S[2] * c + D[2] * sn];
+          ring.push({ x: p[0] + n[0] * p[3], y: p[1] + n[1] * p[3], z: p[2] + n[2] * p[3], n });
+        }
+        rings.push(ring);
+      }
+      for (let i = 0; i < N; i++) for (let m = 0; m < M; m++) {
+        const v = [rings[i][m], rings[i][(m + 1) % M], rings[i + 1][(m + 1) % M], rings[i + 1][m]];
+        const n = nrm([v[0].n[0] + v[1].n[0] + v[2].n[0] + v[3].n[0], v[0].n[1] + v[1].n[1] + v[2].n[1] + v[3].n[1], v[0].n[2] + v[1].n[2] + v[2].n[2] + v[3].n[2]]);
+        const cx = (v[0].x + v[2].x) / 2, cy = (v[0].y + v[2].y) / 2, cz = (v[0].z + v[2].z) / 2;
+        if (n[0] * -cx + n[1] * (CAM - cy) + n[2] * -cz <= 0) continue; // Rückseite
+        if (v.some(w2 => w2.z < 4)) continue;
+        const pts = []; for (const w2 of v) pts.push(...proj(w2.x, w2.y, w2.z));
+        const dl = n[0] * LT[0] + n[1] * LT[1] + n[2] * LT[2];
+        let col = dl > 0.55 ? mixc(TCL.m, TCL.l, (dl - 0.55) / 0.45) : dl > -0.2 ? mixc(TCL.d, TCL.m, (dl + 0.2) / 0.75) : TCL.d;
+        if (i % 3 === 0 && i < N * 0.72 && (m === 3 || m === 4)) col = m === 3 ? TCL.k : TCL.kc; // Saugnäpfe an der Unterseite
+        const sp = Math.max(0, n[0] * HT[0] + n[1] * HT[1] + n[2] * HT[2]) ** 18;                    // nasser Glanz
+        out.push({ z: cz, pts, col: [col[0] + 220 * sp, col[1] + 200 * sp, col[2] + 230 * sp], fog: depthFog(cz) });
+      }
+      if (rise > 0.3 && sink < 0.6) { // Schaumkranz, wo der Arm aus dem Wasser bricht
+        const b = P[0], R = b[3] * 2.4;
+        for (let m = 0; m < 7; m++) {
+          const a0 = m / 7 * Math.PI * 2 + t * 0.05, a1 = a0 + 0.75, hh = 2 + ((m + (t >> 3)) % 3);
+          const z0 = Math.max(SEA.Z0, b[2] + Math.sin(a0) * R * 0.5), z1 = Math.max(SEA.Z0, b[2] + Math.sin(a1) * R * 0.5), zz = (z0 + z1) / 2 - 1;
+          out.push({ z: zz, pts: [...proj(b[0] + Math.cos(a0) * R, 0.5, z0), ...proj(b[0] + Math.cos(a1) * R, 0.5, z1), ...proj(b[0] + (Math.cos(a0) + Math.cos(a1)) * R / 2, hh, zz)], col: SC.foam, fog: depthFog(zz) });
+        }
+      }
+    }
+  }
+  const cssCache = new Map();
+  const cssQ = (r, g, b) => { // Farbe quantisiert (PS2-Flächen, weniger Füllwechsel), Zeichenkette zwischengespeichert
+    r = Math.min(255, Math.max(0, r)) & 0xf8; g = Math.min(255, Math.max(0, g)) & 0xf8; b = Math.min(255, Math.max(0, b)) & 0xf8;
+    const k = (r << 16) | (g << 8) | b;
+    let c = cssCache.get(k); if (!c) { c = `rgb(${r},${g},${b})`; cssCache.set(k, c); }
+    return c;
+  };
+  function drawSea(ctx, w, t, o = {}) {
+    const TOP = 48, t0 = performance.now(), lo = View.lite || seaLo, Wb = Math.ceil(w / 2), Hb = SEA.H + TOP, HY = o.horizon || 122; // TOP: Luft über dem Meer für hohe Fangarme
+    if (!seaBuf || seaBuf.c.width !== Wb) { seaBuf = { c: Sprites.canvas(Wb, Hb) }; seaBuf.x = seaBuf.c.getContext('2d'); }
+    const x = seaBuf.x; x.clearRect(0, 0, Wb, Hb);
+    const calm = o.calm === undefined ? 1 : o.calm, A = 30 * (0.3 + 0.7 * calm), light = o.flash ? 1.6 : 1;
+    const CAM = SEA.CAM + (o.lift || 0), F = SEA.F, HOR = SEA.HOR + TOP, fx = Wb / (2 * 0.95), q = F / fx;
+    const rv = o.rogue || 0, AR = rv ? 80 * Math.sqrt(Math.max(0, 1 - rv / 430)) : 0, u0 = (o.camX || 0) * 0.06 + (o.sail || 0) * 0.8;
+    const NC = lo ? 18 : 30, zs = [];
+    for (let z = SEA.Z0; z < SEA.Z1; z = z * (lo ? 1.22 : 1.14) + 0.5) zs.push(z);
+    zs.push(SEA.Z1);
+    const NR = zs.length, NV = NC + 1, n = NR * NV;
+    if (!seaBuf.VX || seaBuf.VX.length !== n) { seaBuf.VX = new Float32Array(n); seaBuf.VY = new Float32Array(n); seaBuf.SX = new Float32Array(n); seaBuf.SY = new Float32Array(n); }
+    const VX = seaBuf.VX, VY = seaBuf.VY, SX = seaBuf.SX, SY = seaBuf.SY;
+    for (let r = 0; r < NR; r++) {
+      const z = zs[r];
+      for (let c = 0; c <= NC; c++) { const xr = (c / NC * 2 - 1) * 1.1 * z, i = r * NV + c; VX[i] = xr; VY[i] = seaH(u0 + xr, z, t, A, rv, AR); SX[i] = Wb / 2 + xr * fx / z; SY[i] = HOR + (CAM - VY[i]) * F / z; }
+    }
+    x.fillStyle = cssQ(SC.fog[0] * light, SC.fog[1] * light, SC.fog[2] * light); x.fillRect(0, HOR, Wb, Hb - HOR); // Dunst bis zum Horizont
+    x.fillStyle = `rgba(226,200,222,${(0.35 * light).toFixed(2)})`; x.fillRect(0, HOR, Wb, 1);
+    const tp = [];
+    if (o.kraken && o.kraken.t >= 0) tentaclePolys(o.kraken, t, fx, F, Wb, HOR, CAM, tp);
+    tp.sort((a, b) => b.z - a.z);
+    let ti = 0;
+    x.lineWidth = 0.7; x.lineJoin = 'round';
+    const fillOne = (pts, col, fog) => {
+      const css = cssQ((col[0] + (SC.fog[0] - col[0]) * fog) * light, (col[1] + (SC.fog[1] - col[1]) * fog) * light, (col[2] + (SC.fog[2] - col[2]) * fog) * light);
+      x.fillStyle = css; x.strokeStyle = css; x.beginPath(); x.moveTo(pts[0], pts[1]);
+      for (let k = 2; k < pts.length; k += 2) x.lineTo(pts[k], pts[k + 1]);
+      x.closePath(); x.fill(); x.stroke();
+    };
+    const [D0, D1, D2] = SC.deep, [M0, M1, M2] = SC.mid, [H0c, H1c, H2c] = SC.hi, [T0, T1, T2] = SC.teal, [F0, F1, F2] = SC.foam, [G0, G1, G2] = SC.fog, [O0, O1, O2] = SC.moon;
+    const rowPaths = new Map();
+    for (let r = NR - 2; r >= 0; r--) { // von hinten nach vorn; Krakenarme nach Tiefe dazwischen
+      const za = zs[r], zb = zs[r + 1], zm = (za + zb) / 2, fog = depthFog(zm), dz = zb - za;
+      while (ti < tp.length && tp[ti].z >= zm) { const p = tp[ti++]; fillOne(p.pts, p.col, p.fog); }
+      rowPaths.clear();
+      for (let c = 0; c < NC; c++) {
+        const a = r * NV + c, b = a + 1, d = (r + 1) * NV + c, e = d + 1;
+        if (Math.max(SY[a], SY[b], SY[d], SY[e]) < 0 || Math.min(SX[a], SX[d]) > Wb || Math.max(SX[b], SX[e]) < 0) continue;
+        // Viereck-Normale aus den Diagonalen (x isotrop), nach oben gerichtet
+        const ux = (VX[e] - VX[a]) / q, uy = VY[e] - VY[a], uz = dz, vx = (VX[d] - VX[b]) / q, vy = VY[d] - VY[b], vz = dz;
+        let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl; if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+        const px = VX[a] / q, py = VY[a], pz = za;
+        let vX = -px, vY = CAM - py, vZ = -pz; const vl = Math.hypot(vX, vY, vZ) || 1; vX /= vl; vY /= vl; vZ /= vl;
+        let hx = LM[0] + vX, hy = LM[1] + vY, hz = LM[2] + vZ; const hl = Math.hypot(hx, hy, hz) || 1; hx /= hl; hy /= hl; hz /= hl;
+        const ndl = nx * LM[0] + ny * LM[1] + nz * LM[2], nv = Math.max(0, nx * vX + ny * vY + nz * vZ), fres = (1 - nv) * (1 - nv) * (1 - nv);
+        const hAvg = (VY[a] + VY[b] + VY[d] + VY[e]) / 4, crest = Math.max(0, Math.min(1, (hAvg - A * 0.4) / (A * 0.6 + AR * 0.5 + 1)));
+        let k = Math.max(0, Math.min(1, 0.05 + ny * 0.3 + fres * 0.45 + crest * 0.35));
+        let R = D0 + (M0 - D0) * k, G = D1 + (M1 - D1) * k, B = D2 + (M2 - D2) * k;
+        k = Math.max(0, ndl) * crest * 0.5; R += (H0c - R) * k; G += (H1c - G) * k; B += (H2c - B) * k;
+        if (crest > 0.62 && ndl < 0.25) { k = Math.min(0.45, (crest - 0.62) * 1.2); R += (T0 - R) * k; G += (T1 - G) * k; B += (T2 - B) * k; } // Licht scheint durch dünne Kämme
+        if (crest > 0.93 && fog < 0.6) { k = Math.min(0.85, (crest - 0.93) / 0.07); R += (F0 - R) * k; G += (F1 - G) * k; B += (F2 - B) * k; }              // Schaumkronen
+        const sd = Math.max(0, nx * hx + ny * hy + nz * hz), sp = sd > 0.9 ? Math.pow(sd, 60) * 1.5 : 0;                                  // Mondglanz
+        R += O0 * sp; G += O1 * sp; B += O2 * sp;
+        R += (G0 - R) * fog; G += (G1 - G) * fog; B += (G2 - B) * fog;
+        const css = cssQ(R * light, G * light, B * light);
+        let pth = rowPaths.get(css); if (!pth) { pth = new Path2D(); rowPaths.set(css, pth); }
+        pth.moveTo(SX[a], SY[a]); pth.lineTo(SX[b], SY[b]); pth.lineTo(SX[e], SY[e]); pth.lineTo(SX[d], SY[d]); pth.closePath();
+      }
+      for (const [css, pth] of rowPaths) { x.fillStyle = css; x.strokeStyle = css; x.fill(pth); x.stroke(pth); }
+    }
+    while (ti < tp.length) { const p = tp[ti++]; fillOne(p.pts, p.col, p.fog); }
+    ctx.save(); ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(seaBuf.c, 0, 0, Wb, Hb, 0, HY - HOR * 2, Wb * 2, Hb * 2); // HOR enthält TOP: Oberkante liegt TOP höher
+    ctx.restore();
+    if (!seaLo && !View.lite) { // dauerhaft zu teuer: gröberes Netz
+      seaPerf = seaPerf * 0.95 + (performance.now() - t0) * 0.05;
+      if (seaPerf > 6) { if (++seaSlow > 120) { seaLo = true; console.info('[NACHTMAHR] Meer: gröberes Netz'); } } else seaSlow = 0;
+    }
+  }
+
   const prewarm = () => { if (!city) city = buildCity(); };
-  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, Tower, ENV, prewarm };
+  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, drawSea, Tower, ENV, prewarm };
 })();
