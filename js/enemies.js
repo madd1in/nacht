@@ -756,33 +756,57 @@ class Panther extends Enemy {
 // Bücher lösen sich aus den Regalen und schlagen mit den Buchdeckeln wie mit Flügeln; dazwischen fächern sich die Seiten
 // auf, ein rotes Lesebändchen flattert hinterher. Ab und zu stoßen sie im Sturzflug auf den Helden herab.
 const BOOK_COLS = [['#4c0c14', '#a02830', '#d85048'], ['#101848', '#2c3c8c', '#5068c0'], ['#0c3018', '#1c6430', '#3c9050'], ['#3c2008', '#7c4c1c', '#b07838'], ['#3c0c3c', '#6c2470', '#9c48a0']];
+// Fliegende Bücher, gemalt wie kleine 3D-Modelle: der Buchrücken läuft schräg in die Tiefe, die Ledereinbände schlagen
+// wie Flügel (Parallelogramme mit Dicke, Licht von oben links, Goldecken, Prägung), dazwischen fächern die Seiten auf.
+// Kanten danach pixelhart (Alpha-Schwelle), die Verläufe bleiben – SNES-Look mit PS2-Plastizität.
 const BOOK_SPR = BOOK_COLS.map(([d, m, l]) => {
-  const mk = (ang, closed, rib) => {
-    const c = Sprites.canvas(20, 16), x = c.getContext('2d'), P = (col, X, Y) => { x.fillStyle = col; x.fillRect(Math.round(X), Math.round(Y), 1, 1); };
-    const cx = 10, cy = 8;
-    if (closed) { // zugeklappt, liegt auf dem Regalbrett: Deckel, Seitenschnitt, Rücken mit Goldbünden
-      for (let X = 4; X < 17; X++) { P(m, X, 10); P('#ece4cc', X, 11); P('#c8bca0', X, 12); P(d, X, 13); }
-      P(l, 5, 10); P(l, 6, 10); P('#e8c070', 15, 10); P('#e8c070', 15, 13);
-      for (let Y = 10; Y < 14; Y++) P(Y === 11 || Y === 12 ? '#e8c070' : l, 3, Y);
-      P('#d82828', 16, 14); P('#a81818', 17, 15);
-      return Sprites.fromCanvas(c);
+  const W0 = 24, H0 = 20, cx = 9.5, cy = 13, D = [4.4, -4.6], L = 8.5;
+  const harden = (c) => { const x = c.getContext('2d'), img = x.getImageData(0, 0, c.width, c.height), dd = img.data; for (let i = 3; i < dd.length; i += 4) dd[i] = dd[i] < 100 ? 0 : 255; x.putImageData(img, 0, 0); return Sprites.fromCanvas(c); };
+  const quad = (x, pts, fill) => { x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) x.lineTo(q[0], q[1]); x.closePath(); x.fillStyle = fill; x.fill(); };
+  const mk = (ang, rib) => {
+    const c = Sprites.canvas(W0, H0), x = c.getContext('2d');
+    const P0 = [cx, cy], P1 = [cx + D[0], cy + D[1]];
+    const tip = (s, a, len = L) => [s * len * Math.cos(a), -len * Math.sin(a)];
+    // Seitenfächer zwischen den Deckeln (hinten zuerst): cremefarbene Blätter mit Goldschnitt an der Kante
+    for (const s of [-1, 1]) for (let k = 1; k >= 0; k--) {
+      const a0 = Math.max(ang, 0) + 0.25, a = a0 + (Math.PI / 2 - a0) * (0.18 + k * 0.3), t = tip(s, a, L - 2);
+      quad(x, [P0, P1, [P1[0] + t[0], P1[1] + t[1]], [P0[0] + t[0], P0[1] + t[1]]], k % 2 ? '#e4d8bc' : '#f8f0dc');
+      x.strokeStyle = '#c8a050'; x.lineWidth = 0.7; x.beginPath(); x.moveTo(P0[0] + t[0], P0[1] + t[1]); x.lineTo(P1[0] + t[0], P1[1] + t[1]); x.stroke();
     }
-    for (const s of [-1, 1]) {
-      const a0 = Math.max(ang, 0) + 0.25;
-      for (let k = 0; k < 4; k++) { // Seitenfächer zwischen den Deckeln
-        const a = a0 + (Math.PI / 2 - a0) * (0.12 + k * 0.22);
-        for (let r = 1; r <= 6; r++) P(k % 2 ? '#d8ccb0' : '#f4ecd8', cx + s * r * Math.cos(a), cy - r * Math.sin(a));
-      }
-      for (let r = 0; r <= 8; r++) { // Buchdeckel: Leder, dunkle Unterkante, Goldecke an der Spitze
-        const X = cx + s * r * Math.cos(ang), Y = cy - r * Math.sin(ang);
-        P(d, X, Y + 1); P(r > 6 ? '#e8c070' : r === 4 ? l : m, X, Y);
-      }
+    for (const s of [-1, 1]) { // Einbände: Leder mit Verlauf (oben hell), Dicke als dunkle Kante, Goldecken, Prägung
+      const t = tip(s, ang), up = Math.sin(ang) > 0.2;
+      const g = x.createLinearGradient(P0[0], P0[1] - 6, P0[0] + t[0], P0[1] + t[1] + 4);
+      g.addColorStop(0, l); g.addColorStop(0.55, m); g.addColorStop(1, d);
+      const A = P0, B = P1, C2 = [P1[0] + t[0], P1[1] + t[1]], E = [P0[0] + t[0], P0[1] + t[1]];
+      quad(x, [[A[0], A[1] + 1.2], [E[0], E[1] + 1.2], [C2[0], C2[1] + 1.2], [B[0], B[1] + 1.2]], d); // Deckeldicke
+      quad(x, [A, B, C2, E], g);
+      x.strokeStyle = 'rgba(255,230,160,0.9)'; x.lineWidth = 0.8; x.beginPath(); x.moveTo(E[0], E[1]); x.lineTo(C2[0], C2[1]); x.stroke(); // Goldkante
+      for (const q of [E, C2]) { x.fillStyle = '#f0c040'; x.fillRect(q[0] - 1.2, q[1] - 1.2, 2.4, 2.4); x.fillStyle = '#fcf0a0'; x.fillRect(q[0] - 1.2, q[1] - 1.2, 1, 1); } // Eckbeschläge
+      const mx = (A[0] + B[0] + C2[0] + E[0]) / 4, my = (A[1] + B[1] + C2[1] + E[1]) / 4; // geprägtes Emblem
+      x.fillStyle = up ? '#fce0a8' : '#c8982c'; x.beginPath(); x.arc(mx, my, 1.4, 0, Math.PI * 2); x.fill();
+      x.fillStyle = d; x.fillRect(mx - 0.4, my - 0.4, 0.8, 0.8);
     }
-    P(d, cx - 1, cy + 1); P(d, cx, cy + 1); P(d, cx + 1, cy + 1); P('#e8c070', cx, cy + 2); // Rücken
-    P('#d82828', cx + rib, cy + 3); P('#d82828', cx + rib * 2, cy + 4); P('#a81818', cx + rib * 2, cy + 5); // Lesebändchen
-    return Sprites.fromCanvas(c);
+    // Rücken mit Goldbünden, Lesebändchen
+    x.strokeStyle = d; x.lineWidth = 2.6; x.lineCap = 'round'; x.beginPath(); x.moveTo(P0[0], P0[1] + 0.6); x.lineTo(P1[0], P1[1] + 0.6); x.stroke();
+    x.strokeStyle = m; x.lineWidth = 1.4; x.beginPath(); x.moveTo(P0[0], P0[1]); x.lineTo(P1[0], P1[1]); x.stroke();
+    for (const k of [0.25, 0.75]) { x.fillStyle = '#f0c040'; x.fillRect(P0[0] + D[0] * k - 1, P0[1] + D[1] * k - 0.5, 2, 1); }
+    x.strokeStyle = '#d82828'; x.lineWidth = 1; x.beginPath(); x.moveTo(cx + D[0] * 0.5, cy + D[1] * 0.5 + 1); x.quadraticCurveTo(cx + D[0] * 0.5 + rib, cy + D[1] * 0.5 + 3, cx + D[0] * 0.5 + rib * 1.5, cy + D[1] * 0.5 + 4.5); x.stroke();
+    return harden(c);
   };
-  return { fly: [1.05, 0.62, 0.18, -0.3, 0.18, 0.62].map((a, i) => mk(a, false, i % 3 === 0 ? 0 : i < 3 ? 1 : -1)), dive: mk(1.3, false, 0), closed: mk(0, true, 0) };
+  const closed = (() => { // zugeklappt auf dem Brett: Quader mit Deckel, Goldschnitt-Seitenblock, Rücken mit Bünden
+    const c = Sprites.canvas(W0, H0), x = c.getContext('2d'), y0 = 13, x0 = 5, w = 13, dz = [3, -2.5];
+    const g = x.createLinearGradient(x0, y0 - 3, x0 + w, y0); g.addColorStop(0, l); g.addColorStop(1, m);
+    quad(x, [[x0, y0], [x0 + w, y0], [x0 + w + dz[0], y0 + dz[1]], [x0 + dz[0], y0 + dz[1]]], g);             // Deckel oben
+    quad(x, [[x0, y0], [x0 + w, y0], [x0 + w, y0 + 4], [x0, y0 + 4]], '#f4ecd8');                              // Seitenblock vorn
+    for (let k = 1; k < 4; k++) { x.fillStyle = '#c8bca0'; x.fillRect(x0 + 1, y0 + k, w - 2, 0.5); }
+    x.fillStyle = '#c8982c'; x.fillRect(x0, y0, w, 0.8);
+    quad(x, [[x0 + w, y0], [x0 + w + dz[0], y0 + dz[1]], [x0 + w + dz[0], y0 + 4 + dz[1]], [x0 + w, y0 + 4]], d); // Rücken rechts
+    x.fillStyle = '#f0c040'; x.fillRect(x0 + w + 0.5, y0 + 1, 2, 0.8); x.fillRect(x0 + w + 0.5, y0 + 2.6, 2, 0.8);
+    x.fillStyle = '#d82828'; x.fillRect(x0 + 4, y0 + 4, 1, 3); // Lesebändchen hängt heraus
+    x.fillStyle = '#fce0a8'; x.beginPath(); x.arc(x0 + w / 2 + 1.5, y0 - 1.2, 1.2, 0, Math.PI * 2); x.fill(); // Prägung
+    return harden(c);
+  })();
+  return { fly: [1.05, 0.62, 0.18, -0.3, 0.18, 0.62].map((a, i) => mk(a, i % 3 === 0 ? 0 : i < 3 ? 1 : -1)), dive: mk(1.3, 0), closed };
 });
 
 class FlyBook extends Enemy {
@@ -828,7 +852,7 @@ class FlyBook extends Enemy {
     const S = BOOK_SPR[this.col];
     const s = this.state === 'rest' ? S.closed : this.state === 'dive' ? S.dive : S.fly[Math.floor(this.t / (this.state === 'wake' ? 2 : 4)) % 6];
     if (this.state === 'emerge') ctx.globalAlpha = Math.min(1, this.t / 24);
-    this.ds(ctx, s, Math.round(this.cx - 10 - W.cam.x), Math.round(this.cy - 8 - W.cam.y), this.face < 0, this.flash);
+    this.ds(ctx, s, Math.round(this.cx - 12 - W.cam.x), Math.round(this.cy - 10 - W.cam.y), this.face < 0, this.flash);
     ctx.globalAlpha = 1;
   }
 }

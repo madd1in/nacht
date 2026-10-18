@@ -326,6 +326,48 @@ const PS2 = (() => {
     drawCathedral(ctx, cam, frame, { theta: a + 2.2, R: 300, cx: 520, cz: 120, rise: 300, pitch: 0.16 });
   }
 
+  // ---------------- Burghof: Low-Poly-Wald im Mondlicht ----------------
+  // Tannen (Stamm + gestufte Kegel) und knorrige tote Bäume (verzweigte Balken) auf einer Ebene, echte Perspektive:
+  // ferne Tannen hinter der Burg (band 0), nahe Bäume davor (band 1). Mondlicht von rechts hinten zeichnet die Kanten
+  // rötlich-violett nach, dazwischen violetter Dunst. Gerendert in halber Auflösung, weich hochskaliert.
+  const FENV = { sun: null, sunC: [0.95, 0.55, 0.95], amb: [0.24, 0.17, 0.32], sky: [0.12, 0.08, 0.2], fog: [58, 28, 88], fogD: 0.0009 };
+  { const v = [0.8, 0.5, -0.35], l = Math.hypot(...v); FENV.sun = v.map(c => c / l); }
+  let forest = null;
+  const fbuf = [null, null];
+  function buildForest() {
+    let s = 913; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+    const far = mesh(), near = mesh(), PINE = [50, 84, 86], PINE2 = [66, 100, 96], BARK = [80, 54, 62], DEAD = [64, 42, 68];
+    const pine = (m, x, z, k, tiers) => {
+      prism(m, x, 0, z, 2.6 * k, 16 * k, 4, BARK, { cap: false });
+      for (let t = 0; t < tiers; t++) cone(m, x, (10 + t * 13) * k, z, (17 - t * 4.5) * k, (24 - t * 3) * k, 6, t % 2 ? PINE2 : PINE, { rot: rnd() * 3 });
+    };
+    const dead = (m, x, z, k) => { // Stamm mit Ästen, die nach oben greifen
+      const limb = (x0, y0, z0, a, b, len, w, d) => {
+        const x1 = x0 + Math.cos(a) * Math.sin(b) * len, y1 = y0 + Math.cos(b) * len, z1 = z0 + Math.sin(a) * Math.sin(b) * len;
+        beam(m, x0, y0, z0, x1, y1, z1, w, w, DEAD);
+        if (d > 0) for (let i = 0, n = 2 + (d > 2 && rnd() < 0.4 ? 1 : 0); i < n; i++) limb(x1, y1, z1, a + (i - (n - 1) / 2) * 2.4 + (rnd() - 0.5) * 0.8, Math.min(1.05, b * 0.6 + 0.3 + rnd() * 0.3), len * (0.68 + rnd() * 0.12), w * 0.62, d - 1);
+      };
+      for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + rnd(); beam(m, x, 3 * k, z, x + Math.cos(a) * 14 * k, 0, z + Math.sin(a) * 14 * k, 3.4 * k, 3 * k, BARK); } // Wurzeln
+      limb(x, 0, z, rnd() * 6, 0.08 + rnd() * 0.1, 42 * k, 10 * k, 4);
+    };
+    for (let i = 0; i < 70; i++) pine(far, -900 + rnd() * 4200, 820 + rnd() * 520, 2.1 + rnd() * 1.4, 3);
+    for (let i = 0; i < 26; i++) pine(near, -700 + rnd() * 3800, 430 + rnd() * 260, 1.4 + rnd() * 0.8, 3);
+    for (let i = 0; i < 9; i++) dead(near, -400 + i * 400 + rnd() * 160, 330 + rnd() * 40, 1.15 + rnd() * 0.35);
+    return [[far], [near]];
+  }
+  function drawForest(ctx, cam, frame, band) {
+    if (!forest) forest = buildForest();
+    const w = View.w, lite = View.lite, dv = lite ? 3 : 2, Wb = Math.ceil(w / dv), Hb = Math.ceil(208 / dv);
+    let B = fbuf[band];
+    if (!B || B.c.width !== Wb) { B = fbuf[band] = { c: Sprites.canvas(Wb, Hb), key: null }; B.x = B.c.getContext('2d'); }
+    const camX = cam.x + w / 2, key = Math.round(cam.x / (lite ? 3 : 2)) + '|' + Wb;
+    if (B.key !== key) {
+      B.key = key; B.x.clearRect(0, 0, Wb, Hb);
+      render(B.x, Wb, Hb, forest[band], { x: camX, y: 118, z: 0, yaw: 0, pitch: 0, f: 200 / dv, near: 20, hy: 0.62 }, FENV);
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
+  }
+
   const prewarm = () => { if (!city) city = buildCity(); };
-  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, Tower, ENV, prewarm };
+  return { mesh, box, prism, cone, gable, beam, render, project, drawCathedral, drawSpireBg, drawForest, Tower, ENV, prewarm };
 })();

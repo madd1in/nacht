@@ -464,6 +464,7 @@ class Gatehouse extends Ent {
     const cx = W.cam.x, cy = W.cam.y, fx = Math.round(this.x - cx);
     if (fx > View.w + 40 || fx + this.w < -150) return;
     const A = Gatehouse.art();
+    this.drawDepth(ctx, fx, Math.round(-cy));
     ctx.drawImage(A.back, fx, Math.round(-cy));
     const tp = this.tip(); // Kette von der Mauer zur Brückenspitze
     [[this.hx + 4, 74], [this.hx + 8, 82]].forEach(([kx, ky], j) => {
@@ -543,6 +544,32 @@ class Gatehouse extends Ent {
     for (let i = 4; i < len; i += 24) { x.fillStyle = '#2c2c38'; x.fillRect(i, 0, 4, 14); x.fillStyle = '#8c8898'; x.fillRect(i, 1, 1, 12); x.fillStyle = '#c8c4d0'; x.fillRect(i + 2, 3, 1, 1); x.fillRect(i + 2, 10, 1, 1); }
     x.fillStyle = '#4c4858'; x.fillRect(0, 4, 4, 6); x.fillStyle = '#9c98a8'; x.fillRect(0, 5, 1, 4); // Kettenöse
     return (Gatehouse.pl = c);
+  }
+  // PS2-Tiefe: die Silhouette des Torhauses wird zum Fluchtpunkt (Bildmitte) hin extrudiert – gestaffelte, nach hinten
+  // dunkler werdende Kopien ergeben massive Seitenflächen, die sich beim Vorbeigehen drehen
+  static depthLayers() {
+    if (Gatehouse.DL) return Gatehouse.DL;
+    const A = Gatehouse.art(), Wd = A.back.width, Hd = A.back.height, N = 9, out = [];
+    for (let i = 0; i < N; i++) {
+      const t = Sprites.canvas(Wd, Hd), y = t.getContext('2d'), k = i / (N - 1);
+      y.drawImage(A.back, 0, 0); y.drawImage(A.front, 0, 0);
+      y.globalCompositeOperation = 'source-in';
+      const g = y.createLinearGradient(0, 0, Wd, 0); // Fackelschein vorn warm, hinten kaltes Mondlicht
+      g.addColorStop(0, `rgb(${Math.round(92 - 66 * k)},${Math.round(62 - 44 * k)},${Math.round(80 - 48 * k)})`);
+      g.addColorStop(1, `rgb(${Math.round(42 - 26 * k)},${Math.round(34 - 22 * k)},${Math.round(58 - 30 * k)})`);
+      y.fillStyle = g; y.fillRect(0, 0, Wd, Hd);
+      y.globalCompositeOperation = 'source-atop'; y.fillStyle = 'rgba(0,0,0,0.35)'; // Quaderfugen auf den Seitenflächen
+      for (let Y = 0; Y < Hd; Y += 8) y.fillRect(0, Y, Wd, 1);
+      out.push(t);
+    }
+    return (Gatehouse.DL = out);
+  }
+  drawDepth(ctx, fx, fy) {
+    const L = Gatehouse.depthLayers(), n = View.lite ? 5 : L.length, vx = View.w / 2, vy = 104, w = L[0].width, h = L[0].height, D = 0.2;
+    for (let i = n; i >= 1; i--) {
+      const s = 1 - D * i / n, img = L[Math.min(L.length - 1, Math.round((i - 1) / Math.max(1, n - 1) * (L.length - 1)))];
+      ctx.drawImage(img, vx + (fx - vx) * s, vy + (fy - vy) * s, w * s, h * s);
+    }
   }
   static art() { // zwei Ebenen: hinten (linker Turm im Graben, dunkler Durchgang), vorn (Torbau mit Bogen, rechter Turm)
     if (Gatehouse.A) return Gatehouse.A;

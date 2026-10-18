@@ -1458,9 +1458,14 @@ const Tiles = (() => {
       ladder(60, 19, 74, 127); ladder(424, 163, 440, 318);
       // Spinnweben in den oberen Ecken einiger Buchten
       [[10, 14, 1], [246, 14, -1], [394, 158, 1], [118, 158, -1]].forEach(([X, Y, d]) => { for (let k = 0; k < 12; k++) { px(x, 'rgba(210,210,230,0.32)', X + d * k, Y + 1, 1, 1); px(x, 'rgba(210,210,230,0.32)', X, Y + 1 + k, 1, 1); px(x, 'rgba(210,210,230,0.28)', X + d * k, Y + 12 - k, 1, 1); } });
+      { // Buchrücken-Textur für die 3D-Regale: untere Bücherreihen einer Bucht, senkrecht gekachelt
+        stackTex = C(216, 960); const xt = stackTex.getContext('2d');
+        for (let ty = 0; ty < 960; ty += 160) for (const tx of [0, 108]) xt.drawImage(c, 10, 158, 108, 160, tx, ty, 108, 160);
+      }
       shade(x, 512, H, '#060201', 0, 50);
       x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(8,3,10,0.6)'; x.fillRect(0, 0, 512, H); x.globalCompositeOperation = 'source-over'; // Hintergrund zurücknehmen, damit die begehbaren Regale vorn klar lesbar bleiben
       add('wall', c, 0.5, { vtile: true });
+      L.push({ name: 'stacks', custom: drawStacks3D, par: 1, c: C(1, 1) }); // PS2-3D: frei stehende Regale ragen aus den Pilastern
       L.push({ name: 'books', custom: drawBookFlock, par: 0.7, c: C(1, 1) }); // in der Ferne kreisen Bücherschwärme
     } else if (theme === 'courtyard') {
       const sky = C(640, 208), x = sky.getContext('2d');
@@ -1548,7 +1553,8 @@ const Tiles = (() => {
       }
       px(fx2, '#06020a', 0, 198, 512, 10);
       for (let Y = 176; Y < 208; Y++) for (let X = 0; X < 512; X++) if (bay(X, Y) < (Y - 176) / 64 * 0.65 && hn(X >> 3, Y >> 2, 21) > 0.3) px(fx2, '#2a1438', X, Y); // Bodennebel
-      add('forest', fo, 0.18);
+      add('forest', fo, 0.18, { hidden: true }); // ersetzt durch den Low-Poly-Wald
+      L.push({ name: 'forest3d', custom: (c2, cam, f) => PS2.drawForest(c2, cam, f, 0), par: 0.18, c: C(1, 1) }); // ferne Tannen hinter der Burg
       const cs = C(512, 208), x2 = cs.getContext('2d'), col = '#12061a';
       const tower = (tx, ty, tw, roof) => {
         px(x2, col, tx, ty, tw, 208 - ty);
@@ -1616,7 +1622,7 @@ const Tiles = (() => {
         px(tcx, '#fcd040', X - 1, Y - 6, 1, 1); px(tcx, '#fcd040', X + 1, Y - 6, 1, 1); }
       if (perch.length > 4) { const X = Math.round(perch[4][0]), Y = Math.round(perch[4][1]) - 1; // Rabe
         px(tcx, TC, X - 3, Y - 4, 6, 3); px(tcx, TC, X + 2, Y - 6, 2, 2); px(tcx, '#5c2448', X + 4, Y - 5, 1, 1); px(tcx, TC, X - 5, Y - 3, 2, 1); px(tcx, TC, X - 1, Y - 1, 1, 1); }
-      x3.drawImage(tcv, 0, 0);
+      // die toten Bäume stehen jetzt als Low-Poly-Modelle im Wald (PS2.drawForest), hier bleiben Zaun und Grabsteine
       for (let i = 0; i < 512; i += 6) {
         px(x3, '#2a2636', i, 146, 2, 30); px(x3, '#4c4458', i, 146, 1, 30);
         px(x3, '#5c5468', i, 141, 2, 1); px(x3, '#4c4458', i - 1, 143, 4, 1); px(x3, '#4c4458', i, 142, 2, 3);
@@ -1627,6 +1633,7 @@ const Tiles = (() => {
         px(x3, '#24202c', gx + 4, 179 - gh, 2, 8); px(x3, '#24202c', gx + 2, 181 - gh, 6, 2);
       });
       L.push({ name: 'fog7', custom: drawFog7, par: 0, c: C(1, 1) }); // Mode-7-Bodennebel zwischen Burg und Bäumen
+      L.push({ name: 'trees3d', custom: (c2, cam, f) => PS2.drawForest(c2, cam, f, 1), par: 0.6, c: C(1, 1) }); // nahe Tannen und tote Bäume
       add('near', nr, 0.6);
     } else if (theme === 'hall' || theme === 'throne') {
       const c = C(512, 208), x = c.getContext('2d');
@@ -1857,6 +1864,50 @@ const Tiles = (() => {
     for (let i = 0; i < n; i++) {
       const sx = (i * 97 + frame * 3.1) % (w + 60) - 30, sy = ((i * 53 + frame * 9.5) % 260) - 30, len = 6 + (i % 3) * 3;
       for (let k = 0; k < len; k++) ctx.fillRect(Math.round(sx - k * 0.35), Math.round(sy + k), 1, 1);
+    }
+  }
+
+  // Bibliothek im PS2-Look: an jedem Pilaster der Wand (Ebene z = 400, Parallaxe 0.5) steht ein deckenhohes Regal, das bis
+  // z = 232 zum Betrachter ragt. Die Seitenwand ist spaltenweise perspektivisch korrekt mit Buchrücken texturiert (1/z),
+  // hinten im Dunst, vorn die geschnitzte Stirnseite mit Goldleiste und Messingschild. Die Spielebene liegt bei z = 200.
+  let stackTex = null;
+  function drawStacks3D(ctx, cam, frame) {
+    if (!stackTex) return;
+    const w = View.w, f = 200, Z0 = 214, Z1 = 400, H0 = 104, camX = cam.x + w / 2, camY = cam.y + H0;
+    const Hr = Math.min(stackTex.height, W.room.h * T), TW = stackTex.width, step = View.lite ? 2 : 1, half = 13;
+    const list = [];
+    for (let b = Math.floor((camX - w * 1.4) / 256); b <= Math.ceil((camX + w * 1.4) / 256) + 1; b++) list.push(256 * b - w / 2);
+    list.sort((a, b) => Math.abs(b - camX) - Math.abs(a - camX)); // ferne zuerst
+    for (const Xb of list) {
+      const side = Xb > camX ? -1 : 1, Xs = Xb + side * half, dx = Xs - camX;
+      // Seitenwand: Buchrücken, perspektivisch korrekt Spalte für Spalte
+      const sA = w / 2 + dx * f / Z0, sB = w / 2 + dx * f / Z1, lo = Math.max(0, Math.floor(Math.min(sA, sB))), hi = Math.min(w, Math.ceil(Math.max(sA, sB)));
+      for (let X = lo; X < hi; X += step) {
+        const q = X + step / 2 - w / 2; if (Math.abs(q) < 0.5) continue;
+        const z = dx * f / q; if (z < Z0 || z > Z1) continue;
+        const k = f / z, y0 = Math.max(0, H0 - camY * k), y1 = Math.min(208, H0 + (Hr - camY) * k); if (y1 <= y0) continue;
+        const v0 = camY + (y0 - H0) / k, u = Math.floor((Z1 - z) * 1.25) % TW;
+        ctx.drawImage(stackTex, u, v0, 1, (y1 - y0) / k, X, y0, step, y1 - y0);
+        const fog = (z - Z0) / (Z1 - Z0); // hinten im Dunkel, vorn vom Kerzenlicht gestreift
+        ctx.fillStyle = `rgba(8,3,6,${(0.3 + fog * 0.5).toFixed(2)})`; ctx.fillRect(X, y0, step, y1 - y0);
+      }
+      // Stirnseite vorn (z = Z0): geschnitzte Wange mit Goldleiste, Messingschild, Kerzenschein
+      const k = f / Z0, x0 = w / 2 + (Xb - half - camX) * k, x1 = w / 2 + (Xb + half - camX) * k;
+      if (x1 < 0 || x0 > w) continue;
+      const y0 = Math.max(0, H0 - camY * k), y1 = Math.min(208, H0 + (Hr - camY) * k); if (y1 <= y0) continue;
+      const g = ctx.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, '#2c1406'); g.addColorStop(0.18, '#6c3c18'); g.addColorStop(0.5, '#4c2810'); g.addColorStop(0.85, '#3c1c08'); g.addColorStop(1, '#140802');
+      ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.fillStyle = '#b8882c'; ctx.fillRect(x0 + 1, y0, 1, y1 - y0); ctx.fillStyle = 'rgba(252,224,168,0.5)'; ctx.fillRect(x0 + 1, y0, 0.6, y1 - y0); // Goldleiste
+      ctx.fillStyle = '#0c0402'; ctx.fillRect(x1 - 1.2, y0, 1.2, y1 - y0);
+      const pw = (x1 - x0) * 0.56, px0 = x0 + (x1 - x0) * 0.22, rep = 96 * k, off = ((-(camY * k) % rep) + rep) % rep; // Füllungen und Messingschilder in jedem Regalfach
+      for (let Y = y0 - rep + off; Y < y1; Y += rep) {
+        ctx.fillStyle = 'rgba(10,4,2,0.55)'; ctx.fillRect(px0, Y + 8 * k, pw, rep - 16 * k);
+        ctx.fillStyle = 'rgba(156,104,52,0.6)'; ctx.fillRect(px0, Y + 8 * k, pw, 0.8);
+        ctx.fillStyle = '#c8982c'; ctx.fillRect(px0 + pw * 0.25, Y + 22 * k, pw * 0.5, 3 * k); ctx.fillStyle = '#fce0a8'; ctx.fillRect(px0 + pw * 0.25, Y + 22 * k, pw * 0.5, 0.8);
+      }
+      const glow = ctx.createLinearGradient(0, y0, 0, y1); glow.addColorStop(0, 'rgba(8,3,6,0.55)'); glow.addColorStop(0.5, 'rgba(8,3,6,0.15)'); glow.addColorStop(1, 'rgba(8,3,6,0.55)');
+      ctx.fillStyle = glow; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
     }
   }
 
