@@ -385,7 +385,7 @@ const HEROES = (() => {
     S.skelThrow = frame(M.skel, { legs: STANCE, fa: { t: [20, 1], bend: 'back' }, ba: { a: [30, 30] } });
     S.knight = walk2(M.knight, k => ({ fa: { a: [55, 25] }, ba: { a: [k ? -20 : 10, 60] } }));
     S.ghul = walk2(M.ghoul, k => ({ fa: { a: [92 + k * 6, 0] }, ba: { a: [80 - k * 6, 8] }, lean: 1 }));
-    S.fish = walk2(M.fish, k => ({ fa: { a: [k ? 25 : -10, 40] }, ba: { a: [k ? -10 : 25, 35] } }));
+    S.fish = [...walk2(M.fish, k => ({ fa: { a: [k ? 25 : -10, 40] }, ba: { a: [k ? -10 : 25, 35] } })), frame(M.fish, { legs: [[50, 85], [5, 70]], air: true, fa: { a: [120, 30] }, ba: { a: [-60, 40] } })]; // Gang + Sprung aus dem Wasser
     S.fishShoot = frame(M.fish, { legs: STANCE, fa: { a: [85, 10] }, ba: { a: [60, 20] }, lean: 1 });
     // Knochenriese: dasselbe Skelett in doppelter Auflösung (glatte Knochen statt grober Vergrößerung)
     S.giant = [...walk2(M.skel, k => ({ fa: { a: [k ? 20 : -15, 35] }, ba: { a: [k ? -15 : 20, 30] } }), 2),
@@ -429,7 +429,7 @@ const HEROES = (() => {
       if (d) {
         built[id] = build(d); Sprites.S.heroes = built; Sprites.S.hero = built.henrik;
         if (typeof W !== 'undefined' && W.player && W.player.def && W.player.def.id === id) { W.player.H = built[id]; }
-      } else buildMonsters();
+      } else { Sprites.S.rig3d = true; buildMonsters(); }
     };
     img.src = url;
   }

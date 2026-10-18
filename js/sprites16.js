@@ -153,7 +153,7 @@
     else { G.line(cx + 1, 8.5, cx + 5.5, 8.5, SCALE[0]); G.P(cx + 3, 9, '#fcfcfc'); G.P(cx + 5, 9, '#fcfcfc'); } // Maul mit Zähnen
     return Sprites.fromCanvas(G.c);
   }
-  S.fish = [fishman(0), fishman(1), fishman(2)]; S.fishShoot = fishman(3);
+  if (!S.rig3d) { S.fish = [fishman(0), fishman(1), fishman(2)]; S.fishShoot = fishman(3); } // 3D-Fischmensch (aus dem Rig) schon geladen: nicht überschreiben
 
   // ---------------- Gespenst ----------------
   const GH = ['#2c3c6c', '#5c74ac', '#94acdc', '#c8d8f4', '#f4f8fc'];
