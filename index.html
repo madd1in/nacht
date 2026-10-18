@@ -45,9 +45,18 @@
   }
   #crt.off { display: none; }
   canvas#screen.crt { filter: saturate(1.15) contrast(1.06) brightness(1.06); }
+  /* Ladebildschirm (js/boot.js): liegt über allem, bis eine Taste gedrückt wird */
+  #boot { position: fixed; inset: 0; z-index: 100; background: #000 radial-gradient(ellipse at 55% 60%, #3a0c22 0%, #14051c 42%, #020006 100%); overflow: hidden; display: flex; align-items: center; justify-content: center;
+    transition: opacity .55s ease-in; cursor: pointer; --s: 3px; --a: 1.8px; }
+  #boot.out { opacity: 0; pointer-events: none; }
+  #boot canvas { flex: none; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #boot::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%),
+      repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--a), rgba(0,0,0,.18) var(--a), rgba(0,0,0,.18) var(--s)); }
 </style>
 </head>
 <body>
+<div id="boot"><canvas aria-label="NACHTMAHR lädt"></canvas></div>
 <div id="wrap"><canvas id="screen" width="256" height="240" aria-label="NACHTMAHR Spielfeld"></canvas><div id="crt"></div></div>
 <div id="touch" aria-hidden="true">
   <div id="stickBase"><div id="stickKnob"></div></div>
@@ -59,7 +68,7 @@
   <div class="tbtn" id="tStart" data-k="start">II</div>
   <div class="tbtn" id="tFull" data-k="full" aria-label="Vollbild"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6V1h5M12 1h5v5M17 12v5h-5M6 17H1v-5"/></svg></div>
 </div>
-<script>window.BUILD = '20261018-1658';
+<script>window.BUILD = '20261018-1952';
 // Lädt ein Spielskript nicht (z. B. kurzer 503 von GitHub Pages direkt nach einem Update), einmal automatisch neu laden
 window.addEventListener('error', function (e) {
   var el = e.target;
@@ -69,32 +78,33 @@ window.addEventListener('error', function (e) {
 }, true);
 window.addEventListener('load', function () { setTimeout(function () { try { sessionStorage.removeItem('nachtmahr.retry'); } catch (err) { /* privat */ } }, 8000); });
 </script>
-<script src="js/view.js?v=20261018-1658"></script>
-<script src="js/options.js?v=20261018-1658"></script>
-<script src="js/i18n.js?v=20261018-1658"></script>
-<script src="js/font.js?v=20261018-1658"></script>
-<script src="js/sprites.js?v=20261018-1658"></script>
-<script src="js/sprites2.js?v=20261018-1658"></script>
-<script src="js/hero.js?v=20261018-1658"></script>
-<script src="js/chars3d.js?v=20261018-1658"></script>
-<script src="js/audio.js?v=20261018-1658"></script>
-<script src="js/voice.js?v=20261018-1658"></script>
-<script src="js/input.js?v=20261018-1658"></script>
-<script src="js/levels.js?v=20261018-1658"></script>
-<script src="js/ps2.js?v=20261018-1658"></script>
-<script src="js/tiles.js?v=20261018-1658"></script>
-<script src="js/fx.js?v=20261018-1658"></script>
-<script src="js/entities.js?v=20261018-1658"></script>
-<script src="js/enemies.js?v=20261018-1658"></script>
-<script src="js/grand.js?v=20261018-1658"></script>
-<script src="js/props.js?v=20261018-1658"></script>
-<script src="js/drama.js?v=20261018-1658"></script>
-<script src="js/mode7.js?v=20261018-1658"></script>
-<script src="js/bosses.js?v=20261018-1658"></script>
-<script src="js/sprites16.js?v=20261018-1658"></script>
-<script src="js/creatures3d.js?v=20261018-1658"></script>
-<script src="js/world.js?v=20261018-1658"></script>
-<script src="js/scores.js?v=20261018-1658"></script>
-<script src="js/game.js?v=20261018-1658"></script>
+<script src="js/boot.js?v=20261018-1952"></script>
+<script src="js/view.js?v=20261018-1952"></script>
+<script src="js/options.js?v=20261018-1952"></script>
+<script src="js/i18n.js?v=20261018-1952"></script>
+<script src="js/font.js?v=20261018-1952"></script>
+<script src="js/sprites.js?v=20261018-1952"></script>
+<script src="js/sprites2.js?v=20261018-1952"></script>
+<script src="js/hero.js?v=20261018-1952"></script>
+<script src="js/chars3d.js?v=20261018-1952"></script>
+<script src="js/audio.js?v=20261018-1952"></script>
+<script src="js/voice.js?v=20261018-1952"></script>
+<script src="js/input.js?v=20261018-1952"></script>
+<script src="js/levels.js?v=20261018-1952"></script>
+<script src="js/ps2.js?v=20261018-1952"></script>
+<script src="js/tiles.js?v=20261018-1952"></script>
+<script src="js/fx.js?v=20261018-1952"></script>
+<script src="js/entities.js?v=20261018-1952"></script>
+<script src="js/enemies.js?v=20261018-1952"></script>
+<script src="js/grand.js?v=20261018-1952"></script>
+<script src="js/props.js?v=20261018-1952"></script>
+<script src="js/drama.js?v=20261018-1952"></script>
+<script src="js/mode7.js?v=20261018-1952"></script>
+<script src="js/bosses.js?v=20261018-1952"></script>
+<script src="js/sprites16.js?v=20261018-1952"></script>
+<script src="js/creatures3d.js?v=20261018-1952"></script>
+<script src="js/world.js?v=20261018-1952"></script>
+<script src="js/scores.js?v=20261018-1952"></script>
+<script src="js/game.js?v=20261018-1952"></script>
 </body>
 </html>

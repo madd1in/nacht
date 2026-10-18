@@ -48,6 +48,7 @@ const Game = {
     this.debugStage = q.has('stage') ? clamp(parseInt(q.get('stage'), 10) - 1, 0, Levels.STAGES.length - 1) : null;
     this.debugRoom = q.has('room') ? Math.max(0, parseInt(q.get('room'), 10) - 1) : 0;
     this.toTitle();
+    if (window.Boot) Boot.onExit = () => { if (this.state === 'title' && !this.revealed) this.t = Math.max(this.t, 38); }; // Ladebildschirm verlassen: Titel schlägt kurz danach ein
     let acc = 0, last = performance.now();
     const seen = new Set();
     const loop = (now) => {
@@ -57,7 +58,7 @@ const Game = {
       const t0 = performance.now();
       try {
         while (acc >= 1000 / 60 && n < 4) { acc -= 1000 / 60; n++; this.step(); }
-        this.render();
+        if (!(window.Boot && Boot.cover)) this.render(); // unter dem deckenden Ladebildschirm nicht zeichnen
       } catch (e) { // jeden Fehler nur einmal melden, Spiel läuft weiter statt einzufrieren
         const key = String(e && e.message);
         if (!seen.has(key)) { seen.add(key); console.error('[NACHTMAHR]', e); }
@@ -338,6 +339,7 @@ const Game = {
 
   // ---------------- Update ----------------
   step() {
+    if (window.Boot && Boot.hold) { Input.update(); return; } // Ladebildschirm liegt noch darüber: Titel wartet, Tasten verfallen
     Input.update();
     const P = Input.pressed;
     this.t++;
