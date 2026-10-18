@@ -167,7 +167,7 @@ class Campfire extends Statue {
     super.update();
     if (this.active && this.t % 9 === 0) W.spawn(new Particle(this.cx + rnd(-4, 4), this.y + 2, rnd(-0.2, 0.2), rnd(-1.2, -0.5), Math.random() < 0.5 ? '#f8b800' : '#fc7460', 40, 1, 0)); // Funken
   }
-  glow(L, cx, cy, flick) {
+  lightUp(L, cx, cy, flick) {
     const x = this.cx - cx, y = this.y - cy + 4;
     L.push(this.active ? { x, y: y - 4, r: 58 + flick(this.x) * 2, c: [252, 140, 40], a: 0.75 } : { x, y, r: 18 + flick(this.x), c: [220, 40, 20], a: 0.4 });
   }
@@ -201,7 +201,7 @@ class Relic extends Ent {
       for (let i = 0; i < 16; i++) W.spawn(new Particle(this.cx + rnd(-4, 4), this.y - 6, rnd(-1, 1), rnd(-1.8, -0.4), i % 2 ? '#fcfcfc' : '#fce0a8', 40, 1, 0));
     }
   }
-  glow(L, cx, cy) { if (!this.taken) L.push({ x: this.cx - cx, y: this.y - cy - 6, r: 28 + Math.sin(this.t * 0.08) * 4, c: [252, 236, 200], a: 0.6 }); }
+  lightUp(L, cx, cy) { if (!this.taken) L.push({ x: this.cx - cx, y: this.y - cy - 6, r: 28 + Math.sin(this.t * 0.08) * 4, c: [252, 236, 200], a: 0.6 }); }
   draw(ctx) {
     const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y);
     ctx.fillStyle = '#2a2420'; ctx.fillRect(x + 2, y + 6, 9, 10); ctx.fillRect(x + 9, y + 13, 10, 3); // Mantel, ausgestreckte Beine
@@ -279,7 +279,7 @@ class FogWall extends Ent {
     if (inside) { p.x -= p.vx * 0.62; if (this.push < 0.05) Audio8.sfx('whoosh', this.cx); }
     this.push += ((inside ? 1 : 0) - this.push) * 0.08;
   }
-  glow(L, cx, cy) { L.push({ x: this.cx - cx, y: 120 - cy, r: 70, c: [220, 230, 240], a: 0.35 }); }
+  lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: 120 - cy, r: 70, c: [220, 230, 240], a: 0.35 }); }
   draw(ctx) {
     const x0 = Math.round(this.x - W.cam.x), t = this.t;
     if (x0 > View.w + 40 || x0 < -80) return;

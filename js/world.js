@@ -699,7 +699,7 @@ const W = {
       const x = e.cx - cx, y = e.cy - cy;
       if (x < -48 || x > View.w + 48 || y < -60 || y > 270) continue;
       if (darkRoom && e.kind === 'enemy') L.push({ x, y, r: 30, c: [150, 140, 230], a: 0.3 });
-      if (e.glow) e.glow(L, cx, cy, flick); // Rastfeuer, Fund, Nebelwand
+      if (e.lightUp) e.lightUp(L, cx, cy, flick); // Rastfeuer, Fund, Nebelwand (eigener Name: „glow“ ist bei Kronleuchtern eine Zahl)
       else if (e instanceof Candle) L.push({ x, y: e.y - cy + 3, r: (e.torch ? 36 : 28) + (e.blood ? 10 + Math.sin(f * 0.15) * 4 : 0) + flick(e.x), c: e.blood ? [232, 24, 48] : [248, 140, 40], a: e.blood ? 0.65 : 0.5 });
       else if (e instanceof GrandChandelier) e.lights(L, cx, cy, flick);
       else if (e instanceof Gatehouse) e.lights(L, this.cam.x, this.cam.y, flick);
