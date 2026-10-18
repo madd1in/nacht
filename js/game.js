@@ -313,7 +313,7 @@ const Game = {
     ctx.globalAlpha = this.noteT < 20 ? this.noteT / 20 : 1;
     ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.fillRect(x, y, w, 13);
     ctx.fillStyle = '#c89020'; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + 12, w, 1);
-    Font.draw(ctx, s, View.cx, y + 3, '#fce0a8', { align: 'center' });
+    Font.draw(ctx, s, View.cx, y + 3, '#fce0a8', { align: 'center', shadow: '#3c2008' });
     ctx.globalAlpha = 1;
   },
   // großer Ausruf in der Bildmitte (z. B. „Land in Sicht!“)
@@ -701,20 +701,54 @@ const Game = {
   // PS1-Schrift: der Schriftzug als Körper – nach hinten unten extrudiert (dunkle Flanken, je nach Winkel zur Seite) und
   // langsam um die Hochachse gedreht (seitlich gestaucht); zoom > 1 lässt ihn aus der Tiefe heranfliegen
   big3d(ctx, text, cx, y, scale, colors, ang, depth = 6, zoom = 1) {
-    const b = this.bigCanvas, fbk = Font.hasFB(text), top = fbk ? 3 : 0, H = fbk ? 12 : 7;
-    const w = Math.min(b.width, Font.width(text) + 1), mid = y + (H * scale) / 2, ca = Math.cos(ang), sa = Math.sin(ang);
-    const paint = (col) => this.textLayer(text, col, w, H, top); // vorgemalte Schriftebene aus dem Zwischenspeicher
+    return this.text3d(ctx, text, cx, y, scale, colors, { ang, depth, zoom, wobble: 0.16, bob: 0.3, outline: true });
+  },
+  // PS2-Schrift: jeder Buchstabe ist ein eigener Körper – nach hinten unten extrudiert (Flanken aus der dunklen Farbe
+  // des Verlaufs), wiegt sich phasenversetzt um die Hochachse (gestaucht, Flanken wandern zur Seite), schwingt sanft auf
+  // und ab; ein Glanzstreifen läuft über die Vorderseiten. Erst alle Umrisse, dann alle Flanken, dann alle Fronten –
+  // so verdeckt keine Flanke den Nachbarbuchstaben.
+  text3d(ctx, text, cx, y, scale, colors, o = {}) {
+    const fbk = Font.hasFB(text), top = fbk ? 3 : 0, H = fbk ? 12 : 7, w = Math.min(this.bigCanvas.width, Font.width(text) + 1);
+    const T = performance.now() / 16.667, ang = o.ang || 0, zoom = o.zoom || 1, lite = View.lite;
+    const depth = Math.max(1, Math.round((o.depth ?? Math.max(2, scale + 1)) * (lite ? 0.6 : 1))), wob = o.wobble ?? 0.2, bob = o.bob ?? 0.4;
+    const paint = (col) => this.textLayer(text, col, w, H, top);
+    const dark = Array.isArray(colors) ? colors[6] : colors, side = this.sideRamp(dark);
+    const L = Font.layout(text), cw = Math.cos(ang) * zoom, mid = y - top * scale + (H * scale) / 2, step = Math.max(1, scale / 2) * zoom, ga = ctx.globalAlpha;
+    const totalW = w * scale * cw, x0 = cx - totalW / 2, glossX = ((T * 2.6) % (totalW + 160)) - 80;
+    const geo = L.map((g, i) => {
+      if (g.ch === ' ') return null;
+      const la = ang + Math.sin(T * 0.045 + i * 0.55) * wob, ca = Math.abs(Math.cos(la)) * zoom, sa = Math.sin(la);
+      const lcx = x0 + (g.x + g.w / 2) * scale * cw, sw = Math.max(1, g.w * scale * ca), sh = H * scale * zoom;
+      return { g, sa, dx: lcx - sw / 2, dy: mid - sh / 2 + Math.sin(T * 0.07 + i * 0.8) * bob * scale, sw, sh, lcx };
+    });
+    const put = (img, q, ox, oy) => ctx.drawImage(img, q.g.x, 0, q.g.w, H, Math.round(q.dx + ox), Math.round(q.dy + oy), q.sw, q.sh);
     ctx.save(); ctx.imageSmoothingEnabled = false;
-    ctx.translate(cx, mid); ctx.scale(ca * zoom, zoom); ctx.translate(-cx, -mid);
-    const dx = Math.round(cx - (w * scale) / 2), dy = y - top * scale, step = Math.max(1, scale / 2);
-    const ol = paint('#000'); for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(ol, 0, 0, w, H, dx + ox, dy + oy, w * scale, H * scale);
-    const side = ['#2c0008', '#480010', '#640418', '#7c0820'];
+    if (o.shadow) { const sd = paint(o.shadow); ctx.globalAlpha = ga * 0.7; for (const q of geo) if (q) put(sd, q, scale + depth * step * 0.4, scale + depth * step * 0.8); ctx.globalAlpha = ga; }
+    if (o.outline) { const ol = paint('#000'); for (const q of geo) if (q) for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) put(ol, q, ox, oy); }
     for (let k = depth; k >= 1; k--) { // Flanken von hinten nach vorn, vorne heller
-      ctx.drawImage(paint(side[Math.min(3, Math.floor((depth - k) / depth * 4))]), 0, 0, w, H, Math.round(dx + k * step * (0.35 + sa * 1.4)), Math.round(dy + k * step * 0.8), w * scale, H * scale);
+      const img = paint(side[Math.min(3, Math.floor((depth - k) / depth * 4))]);
+      for (const q of geo) if (q) put(img, q, k * step * (0.35 + q.sa * 1.4), k * step * 0.8);
     }
-    ctx.drawImage(paint(colors), 0, 0, w, H, dx, dy, w * scale, H * scale);
+    const fr = paint(colors), wh = paint('#fcfcfc');
+    for (const q of geo) {
+      if (!q) continue;
+      put(fr, q, 0, 0);
+      const d = Math.abs(q.lcx - (x0 + glossX)); // Glanzstreifen
+      if (d < 18 * scale) { ctx.globalAlpha = ga * (1 - d / (18 * scale)) * 0.55; put(wh, q, 0, 0); ctx.globalAlpha = ga; }
+    }
     ctx.restore();
-    return { x: Math.round(cx - (w * scale * ca * zoom) / 2), w: w * scale * ca * zoom };
+    return { x: Math.round(x0), w: totalW };
+  },
+  // Flankenfarben aus der dunkelsten Verlaufsfarbe: hinten fast schwarz, vorn etwas heller
+  sideRamp(dark) {
+    this.rampCache = this.rampCache || new Map();
+    let r = this.rampCache.get(dark);
+    if (r) return r;
+    const m = /^#([0-9a-f]{6})$/i.exec(dark || ''), v = m ? parseInt(m[1], 16) : 0x2c0008, R = v >> 16, G = (v >> 8) & 255, B = v & 255;
+    const f = (k) => `rgb(${Math.round(R * k)},${Math.round(G * k)},${Math.round(B * k)})`;
+    r = [f(0.45), f(0.7), f(0.95), f(1.2)];
+    this.rampCache.set(dark, r);
+    return r;
   },
   // Schriftzug in einer Farbe (oder Zeilen-Verlauf) einmal malen und merken – das Malen über Clip-Zeilen ist teuer
   textLayer(text, cols, w, H, top) {
@@ -739,7 +773,10 @@ const Game = {
     if (rooms.some(r => r.theme === 'cathedral' || r.theme === 'spire')) jobs.push(() => PS2.prewarm());
     this.warmJobs = jobs;
   },
-  big(ctx, text, cx, y, scale, colors, shadow, outline) {
+  big(ctx, text, cx, y, scale, colors, shadow, outline) { // alle Großschriften (Ausrufe, Combo, Titel der Menüs, Boss-Namen): PS2-3D
+    return this.text3d(ctx, text, cx, y, scale, colors, { shadow, outline: !!outline, depth: Math.max(2, scale + 1), wobble: 0.2, bob: 0.4 });
+  },
+  bigFlat(ctx, text, cx, y, scale, colors, shadow, outline) {
     const b = this.bigCanvas, bx = b.getContext('2d');
     const fbk = Font.hasFB(text), top = fbk ? 3 : 0, H = fbk ? 12 : 7; // CJK-Glyphen sind höher
     const w = Math.min(b.width, Font.width(text) + 1), dx = Math.round(cx - (w * scale) / 2), dy = y - top * scale;
@@ -947,7 +984,7 @@ const Game = {
     Font.draw(ctx, tr('subtitle'), cx, 66, (this.t >> 2) % 40 === 0 ? '#fcfcfc' : '#bcbcbc', { align: 'center', shadow: '#000' });
     [tr('start'), tr('options'), tr('hiTitle')].forEach((m, i) => {
       const on = this.menu === i;
-      Font.draw(ctx, m, cx - 30, 97 + i * 11, on ? '#fcfcfc' : '#8c8c8c', { shadow: '#000' });
+      Font.draw(ctx, m, cx - 30, 97 + i * 11, on ? '#fcfcfc' : '#8c8c8c', { shadow: '#000', wave: on ? 1.4 : 0, t: this.t });
       if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 44, 96 + i * 11);
     });
     const tags = [Options.easy && tr('tagEasy'), Options.maxWhip && tr('tagWhip'), Options.infHearts && tr('tagHearts')].filter(Boolean);
@@ -973,7 +1010,7 @@ const Game = {
     OPTION_ITEMS.forEach((it, i) => {
       const y = 64 + i * 14, on = this.optSel === i;
       if (on) { ctx.fillStyle = 'rgba(200,144,32,0.2)'; ctx.fillRect(cx - 118, y - 3, 236, 13); }
-      Font.draw(ctx, tr(it.label), cx - 110, y, on ? '#fcfcfc' : '#9c9c9c');
+      Font.draw(ctx, tr(it.label), cx - 110, y, on ? '#fcfcfc' : '#9c9c9c', on ? { shadow: '#3c2008', wave: 1.2, t: this.t } : { shadow: '#000' });
       let val = '', good = false;
       if (it.key === 'music') {
         for (let k = 0; k < 10; k++) { ctx.fillStyle = k < Options.music ? '#f8b800' : '#3c3c3c'; ctx.fillRect(cx + 54 + k * 6, y, 4, 7); }

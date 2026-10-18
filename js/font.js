@@ -117,20 +117,41 @@ const Font = (() => {
   function width(str) { let w = 0; for (const ch of norm(str)) w += adv(ch); return w - 1; }
   function hasFB(str) { for (const ch of norm(str)) if (!INDEX.has(ch)) return true; return false; }
 
-  // opts: { align: 'left'|'center'|'right', shadow: color }
+  // Lichtkante: hellere Variante einer Farbe (für die obere Glyphenzeile – die Schrift wirkt wie aus der Fläche gehoben)
+  const lights = new Map();
+  function lighter(color) {
+    let l = lights.get(color);
+    if (l) return l;
+    const m = /^#([0-9a-f]{6})$/i.exec(color);
+    if (!m) { lights.set(color, color); return color; }
+    const v = parseInt(m[1], 16), mix = (c) => Math.round(c + (255 - c) * 0.55);
+    l = `rgb(${mix(v >> 16)},${mix((v >> 8) & 255)},${mix(v & 255)})`;
+    lights.set(color, l);
+    return l;
+  }
+  // Buchstaben mit Position und Vorschub (für Großschrift, die jeden Buchstaben als eigenen Körper animiert)
+  function layout(str) { const out = []; let x = 0; for (const ch of norm(str)) { const a = adv(ch); out.push({ ch, x, w: a }); x += a; } return out; }
+
+  // opts: { align: 'left'|'center'|'right', shadow: color, wave: Amplitude (px), t: Zeit }
+  // Mit Schatten gezeichnet bekommt die Schrift PS2-Tiefe: ein Pixel Extrusion nach rechts unten und eine Lichtkante oben.
   function draw(ctx, str, x, y, color = '#fcfcfc', opts = {}) {
     const s = norm(str);
     let sx = Math.round(x);
     if (opts.align === 'center') sx = Math.round(x - width(s) / 2);
     else if (opts.align === 'right') sx = Math.round(x - width(s));
-    if (opts.shadow) draw(ctx, s, sx + 1, y + 1, opts.shadow);
-    const a = atlas(color), yy = Math.round(y);
+    const wave = opts.wave || 0, t = opts.t || 0;
+    if (opts.shadow) draw(ctx, s, sx + 1, y + 1, opts.shadow, { wave, t });
+    const a = atlas(color), hl = opts.shadow ? atlas(lighter(color)) : null, yy = Math.round(y);
+    let i = 0;
     for (const ch of s) {
-      const gi = INDEX.get(ch);
-      if (gi !== undefined) { if (ch !== ' ') ctx.drawImage(a, gi * ADV, 0, 5, 7, sx, yy, 5, 7); sx += ADV; }
-      else { ctx.drawImage(tinted(ch, color), sx, yy - 3); sx += fb(ch).adv; }
+      const gi = INDEX.get(ch), oy = wave ? Math.round(Math.sin(t * 0.16 - i * 0.7) * wave) : 0;
+      if (gi !== undefined) {
+        if (ch !== ' ') { ctx.drawImage(a, gi * ADV, 0, 5, 7, sx, yy + oy, 5, 7); if (hl) ctx.drawImage(hl, gi * ADV, 0, 5, 1, sx, yy + oy, 5, 1); }
+        sx += ADV;
+      } else { ctx.drawImage(tinted(ch, color), sx, yy - 3 + oy); sx += fb(ch).adv; }
+      i++;
     }
   }
 
-  return { draw, width, hasFB, setCJK, ADV, LINE };
+  return { draw, width, hasFB, setCJK, layout, ADV, LINE };
 })();
