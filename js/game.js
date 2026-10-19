@@ -802,6 +802,7 @@ const Game = {
     if (rooms.some(r => r.theme === 'forest')) jobs.push(() => PS2.prewarmWoods());
     if (rooms.some(r => r.theme === 'expo')) jobs.push(() => Expo.prewarm());
     if (rooms.some(r => r.theme === 'ballroom')) jobs.push(() => Ball.prewarm());
+    if (rooms.some(r => r.ents.some(e => e.type === 'grand'))) jobs.push(...PS2.chandJobs(54, 2)); // XXL-Kronleuchter: alle Drehstellungen vorab
     [...new Set(rooms.map(r => r.theme))].forEach(th => jobs.push(() => FX.drawFog(this.warmCtx(), th, { x: 0, y: 0 }, 0))); // Bodennebel je Thema
     jobs.push(() => this.warmRoom());
     this.warmJobs = jobs; this.warmTotal = jobs.length; this.warmDoneT = -1;

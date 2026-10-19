@@ -770,7 +770,8 @@ const PS2 = (() => {
     const cy = Math.cos(yaw), sy = Math.sin(yaw), P = (x, y, z) => [x * cy - z * sy, y, x * sy + z * cy];
     const ring = (r, y, n, w) => { for (let i = 0; i < n; i++) { const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2, [x0, , z0] = P(Math.cos(a0) * r, y, Math.sin(a0) * r), [x1, , z1] = P(Math.cos(a1) * r, y, Math.sin(a1) * r); beam(m, x0, y, z0, x1, y, z1, w, w * 1.3, BR); } };
     const w = Math.max(1.4, R * 0.075);
-    ring(R, 0, 18, w); if (tiers > 1) ring(R * 0.58, -R * 0.34, 12, w * 0.8);
+    const big = R > 30; // groß: 10 Arme, 5 Ketten, Reifen aus 20/10 Gliedern → nach einer Fünfteldrehung gleich; klein: nach einer Dritteldrehung
+    ring(R, 0, big ? 20 : 18, w); if (tiers > 1) ring(R * 0.58, -R * 0.34, big ? 10 : 12, w * 0.8);
     prism(m, 0, -R * 0.5, 0, R * 0.09, R * 0.78, 6, BR2, { rTop: R * 0.05 }); cone(m, 0, -R * 0.5, 0, R * 0.1, -R * 0.2, 6, BR); // Nabe und Zapfen
     const n = R > 30 ? 10 : 6;
     for (let i = 0; i < n; i++) {
@@ -780,26 +781,28 @@ const PS2 = (() => {
       if (lit) cone(m, ax, R * 0.27, az, R * 0.04, R * 0.13, 4, FL, { e: 1 });
     }
     for (let i = 0; i < n * 2; i++) { const a = i / (n * 2) * Math.PI * 2, [x, , z] = P(Math.cos(a) * R, 0, Math.sin(a) * R); cone(m, x, -w * 0.6, z, R * 0.035, -R * (i % 2 ? 0.12 : 0.18), 4, CRY); } // Kristalle
-    if (tiers > 1) for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, [x, , z] = P(Math.cos(a) * R * 0.58, 0, Math.sin(a) * R * 0.58); cone(m, x, -R * 0.36, z, R * 0.03, -R * 0.12, 4, CRY); }
-    for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.3, [x, , z] = P(Math.cos(a) * R, 0, Math.sin(a) * R); beam(m, x, 0, z, 0, R * 0.85, 0, w * 0.4, w * 0.4, IRON); } // Ketten zur Aufhängung
+    const nt = big ? 10 : 12;
+    if (tiers > 1) for (let i = 0; i < nt; i++) { const a = i / nt * Math.PI * 2, [x, , z] = P(Math.cos(a) * R * 0.58, 0, Math.sin(a) * R * 0.58); cone(m, x, -R * 0.36, z, R * 0.03, -R * 0.12, 4, CRY); }
+    const nc = big ? 5 : 3;
+    for (let i = 0; i < nc; i++) { const a = i / nc * Math.PI * 2 + 0.3, [x, , z] = P(Math.cos(a) * R, 0, Math.sin(a) * R); beam(m, x, 0, z, 0, R * 0.85, 0, w * 0.4, w * 0.4, IRON); } // Ketten zur Aufhängung
     return m;
   }
   const chandView = (R) => { const S = 2, D = R * 9; return { S, Wc: Math.ceil((R * 2.3 + 16) * S), Hc: Math.ceil((R * 2.1 + 16) * S), cam: { x: 0, y: D * Math.tan(0.5), z: -D, yaw: 0, pitch: -0.5, f: D * 1.13 * S, near: 4, hy: 0.42 } }; };
   // Kleine Kronleuchter (6 Arme, 3 Ketten, Reif aus 18 Gliedern) sehen nach einer Dritteldrehung wieder gleich aus: jede der
   // CH_N Drehstellungen wird nur einmal gerastert – geteilt von allen Kronleuchtern gleicher Bauart – und danach nur kopiert
-  const CH_N = 60, CH_PER = Math.PI * 2 / 3, CHC = new Map();
+  const CHC = new Map(), chN = (R) => (R > 30 ? 24 : 60), chPer = (R) => Math.PI * 2 / (R > 30 ? 5 : 3);
   function chandFrame(R, tiers, lit, i) {
     const k = R + '|' + tiers + '|' + (lit ? 1 : 0);
     let set = CHC.get(k);
     if (!set) { const v = chandView(R); set = { v, f: [], p: project(v.cam, v.Wc, v.Hc, 0, 0, 0) }; CHC.set(k, set); }
     let c = set.f[i];
-    if (!c) { c = set.f[i] = Sprites.canvas(set.v.Wc, set.v.Hc); render(c.getContext('2d', CPU2D), set.v.Wc, set.v.Hc, [chandMesh(R, i / CH_N * CH_PER, tiers, lit)], set.v.cam, CHENV); }
+    if (!c) { c = set.f[i] = Sprites.canvas(set.v.Wc, set.v.Hc); render(c.getContext('2d', CPU2D), set.v.Wc, set.v.Hc, [chandMesh(R, i / chN(R) * chPer(R), tiers, lit)], set.v.cam, CHENV); }
     return { c, set };
   }
   // (x, y) = Bildposition der Reifmitte; o: { yaw, tiers, lit, holder } – holder behält den eigenen Puffer des Objekts (große Leuchter)
   function drawChandelier(ctx, x, y, R, o = {}) {
-    if (R <= 30) {
-      const i = ((Math.round((o.yaw || 0) / CH_PER * CH_N) % CH_N) + CH_N) % CH_N, { c, set } = chandFrame(R, o.tiers || 1, !!o.lit, i), v = set.v;
+    if (R <= 60) {
+      const N = chN(R), i = ((Math.round((o.yaw || 0) / chPer(R) * N) % N) + N) % N, { c, set } = chandFrame(R, o.tiers || 1, !!o.lit, i), v = set.v;
       ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(c, 0, 0, v.Wc, v.Hc, x - set.p[0] / v.S, y - set.p[1] / v.S, v.Wc / v.S, v.Hc / v.S); ctx.restore();
       return;
     }
@@ -811,6 +814,8 @@ const PS2 = (() => {
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, Wc, Hc, x - B.p[0] / S, y - B.p[1] / S, Wc / S, Hc / S); ctx.restore();
   }
 
+  // Vorbau für den Bildvorrat eines Kronleuchters: Aufgaben zu je vier Drehstellungen (Kapitelkarte, Hintergrund)
+  const chandJobs = (R, tiers = 1, lit = true) => Array.from({ length: Math.ceil(chN(R) / 4) }, (_, j) => () => { for (let i = j * 4; i < Math.min(chN(R), j * 4 + 4); i++) chandFrame(R, tiers, lit, i); });
   const prewarm = () => { if (!city) city = buildCity(); };
   const prewarmMap = () => { if (!world) world = buildWorld(); }; // Ladebildschirm: Kartenlandschaft vorab bauen
   // ---------------- Kleine Objekte in Kachel-Perspektive ----------------
@@ -834,5 +839,5 @@ const PS2 = (() => {
   }
   const projLocal = (sx, sy, x, y, z) => { const VX = View.w / 2, k = 200 / (200 + z); return [VX + (sx + x - VX) * k, 60 + (sy - y - 60) * k]; }; // Punkt des Meshes → Bild
 
-  return { mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawLocal, projLocal, LENV, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawChandelier, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
+  return { mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawLocal, projLocal, LENV, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawChandelier, chandJobs, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
 })();

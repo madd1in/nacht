@@ -31,7 +31,7 @@ const Levels = (() => {
       // Pendel-Kronleuchter: Aufhängepunkt (Kacheln), Seillänge (px), Ausschlag (rad), Phase
       chandelier(px, py, len, amp = 0.45, phase = 0) { r.ents.push({ type: 'chandelier', x: px, y: py, len, amp, phase }); return api; },
       // XXL-Kronleuchter (Mode-7-Drehung, schräge Standfläche)
-      grand(px, py, len, amp = 0.32, phase = 0) { r.ents.push({ type: 'grand', x: px, y: py, len, amp, phase }); return api; },
+      grand(px, py, len, amp = 0.32, phase = 0, dance = false) { r.ents.push({ type: 'grand', x: px, y: py, len, amp, phase, dance }); return api; },
       // Zahnrad-Riesenrad: Mittelpunkt (Kacheln), Radius (px), Anzahl Stege, Drehgeschwindigkeit
       // Pendelbeil: Aufhängung (Kacheln), Stangenlänge (px), Ausschlag (rad), Phase
       pendulum(px, py, len, amp = 0.55, phase = 0, speed = 0.03) { r.ents.push({ type: 'pendulum', x: px, y: py, len, amp, phase, speed }); return api; },
@@ -571,19 +571,23 @@ const Levels = (() => {
     .enemy('raven', 70, 7).enemy('raven', 95, 7)
     .start(2, 8).exit(108).done();
 
-  // Ballsaal: der Ball der Toten. Durch den Spiegelsaal kreisen Geister-Tanzpaare – aus der Tiefe des Saals durch die
-  // Spielebene bis vor den Helden –, zum Geistertango zucken Blitze abwechselnd links und rechts durch die Fenster.
-  // In der Mitte eine Musikergalerie mit zwei Treppen, vergoldete Standleuchter, vor dem Thronsaal ein Kontrollpunkt.
+  // Ballsaal: der Ball der Toten. Das Parkett gehört den Toten – wer es betritt, wird vom Totentanz zurückgeworfen;
+  // weiter geht es nur über tanzende XXL-Kronleuchter, die paarweise gegenläufig im Takt der Orgel-Toccata schwingen,
+  // wippen und sich drehen. Durch den Saal kreisen Geister-Tanzpaare, durchscheinende Riesenvorhänge wehen, und der ganze
+  // Saal dreht sich im Takt um den Helden. In der Mitte ein Podest mit Kontrollpunkt.
   const bs = room(112, 'ballroom')
     .ground(0, 111)
-    .stair(38, 10, 4, 1).fill(42, 7, 58, 7, '=').stair(62, 10, 4, -1)     // Musikergalerie
-    .fill(14, 7, 18, 7, '=').fill(86, 7, 91, 7, '=').fill(100, 5, 104, 5, '=')
-    .prop('ghostball', { rings: [16, 52, 92], n: 5 })
-    .statue(70, 10)
-    .prop('candelabra', { x: 6, y: 10 }).prop('candelabra', { x: 26, y: 10 }).prop('candelabra', { x: 34, y: 10 }).prop('candelabra', { x: 76, y: 10 }).prop('candelabra', { x: 96, y: 10 })
-    .candle(10, 8, 'H').candle(16, 5).candle(22, 8, 'W').candle(46, 5, 'H').candle(50, 5, '$').candle(54, 5, 'H').candle(66, 8).candle(82, 8, 'W').candle(88, 5, 'H').candle(102, 3, '1').candle(108, 8)
-    .enemy('ghost', 30, 5).enemy('ghost', 74, 4).enemy('ghost', 98, 6).enemy('knight', 50, 6).enemy('bat', 20, 3).enemy('bat', 84, 3)
-    .music('ball').label('BALLSAAL')
+    .fill(50, 9, 56, 10, '#')                                               // Mittelpodest
+    .grand(11.5, 0, 128, 0.26, 0, true).grand(20, 0, 108, 0.26, Math.PI, true).grand(28.5, 0, 120, 0.26, 0, true)
+    .grand(37, 0, 104, 0.26, Math.PI, true).grand(45.5, 0, 116, 0.26, 0, true)
+    .grand(61, 0, 112, 0.26, Math.PI, true).grand(69.5, 0, 124, 0.26, 0, true).grand(78, 0, 106, 0.26, Math.PI, true)
+    .grand(86.5, 0, 118, 0.26, 0, true).grand(95, 0, 110, 0.26, Math.PI, true)
+    .prop('ghostball', { rings: [16, 52, 92], n: 5, cursed: [[7, 49], [57, 100]] })
+    .statue(53, 8)
+    .prop('candelabra', { x: 2, y: 10 }).prop('candelabra', { x: 5, y: 10 }).prop('candelabra', { x: 50.5, y: 8 }).prop('candelabra', { x: 55.5, y: 8 }).prop('candelabra', { x: 104, y: 10 }).prop('candelabra', { x: 108, y: 10 })
+    .candle(16, 3, 'H').candle(24, 3).candle(33, 3, 'W').candle(41, 3, 'H').candle(53, 4, '$').candle(65, 3, 'H').candle(74, 3).candle(82, 3, 'W').candle(91, 3, 'H').candle(99, 3, '1')
+    .enemy('ghost', 30, 4).enemy('ghost', 80, 4).enemy('bat', 24, 2).enemy('bat', 66, 2).enemy('bat', 90, 2)
+    .label('BALLSAAL')
     .start(2, 10).exit(110).done();
 
   const r32 = room(88, 'throne')

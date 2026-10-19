@@ -87,10 +87,11 @@ class GrandChandelier extends Ent {
     super(0, 0, 108, 8);
     this.kind = 'platform'; this.ax = d.x * T; this.ay = d.y * T; this.L = d.len; this.amp = d.amp; this.phase = d.phase || 0;
     this.speed = d.speed || 0.02; this.hw = 54; this.slack = 3; this.sc = 1;
+    this.dance = !!d.dance; this.L0 = this.L; this.prevL = this.L; this.spin = 0; // dance: schwingt, wippt und dreht sich im Takt der Musik
     this.ang = this.prevAng = this.angleAt(0); this.dx = this.dy = 0;
     this.place();
   }
-  angleAt(t) { return this.amp * Math.sin(t * this.speed + this.phase); }
+  angleAt(t) { return this.dance ? this.amp * Math.sin(Ball.beat() * Math.PI / 4 + this.phase) : this.amp * Math.sin(t * this.speed + this.phase); } // tanzend: zwei Takte hin, zwei zurück
   // lokale Koordinate (lx entlang der Kante, ly ab Anker nach unten) → Welt
   world(lx, ly, a = this.ang) { const c = Math.cos(a), s = Math.sin(a); return [this.ax + lx * c + ly * s, this.ay - lx * s + ly * c]; }
   localX(x, a = this.ang) { return (x - this.ax - this.L * Math.sin(a)) / Math.cos(a); }
@@ -102,13 +103,15 @@ class GrandChandelier extends Ent {
   // Mitnahme des Punktes, auf dem der Spieler steht (Drehung, nicht nur Verschiebung)
   carryAt(x) {
     const lx = this.localX(x, this.prevAng);
-    const [x0, y0] = this.world(lx, this.L, this.prevAng), [x1, y1] = this.world(lx, this.L, this.ang);
+    const [x0, y0] = this.world(lx, this.prevL, this.prevAng), [x1, y1] = this.world(lx, this.L, this.ang);
     return [x1 - x0, y1 - y0];
   }
   place() { const [cx, cy] = this.world(0, this.L); this.x = cx - this.w / 2; this.y = cy; }
   update() {
     this.t++;
-    this.prevAng = this.ang; this.ang = this.angleAt(this.t);
+    this.prevAng = this.ang; this.prevL = this.L;
+    if (this.dance) { const b = Ball.beat(); this.L = this.L0 - 7 * Ball.sway(b + this.phase * 0.3); this.spin = Ball.steps(b) * 0.35 + this.phase; } // wippt auf jedem Schlag, Drehschritt im Takt
+    this.ang = this.angleAt(this.t);
     this.sc = 1 + 0.06 * (1 - Math.abs(this.ang) / this.amp); // Mode-7-Zoom beim Durchschwingen
     const ox = this.x, oy = this.y;
     this.place(); this.dx = this.x - ox; this.dy = this.y - oy;
@@ -140,7 +143,7 @@ class GrandChandelier extends Ent {
     }
     ctx.save(); // XXL-Kronleuchter als Low-Poly-Modell (PS2): zwei Etagen, dreht sich, schwingt mit der Kette
     ctx.translate(Math.round(sx), Math.round(sy)); ctx.rotate(-this.ang); ctx.translate(0, this.L); ctx.scale(s, s);
-    PS2.drawChandelier(ctx, 0, 2, 54, { yaw: this.t * 0.006, tiers: 2, lit: true, holder: this });
+    PS2.drawChandelier(ctx, 0, 2, 54, { yaw: this.dance ? this.spin : this.t * 0.006, tiers: 2, lit: true, holder: this });
     ctx.restore();
   }
 }

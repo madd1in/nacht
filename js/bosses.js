@@ -398,7 +398,7 @@ class Count extends Boss {
   constructor(ax, aw) {
     super(ax + aw - 96, 176 - 80, 24, 80, 28, 4);
     this.ax = ax; this.aw = aw; this.state = 'appear'; this.timer = 0; this.cycle = 0; this.score = 10000; this.hover = 0;
-    this.nameKey = 'boss4'; this.voice = 'boss3'; // Boss von Stage 4; die Studioaufnahme heißt noch boss3
+    this.nameKey = 'boss4'; this.voice = 'boss3'; this.music = 'chapel'; // Orgel-Toccata von der Brücke bis zum Schluss // Boss von Stage 4; die Studioaufnahme heißt noch boss3
   }
   vulnerable() { return this.state === 'open'; }
   hurtBox() { return { x: this.x - 6, y: this.y + 2 + this.hover, w: this.w + 12, h: 54 }; }

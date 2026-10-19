@@ -268,20 +268,6 @@ const Audio8 = (() => {
   const LB = { Am: ['a3', 'c4', 'e4'], E: ['g#3', 'b3', 'e4'], Dm: ['d4', 'f4', 'a4'], G: ['g3', 'b3', 'd4'], C: ['c4', 'e4', 'g4'], F: ['f3', 'a3', 'c4'] };
   const LB_B = { Am: ['a1', 'a2'], E: ['e2', 'e3'], Dm: ['d2', 'd3'], G: ['g1', 'g2'], C: ['c2', 'c3'], F: ['f1', 'f2'] };
   const LB_C = ['Am', 'E', 'Am', 'G', 'F', 'C', 'Dm', 'E', 'Am', 'Dm', 'G', 'C', 'F', 'Dm', 'E', 'E'];
-  // Ballsaal – Geistertango (g-Moll, 4/4): Akkorde pro Takt, Bass als Oktaven
-  const TG = { Gm: ['g3', 'a#3', 'd4'], D: ['f#3', 'a3', 'd4'], Cm: ['g3', 'c4', 'd#4'], Eb: ['g3', 'a#3', 'd#4'] };
-  const TG_B = { Gm: ['g1', 'g2'], D: ['d2', 'd3'], Cm: ['c2', 'c3'], Eb: ['d#2', 'd#3'] };
-  const TG_C = ['Gm', 'Gm', 'D', 'D', 'Cm', 'Cm', 'D', 'Gm', 'Eb', 'Eb', 'Cm', 'D', 'Gm', 'Cm', 'D', 'D'];
-  // Schlagzeug: Kick auf dem Habanera-Rhythmus (1 und die punktierte 2), Snare auf 2 und 4; „b“ = Gewitter-Stakkato
-  // (Donnerschlag + Orchesterschlag – das Bild blitzt im selben Moment). A-Teil: Stakkato am Phrasenende und in den
-  // Kadenzen, B-Teil: auf jeder Eins und als Marcato-Salven (vier Schläge) vor der Wiederholung
-  const TGA = (i) => i === 7 || i === 15 ? 'b:4 -:4 s:1 s:1 t:1 u:1 b:4'
-    : i % 4 === 3 ? 'b:2 h:2 b:2 h:2 b:2 -:2 s:1 s:1 s:1 s:1'
-    : (i === 0 ? 'x:1' : i % 2 ? 'b:1' : 'k:1') + ' h:1 o:1 k:1 s:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 s:1 h:1 o:1 h:1';
-  const TGB = (i) => i === 15 ? 'b:2 -:2 b:2 -:2 w:8'
-    : i === 7 ? 'b:2 -:2 b:2 -:2 s:1 s:1 s:1 s:1 t:1 t:1 u:1 u:1'
-    : i % 8 === 6 ? 'b:2 h:2 b:2 h:2 b:2 h:2 b:2 h:2'
-    : (i % 4 === 0 ? 'x:1' : 'b:1') + ' h:1 o:1 k:1 q:1 h:1 o:1 k:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
   // Pauken auf der Eins und ein Paukenwirbel als Fill (Glasturm)
   const PFOUR = 'p:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1';
   const FILLP = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 p:1 h:1 p:1 h:1 p:1 p:1 p:1 p:1';
@@ -458,26 +444,6 @@ const Audio8 = (() => {
       dr: EX_C.map((c, i) => i % 8 === 7 ? 'k:1 h:1 o:1 h:1 q:1 h:1 q:1 h:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1' : 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1').join(' ') + ' ' +
         EX_C.map((c, i) => i === 31 ? 'k:1 d:1 q:1 d:1 t:1 u:1 w:6' : i % 8 === 7 ? 'k:1 d:1 d:1 d:1 q:1 d:1 q:1 d:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1' : 'k:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1').join(' '),
     },
-    // Ballsaal: Geistertango – dramatische Punktierungen über dem Habanera-Bass, Bandoneon-Stakkato in Achteln; im B-Teil
-    // rauschende 32tel, Marcato-Bass in Vierteln und Donner-Stakkato auf jeder Eins
-    ball: {
-      bpm: 138, loop: true, echo: { delay: 3, vol: 0.26 },
-      p1: contrastLead(TG_C, TG, [
-        'd5:3 d5:1 d5:2 d5:2 g5:4 a#5:4', 'a5:3 g5:1 f#5:2 g5:2 d5:8',
-        'c6:3 a#5:1 a5:2 g5:2 f#5:4 a5:4', 'd6:6 c6:2 a5:4 f#5:4',
-        'g5:3 g5:1 g5:2 g5:2 c6:4 d#6:4', 'd6:3 c6:1 b5:2 c6:2 g5:8',
-        'f#5:2 g5:2 a5:2 a#5:2 c6:2 a#5:2 a5:2 f#5:2', 'g5:4 -:2 d5:2 g5:4 -:4',
-        'a#5:3 a#5:1 a#5:2 a#5:2 d#6:4 g6:4', 'f6:3 d#6:1 d6:2 d#6:2 a#5:8',
-        'c6:3 d6:1 d#6:2 f6:2 g6:4 d#6:4', 'f#6:6 d6:2 a5:4 c6:4',
-        'a#5:3 a5:1 g5:2 a#5:2 d6:4 g6:4', 'g6:3 f6:1 d#6:2 d6:2 c6:4 d#6:4',
-        'd6:2 c#6:2 d6:2 d#6:2 d6:2 c6:2 a#5:2 a5:2', 'f#5:4 a5:4 d6:4 -:4',
-      ]),
-      p2: TG_C.map(c => { const [a, b, d] = TG[c]; return rep(`${a}:1 -:1 ${b}:1 -:1 ${d}:1 -:1 ${b}:1 -:1`, 2); }).join(' ') + ' ' + TG_C.map(c => arp3f(...TG[c])).join(' '),
-      tri: TG_C.map(c => { const [lo, hi] = TG_B[c]; return rep(`${lo}:3 ${lo}:1 ${hi}:2 ${lo}:2`, 2); }).join(' ') + ' ' +
-        TG_C.map(c => { const [lo, hi] = TG_B[c]; return rep(`${lo}:1 -:1 ${hi}:1 -:1`, 4); }).join(' '),
-      pad: chordPad(TG_C, TG),
-      dr: TG_C.map((c, i) => TGA(i)).join(' ') + ' ' + TG_C.map((c, i) => TGB(i)).join(' '),
-    },
     clear: {
       bpm: 150, loop: false,
       p1: 'd5:2 f5:2 a5:2 d6:6 c6:2 a#5:2 a5:2 c#6:2 d6:8',
@@ -534,19 +500,9 @@ const Audio8 = (() => {
     melBus.gain.setValueAtTime(0.45, t);
     melBus.gain.linearRampToValueAtTime(1, t + 0.12);
   }
-  let cueQ = []; // geplante Stakkato-Zeitpunkte (Audiozeit) – das Bild blitzt, wenn sie erreicht sind
+  let cueQ = [], songT0 = 0; // geplante Pauken-/Beckenschläge (Audiozeit) fürs Bild; Startzeit des laufenden Stücks
   function drum(n, t, dur) {
-    if (n === 'b') { // Gewitter-Stakkato: tiefer Donnerschlag, Knall, Grollen
-      sidechain(t);
-      const o = osc('triangle'), g = ac.createGain();
-      o.frequency.setValueAtTime(118, t); o.frequency.exponentialRampToValueAtTime(36, t + 0.24);
-      g.gain.setValueAtTime(0.95, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-      o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.3);
-      noise(0.2, 0.34, 'bandpass', 2600, 500, t, musicBus);
-      noise(0.55, 0.15, 'lowpass', 900, 120, t + 0.03, musicBus);
-      cueQ.push(t); if (cueQ.length > 32) cueQ.shift();
-      return;
-    }
+    if (n === 'p' || n === 'x') { cueQ.push(t); if (cueQ.length > 32) cueQ.shift(); } // Pauke und Becken: Taktmarken fürs Bild (Ballsaal-Blitze)
     if (n === 'w') { // Riser: Rauschen schwillt an und steigt
       const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
       const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2;
@@ -662,6 +618,7 @@ const Audio8 = (() => {
     song = parsed[name]; songName = name; nextSong = then;
     const t0 = ac.currentTime + 0.05 + (fade ? fade * 2 : 0);
     cursors = song.tracks.map(() => ({ i: 0, t: t0, done: false }));
+    songT0 = t0;
     schedule();
     timer = setInterval(schedule, 40);
   }
@@ -832,6 +789,7 @@ const Audio8 = (() => {
 
   return { init, prepare, sfx, play, stop, ambience, drip, toggleMute, setMusicVolume, setMusicLevel, ready, duck, muffle, tempo,
     context: () => ac, voiceOut: () => voiceBus,
+    beat: () => (ac && song ? Math.max(0, ac.currentTime - songT0) * song.bpm * tempoMul / 60 : null), // Schlag im laufenden Stück
     cues: () => { if (!ac) return 0; const now = ac.currentTime; let n = 0; while (cueQ.length && cueQ[0] <= now) { cueQ.shift(); n++; } return n; }, // fällige Stakkato-Schläge
     stream: () => { if (!ac) return null; if (!tapDest) { tapDest = ac.createMediaStreamDestination(); comp.connect(tapDest); } return tapDest.stream; }, // Mitschnitt (Trailer-Aufnahme)
     get muted() { return muted; }, get current() { return songName; }, _songs: parsed };
