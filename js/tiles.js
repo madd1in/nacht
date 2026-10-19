@@ -1596,8 +1596,10 @@ const Tiles = (() => {
       }
       add('clouds', cl, 0.04, { drift: 0.05 });
       L.push({ name: 'woods0', custom: (c2, cam, f) => PS2.drawWoods(c2, cam, f, 0), par: 0.2, c: C(1, 1) });
+      L.push({ name: 'coach0', custom: (c2, cam) => { if (typeof Coach !== 'undefined') Coach.slot(c2, cam, 0); }, par: 0.2, c: C(1, 1) }); // Geisterkutsche tief im Wald
       L.push({ name: 'shafts', custom: drawMoonShafts, par: 0.4, c: C(1, 1) });
       L.push({ name: 'woods1', custom: (c2, cam, f) => PS2.drawWoods(c2, cam, f, 1), par: 0.5, c: C(1, 1) });
+      L.push({ name: 'coach1', custom: (c2, cam) => { if (typeof Coach !== 'undefined') Coach.slot(c2, cam, 1); }, par: 0.5, c: C(1, 1) });
       L.push({ name: 'woods2', custom: (c2, cam, f) => PS2.drawWoods(c2, cam, f, 2), par: 0.8, c: C(1, 1) });
       const ug = C(512, 208), ux = ug.getContext('2d'); // Unterholz am Boden: Farnwedel und Büsche, Kanten im Mondlicht
       for (let i = 0; i < 70; i++) {

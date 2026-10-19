@@ -158,6 +158,14 @@ const Audio8 = (() => {
     cog: () => { noise(0.03, 0.1, 'highpass', 3200); tone('pulse', 1900, 1750, 0.025, 0.045, 0.125); },
     latch: () => { tone('pulse', 1800, 2600, 0.06, 0.12, 0.125); noise(0.08, 0.2, 'highpass', 5000); },
     whoosh: () => noise(0.22, 0.28, 'bandpass', 600, 3000),
+    neigh: () => { // Geisterpferd wiehert: zitternd auf und ab, Atemrauschen, Schnauben am Ende (im Hall)
+      const t = ac.currentTime, seq = [620, 1180, 1460, 1320, 1420, 1240, 1300, 1060, 1120, 820, 700, 520];
+      seq.forEach((f, i) => tone('pulse', f, f * (i % 2 ? 0.88 : 1.1), 0.075, 0.07, 0.25, t + i * 0.055));
+      noise(0.8, 0.12, 'bandpass', 2000, 600); noise(0.25, 0.14, 'lowpass', 700, 200, t + 0.72); tone('sawtooth', 180, 90, 0.3, 0.05, 0, t + 0.72);
+    },
+    neighFar: () => { const t = ac.currentTime; [900, 1250, 1150, 1200, 950, 700].forEach((f, i) => tone('triangle', f, f * 0.9, 0.08, 0.035, 0, t + i * 0.06)); noise(0.6, 0.04, 'bandpass', 1400, 600); },
+    hooves: () => { const t = ac.currentTime; [0, 0.08, 0.19, 0.26].forEach(d => { noise(0.08, 0.24, 'lowpass', 520, 120, t + d); tone('triangle', 92, 52, 0.09, 0.22, 0, t + d); }); }, // Galopp, Viertakt
+    hoovesFar: () => { const t = ac.currentTime; [0, 0.08, 0.19, 0.26].forEach(d => noise(0.07, 0.07, 'lowpass', 320, 100, t + d)); },
     djump: () => { tone('pulse', 420, 1250, 0.11, 0.11, 0.25); noise(0.12, 0.12, 'highpass', 3500, 7000); },
     ready: () => arp(['e6', 'a6', 'e7'], 0.04, 'pulse', 0.12, 0.125),
     crash: () => { arp(['a4', 'e5', 'a5', 'c#6', 'e6', 'a6', 'c#7'], 0.035, 'pulse', 0.16, 0.5); noise(0.9, 0.4, 'highpass', 5000, 800); tone('triangle', 220, 55, 0.7, 0.4); },

@@ -169,6 +169,7 @@ const Levels = (() => {
     .chest(84, 6)                                                        // Belohnung für den Astweg
     .prop('relic', { x: 90, y: 10, loot: 'heartB' })
     .zone('ghoul', 86, 98, { interval: 220, max: 1 })
+    .prop('coach', { x: 92, trig: 80 })                                  // Geisterkutsche: fährt im Wald vorbei, bricht vor den Pfählen durch
     .music('stage1')
     .start(2, 10).exit(102).noDoor().done();
 
