@@ -326,7 +326,8 @@ class AcidBlob extends Ent {
 // ---------------- Boss: die Menschenfalle ----------------
 // Aus einem riesigen Pflanzkübel in der Kuppel wachsen drei Fangköpfe auf langen, sich windenden Hälsen. Ein Kopf reißt
 // das Maul auf (rot glühend) und schnellt dorthin, wo der Held steht; andere spucken Säure im Bogen. Ab halber Kraft
-// brechen dornige Wurzeln aus dem Boden. Treffer an jedem Kopf schwächen die Pflanze. Echtzeit-3D (PS2-Renderer).
+// brechen dornige Wurzeln aus dem Boden. Treffer an jedem Kopf schwächen die Pflanze – am leichtesten, wenn sich ein Kopf nach dem
+// Zuschnappen im Boden verbeißt (er zerrt und glüht gelb). Die Knolle im Kübel ist zäh: Hiebe prallen ab. Echtzeit-3D (PS2-Renderer).
 class ManTrap extends Boss {
   constructor(ax, aw) {
     const floor = (W.room.h - 2) * T;
@@ -335,23 +336,52 @@ class ManTrap extends Boss {
     this.go('rise'); this.seq = 0;
     const bx = this.cx, by = floor - 40;
     this.heads = [-1, 0, 1].map((k, i) => ({ k, i, home: { x: bx + k * 62, y: by - 70 + Math.abs(k) * 16 }, x: bx, y: by, open: 0.1, st: 'sway', t: 0, tx: 0, ty: 0, glow: 0, flash: 0 }));
-    this.buf = null;
+    this.buf = null; this.hintCd = 0;
   }
   go(s) { this.state = s; this.timer = 0; }
   base() { return { x: this.cx, y: this.floor - 40 }; }
-  hurtBoxes() { return this.state === 'rise' && this.timer < 60 ? [] : this.heads.map(h => ({ x: h.x - 14, y: h.y - 11, w: 28, h: 22 })); }
-  hit(dmg, id) { const r = super.hit(dmg, id); if (r) for (const h of this.heads) h.flash = 10; return r; }
+  // Mitte des sichtbaren Kopfes: die Kiefer sitzen vor dem Gelenk, in Blickrichtung des Halses (wie in buildMesh)
+  jawC(h) {
+    const B = this.base(), hx = h.x, hy = -h.y, bx = B.x + h.k * 14, by = -(B.y + 20) + 22;
+    const cx = (bx + hx) / 2 - h.k * 30 + Math.sin(this.t * 0.04 + h.i) * 10, cy = (by + hy) / 2 + 40, a = Math.atan2(hy - cy, hx - cx);
+    return { x: hx + Math.cos(a) * 11.5, y: -(hy + Math.sin(a) * 11.5) };
+  }
+  hurtBoxes() { return this.state === 'rise' && this.timer < 60 ? [] : this.heads.map(h => { const c = this.jawC(h); return { x: c.x - 16, y: c.y - 13, w: 32, h: 26, head: h }; }); }
+  armorBoxes() { return this.dying ? [] : [{ x: this.cx - 34, y: this.floor - 58, w: 68, h: 58 }]; } // Knolle im Kübel
+  hit(dmg, id) { // Treffer am Kopf, der dem Hieb am nächsten ist: Funken dort, nur dieser Kopf blitzt und zuckt zurück
+    const p = W.player, ax = p.cx + p.face * 26, ay = p.cy - 4;
+    let best = null, bd = Infinity;
+    for (const b of this.hurtBoxes()) { const d = Math.hypot(b.x + b.w / 2 - ax, b.y + b.h / 2 - ay); if (d < bd) { bd = d; best = b; } }
+    const ox = this.x, oy = this.y;
+    if (best) { this.x = best.x + best.w / 2 - this.w / 2; this.y = best.y + best.h / 2 - this.h / 2; }
+    const ok = super.hit(dmg, id);
+    this.x = ox; this.y = oy;
+    if (ok && best) {
+      const h = best.head; h.flash = 14; h.rdir = Math.sign(h.x - p.cx) || 1; W.sparks(best.x + best.w / 2, best.y + best.h / 2, 10);
+      if (h.st === 'stuck') { if (++h.bites >= 2) { h.st = 'back'; h.t = 0; h.recoil = 14; Audio8.sfx('growl', h.x); } } // nach zwei Treffern reißt er sich los
+      else h.recoil = 12;
+    }
+    return ok;
+  }
+  deflect(id, b) { // Hieb auf die Knolle: prallt ab (heller Klang, Funken) – und der Tipp erscheint
+    if (this.dying || (id && this.lastDeflect === id)) return;
+    this.lastDeflect = id;
+    const p = W.player, x = clamp(p.cx + p.face * 22, b.x + 4, b.x + b.w - 4), y = clamp(p.cy - 4, b.y + 4, b.y + b.h - 4);
+    Audio8.sfx('tink', x); W.spawn(new Spark(x, y));
+    if (this.hintCd <= 0) { Game.note('trapHint'); this.hintCd = 600; }
+  }
   update() {
     this.tick();
     const p = W.player, half = this.hp <= this.maxHp / 2, B = this.base();
-    for (const h of this.heads) { h.t++; if (h.flash > 0) h.flash--; }
+    for (const h of this.heads) { h.t++; if (h.flash > 0) h.flash--; if (h.recoil > 0) { h.recoil--; h.x += h.rdir * h.recoil * 0.35; h.y -= h.recoil * 0.25; } }
+    if (this.hintCd > 0) this.hintCd--;
     if (this.dying) { for (const h of this.heads) { h.y += 0.9; h.open = Math.min(1, h.open + 0.02); } return this.updateDeath(140); }
     if (this.state === 'rise') { // wächst aus dem Kübel
       const k = Math.min(1, this.timer / 90);
       for (const h of this.heads) { h.x = B.x + (h.home.x - B.x) * k; h.y = B.y + (h.home.y - B.y) * k; h.open = 0.2 + 0.5 * Math.sin(k * Math.PI); }
       if (this.timer === 1) { Audio8.sfx('rise'); W.shake = 10; }
       if (this.timer === 70) { Audio8.sfx('roar'); W.shake = 18; Input.rumble(0.9, 0.7, 500); }
-      if (this.timer > 100) this.go('idle');
+      if (this.timer > 100) { this.go('idle'); Game.note('trapHint'); this.hintCd = 900; }
       return;
     }
     if (this.state === 'idle' && this.timer > (half ? 40 : 64)) {
@@ -377,8 +407,17 @@ class ManTrap extends Boss {
       } else if (h.st === 'lunge') {
         const k = Math.min(1, h.t / 10); h.x += (h.tx - h.x) * (0.25 + k * 0.4); h.y += (h.ty - h.y) * (0.25 + k * 0.4);
         if (h.t === 8) { h.open = 0.02; Audio8.sfx('chomp'); W.shake = Math.max(W.shake, 8); }
-        if (h.t > 8 && h.t < 22 && p.alive && Phys.overlap({ x: h.x - 15, y: h.y - 12, w: 30, h: 24 }, p)) p.hurt(this.dmg, h.x);
-        if (h.t > 30) { h.st = 'back'; h.t = 0; }
+        if (h.t > 8 && h.t < 22 && p.alive) { const c = this.jawC(h); if (Phys.overlap({ x: c.x - 15, y: c.y - 12, w: 30, h: 24 }, p)) p.hurt(this.dmg, c.x); }
+        if (h.t > 24) {
+          const c = this.jawC(h);
+          if (c.y > this.floor - 30) { h.st = 'stuck'; h.t = 0; h.bites = 0; h.sx = h.x; h.sy = h.y; W.shake = Math.max(W.shake, 4); Audio8.sfx('crumble', c.x); for (let k = 0; k < 6; k++) W.debris(c.x + rnd(-10, 10), this.floor - 2, '#4c3420', 1); }
+          else { h.st = 'back'; h.t = 0; }
+        }
+      } else if (h.st === 'stuck') { // im Boden verbissen: zerrt und zappelt, glüht gelb – jetzt treffen!
+        h.x = h.sx + Math.sin(h.t * 0.9) * 1.6; h.y = h.sy - Math.abs(Math.sin(h.t * 0.42)) * 3; h.open = 0.3 + 0.12 * Math.sin(h.t * 0.5); h.glow *= 0.85;
+        if (h.t % 18 < 3) h.flash = Math.max(h.flash, 2); // blinkt weiß: hier treffen
+        if (h.t % 14 === 0) { const c = this.jawC(h); W.debris(c.x + rnd(-8, 8), this.floor - 2, '#4c3420', 1); }
+        if (h.t > (half ? 56 : 80)) { h.st = 'back'; h.t = 0; Audio8.sfx('crack', h.x); }
       } else if (h.st === 'back') {
         h.x += (sway.x - h.x) * 0.1; h.y += (sway.y - h.y) * 0.1; h.glow *= 0.9; h.open += (0.2 - h.open) * 0.1;
         if (h.t > 26) h.st = 'sway';
@@ -419,7 +458,7 @@ class ManTrap extends Boss {
     PS2.box(m, bx, by - 34, 0, 100, 6, 70, [124, 112, 90]);
     ManTrap.sphere(m, bx, by + 6, 0, 36, 26, 30, 10, 8, (j, i) => (i + j) % 3 ? BULB : BULB2); // Knolle
     for (const h of this.heads) {
-      const [hx, hy] = V(h.x, h.y), z = h.k * 10, base = [bx + h.k * 14, by + 22, 0];
+      const [hx, hy] = V(h.x, h.y), z = h.k * 10 - 36, base = [bx + h.k * 14, by + 22, 0];
       const ctrl = [(base[0] + hx) / 2 - h.k * 30 + Math.sin(this.t * 0.04 + h.i) * 10, (base[1] + hy) / 2 + 40, z * 0.5];
       const N = 10, ring = [];
       for (let s = 0; s <= N; s++) { // Hals: Bézier-Röhre
@@ -454,6 +493,11 @@ class ManTrap extends Boss {
     if (this.dying && (this.dying & 2)) return;
     PS2.render(x, Wb, Hb, [this.buildMesh()], cam, env);
     x.save(); x.globalCompositeOperation = 'lighter'; // glühender Schlund beim Ausholen
+    for (const h of this.heads) if (h.st === 'stuck') { // Trefferfenster: verbissener Kopf pulsiert gelb
+      const c = this.jawC(h), sx = (c.x - W.cam.x) / dv, sy = (c.y - W.cam.y) / dv, a = 0.5 + 0.3 * Math.sin(this.t * 0.35), r = 34 / dv;
+      const g = x.createRadialGradient(sx, sy, 0, sx, sy, r); g.addColorStop(0, `rgba(255,236,120,${a.toFixed(2)})`); g.addColorStop(1, 'rgba(255,200,60,0)');
+      x.fillStyle = g; x.fillRect(sx - r, sy - r, r * 2, r * 2);
+    }
     for (const h of this.heads) if (h.glow > 0.05) { const sx = (h.x - W.cam.x) / dv, sy = (h.y - W.cam.y) / dv, r = 14 / dv * (1 + h.glow), g = x.createRadialGradient(sx, sy, 0, sx, sy, r * 2); g.addColorStop(0, `rgba(255,80,60,${(0.5 * h.glow).toFixed(2)})`); g.addColorStop(1, 'rgba(255,40,40,0)'); x.fillStyle = g; x.fillRect(sx - r * 2, sy - r * 2, r * 4, r * 4); }
     x.restore();
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(this.buf.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
