@@ -228,10 +228,10 @@ const Game = {
   // Demo: die KI spielt den Burghof (abwechselnd mit beiden Helden), jede echte Taste beendet sie
   startDemo() {
     this.demoN = (this.demoN || 0) + 1;
-    const other = Options.character === 'henrik' ? 'ragnor' : 'henrik', hero = this.demoN % 2 ? Options.character : other;
+    const ids = HEROES.list.map(d => d.id), hero = this.demoN % 2 ? Options.character : ids[(ids.indexOf(Options.character) + Math.ceil(this.demoN / 2)) % ids.length]; // abwechselnd die anderen Helden
     W.score = 0; W.lives = 3; W.nextLife = 20000;
     const p = W.player = new Player();
-    if (hero !== Options.character) { p.H = HEROES.get(hero); p.def = p.H.def; p.sword = p.def.weapon === 'sword'; } // ohne die Einstellung zu speichern
+    if (hero !== Options.character) p.setHero(HEROES.get(hero)); // ohne die Einstellung zu speichern
     W.stage = 0; W.time = Levels.STAGES[0].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0; W.miniDone = {};
     W.stats = { hits: 0, deaths: 0, combo: 0 };
     W.loadRoom(0, Math.max(0, Levels.STAGES[0].rooms.findIndex(r => r.theme === 'courtyard'))); // Demo spielt im Burghof
@@ -599,7 +599,7 @@ const Game = {
       Font.draw(ctx, e.n, cx - 76, y, c);
       Font.draw(ctx, String(e.s).padStart(6, '0'), cx + 34, y, c, { align: 'right' });
       Font.draw(ctx, e.st > Levels.STAGES.length ? tr('allClear') : String(e.st), cx + 66, y, c, { align: 'center' });
-      const hd = HEROES.get(e.c === 'ragnor' ? 'ragnor' : 'henrik').def; // Kopf-Symbol des Helden
+      const hd = HEROES.get(e.c).def; // Kopf-Symbol des Helden
       hd.icon.forEach((row, yy) => [...row].forEach((ch, xx) => { if (hd.iconPal[ch]) { ctx.fillStyle = hd.iconPal[ch]; ctx.fillRect(cx + 94 + xx, y + yy, 1, 1); } }));
     });
     if ((this.t >> 5) % 2) Font.draw(ctx, tr('pressStart'), cx, 224, '#bcbcbc', { align: 'center', shadow: '#000' });
@@ -888,7 +888,7 @@ const Game = {
     const hd = p.def;
     hd.icon.forEach((row, y) => [...row].forEach((ch, x) => { if (hd.iconPal[ch]) R(hd.iconPal[ch], right + 1 + x, 22 + y, 1, 1); }));
     Font.draw(ctx, pad(W.lives, 2), right + 11, 22, W.lifeT > 0 && (W.frame & 8) ? '#58f898' : val, { shadow: '#000' });
-    Font.draw(ctx, tr(p.sword ? 'hudSword' : 'hudWhip'), Wd - 60, 13, label);
+    Font.draw(ctx, tr(p.pole ? 'hudPole' : p.sword ? 'hudSword' : 'hudWhip'), Wd - 60, 13, label);
     for (let i = 0; i < 3; i++) {
       const on = i < p.whip, x = Wd - 54 + i * 12, y = 22;
       R(on ? '#9c6400' : '#2c2c2c', x + 1, y, 5, 7); R(on ? '#f8b800' : '#4c4c4c', x, y + 1, 7, 5);
@@ -1134,13 +1134,18 @@ const Game = {
     Font.draw(ctx, tr(Input.device === 'pad' ? 'optNavPad' : 'optNavKey'), cx, 214, '#7c7c7c', { align: 'center' });
   },
 
+  cap: (id) => id[0].toUpperCase() + id.slice(1),
   drawCharSel(ctx) {
     const cx = View.cx;
     this.drawSkyScene(ctx);
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, View.w, 176);
     this.big(ctx, tr('choose'), cx, 40, 2, LOGO, null, '#000');
+    // Karussell: der gewählte Held in der Mitte, die anderen daneben (gleitet beim Wechseln, passt auf jede Bildbreite)
+    const sel = Math.max(0, HEROES.list.findIndex(d => d.id === Options.character));
+    this.selX = this.selX === undefined ? sel : this.selX + (sel - this.selX) * 0.25;
     HEROES.list.forEach((d, i) => {
-      const on = Options.character === d.id, pw = 134, px = cx + (i === 0 ? -pw - 4 : 4), py = 58, mid = px + pw / 2;
+      const on = Options.character === d.id, pw = 134, px = Math.round(cx - pw / 2 + (i - this.selX) * (pw + 8)), py = 58, mid = px + pw / 2;
+      if (px > View.w || px + pw < 0) return;
       ctx.fillStyle = on ? 'rgba(200,144,32,0.22)' : 'rgba(0,0,0,0.6)'; ctx.fillRect(px, py, pw, 148);
       ctx.fillStyle = on ? '#f8b800' : '#4c4c4c';
       ctx.fillRect(px, py, pw, 1); ctx.fillRect(px, py + 147, pw, 1); ctx.fillRect(px, py, 1, 148); ctx.fillRect(px + pw - 1, py, 1, 148);
@@ -1152,6 +1157,7 @@ const Game = {
       tr(d.id + 'Desc').forEach((l, k) => Font.draw(ctx, l, mid, py + 120 + k * 11, on ? '#bcbcbc' : '#5c5c5c', { align: 'center' }));
       if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, mid - 4, py + 140);
     });
+    if ((this.t >> 4) % 2 === 0) { Font.draw(ctx, '<', 6, 128, '#f8b800'); Font.draw(ctx, '>', View.w - 11, 128, '#f8b800'); }
     Font.draw(ctx, tr(Input.device === 'pad' ? 'selPad' : 'selKey'), cx, 214, '#9c9c9c', { align: 'center' });
   },
 
@@ -1159,7 +1165,7 @@ const Game = {
     const cx = View.cx;
     this.drawSkyScene(ctx);
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, View.w, 176);
-    const text = [...tr('intro'), '', ...tr(Options.character === 'ragnor' ? 'introRagnor' : 'introHenrik')];
+    const text = [...tr('intro'), '', ...tr('intro' + Game.cap(HEROES.get(Options.character).def.id))];
     const slow = I18N.cjk ? 6 : 3; // CJK: weniger Zeichen, gleiches Erzähltempo
     let budget = Math.floor(this.t / slow);
     text.forEach((l, i) => {
@@ -1205,7 +1211,7 @@ const Game = {
     }
     const lines = [
       ...tr('ending').map(l => [l, '#fcfcfc']),
-      ['', ''], [tr(Options.character === 'ragnor' ? 'endRagnor' : 'endHenrik'), '#f8b800'], [tr('endUntil'), '#f8b800'],
+      ['', ''], [tr('end' + Game.cap(HEROES.get(Options.character).def.id)), '#f8b800'], [tr('endUntil'), '#f8b800'],
       ['', ''], ['', ''], ['NACHTMAHR', '#d82800'], [tr('subtitle'), '#bcbcbc'], ['', ''],
       [tr('credits'), '#7c7c7c'], [tr('madeWith'), '#bcbcbc'], [tr('voiceBy'), '#7c7c7c'], ['', ''],
       [tr('inspired'), '#7c7c7c'], ['CASTLEVANIA - BLOODSTAINED - INFERNAX', '#bcbcbc'], ['MONKEY ISLAND', '#bcbcbc'], ['', ''],

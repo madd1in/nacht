@@ -63,6 +63,8 @@ const I18N = (() => {
     henrikDesc: { de: ['MORGENSTERN-PEITSCHE', 'GROSSE REICHWEITE'], en: ['MORNING STAR WHIP', 'LONG REACH'], fr: ['FOUET ÉTOILE DU MATIN', 'GRANDE PORTÉE'], es: ['LÁTIGO LUCERO', 'GRAN ALCANCE'], ja: ['モーニングスター', 'リーチが長い'], zh: ['晨星鞭', '攻击距离远'] },
     ragnorTitle: { de: 'BARBAR AUS DEM NORDEN', en: 'BARBARIAN OF THE NORTH', fr: 'BARBARE DU NORD', es: 'BÁRBARO DEL NORTE', ja: '北の蛮族', zh: '北方蛮族' },
     ragnorDesc: { de: ['BREITSCHWERT', 'WEITER HIEBBOGEN'], en: ['BROADSWORD', 'WIDE SWING'], fr: ['ÉPÉE LARGE', 'GRAND ARC'], es: ['ESPADA ANCHA', 'GRAN ARCO'], ja: ['大剣', '広い斬撃'], zh: ['阔剑', '大范围斩击'] },
+    kasparTitle: { de: 'MARIONETTE OHNE FÄDEN', en: 'PUPPET WITHOUT STRINGS', fr: 'PANTIN SANS FILS', es: 'MARIONETA SIN HILOS', ja: '糸の切れた人形', zh: '断线的木偶' },
+    kasparDesc: { de: ['HELLEBARDE', 'GRÖSSTE REICHWEITE'], en: ['HALBERD', 'LONGEST REACH'], fr: ['HALLEBARDE', 'PLUS GRANDE PORTÉE'], es: ['ALABARDA', 'MAYOR ALCANCE'], ja: ['ハルバード', '最長のリーチ'], zh: ['戟', '攻击距离最远'] },
     selPad: { de: 'STICK WÄHLEN   A = LOS', en: 'STICK SELECT   A = GO', fr: 'STICK CHOISIR   A = GO', es: 'STICK ELEGIR   A = YA', ja: 'スティックで選択  A = 決定', zh: '摇杆选择  A = 确定' },
     selKey: { de: 'PFEILE WÄHLEN   Z / ENTER = LOS', en: 'ARROWS SELECT   Z / ENTER = GO', fr: 'FLÈCHES CHOISIR   Z / ENTRÉE = GO', es: 'FLECHAS ELEGIR   Z / ENTER = YA', ja: '矢印で選択  Z / ENTER = 決定', zh: '方向键选择  Z / ENTER = 确定' },
     // ---------------- Vorspann ----------------
@@ -89,6 +91,14 @@ const I18N = (() => {
       es: ['RAGNOR, BÁRBARO DEL NORTE,', 'DESENVAINA SU ESPADA', 'CONTRA LA NOCHE ...'],
       ja: ['北の蛮族ラグノルは、', '夜に向かって', '大剣を抜く……'],
       zh: ['北方蛮族拉格诺尔，', '向黑夜', '拔出他的巨剑……'],
+    },
+    introKaspar: {
+      de: ['KASPAR, DIE MARIONETTE OHNE FÄDEN,', 'SCHNITT SICH VON SEINEM PUPPENSPIELER LOS', 'UND GREIFT ZUR HELLEBARDE ...'],
+      en: ['KASPAR, THE PUPPET WITHOUT STRINGS,', 'CUT HIMSELF FREE FROM HIS PUPPETEER', 'AND TAKES UP THE HALBERD ...'],
+      fr: ['KASPAR, LE PANTIN SANS FILS,', "S'EST LIBÉRÉ DE SON MARIONNETTISTE", 'ET SAISIT LA HALLEBARDE ...'],
+      es: ['KASPAR, LA MARIONETA SIN HILOS,', 'SE SOLTÓ DE SU TITIRITERO', 'Y EMPUÑA LA ALABARDA ...'],
+      ja: ['糸の切れた人形カスパーは、', '人形遣いから自らを解き放ち、', 'ハルバードを手に取る……'],
+      zh: ['断线的木偶卡斯帕尔，', '挣脱了操偶师的束缚，', '握起了长戟……'],
     },
     next: { de: 'START = WEITER', en: 'START = SKIP', fr: 'START = PASSER', es: 'START = SALTAR', ja: 'START = スキップ', zh: 'START = 跳过' },
     // ---------------- Stages & Bosse ----------------
@@ -118,6 +128,7 @@ const I18N = (() => {
     hudStage: { de: 'STAGE', en: 'STAGE', fr: 'NIV.', es: 'NIVEL', ja: 'STAGE', zh: 'STAGE' },
     hudPlayer: { de: 'SPIELER', en: 'PLAYER', fr: 'JOUEUR', es: 'JUGADOR', ja: 'PLAYER', zh: 'PLAYER' },
     hudEnemy: { de: 'GEGNER', en: 'ENEMY', fr: 'ENNEMI', es: 'ENEMIGO', ja: 'ENEMY', zh: 'ENEMY' },
+    hudPole: { de: 'HELLEBARDE', en: 'HALBERD', fr: 'HALLEBARDE', es: 'ALABARDA', ja: 'HALBERD', zh: 'HALBERD' },
     hudWhip: { de: 'PEITSCHE', en: 'WHIP', fr: 'FOUET', es: 'LÁTIGO', ja: 'WHIP', zh: 'WHIP' },
     hudSword: { de: 'SCHWERT', en: 'SWORD', fr: 'ÉPÉE', es: 'ESPADA', ja: 'SWORD', zh: 'SWORD' },
     scoreX: { de: 'PUNKTE X{0}', en: 'SCORE X{0}', fr: 'SCORE X{0}', es: 'PUNTOS X{0}', ja: 'スコア X{0}', zh: '得分 X{0}' },
@@ -212,6 +223,7 @@ const I18N = (() => {
       ja: ['血の月は消えゆく。', 'ナハトマール伯爵は滅び、', '城は塵となって崩れ去った。'],
       zh: ['血月消逝。', '纳赫特马尔伯爵已被击败，', '他的城堡化为尘土。'],
     },
+    endKaspar: { de: 'KASPAR SCHNITZT SICH EIN NEUES HERZ -', en: 'KASPAR CARVES HIMSELF A NEW HEART -', fr: 'KASPAR SE TAILLE UN NOUVEAU CŒUR -', es: 'KASPAR SE TALLA UN NUEVO CORAZÓN -', ja: 'カスパーは新しい心を彫る―', zh: '卡斯帕尔为自己雕了一颗新的心——' },
     endHenrik: { de: 'HENRIK MORGENSTERN KEHRT HEIM -', en: 'HENRIK MORGENSTERN RETURNS HOME -', fr: 'HENRIK MORGENSTERN RENTRE CHEZ LUI -', es: 'HENRIK MORGENSTERN VUELVE A CASA -', ja: 'ヘンリクは故郷へ帰る―', zh: '亨里克回到了故乡——' },
     endRagnor: { de: 'RAGNOR ZIEHT WEITER GEN NORDEN -', en: 'RAGNOR RIDES ON TO THE NORTH -', fr: 'RAGNOR REPART VERS LE NORD -', es: 'RAGNOR PARTE HACIA EL NORTE -', ja: 'ラグノルは北へ旅立つ―', zh: '拉格诺尔向北方远去——' },
     endUntil: { de: 'BIS ZUM NÄCHSTEN JAHRHUNDERT ...', en: 'UNTIL THE NEXT CENTURY ...', fr: "JUSQU'AU PROCHAIN SIÈCLE ...", es: 'HASTA EL PRÓXIMO SIGLO ...', ja: '次の百年まで……', zh: '直到下一个世纪……' },
@@ -223,6 +235,7 @@ const I18N = (() => {
     // ---------------- Gesprochene Zeilen (Text für die Browser-Stimme, falls keine Aufnahme vorliegt) ----------------
     'v.title': { de: 'Nachtmahr. Der Blutmond erwacht.', en: 'Nachtmahr. The blood moon awakens.', fr: "Nachtmahr. La lune de sang s'éveille.", es: 'Nachtmahr. La luna de sangre despierta.', ja: 'ナハトマール。血の月が目覚める。', zh: '纳赫特马尔。血月苏醒。' },
     'v.intro': { de: 'Anno 1691. Alle hundert Jahre erwacht Graf Nachtmahr unter dem Blutmond.', en: 'Anno 1691. Every hundred years, Count Nachtmahr rises beneath the blood moon.', fr: 'An de grâce 1691. Tous les cent ans, le comte Nachtmahr se lève sous la lune de sang.', es: 'Año 1691. Cada cien años, el conde Nachtmahr despierta bajo la luna de sangre.', ja: '1691年。百年に一度、血の月の下でナハトマール伯爵が蘇る。', zh: '公元1691年。每隔一百年，纳赫特马尔伯爵便会在血月之下苏醒。' },
+    'v.kaspar': { de: 'Kaspar, die Marionette ohne Fäden, schnitt sich von seinem Puppenspieler los und greift zur Hellebarde.', en: 'Kaspar, the puppet without strings, cut himself free from his puppeteer and takes up the halberd.', fr: "Kaspar, le pantin sans fils, s'est libéré de son marionnettiste et saisit la hallebarde.", es: 'Kaspar, la marioneta sin hilos, se soltó de su titiritero y empuña la alabarda.', ja: '糸の切れた人形カスパーは、人形遣いから自らを解き放ち、ハルバードを手に取る。', zh: '断线的木偶卡斯帕尔挣脱了操偶师的束缚，握起了长戟。' },
     'v.henrik': { de: 'Henrik Morgenstern ergreift die Peitsche seiner Ahnen und betritt die verfluchte Burg.', en: 'Henrik Morgenstern takes up the whip of his ancestors and enters the cursed castle.', fr: 'Henrik Morgenstern saisit le fouet de ses ancêtres et pénètre dans le château maudit.', es: 'Henrik Morgenstern empuña el látigo de sus ancestros y entra en el castillo maldito.', ja: 'ヘンリク・モルゲンシュテルンは祖先の鞭を手に、呪われた城へ踏み込む。', zh: '亨里克·摩根施特恩手握祖传之鞭，踏入被诅咒的城堡。' },
     'v.ragnor': { de: 'Ragnor, Barbar aus dem Norden, zieht sein Breitschwert gegen die Nacht.', en: 'Ragnor, barbarian of the north, draws his broadsword against the night.', fr: 'Ragnor, barbare du Nord, tire sa grande épée contre la nuit.', es: 'Ragnor, bárbaro del norte, desenvaina su espada contra la noche.', ja: '北の蛮族ラグノルは、夜に向かって大剣を抜く。', zh: '北方蛮族拉格诺尔，向黑夜拔出他的巨剑。' },
     'v.stage1': { de: 'Stage eins. Der Burghof.', en: 'Stage one. The castle courtyard.', fr: 'Niveau un. La cour du château.', es: 'Nivel uno. El patio del castillo.', ja: 'ステージ1。城の中庭。', zh: '第一关。城堡庭院。' },

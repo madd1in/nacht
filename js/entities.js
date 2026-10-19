@@ -61,6 +61,7 @@ const Phys = {
 const WALK = 1.45, JUMP = -4.3, GRAV = 0.21, MAXFALL = 4.2, ATK_LEN = 19; // flotter: schneller laufen, kürzere Peitschen-Erholung
 const WHIP_LEN = [0, 23, 23, 38];
 const SWORD_LEN = [0, 17, 19, 27];
+const POLE_LEN = [0, 27, 31, 36]; // Hellebarde: größte Reichweite, am Ende das Axtblatt
 // Peitschen-/Schwertrichtungen: Handposition (relativ zu x-3 / Füße-32, nach rechts schauend) und Winkel.
 // Passt zu den ausgestreckten Armen der 16-Bit-Figur (hero.js, DIR-Ziele minus 9/4).
 const WHIP_DIRS = {
@@ -75,7 +76,7 @@ const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 class Player {
   constructor() {
     this.w = 10; this.h = 28;
-    this.H = HEROES.get(Options.character); this.def = this.H.def; this.sword = this.def.weapon === 'sword';
+    this.setHero(HEROES.get(Options.character));
     this.maxHp = Options.maxHp; this.hp = this.maxHp;
     this.hearts = Options.infHearts ? 99 : 5; this.sub = null; this.whip = Options.maxWhip ? 3 : 1;
     this.reset(40, 176);
@@ -129,9 +130,13 @@ class Player {
     }
   }
   // Ziel-Hilfe (nur Touch, in der Luft): Ring in Reichweite über dem Spieler → automatisch dorthin peitschen
+  setHero(H) { // Waffenart aus dem Helden: Peitsche, Schwert oder Hellebarde (die sich wie ein langes Schwert führt)
+    this.H = H; this.def = H.def; this.pole = this.def.weapon === 'halberd'; this.sword = this.def.weapon === 'sword' || this.pole;
+  }
+  get wlen() { return (this.pole ? POLE_LEN : this.sword ? SWORD_LEN : WHIP_LEN)[this.whip]; }
   ringAssist() {
     if (!W.rings || !W.rings.length) return;
-    const reach = (this.sword ? SWORD_LEN : WHIP_LEN)[this.whip] + 52;
+    const reach = this.wlen + 52;
     let best = null, bd = 1e9;
     for (const r of W.rings) {
       const dx = r.cx - this.cx, dy = r.cy - (this.y + 8), d = Math.hypot(dx, dy);
@@ -168,10 +173,11 @@ class Player {
   }
   // Trefferzonen entlang der Peitsche/Klinge im aktuellen Winkel
   whipBox() {
-    const D = this.dir, h = this.hand(), len = (this.sword ? SWORD_LEN : WHIP_LEN)[this.whip], rad = this.sword ? 8 : 4;
+    const D = this.dir, h = this.hand(), len = this.wlen, rad = this.pole ? 6 : this.sword ? 8 : 4;
     const ca = Math.cos(D.a) * this.face, sa = Math.sin(D.a), n = Math.ceil(len / 6), out = [];
     for (let k = 1; k <= n; k++) { const px = h.x + ca * len * k / n, py = h.y + sa * len * k / n; out.push({ x: px - rad, y: py - rad, w: rad * 2, h: rad * 2 }); }
-    if (this.sword && this.atkDir === 'fwd') out.push({ x: h.x + (this.face > 0 ? 0 : -len), y: h.y - 16, w: len, h: 14 }); // Hiebbogen
+    if (this.pole) { const tx = h.x + ca * len, ty = h.y + sa * len; out.push({ x: tx - 8, y: ty - 13, w: 16, h: 20 }); } // Axtblatt an der Spitze
+    else if (this.sword && this.atkDir === 'fwd') out.push({ x: h.x + (this.face > 0 ? 0 : -len), y: h.y - 16, w: len, h: 14 }); // Hiebbogen
     return out;
   }
 
@@ -651,7 +657,7 @@ class Player {
   tryLatch() {
     // nur bei bewusst nach oben gerichteten Hieben einhaken – Vorwärts-/Duck-/Abwärtshiebe treffen immer die Gegner
     if (this.state !== 'normal' || !W.rings || !W.rings.length || (this.atkDir !== 'up' && this.atkDir !== 'upd')) return false;
-    const D = this.dir, h = this.hand(), reach = (this.sword ? SWORD_LEN : WHIP_LEN)[this.whip] + 48;
+    const D = this.dir, h = this.hand(), reach = this.wlen + 48;
     const wa = Math.atan2(Math.sin(D.a), Math.cos(D.a) * this.face);
     for (const r of W.rings) { // großzügig wie bei Super Castlevania IV
       const dx = r.cx - h.x, dy = r.cy - h.y, d = Math.hypot(dx, dy);
@@ -715,7 +721,7 @@ class Player {
   startDangle() {
     this.dangle = true; this.dT = 0; this.dAngV = 0;
     this.dAng = this.face > 0 ? 0 : Math.PI;
-    const n = this.sword ? 5 : [0, 6, 6, 9][this.whip];
+    const n = this.pole ? 7 : this.sword ? 5 : [0, 6, 6, 9][this.whip];
     this.dSeg = Array(n).fill(this.dAng); this.dId = ++W.atkId;
   }
   danglePoints() {
@@ -743,6 +749,11 @@ class Player {
   }
   drawDangle(ctx, cam) {
     const pts = this.danglePoints(), lvl = this.whip;
+    if (this.pole) { // Hellebarde wirbelt: Schaft aus Holz, am Ende Axtblatt und Spitze
+      const [x0, y0] = [this.cx + this.face * 11 - cam.x, this.feet - 22 - cam.y], [x1, y1] = pts[pts.length - 1];
+      this.paintHalberd(ctx, x0 - (x1 - cam.x - x0) * 0.3, y0 - (y1 - cam.y - y0) * 0.3, x1 - cam.x, y1 - cam.y, lvl);
+      return;
+    }
     if (this.sword) {
       const [x0, y0] = [this.cx + this.face * 11 - cam.x, this.feet - 22 - cam.y], [x1, y1] = pts[pts.length - 1];
       for (let k = 0; k <= 20; k++) {
@@ -890,7 +901,7 @@ class Player {
       ctx.drawImage(src, -(spr.w / 2) - spr.pad, -spr.h - spr.pad);
       ctx.restore();
     } else Sprites.draw(ctx, spr, sx - (spr.mx || 0), Math.round(this.feet - spr.h - cam.y), this.face < 0, flash);
-    if (this.atkT && !this.atkSub) (this.sword ? this.drawSword(ctx, sx, sy) : this.drawWhip(ctx, sx, sy));
+    if (this.atkT && !this.atkSub) (this.pole ? this.drawHalberd(ctx, sx, sy) : this.sword ? this.drawSword(ctx, sx, sy) : this.drawWhip(ctx, sx, sy));
     if (this.dangle) this.drawDangle(ctx, cam);
   }
 
@@ -971,6 +982,40 @@ class Player {
         for (let a = D.a - 1.4; a <= D.a + 0.05; a += 0.05) ctx.fillRect(Math.round(hx - 2 + Math.cos(a) * (len + 2)), Math.round(hy + Math.sin(a) * (len + 2)), 2, 1);
         ctx.fillStyle = 'rgba(252,224,168,0.35)';
         for (let a = D.a - 1.2; a <= D.a; a += 0.07) ctx.fillRect(Math.round(hx - 2 + Math.cos(a) * (len - 4)), Math.round(hy + Math.sin(a) * (len - 4)), 1, 1);
+      }
+    }
+    ctx.restore();
+  }
+
+  // Hellebarde (Kaspar): Holzschaft, Stoßspitze, Axtblatt nach oben, Haken nach unten; Eisen → Stahl → Gold mit Funken
+  paintHalberd(ctx, bx, by, tx, ty, lvl) {
+    const dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, nx = uy, ny = -ux; // n: Seite des Axtblatts (oben bei Blick nach rechts)
+    const head = ['', '#9c9cac', '#d8dcec', '#f8d060'][lvl], edge = ['', '#d8d8e4', '#fcfcfc', '#fcf0a0'][lvl], dark = ['', '#4c4c5c', '#6c6c88', '#a87818'][lvl];
+    const dot = (x, y, c, w = 1) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, w); };
+    for (let k = 0; k <= d - 7; k += 0.6) dot(bx + ux * k, by + uy * k, k % 6 < 3 ? '#8c5a2c' : '#6c4020', 2); // Schaft
+    for (let k = 0; k < 7; k++) dot(tx - ux * (7 - k), ty - uy * (7 - k), k < 2 ? dark : head, 2);            // Spitze
+    dot(tx, ty, edge);
+    for (let a = 0; a < 6; a++) for (let b = 0; b < 5 - Math.abs(a - 2.5) * 0.8; b++) {                       // Axtblatt
+      const px = tx - ux * (8 + a) + nx * (1.5 + b), py = ty - uy * (8 + a) + ny * (1.5 + b);
+      dot(px, py, b >= 4 - Math.abs(a - 2.5) * 0.8 ? edge : head);
+    }
+    for (let b = 0; b < 3; b++) dot(tx - ux * (10 - b) - nx * (1.5 + b), ty - uy * (10 - b) - ny * (1.5 + b), dark); // Haken
+    if (lvl === 3 && (W.frame & 3) === 0) { ctx.fillStyle = '#fce0a8'; ctx.fillRect(Math.round(tx + rnd(-3, 3)), Math.round(ty + rnd(-3, 3)), 1, 1); }
+  }
+  drawHalberd(ctx, sx, sy) {
+    const p = this.atkPose, lvl = this.whip;
+    if (this.crouchAtk) sy += this.H.crouchDrop;
+    ctx.save();
+    if (this.face < 0) { ctx.translate(sx * 2 + 16, 0); ctx.scale(-1, 1); }
+    if (p === 0) this.paintHalberd(ctx, sx + 8, sy + 10, sx - 14, sy - 12, lvl);      // ausholen: Klinge weit hinten oben
+    else if (p === 1) this.paintHalberd(ctx, sx + 4, sy + 6, sx + 10, sy - 24, lvl);  // senkrecht über dem Kopf
+    else { // zustoßen bzw. niederhauen in Blickrichtung, mit Schweif der Klinge
+      const D = this.dir, len = POLE_LEN[lvl], hx = sx + D.hx, hy = sy + D.hy, ca = Math.cos(D.a), sa = Math.sin(D.a);
+      const ext = Math.min(1, (this.atkT - 11) / 3);
+      this.paintHalberd(ctx, hx - ca * 10, hy - sa * 10, hx + ca * len * (0.55 + 0.45 * ext), hy + sa * len * (0.55 + 0.45 * ext), lvl);
+      if (this.atkT <= 15) {
+        ctx.fillStyle = 'rgba(252,252,252,0.45)';
+        for (let a = D.a - 1.5; a <= D.a + 0.05; a += 0.045) ctx.fillRect(Math.round(hx + Math.cos(a) * (len - 2)), Math.round(hy + Math.sin(a) * (len - 2)), 2, 1);
       }
     }
     ctx.restore();

@@ -17,6 +17,15 @@ const Expo = (() => {
     };
     img.src = 'img/plants3d.png';
   }
+  { // durstige Pflanze (Easteregg): Majolika-Kübel und Fangkopf in fünf Stimmungen, aus Blender (img/tplant3d.png)
+    const MAP = { tp_burp: [0, 0, 40, 36], tp_gulp: [41, 0, 40, 36], tp_idle0: [82, 0, 40, 36], tp_idle1: [123, 0, 40, 36], tp_open: [164, 0, 40, 36], tp_pot: [205, 0, 32, 22] };
+    const img = new Image();
+    img.onload = () => {
+      const fr = (n) => { const r = MAP[n], c = Sprites.canvas(r[2], r[3]); c.getContext('2d').drawImage(img, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]); return Sprites.fromCanvas(c, true); };
+      S.tp = { pot: fr('tp_pot'), idle: [fr('tp_idle0'), fr('tp_idle1')], open: fr('tp_open'), gulp: fr('tp_gulp'), burp: fr('tp_burp') };
+    };
+    img.src = 'img/tplant3d.png';
+  }
 
   // ---------------- Glaspalast (Hintergrund) ----------------
   // Spielebene bei z = 200 wie die Kacheln; Rückwand aus Glas bei z = 540, davor drei Galerien übereinander, darüber ein
@@ -493,7 +502,7 @@ class ThirstyPlant extends Ent {
       const y = Math.round(y0 - (y0 - y1) * i / n), side = y < (d.hole[3] + 1) * T + 64 ? 0 : i % 2 ? 1 : -1, l = new VineLeaf(this.sx - 14 + side * 16, y);
       l.side = side; return l;
     });
-    this.body = {}; this.head = {}; this.bodyKey = '';
+    this.body = {}; this.bodySpr = null; this.bodyKey = '';
   }
   ease(g) { return 1 - Math.pow(1 - g, 2.2); }
   len() { return this.state === 'grow' || this.state === 'grown' ? 14 + (this.full - 14) * this.ease(this.g) : 14; }
@@ -532,9 +541,7 @@ class ThirstyPlant extends Ent {
     Game.note('plantBreak');
   }
   bodyMesh(len) {
-    const m = PS2.mesh(), TER = [168, 88, 56], TER2 = [128, 64, 44], SOIL = [52, 36, 26], ST = [72, 132, 52], ST2 = [52, 104, 42], LEAF = [84, 156, 60], LEAF2 = [60, 124, 48], RIB = [150, 196, 96];
-    PS2.prism(m, 0, 0, 0, 10, 15, 8, TER, { rTop: 13.5, top: SOIL }); // Terrakotta-Kübel mit wulstigem Rand
-    PS2.prism(m, 0, 13, 0, 15, 4, 8, TER2, { cap: false });
+    const m = PS2.mesh(), ST = [72, 140, 52], ST2 = [52, 112, 42], LEAF = [92, 176, 64], LEAF2 = [66, 140, 50], RIB = [170, 216, 106]; // Kübel und Kopf sind Sprites
     const N = Math.max(2, Math.ceil(len / 22)), ring = [];
     for (let s = 0; s <= N; s++) { // Stamm: gewundene Röhre, unten dick, oben dünn
       const u = s / N, y = 15 + len * u, x = this.wob(y - 15), r = 4 - 1.5 * u + (len > 40 ? 2.5 * (1 - u) : 0), row = [];
@@ -552,33 +559,27 @@ class ThirstyPlant extends Ent {
     }
     return m;
   }
-  headMesh(L) { // Fangkopf wie bei der Menschenfalle: zwei Kieferschalen, innen roter Schlund, Wimpernzähne
-    const m = PS2.mesh(), G = [70, 138, 56], R = [200, 40, 56], RD = [130, 20, 36], CIL = [232, 240, 160];
-    const hx = 0, hy = 30, dirA = this.look > 0 ? 0.55 : Math.PI - 0.55, op = 0.15 + this.open * 0.95;
-    for (const sgn of [1, -1]) {
-      const ang = dirA + sgn * op / 2, ca = Math.cos(ang), sa = Math.sin(ang), ox = -sa * sgn, oy = ca * sgn, jx = hx + ca * L * 0.55, jy = hy + sa * L * 0.55;
-      ManTrap.sphere(m, jx + ox * 1.5, jy + oy * 1.5, 0, L * 0.62, L * 0.33, L * 0.62, 8, 6, () => G, ang, -sgn);
-      ManTrap.sphere(m, jx - ox * 0.4, jy - oy * 0.4, 0, L * 0.54, L * 0.15, L * 0.54, 8, 4, () => (sgn > 0 ? R : RD), ang, sgn);
-      for (let k = 0; k < 6; k++) {
-        const t = 0.3 + k * 0.12, tx = hx + ca * L * t, ty = hy + sa * L * t, zz = (k % 2 ? 1 : -1) * L * 0.28;
-        PS2.face(m, [PS2.vtx(m, tx - ca, ty - sa, zz), PS2.vtx(m, tx + ca, ty + sa, zz), PS2.vtx(m, tx + ox * L * 0.42 + ca * 2, ty + oy * L * 0.42 + sa * 2, zz)], CIL, null, { two: true });
-      }
-    }
-    return m;
+  headSprite() { // Stimmung des Fangkopfs: ruhig, durstig (Zunge), schluckend, rülpsend
+    const tp = Expo.S.tp, st = this.state;
+    if (st === 'drink') return this.st >= 72 && this.st < 104 ? tp.burp : (this.st >> 3) & 1 ? tp.gulp : tp.idle[1];
+    if (st === 'grow') return (this.st >> 3) & 1 ? tp.open : tp.idle[0];
+    return this.open > 0.6 ? tp.open : tp.idle[(this.t >> 4) & 1];
   }
   draw(ctx) {
-    const sx = Math.round(this.sx - W.cam.x), by = Math.round(this.base - W.cam.y), len = this.len(), H = Math.ceil(len) + 24;
+    const sx = Math.round(this.sx - W.cam.x), by = Math.round(this.base - W.cam.y), len = this.len(), H = Math.ceil(len) + 24, tp = Expo.S.tp;
     this.plate(ctx, sx, by);
     if (sx < -70 || sx > View.w + 70 || by - H - 40 > 214 || by < -8) return;
     const key = Math.round(len) + '|' + this.leaves.reduce((a, l) => a + l.pop, 0);
-    if (key !== this.bodyKey) { this.bodyKey = key; Expo.propRender(this.body, 100, H, [this.bodyMesh(len)]); }
-    ctx.drawImage(this.body.c, sx - 50, by - H);
-    const grown = this.state === 'grow' || this.state === 'grown', L = 13 + (grown ? 9 * this.ease(this.g) : 0);
-    const tx = sx + Math.round(this.wob(len)), ty = by - 15 - Math.round(len);
-    if (ty > -40 && ty < 250) {
-      if (!this.head.c || (this.t & 1)) Expo.propRender(this.head, 72, 72, [this.headMesh(L)]);
-      ctx.drawImage(this.head.c, tx - 36, ty - 42);
+    if (key !== this.bodyKey) { // Ranke und Blätter in 3D; steht sie still, bekommt sie die dunkle Kontur der Sprites (scharf)
+      this.bodyKey = key; Expo.propRender(this.body, 100, H, [this.bodyMesh(len)]);
+      this.bodySpr = this.state === 'grow' ? null : Sprites.fromCanvas(this.body.c, true);
     }
+    if (!this.bodySpr && this.state !== 'grow') this.bodySpr = Sprites.fromCanvas(this.body.c, true); // nach dem Wachsen einmal nachziehen
+    if (this.bodySpr) Sprites.draw(ctx, this.bodySpr, sx - 50, by - H); else ctx.drawImage(this.body.c, sx - 50, by - H);
+    if (!tp) return;
+    Sprites.draw(ctx, tp.pot, sx - 16, by - 22);
+    const hs = this.headSprite(), tx = sx + Math.round(this.wob(len)), ty = by - 15 - Math.round(len), fl = this.look < 0; // Angel des Kopfs auf der Rankenspitze
+    if (ty > -40 && ty < 250) Sprites.draw(ctx, hs, fl ? tx - 29 : tx - 11, ty - 26, fl);
   }
   plate(ctx, sx, by) { // Messingschild am Pfosten rechts neben dem Kübel
     const s = tr('plateFeed'), w = Font.width(s) + 8, x = sx + 20, y = by - 30;

@@ -27,6 +27,8 @@ const HEROES = (() => {
     fish: ['#0c2c24', '#145c40', '#2c8c58', '#58b478', '#a4e4a0'],
     belly: ['#3c4c14', '#6c7c28', '#a4ac48', '#d4d478', '#f4f4b4'],
     shield: ['#0c1444', '#1c2c84', '#2c48c4', '#5c7cf4', '#a4bcfc'],
+    wood: ['#2c1608', '#5c3418', '#8c5a2c', '#b8844c', '#e0b07c'],
+    woodD: ['#1c0c04', '#3c200c', '#5c3418', '#7c4a24', '#9c6434'],
   };
 
   // ---------------- Köpfe (10x10, Blick nach rechts) ----------------
@@ -38,6 +40,7 @@ const HEROES = (() => {
     zombie: ['..1121....', '.122g21...', '.gggggg2..', '1ggGGGGg..', '1gggkGGG..', '.ggGGrGGG.', '.gggGGGGG.', '..ggGmmG..', '...gGGG...', '....gg....'],
     fish: ['..rr......', '.rRrg.....', '.rgggggg..', 'rgGGGGGGg.', 'rgGGwkGGGg', '.gGGwwGGGG', '.gGGGGGmmm', '..gGGGGGG.', '...gggg...', '....gg....'],
     count: ['...1111...', '..111111..', '.11111111.', '.11pp1ppp.', '.1ppppppL.', '.1pprpprL.', '.1pppppPP.', '..pPppmp..', '...pppw...', '....pp....'],
+    kaspar: ['...1122...', '..122332..', '.12222332.', '.111111111', '.dWwwwwW..', '.dWwwewWnn', '.dWwrwwnnn', '.dWwwwwW..', '..dkkkkW..', '...dWWW...'],
   };
   const EYE_ROW = 5;
 
@@ -58,6 +61,17 @@ const HEROES = (() => {
     scarf: { a: '#241c30', b: '#3c3450', d: '#08040c', w: 3 },
     icon: ['.1111..', '122221.', 'rrrrrr.', '1aesL..', '11sss..', '.111...'],
     iconPal: { 1: '#08040c', 2: '#241c30', r: '#c81c1c', a: '#9c5430', s: '#d88c5c', L: '#f4bc8c', e: '#000' },
+  };
+  // Kaspar, die Marionette ohne Fäden: geschnitzt, mit langer Nase, roten Bäckchen und Zipfelmütze; dunkelrotes Wams mit
+  // Goldknöpfen, Kugelgelenke, an den Handgelenken die abgeschnittenen Fäden. Waffe: Hellebarde (größte Reichweite)
+  const KASPAR = {
+    id: 'kaspar', head: 'kaspar', name: 'KASPAR', weapon: 'halberd', blink: 'w', hurtRow: '.dWwkkwWnn',
+    headPal: { 1: '#0c1430', 2: '#1c2c6c', 3: '#3c58b4', d: '#5c3418', W: '#a87440', w: '#d8a868', e: '#100808', r: '#c83c3c', n: '#c8945c', k: '#3c1c0c' },
+    skin: RAMP.wood, sleeve: RAMP.cloth, arm: { r: 1.6 }, thigh: RAMP.wood, boot: RAMP.woodD, legR: 0.9,
+    flap: RAMP.cloth, sash: RAMP.leather, flapTrim: RAMP.gold, torso: 'jerkin', belt: true, joints: true, strings: true, backPole: true,
+    scarf: { a: '#1c2c6c', b: '#3c58b4', d: '#0c1430', w: 2 }, // Zipfel der Mütze
+    icon: ['..122..', '.12232.', '1111111', '.Wwewnn', '.Wwrw..', '..kkW..'],
+    iconPal: { 1: '#0c1430', 2: '#1c2c6c', 3: '#3c58b4', W: '#a87440', w: '#d8a868', e: '#000', r: '#c83c3c', n: '#c8945c', k: '#3c1c0c' },
   };
   const MONSTERS = {
     skel: { id: 'skel', head: 'skull', headPal: { w: '#9c9478', W: '#e8e0c8', k: '#140c08' }, skin: RAMP.bone, arm: { r: 1.05 }, thigh: RAMP.bone, boot: RAMP.bone,
@@ -171,6 +185,8 @@ const HEROES = (() => {
         capsule(bx, by, A.hx - (A.hx - A.ex) * 0.12, A.hy - (A.hy - A.ey) * 0.12, ar - 0.05, ar - 0.15, def.arm.bracer, bias);
       }
       disc(A.hx, A.hy, Math.max(1.1, ar * 0.75), Math.max(1.1, ar * 0.75), def.skin, bias);
+      if (def.joints) disc(A.ex, A.ey, 1.15, 1.15, RAMP.woodD, bias + 0.2); // Kugelgelenk am Ellbogen
+      if (def.strings) for (let k = 1; k <= 4; k++) P(A.hx + k * 0.15, A.hy + 1 + k, k % 2 ? '#d8d8e0' : '#a8a8b8'); // abgeschnittener Faden
     };
     const drawLeg = (L, bias) => {
       capsule(L.hx, L.hy, L.kx, L.ky, 2.4 * lr, 1.8 * lr, def.thigh, bias);
@@ -178,6 +194,7 @@ const HEROES = (() => {
       if (lr > 0.8) capsule(L.kx, L.ky, L.kx + (L.ax - L.kx) * 0.18, L.ky + (L.ay - L.ky) * 0.18, 2.15 * lr, 2.05 * lr, def.boot, bias + 0.25); // Stulpe
       capsule(L.ax - 0.5, L.ay + 0.2, L.ax + 2.6, L.ay + 0.8, 1.4 * Math.max(lr, 0.8), 1.2 * Math.max(lr, 0.8), def.boot, bias); // Fuß
       for (let k = -1; k <= 3; k++) P(L.ax + k, L.ay + 2, def.boot[0]); // Sohle
+      if (def.joints) disc(L.kx, L.ky, 1.5 * lr, 1.5 * lr, RAMP.woodD, bias + 0.2); // Kugelgelenk am Knie
     };
 
     // Umhang des Grafen (hinten): geschlossen eine Säule, offen wie Fledermausflügel mit rotem Futter
@@ -195,6 +212,11 @@ const HEROES = (() => {
       capsule(CX - 6.8 + lean, 5.4 + ty, CX - 5.6 + lean, 8 + ty, 0.85, 0.85, RAMP.leather);
       capsule(CX - 7.6 + lean, 9.2 + ty, CX - 3.8 + lean, 7.6 + ty, 0.7, 0.7, RAMP.gold);
     }
+    if (def.backPole) { // Hellebarde schräg auf dem Rücken: Schaft, Axtblatt und Spitze über der Schulter
+      capsule(CX - 7 + lean, 26 + ty, CX + 5 + lean, -2 + ty, 0.7, 0.7, RAMP.wood, -0.25);
+      poly([[CX + 3 + lean, 1 + ty], [CX + 8 + lean, 0 + ty], [CX + 9 + lean, 5 + ty], [CX + 4.5 + lean, 4.5 + ty]], RAMP.steel[2]);
+      poly([[CX + 4.6 + lean, -1.5 + ty], [CX + 6.4 + lean, -6 + ty], [CX + 6 + lean, -1 + ty]], RAMP.steel[3]);
+    }
     if (!armsHidden) drawArm(bA, -0.4);
     drawLeg(bL, -0.35);
     // Rumpf (in voller Auflösung)
@@ -211,6 +233,7 @@ const HEROES = (() => {
           else if (def.torso === 'rags') ramp = ((pxi * 7 + yr * 3) % 11 === 0 || (yr > 15 && (pxi + yr) % 5 === 0)) ? def.skin : RAMP.rags;
           else if (def.torso === 'scales') { ramp = nx > 0.25 ? RAMP.belly : RAMP.fish; if ((pxi + yr) % 3 === 0) l -= 0.25; }
           else if (def.torso === 'suit') { ramp = (yr <= 15 && nx > 0.3 - (yr - 10) * 0.04) ? RAMP.shirt : RAMP.noble; }
+          else if (def.torso === 'jerkin') { ramp = RAMP.cloth; if (Math.abs(nx - 0.32) < 0.13 && yr % 3 === 1) ramp = RAMP.gold; else if (yr === 10) ramp = RAMP.wood; } // Wams mit Goldknöpfen, Holzhals
           else if (def.torso === 'ribs') {
             if (yr % 2 === 1 && Math.abs(nx) > 0.15) continue; // Lücken zwischen den Rippen
             ramp = RAMP.bone; if (Math.abs(nx + 0.1) < 0.18) l += 0.2; // Wirbelsäule
@@ -408,7 +431,7 @@ const HEROES = (() => {
   }
   buildMonsters();
 
-  const list = [HENRIK, RAGNOR];
+  const list = [HENRIK, RAGNOR, KASPAR];
   const built = {};
   list.forEach(d => { built[d.id] = build(d); });
   Sprites.S.heroes = built;

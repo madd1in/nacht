@@ -439,8 +439,10 @@ const Audio8 = (() => {
       tri: EX_C.map(c => { const [lo, hi] = EX_B[c]; return rep(`${lo}:2 ${lo}:1 ${hi}:1`, 3); }).join(' ') + ' ' + // Galopp
         EX_C.map(c => { const [lo, hi] = EX_B[c]; return rep(`${lo}:1 ${lo}:1 ${hi}:1 ${lo}:1`, 3); }).join(' '), // pumpend
       pad: rep(EX_C.map(c => EX[c].join('+') + ':12').join(' '), 2),
-      dr: EX_C.map((c, i) => i % 4 === 3 ? 'k:1 h:1 q:1 h:1 k:1 k:1 q:1 q:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1 q:1 h:1 o:1 k:1' : 'k:1 h:1 k:1 h:1 q:1 h:1 o:1 h:1 q:1 h:1 o:1 k:1').join(' ') + ' ' +
-        EX_C.map((c, i) => i === 31 ? 'k:1 h:1 q:1 h:1 t:1 u:1 w:6' : i % 4 === 3 ? 'k:1 k:1 q:1 k:1 k:1 k:1 q:1 q:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 k:1 k:1 k:1 q:1 k:1 k:1 k:1 q:1 k:1 o:1 k:1' : 'k:1 k:1 k:1 k:1 q:1 k:1 k:1 k:1 q:1 k:1 o:1 k:1').join(' '), // B-Teil: Doppel-Kick
+      // gerader Walzer-Groove: Kick auf 1, Snare auf 2 und 3, Hi-Hat in Achteln; Fill nur alle acht Takte.
+      // B-Teil: durchgehender Doppel-Kick in 16teln (ohne Pumpen), Snare weiter auf 2 und 3
+      dr: EX_C.map((c, i) => i % 8 === 7 ? 'k:1 h:1 o:1 h:1 q:1 h:1 q:1 h:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1' : 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1').join(' ') + ' ' +
+        EX_C.map((c, i) => i === 31 ? 'k:1 d:1 q:1 d:1 t:1 u:1 w:6' : i % 8 === 7 ? 'k:1 d:1 d:1 d:1 q:1 d:1 q:1 d:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1' : 'k:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1').join(' '),
     },
     clear: {
       bpm: 150, loop: false,
@@ -509,6 +511,14 @@ const Audio8 = (() => {
     }
     if (n === 'r') { noise(0.06, 0.3, 'bandpass', 2000, 1100, t, musicBus); noise(0.06, 0.34, 'bandpass', 2000, 1100, t + dur / 2, musicBus); return; }
     if (n === 'z') noise(0.03, 0.1, 'highpass', 8000, null, t, musicBus);
+    if (n === 'd') { // Doppel-Kick: kurz und trocken, ohne Sidechain (sonst pumpt die Musik bei 16teln)
+      const o = osc('triangle'), g = ac.createGain();
+      o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(48, t + 0.07);
+      g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.1);
+      noise(0.012, 0.12, 'lowpass', 3000, null, t, musicBus);
+      return;
+    }
     if (n === 'k' || n === 'x' || n === 'q' || n === 'z') {
       sidechain(t);
       const o = osc('triangle'), g = ac.createGain();
