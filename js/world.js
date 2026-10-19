@@ -2,6 +2,8 @@
 'use strict';
 
 // Gewitter über dem ganzen Schloss: [Dunkelheit zwischen den Blitzen, Restdunkel im Blitz] (Hof und Schiff: Freiluft, ohne Abdunklung)
+// Licht fürs 3D-Tor: warm von vorn links (Fackeln), dazu kühles Umgebungslicht
+const DOOR_ENV = (() => { const v = [-0.35, 0.55, -0.75], l = Math.hypot(...v); return { static: true, sun: v.map(c => c / l), sunC: [0.85, 0.66, 0.46], amb: [0.36, 0.34, 0.44], sky: [0.16, 0.14, 0.22], fog: [0, 0, 0], fogD: 0 }; })();
 const STORMY = { courtyard: null, ship: null, bridge: null, glass: [0.44, 0.12], foyer: [0.88, 0.02], library: [0.52, 0.08], hall: [0.5, 0.1], tower: [0.5, 0.1], throne: [0.46, 0.1] };
 // Fenster in der Wandebene (x, Oberkante, Breite, Höhe): werfen im Blitz Lichtbahnen in den Raum
 const STORM_WINS = { foyer: [[44, 20, 56, 216], [300, 20, 56, 216]], library: [[296, 24, 48, 98]], hall: [[64, 40, 32, 88], [320, 40, 32, 88]], throne: [[59, 24, 32, 108], [315, 24, 32, 108]] };
@@ -734,64 +736,82 @@ const W = {
     return L;
   },
 
-  // Ausgangstor: Steinportal mit Keilsteinbogen und Wappen-Schlussstein, hochgezogenes Fallgitter, offene
-  // Eichenflügel mit Eisenbändern, warmes Licht von drinnen und zwei flackernde Fackeln (statischer Teil zwischengespeichert)
-  doorArt() {
-    if (this.doorC) return this.doorC;
-    const c = Sprites.canvas(64, 86), x = c.getContext('2d'), P = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
-    const inDoor = (X, Y) => X >= 18 && X < 46 && (Y >= 44 || Math.hypot(X + 0.5 - 32, Y + 0.5 - 44) < 14);
-    for (let Y = 30; Y < 86; Y++) for (let X = 18; X < 46; X++) if (inDoor(X, Y)) { // Durchgang mit warmem Licht von drinnen
-      const k = Math.max(0, (Y - 50) / 36);
-      P(k > 0.66 ? '#5c2c0c' : k > 0.33 ? '#3c1808' : '#140808', X, Y);
+  // Ausgangstor in PS2-3D: Steinportal aus Quadern mit Keilsteinbogen und Wappen-Schlussstein, dahinter ein kurzer
+  // Torweg mit warmem Licht von drinnen, hochgezogenes Fallgitter, nach innen geschwenkte Eichenflügel mit Eisenbändern
+  // und zwei Fackelhalter. Perspektive wie bei den 3D-Kacheln (Auge 200 vor der Spielebene, Fluchtpunkt Bildmitte/60);
+  // gerastert wird nur der Bildausschnitt ums Tor. Koordinaten: x zur Tormitte, y nach oben ab Schwelle, z in die Tiefe.
+  doorMesh() {
+    if (this.doorM) return this.doorM;
+    const { mesh, box, beam, face, vtx, cone } = PS2, m = mesh();
+    const ST = [146, 138, 158], ST2 = [112, 104, 126], STL = [184, 176, 198], OAK = [128, 74, 34], OAK2 = [100, 56, 26], IRON = [52, 52, 62], IRONL = [150, 150, 166];
+    const GOLD = [240, 184, 40], RED = [176, 10, 36], WARM = [150, 76, 30], WARM2 = [96, 44, 20];
+    for (const s of [-1, 1]) for (let i = 0; i < 6; i++) box(m, s * 19, i * 7.4, 7, 9 + (i % 2) * 1.6, 7.2, 28 + (i % 2) * 1.5, i % 2 ? ST2 : ST, { top: STL }); // Gewände aus Quadern, so tief wie der Torweg
+    const wedge = (a0, a1, r0, r1, z0, z1, col) => { // Keilstein zwischen zwei Winkeln (Bogenmitte bei y = 44)
+      const P = [];
+      for (const [a, r] of [[a0, r0], [a1, r0], [a1, r1], [a0, r1]]) for (const z of [z0, z1]) P.push(vtx(m, Math.cos(a) * r, 44 + Math.sin(a) * r, z));
+      const am = (a0 + a1) / 2, C = [Math.cos(am) * (r0 + r1) / 2, 44 + Math.sin(am) * (r0 + r1) / 2, (z0 + z1) / 2];
+      for (const q of [[0, 2, 4, 6], [1, 3, 5, 7], [0, 1, 3, 2], [4, 5, 7, 6], [0, 6, 7, 1], [2, 3, 5, 4]]) face(m, q.map(k => P[k]), col, C);
+    };
+    for (let k = 0; k < 9; k++) {
+      const a0 = k / 9 * Math.PI + 0.012, a1 = (k + 1) / 9 * Math.PI - 0.012;
+      if (k === 4) wedge(a0 - 0.03, a1 + 0.03, 13.5, 25, -9, 21.5, STL); // Schlussstein, steht vor
+      else wedge(a0, a1, 14, 22, -7, 21, k % 2 ? ST2 : ST);
     }
-    for (let X = 20; X < 45; X += 4) for (let Y = 30; Y < 40; Y++) if (inDoor(X, Y)) { P('#3c3c44', X, Y); if (Y === 39) P('#8c8c98', X, Y); } // Fallgitter-Zähne
-    for (let Y = 39; Y < 41; Y++) for (let X = 19; X < 45; X++) if (inDoor(X, Y)) P('#2c2c34', X, Y);
-    [[18, 1], [45, -1]].forEach(([ex, dir]) => { // offene Torflügel, nach innen geschwenkt
-      for (let Y = 44; Y < 86; Y++) for (let k = 0; k < 6; k++) {
-        const X = ex + dir * k;
-        P(k === 5 ? '#2c1404' : Y % 9 === 0 ? '#3c2008' : k % 2 ? '#6c3c18' : '#7c4820', X, Y);
-      }
-      [52, 72].forEach(by => { for (let k = 0; k < 6; k++) P('#24242c', ex + dir * k, by, 1, 3); P('#9c9ca8', ex + dir * 2, by + 1); });
-    });
-    for (let Y = 44; Y < 86; Y++) { // Gewände aus Quadern
-      const blk = Math.floor((Y - 44) / 7) % 2, joint = (Y - 44) % 7 === 0;
-      P(joint ? '#1c1a24' : blk ? '#6c6478' : '#8c8498', 10, Y, 8, 1); P(joint ? '#1c1a24' : blk ? '#8c8498' : '#6c6478', 46, Y, 8, 1);
-      if (!joint) { P('#a8a0b4', blk ? 46 : 10, Y, 1, 1); }
+    box(m, 0, 60, -9.6, 6, 6.5, 1.2, RED); box(m, 0, 61.5, -10.4, 2.2, 3.5, 0.8, GOLD); // Wappen am Schlussstein
+    // Torweg: Boden und die warm erleuchtete Rückwand in Bogenform (Gewände und Bogen umschließen ihn ganz – von oben
+    // gesehen lugt so nichts hervor)
+    face(m, [vtx(m, -14, 0.2, -7), vtx(m, 14, 0.2, -7), vtx(m, 14, 0.2, 21), vtx(m, -14, 0.2, 21)], WARM, [0, -10, 7], { e: 0.12 });
+    { const pts = [vtx(m, -14, 0, 20.8), vtx(m, 14, 0, 20.8)]; for (let k = 0; k <= 8; k++) { const a = k / 8 * Math.PI; pts.push(vtx(m, Math.cos(a) * 14, 44 + Math.sin(a) * 14, 20.8)); }
+      face(m, pts, [200, 110, 40], [0, 29, 40], { e: 0.38 }); }
+    for (const s of [-1, 1]) face(m, [vtx(m, s * 13.9, 0, 18), vtx(m, s * 13.9, 0, 20.8), vtx(m, s * 13.9, 44, 20.8), vtx(m, s * 13.9, 44, 18)], WARM2, [s * 30, 22, 19]); // Schatten in den Ecken
+    box(m, 0, 0, 0, 31, 1.6, 16, STL); // Schwelle
+    // Fallgitter, hochgezogen: Stäbe nur innerhalb des Bogens, unten Spitzen
+    for (let x = -12; x <= 12; x += 4) { const top = 44 + Math.sqrt(Math.max(0, 196 - x * x)) - 1; beam(m, x, 41, 2, x, top, 2, 1.5, 1.5, IRON, { open: true }); cone(m, x, 41, 2, 0.9, -2.6, 4, IRONL); }
+    beam(m, -13.5, 45, 2, 13.5, 45, 2, 1.4, 1.4, IRON); beam(m, -13, 50, 2, 13, 50, 2, 1.2, 1.2, IRON);
+    for (const s of [-1, 1]) { // Torflügel aus Eiche, um 65° nach innen geschwenkt, mit zwei Eisenbändern
+      const th = 1.13, dx = s < 0 ? Math.cos(th) : -Math.cos(th), dz = Math.sin(th), cx = s * 14 + dx * 7, cz = 7 + dz * 7, rot = s < 0 ? th : Math.PI - th;
+      box(m, cx, 0, cz, 14, 43, 2, s < 0 ? OAK : OAK2, { rot });
+      for (const by of [9, 31]) box(m, cx, by, cz, 14.4, 2.2, 2.6, IRON, { rot });
     }
-    for (let Y = 20; Y <= 44; Y++) for (let X = 10; X < 54; X++) { // Keilsteinbogen
-      const d = Math.hypot(X + 0.5 - 32, Y + 0.5 - 44);
-      if (d < 14 || d >= 22 || Y > 44) continue;
-      const ang = Math.atan2(44 - Y, X - 32), seg = Math.floor(ang / (Math.PI / 6)), joint = Math.abs(ang / (Math.PI / 6) - Math.round(ang / (Math.PI / 6))) < 0.07;
-      P(joint ? '#1c1a24' : seg % 2 ? '#6c6478' : '#8c8498', X, Y);
+    for (const s of [-1, 1]) { // Fackelhalter: Arm aus der Wand, Kelch, Fackelstiel
+      beam(m, s * 27, 31, 6, s * 27, 35, -3, 1.4, 1.4, IRON); cone(m, s * 27, 39, -3, 2.6, -4, 6, IRONL); beam(m, s * 27, 37, -3, s * 27.6, 43, -3, 1.6, 1.6, OAK2);
     }
-    P('#a8a0b4', 27, 18, 10, 13); P('#c8c0d4', 27, 18, 10, 1); P('#5c5468', 27, 30, 10, 1); // Schlussstein
-    P('#a80020', 29, 21, 6, 5); P('#f8b800', 31, 22, 2, 3); P('#a80020', 30, 26, 4, 1); P('#a80020', 31, 27, 2, 1); // Wappen
-    P('#8c8498', 8, 84, 48, 2); P('#c8c0d4', 8, 84, 48, 1); // Schwelle
-    [5, 59].forEach(fx => { P('#24242c', fx - 1, 54, 3, 8); P('#3c3c44', fx - 3, 50, 7, 4); P('#6c6c78', fx - 3, 50, 7, 1); }); // Fackelhalter
-    return (this.doorC = c);
+    return (this.doorM = m);
   },
+  doorProj(X, Y, x, y, z) { const VX = View.w / 2, k = 200 / (200 + z); return [VX + (X + x - this.cam.x - VX) * k, 60 + (Y - y - this.cam.y - 60) * k]; },
   drawDoor(ctx) {
     const d = this.room.door;
     if (!d) return;
-    const x = Math.round(d.x * T - 12 - this.cam.x), y = d.base * T - 64 - this.cam.y;
-    if (x > View.w + 24 || x < -76 || y > 230 || y < -90) return;
-    const ox = x - 10, oy = y - 22, f = this.frame;
-    ctx.drawImage(this.doorArt(), ox, oy);
-    ctx.fillStyle = `rgba(248,160,48,${(0.14 + Math.sin(f * 0.07) * 0.04).toFixed(3)})`; ctx.fillRect(ox + 24, oy + 58, 16, 26); // Licht von drinnen
-    [5, 59].forEach((fx, i) => { // flackernde Fackeln
-      const fl = Math.sin(f * 0.4 + i * 2) + Math.sin(f * 0.23 + i);
-      ctx.fillStyle = '#d82800'; ctx.fillRect(ox + fx - 2, oy + 43 + (fl > 0.8 ? 1 : 0), 5, 7);
-      ctx.fillStyle = '#f87800'; ctx.fillRect(ox + fx - 1, oy + 41 + (fl > 0 ? 1 : 0), 3, 8);
-      ctx.fillStyle = '#fce0a8'; ctx.fillRect(ox + fx, oy + 45, 1, 3);
+    const X = d.x * T + 10, Y = d.base * T, sx = X - this.cam.x, sy = Y - this.cam.y; // Tormitte und Schwelle (Welt / Bild)
+    if (sx > View.w + 70 || sx < -70 || sy > 300 || sy < -10) return;
+    const dv = View.lite ? 1.5 : 1, BW = 132, BH = 108, bx = Math.round(sx) - BW / 2, by = Math.round(sy) - BH + 10, f = this.frame; // klein genug für volle Auflösung
+    let B = this.doorBuf;
+    if (!B || B.c.width !== BW / dv) { B = this.doorBuf = { c: Sprites.canvas(BW / dv, BH / dv), key: null }; B.x = B.c.getContext('2d', { willReadFrequently: true }); }
+    const key = bx + '|' + by + '|' + View.w;
+    if (B.key !== key) { // nur neu rastern, wenn sich das Tor im Bild verschiebt
+      B.key = key; B.x.clearRect(0, 0, B.c.width, B.c.height);
+      const cam = { x: this.cam.x + View.w / 2 - X, y: Y - this.cam.y - 60, z: -200, yaw: 0, pitch: 0, f: 200 / dv, near: 30, cx: (View.w / 2 - bx) / dv, cy: (60 - by) / dv };
+      PS2.render(B.x, B.c.width, B.c.height, [this.doorMesh()], cam, DOOR_ENV);
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, B.c.width, B.c.height, bx, by, BW, BH);
+    ctx.globalCompositeOperation = 'lighter'; // warmes Licht aus dem Torweg
+    const [lx, ly] = this.doorProj(X, Y, 0, 18, 30), a = 0.16 + Math.sin(f * 0.07) * 0.04, g = ctx.createRadialGradient(lx, ly, 0, lx, ly, 26);
+    g.addColorStop(0, `rgba(248,150,48,${a.toFixed(3)})`); g.addColorStop(1, 'rgba(248,120,40,0)'); ctx.fillStyle = g; ctx.fillRect(lx - 26, ly - 26, 52, 52);
+    ctx.restore();
+    [-1, 1].forEach((s, i) => { // flackernde Fackeln
+      const [fx, fy] = this.doorProj(X, Y, s * 27.3, 44, -3), fl = Math.sin(f * 0.4 + i * 2) + Math.sin(f * 0.23 + i), x0 = Math.round(fx), y0 = Math.round(fy);
+      ctx.fillStyle = '#d82800'; ctx.fillRect(x0 - 2, y0 - 6 + (fl > 0.8 ? 1 : 0), 5, 7);
+      ctx.fillStyle = '#f87800'; ctx.fillRect(x0 - 1, y0 - 8 + (fl > 0 ? 1 : 0), 3, 8);
+      ctx.fillStyle = '#fce0a8'; ctx.fillRect(x0, y0 - 4, 1, 3);
     });
   },
   doorLights(L) { // Fackelschein am Tor
     const d = this.room.door;
     if (!d) return;
-    const x = Math.round(d.x * T - 12 - this.cam.x) - 10, y = d.base * T - 64 - this.cam.y - 22;
-    if (x > View.w + 60 || x < -120 || y > 260 || y < -120) return;
-    const fl = Math.sin(this.frame * 0.3) * 2;
-    L.push({ x: x + 5, y: y + 46, r: 30 + fl, c: [248, 140, 40], a: 0.55 }, { x: x + 59, y: y + 46, r: 30 - fl, c: [248, 140, 40], a: 0.55 });
+    const X = d.x * T + 10, Y = d.base * T, sx = X - this.cam.x, sy = Y - this.cam.y;
+    if (sx > View.w + 110 || sx < -110 || sy > 330 || sy < -60) return;
+    const fl = Math.sin(this.frame * 0.3) * 2, [ax, ay] = this.doorProj(X, Y, -27.3, 41, -3), [bx, by] = this.doorProj(X, Y, 27.3, 41, -3);
+    L.push({ x: ax, y: ay, r: 30 + fl, c: [248, 140, 40], a: 0.55 }, { x: bx, y: by, r: 30 - fl, c: [248, 140, 40], a: 0.55 });
   },
 
   drawRain(ctx) {

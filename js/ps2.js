@@ -79,7 +79,7 @@ const PS2 = (() => {
   const POOL = []; // wiederverwendete Polygon-Datensätze (sonst Tausende neue Objekte pro Bild → Müllabfuhr-Ruckler)
   function render(x, W, H, list, cam, env) {
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-    const f = cam.f, hx = W / 2, hy = H * (cam.hy ?? 0.5), near = cam.near || 4;
+    const f = cam.f, hx = cam.cx ?? W / 2, hy = cam.cy ?? H * (cam.hy ?? 0.5), near = cam.near || 4; // cx/cy: Bildmitte verschoben (Ausschnitt eines größeren Bildes)
     const L = env.sun, S = env.sunC, A = env.amb, K = env.sky, F = env.fog, fd = env.fogD;
     let np = 0;
     for (const m of list) {
@@ -129,7 +129,7 @@ const PS2 = (() => {
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
     X -= cam.x; Y -= cam.y; Z -= cam.z;
     const x1 = X * cy - Z * sy, z1 = X * sy + Z * cy, y2 = Y * cp - z1 * sp, z2 = Y * sp + z1 * cp;
-    return [W / 2 + x1 * cam.f / z2, H * (cam.hy ?? 0.5) - y2 * cam.f / z2, z2];
+    return [(cam.cx ?? W / 2) + x1 * cam.f / z2, (cam.cy ?? H * (cam.hy ?? 0.5)) - y2 * cam.f / z2, z2];
   }
 
   // ---------------- Sonnenkathedrale: die Stadt ----------------

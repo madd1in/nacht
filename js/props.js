@@ -28,6 +28,14 @@
     '.gWgggggggggWWg.', '.gWWWWWWWWWWWWg.', '.GGGGGGGGGGGGGG.', 'gggggggggggggggg', 'GGGGGGGGGGGGGGGG',
   ]);
   S.statue = [angel('g'), angel('c')];
+  // PS2-3D: betender Engel aus Blender (img/statue3d.png) – ruhend, erwacht in zwei pulsierenden Bildern; bis zum Laden
+  // bleibt die Pixel-Statue
+  const img = new Image();
+  img.onload = () => {
+    const fr = (x) => { const c = Sprites.canvas(26, 40); c.getContext('2d').drawImage(img, x, 0, 26, 40, 0, 0, 26, 40); return Sprites.fromCanvas(c, true); };
+    S.statue3d = { off: fr(0), on: [fr(27), fr(54)] };
+  };
+  img.src = 'img/statue3d.png';
 })();
 
 // ---------------- Plattformen (nur von oben begehbar) ----------------
@@ -133,7 +141,16 @@ class Statue extends Ent {
     for (let i = 0; i < 14; i++) W.spawn(new Particle(this.cx + rnd(-8, 8), this.y + rnd(0, 30), rnd(-0.4, 0.4), rnd(-1.6, -0.4), i % 2 ? '#a4e4fc' : '#fcfcfc', 40, 1, 0));
   }
   draw(ctx) {
-    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y);
+    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), s3 = Sprites.S.statue3d;
+    if (s3) { // 3D-Engel: unten bündig mit dem Boden, erwacht pulsieren Heiligenschein, Augen und Runen; blauer Schein dahinter
+      if (this.active) {
+        const a = 0.22 + 0.08 * Math.sin(this.t * 0.08), g = ctx.createRadialGradient(x + 8, y + 2, 0, x + 8, y + 2, 26);
+        g.addColorStop(0, `rgba(120,210,255,${a.toFixed(3)})`); g.addColorStop(1, 'rgba(120,210,255,0)');
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(x - 18, y - 24, 52, 52); ctx.restore();
+      }
+      Sprites.draw(ctx, this.active ? s3.on[(this.t >> 4) & 1] : s3.off, x - 5, y + this.h - 39);
+      return;
+    }
     Sprites.draw(ctx, Sprites.S.statue[this.active ? 1 : 0], x, y);
     if (this.active) {
       ctx.fillStyle = (this.t >> 3) % 2 ? '#f8b800' : '#fce0a8';
