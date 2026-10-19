@@ -368,7 +368,7 @@ const Game = {
     if (this.revealed && this.revealT !== undefined) this.revealT++;
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
     const titleish = ['title', 'options', 'sections', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
-    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'demo') && W.room ? W.room.theme : null);
+    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'demo') && W.room ? W.room.theme : null);
     if (titleish) {
       FX.updateStorm(this.tStorm, View.w, () => { if (Audio8.ready()) setTimeout(() => Audio8.sfx('thunder'), 250 + Math.random() * 600); });
     }
@@ -389,6 +389,7 @@ const Game = {
       case 'demo': this.updateDemo(); break;
       case 'options': this.updateOptions(P); break;
       case 'sections': this.updateSections(P); break;
+      case 'pausesec': this.updateSections(P, true); break;
       case 'charsel': {
         if (P.left || P.right) {
           const ids = HEROES.list.map(d => d.id), i = ids.indexOf(Options.character);
@@ -409,11 +410,17 @@ const Game = {
         if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
         break;
       case 'play': this.updatePlay(P); break;
-      case 'pause': // Pausenmenü: WEITER / LEICHT-MODUS / ZUM TITEL
-        if (P.up || P.down) { this.pauseSel = ((this.pauseSel || 0) + (P.down ? 1 : 2)) % 3; Audio8.sfx('select'); }
-        if (this.pauseAct !== undefined) { this.pauseSel = this.pauseAct; this.pauseAct = undefined; if (this.pauseSel === 1) this.toggleEasy(); else if (this.pauseSel === 0) this.unpause = true; else if (this.t > 10) { Audio8.setMusicVolume(0.5); Audio8.muffle(false); this.finishRun(false); break; } }
+      case 'pause': // Pausenmenü: WEITER / LEICHT-MODUS / ABSCHNITT WÄHLEN / ZUM TITEL
+        if (P.up || P.down) { this.pauseSel = ((this.pauseSel || 0) + (P.down ? 1 : 3)) % 4; Audio8.sfx('select'); }
+        if (this.pauseAct !== undefined) {
+          this.pauseSel = this.pauseAct; this.pauseAct = undefined;
+          if (this.pauseSel === 1) this.toggleEasy(); else if (this.pauseSel === 0) this.unpause = true;
+          else if (this.pauseSel === 2) { this.go('pausesec'); Audio8.sfx('select'); break; }
+          else if (this.t > 10) { Audio8.setMusicVolume(0.5); Audio8.muffle(false); this.finishRun(false); break; }
+        }
         if ((P.jump || P.attack) && this.pauseSel === 1) this.toggleEasy();
-        else if ((P.jump || P.attack) && this.pauseSel === 2 && this.t > 10) {
+        else if ((P.jump || P.attack) && this.pauseSel === 2) { this.go('pausesec'); Audio8.sfx('select'); } // Abschnittswahl mitten im Spiel
+        else if ((P.jump || P.attack) && this.pauseSel === 3 && this.t > 10) {
           this.unpause = false; Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('select'); this.finishRun(false); // Score zählt trotzdem
         } else if (P.start || this.unpause || ((P.jump || P.attack) && !this.pauseSel)) {
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('pause'); }
@@ -536,6 +543,7 @@ const Game = {
         this.drawCombo(ctx);
         this.drawHud(ctx);
         if (this.state === 'pause') this.drawPause(ctx);
+        if (this.state === 'pausesec') this.drawSections(ctx, true);
         if (this.state === 'fade') this.mosaicFade(ctx, this.t < 18 ? this.t / 16 : 1 - (this.t - 18) / 12);
         if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 30 ? this.t / 28 : 1 - (this.t - 30) / 14);
         if (this.hurryT > 0 && this.state === 'play') this.drawHurry(ctx);
@@ -677,23 +685,23 @@ const Game = {
   // Touch im Pausenmenü: Tipp auf einen Menüpunkt wählt ihn (true), sonst geht es weiter
   pauseTouch(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect(), y = (clientY - r.top) / r.height * 240;
-    for (let i = 0; i < 3; i++) if (y >= 117 + i * 12 && y < 129 + i * 12) { this.pauseAct = i; return true; }
+    for (let i = 0; i < 4; i++) if (y >= 117 + i * 12 && y < 129 + i * 12) { this.pauseAct = i; return true; }
     return false;
   },
   drawPause(ctx) {
-    const cx = View.cx, items = [tr('resume'), tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), tr('toTitle')];
+    const cx = View.cx, items = [tr('resume'), tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), tr('secTitle'), tr('toTitle')];
     const hint = tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey');
     const pw = Math.min(View.w - 8, Math.max(150, Font.width(hint) + 16, ...items.map(s => Font.width(s) + 96)));
-    ctx.fillStyle = '#000'; ctx.fillRect(cx - pw / 2, 96, pw, 82);
-    ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - pw / 2 + 0.5, 96.5, pw - 1, 81);
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - pw / 2, 96, pw, 94);
+    ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - pw / 2 + 0.5, 96.5, pw - 1, 93);
     Font.draw(ctx, tr('pause'), cx, 104, '#fcfcfc', { align: 'center' });
     items.forEach((s, i) => {
       const on = (this.pauseSel || 0) === i;
       Font.draw(ctx, s, cx - 46, 120 + i * 12, on ? (i === 1 && Options.easy ? '#58f898' : '#fcfcfc') : '#8c8c8c');
       if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 60, 119 + i * 12);
     });
-    Font.draw(ctx, hint, cx, 164, '#7c7c7c', { align: 'center' });
-    if (!Audio8.ready()) Font.draw(ctx, tr('soundShort'), cx, 184, '#7c7c7c', { align: 'center' });
+    Font.draw(ctx, hint, cx, 176, '#7c7c7c', { align: 'center' });
+    if (!Audio8.ready()) Font.draw(ctx, tr('soundShort'), cx, 196, '#7c7c7c', { align: 'center' });
   },
 
   panel(ctx, title, sub) {
@@ -1079,7 +1087,7 @@ const Game = {
     });
     return (this.secList = L);
   },
-  updateSections(P) {
+  updateSections(P, ingame = false) { // ingame: aus dem Pausenmenü – Held, Punkte und Leben bleiben, Enter führt zurück zur Pause
     const L = this.sectionList(), rooms = L.filter(e => !e.head);
     if (this.secSel === undefined) { let v = 0; try { v = parseInt(localStorage.getItem('nachtmahr.sec') || '0', 10) || 0; } catch (e) { /* privat */ } this.secSel = clamp(v, 0, rooms.length - 1); }
     if (P.up || P.down) { this.secSel = (this.secSel + (P.down ? 1 : rooms.length - 1)) % rooms.length; Audio8.sfx('select'); }
@@ -1087,17 +1095,19 @@ const Game = {
       const s = rooms[this.secSel].s, ns = (s + (P.right ? 1 : Levels.STAGES.length - 1)) % Levels.STAGES.length;
       this.secSel = rooms.findIndex(e => e.s === ns); Audio8.sfx('select');
     }
-    if (P.start && this.t > 8) { this.go('title'); Audio8.sfx('pause'); return; }
+    if (P.start && this.t > 8) { if (ingame) { this.go('pause'); this.pauseSel = 2; } else this.go('title'); Audio8.sfx('pause'); return; }
     if ((P.jump || P.attack) && this.t > 8) {
       const e = rooms[this.secSel];
       try { localStorage.setItem('nachtmahr.sec', String(this.secSel)); } catch (err) { /* privat */ }
-      Audio8.init(); Audio8.sfx('bigItem'); this.newGame(e.s, e.r);
+      Audio8.init(); Audio8.sfx('bigItem');
+      if (ingame) { Audio8.setMusicVolume(0.5); Audio8.muffle(false); W.player.hp = W.player.maxHp; this.startStage(e.s, e.r); }
+      else this.newGame(e.s, e.r);
     }
   },
-  drawSections(ctx) {
+  drawSections(ctx, overlay = false) { // overlay: über dem eingefrorenen Spielbild (aus dem Pausenmenü)
     const cx = View.cx, L = this.sectionList(), rooms = L.filter(e => !e.head), sel = rooms[this.secSel || 0];
-    this.drawSkyScene(ctx);
-    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(0, 32, View.w, 176);
+    if (!overlay) this.drawSkyScene(ctx);
+    ctx.fillStyle = overlay ? 'rgba(0,0,0,0.82)' : 'rgba(0,0,0,0.72)'; ctx.fillRect(0, 32, View.w, overlay ? 208 : 176);
     this.big(ctx, tr('secTitle'), cx, 38, 2, LOGO, null, '#000');
     const idx = L.indexOf(sel), rows = 13, top = clamp(idx - 6, 0, Math.max(0, L.length - rows)), lx = Math.max(12, cx - 120);
     for (let k = 0; k < rows && top + k < L.length; k++) {
