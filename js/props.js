@@ -533,6 +533,12 @@ class Ring extends Ent {
     const x = Math.round(this.cx - W.cam.x), y = Math.round(this.cy - W.cam.y), p = W.player;
     ctx.fillStyle = '#3c3c3c'; for (let k = 7; k < 18; k += 3) ctx.fillRect(x, y - k, 1, 2);
     const near = p.alive && Math.hypot(p.cx - this.cx, p.cy - this.cy) < 80 && p.cy > this.cy;
+    if (p.alive && !p.onGround && p.state === 'normal' && p.nearRing && p.nearRing() === this) { // in Reichweite: jetzt schlagen!
+      const k = 0.5 + 0.5 * Math.sin(this.t * 0.35);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(252,224,140,${(0.25 + 0.3 * k).toFixed(2)})`;
+      for (let a = 0; a < Math.PI * 2; a += 0.15) ctx.fillRect(x + Math.round(Math.cos(a) * (7 + k * 2)), y + Math.round(Math.sin(a) * (7 + k * 2)), 1, 1);
+      ctx.restore();
+    }
     for (let a = 0; a < Math.PI * 2; a += 0.2) {
       const px = x + Math.round(Math.cos(a) * 4), py = y + Math.round(Math.sin(a) * 4);
       ctx.fillStyle = (a > 3.4 && a < 5.2) ? '#fce0a8' : (a > 0.2 && a < 2.2) ? '#9c6400' : '#f8b800';

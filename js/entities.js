@@ -69,9 +69,11 @@ const WHIP_DIRS = {
   downd: { hx: 18, hy: 15, a: Math.PI / 4 }, down: { hx: 13, hy: 17, a: Math.PI / 2 },
 };
 const FLIP_LEN = 26; // Salto-Dauer in Frames
+const RING_REACH = 96; // Ankerringe: so weit (vom Oberkörper) hakt ein Schlag in der Luft noch ein – großzügig, kein Pixel-Zielen
 const SLIDE_H = 14; // Rutschen: flacher als eine Kachel – passt durch Spalten, durch die man weder geht noch kriecht
 const DASH_LEN = 20, AIRDASH_LEN = 15, DASH_V = 3.7, DASH_AIR = 2.5; // Dash am Boden / in der Luft, Schwung danach
 const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+const wrapDx = (dx) => { const r = W.room; if (!r || !r.wrap) return dx; const w = r.w * T; return ((dx + w / 2) % w + w) % w - w / 2; }; // Turmmantel: kürzester Weg über die Naht
 
 class Player {
   constructor() {
@@ -124,12 +126,11 @@ class Player {
     const I = Input.held, horiz = I.left || I.right;
     this.atkDir = 'fwd';
     if (!this.atkSub && this.state === 'normal' && !this.crouchAtk) {
-      if (I.up) this.atkDir = horiz ? 'upd' : 'up';
+      if (!this.onGround && !I.down && this.ringAssist()) { /* in der Luft nahe einem Ring: Schlag zielt automatisch dorthin */ }
+      else if (I.up) this.atkDir = horiz ? 'upd' : 'up';
       else if (I.down && !this.onGround) this.atkDir = horiz ? 'downd' : 'down';
-      else if (Input.device === 'touch' && !this.onGround) this.ringAssist(); // Ziel-Hilfe nur für Touch in der Luft
     }
   }
-  // Ziel-Hilfe (nur Touch, in der Luft): Ring in Reichweite über dem Spieler → automatisch dorthin peitschen
   setHero(H) { this.setHeroId(H.def.id); this._H = H; }
   // Waffenart aus dem Helden: Peitsche, Schwert oder Hellebarde (die sich wie ein langes Schwert führt); die Figur selbst
   // (alle Posen) wird erst beim ersten Zeichnen gebaut
@@ -137,25 +138,30 @@ class Player {
   get H() { return this._H || (this._H = HEROES.get(this.heroId)); }
   set H(v) { this._H = v; }
   get wlen() { return (this.pole ? POLE_LEN : this.sword ? SWORD_LEN : WHIP_LEN)[this.whip]; }
-  ringAssist() {
-    if (!W.rings || !W.rings.length) return;
-    const reach = this.wlen + 52;
+  // nächster Ankerring in Reichweite (vom Oberkörper aus), höchstens knapp unter dem Helden
+  nearRing(reach = Math.max(RING_REACH, this.wlen + 60)) {
+    if (!W.rings || !W.rings.length) return null;
     let best = null, bd = 1e9;
     for (const r of W.rings) {
-      const dx = r.cx - this.cx, dy = r.cy - (this.y + 8), d = Math.hypot(dx, dy);
-      if (dy < -6 && d < reach && d < bd) { best = r; bd = d; }
+      const dx = wrapDx(r.cx - this.cx), dy = r.cy - (this.y + 8), d = Math.hypot(dx, dy);
+      if (dy < 16 && d < reach && d < bd) { best = r; bd = d; }
     }
-    if (!best) return;
-    const dx = best.cx - this.cx;
+    return best;
+  }
+  // Ziel-Hilfe (alle Geräte, in der Luft): Ring in Reichweite → Schlag zielt automatisch dorthin
+  ringAssist() {
+    const r = this.nearRing(); if (!r) return false;
+    const dx = wrapDx(r.cx - this.cx);
     if (Math.abs(dx) < 14) this.atkDir = 'up';
     else { this.atkDir = 'upd'; this.face = Math.sign(dx); }
+    return true;
   }
 
   tickAttack() {
     if (this.atkT === 0) return;
     this.atkT++;
     if (this.atkSub && this.atkT === 9) this.throwSub();
-    if (!this.atkSub && this.atkT === 12 && this.tryLatch()) return;
+    if (!this.atkSub && this.atkT >= 6 && this.atkT <= 16 && this.tryLatch()) return; // Einhak-Fenster über mehrere Frames
     if (!this.atkSub && this.atkT === 13 && !this.sword) Audio8.sfx('crack');
     if (!this.atkSub && this.atkT >= 12 && this.atkT <= 17) this.whipHits();
     if (this.atkT > ATK_LEN) {
@@ -662,16 +668,18 @@ class Player {
 
   // ---------- Ankerringe: Peitsche einhaken und pendeln ----------
   tryLatch() {
-    // nur bei bewusst nach oben gerichteten Hieben einhaken – Vorwärts-/Duck-/Abwärtshiebe treffen immer die Gegner
-    if (this.state !== 'normal' || !W.rings || !W.rings.length || (this.atkDir !== 'up' && this.atkDir !== 'upd')) return false;
-    const D = this.dir, h = this.hand(), reach = this.wlen + 48;
-    const wa = Math.atan2(Math.sin(D.a), Math.cos(D.a) * this.face);
-    for (const r of W.rings) { // großzügig wie bei Super Castlevania IV
-      const dx = r.cx - h.x, dy = r.cy - h.y, d = Math.hypot(dx, dy);
-      if (d > reach || d < 8 || dy > 30 || Math.abs(angDiff(Math.atan2(dy, dx), wa)) > 0.8) continue;
+    // in der Luft hakt jeder Schlag (außer nach unten) am nächsten Ring in Reichweite ein; am Boden nur bewusst nach oben
+    // gerichtete Hiebe – Vorwärts- und Duckhiebe treffen dort weiter die Gegner
+    if (this.state !== 'normal' || !W.rings || !W.rings.length || this.atkDir === 'down' || this.atkDir === 'downd') return false;
+    const air = !this.onGround;
+    if (!air && this.atkDir !== 'up' && this.atkDir !== 'upd') return false;
+    const D = this.dir, h = this.hand(), wa = Math.atan2(Math.sin(D.a), Math.cos(D.a) * this.face), near = this.nearRing(air ? undefined : this.wlen + 56);
+    for (const r of near ? [near] : []) {
+      const dx = wrapDx(r.cx - h.x), dy = r.cy - h.y, rel = wrapDx(this.cx - r.cx);
+      if (!air && Math.abs(angDiff(Math.atan2(dy, dx), wa)) > 1.15) continue;
       this.state = 'swing'; this.ring = r; this.atkT = 0; this.dangle = false; this.setCrouch(false);
-      this.swL = clamp(Math.hypot(this.cx - r.cx, this.cy - r.cy), 26, 76);
-      this.swA = Math.atan2(this.cx - r.cx, this.cy - r.cy);
+      this.swL = clamp(Math.hypot(rel, this.cy - r.cy), 26, RING_REACH); // langes Seil zieht sich danach sanft ein
+      this.swA = Math.atan2(rel, this.cy - r.cy);
       this.swW = clamp((this.vx * Math.cos(this.swA) - this.vy * Math.sin(this.swA)) / this.swL, -0.08, 0.08);
       this.onGround = false; this.vy = 0;
       Audio8.sfx('latch'); Input.rumble(0.3, 0.2, 120); W.sparks(r.cx, r.cy, 6);
@@ -686,8 +694,9 @@ class Player {
     if (I.left) this.swW -= 0.0034;
     if (I.right) this.swW += 0.0034;
     this.swW = clamp(this.swW * 0.996, -0.13, 0.13);
-    if (I.up) this.swL = Math.max(24, this.swL - 0.7);
-    if (I.down) this.swL = Math.min(80, this.swL + 0.7);
+    if (this.swL > 76) this.swL = Math.max(76, this.swL - 1.2); // aus großer Entfernung eingehakt: heranziehen
+    else if (I.up) this.swL = Math.max(24, this.swL - 0.7);
+    if (I.down && this.swL <= 80) this.swL = Math.min(80, this.swL + 0.7);
     this.swA += this.swW;
     if (Math.abs(this.swA) > 1.5) { this.swA = Math.sign(this.swA) * 1.5; this.swW *= -0.3; }
     const nx = r.cx + Math.sin(this.swA) * this.swL - this.w / 2, ny = r.cy + Math.cos(this.swA) * this.swL - this.h / 2;
