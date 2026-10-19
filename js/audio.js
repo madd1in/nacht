@@ -28,10 +28,11 @@ const Audio8 = (() => {
     master = ac.createGain(); master.gain.value = muted ? 0 : 0.7; master.connect(comp);
     // SNES-artiger Hall: erzeugte Impulsantwort (dunkel, ~2 s), leise beigemischt
     const rev = ac.createConvolver(), len = Math.floor(ac.sampleRate * 2.1), ir = ac.createBuffer(2, len, ac.sampleRate);
+    const ENV = new Float32Array(1026); for (let k = 0; k <= 1025; k++) ENV[k] = Math.pow(Math.max(0, 1 - k / 1024), 2.6); // Abklingkurve als Tabelle
     for (let ch = 0; ch < 2; ch++) {
       const d = ir.getChannelData(ch); let lp = 0;
       let e = 0;
-      for (let i = 0; i < len; i++) { lp += ((Math.random() * 2 - 1) - lp) * 0.18; d[i] = lp * Math.pow(1 - i / len, 2.6) * (i < 400 ? i / 400 : 1); e += d[i] * d[i]; }
+      for (let i = 0; i < len; i++) { lp += ((Math.random() * 2 - 1) - lp) * 0.18; const u = i / len * 1024, k0 = u | 0; d[i] = lp * (ENV[k0] + (ENV[k0 + 1] - ENV[k0]) * (u - k0)) * (i < 400 ? i / 400 : 1); e += d[i] * d[i]; }
       const k = 1 / Math.sqrt(e || 1); // auf Energie 1 normieren
       for (let i = 0; i < len; i++) d[i] *= k;
     }

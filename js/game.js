@@ -48,7 +48,7 @@ const Game = {
     this.debugStage = q.has('stage') ? clamp(parseInt(q.get('stage'), 10) - 1, 0, Levels.STAGES.length - 1) : null;
     this.debugRoom = q.has('room') ? Math.max(0, parseInt(q.get('room'), 10) - 1) : 0;
     this.toTitle();
-    if (window.Boot) Boot.onExit = () => { if (this.state === 'title' && !this.revealed) this.t = Math.max(this.t, 38); }; // Ladebildschirm verlassen: Titel schlägt kurz danach ein
+    if (window.Boot) Boot.onExit = () => { if (this.state === 'title' && !this.revealed) this.t = Math.max(this.t, 60); }; // Ladebildschirm blitzt weiß aus: Titel schlägt sofort ein
     let acc = 0, last = performance.now();
     const seen = new Set();
     const loop = (now) => {
@@ -833,7 +833,11 @@ const Game = {
     this.warmJobs = [() => HEROES.get(Options.character), () => HEROES.ensureMonsters(), () => Mode7.mapData(), () => PS2.prewarmMap(), ...stageJobs,
       quiet(() => this.drawCharSel(x)), quiet(() => this.drawIntro(x)), quiet(() => { W.stage = 0; try { this.drawCard(x); } finally { W.stage = s; } })];
     this.warmTotal = this.warmJobs.length; this.warmDoneT = -1;
-    return [() => Audio8.prepare(), quiet(() => this.drawSkyScene(x))];
+    const title = quiet(() => { // fertiger Titel (Logo-Einschlag und Ruhe) einmal unter dem Ladebild auf die echte Fläche: Schriftzüge, Feuer und Bilder liegen dann bereit
+      const rv = this.revealed, rt = this.revealT;
+      try { this.revealed = true; for (const t of [0, 40]) { this.revealT = t; this.drawTitle(this.ctx); } } finally { this.revealed = rv; this.revealT = rt; }
+    });
+    return [() => Audio8.prepare(), () => Tiles.build('courtyard'), () => FX.drawFog(x, 'courtyard', { x: 0, y: 0 }, 0), quiet(() => this.drawSkyScene(x)), title]; // in kleinen Stücken: das Ladebild wartet auf jedes
   },
   big(ctx, text, cx, y, scale, colors, shadow, outline) { // alle Großschriften (Ausrufe, Combo, Titel der Menüs, Boss-Namen): PS2-3D
     return this.text3d(ctx, text, cx, y, scale, colors, { shadow, outline: !!outline, depth: Math.max(2, scale + 1), wobble: 0.2, bob: 0.4 });

@@ -14,9 +14,14 @@ const PAL = {
 const Sprites = (() => {
   const S = {};
 
+  // Kleine Leinwände (Sprites, Kacheln, Zwischenbilder) rechnen im Arbeitsspeicher: Konturen und Effekte lesen ihre Pixel
+  // mit getImageData zurück – auf einer Grafikkarten-Leinwand stockt dabei jedes Mal das Bild (beim Laden Sekunden).
+  // Große Puffer (Licht, Hintergründe) bleiben auf der Grafikkarte.
+  const CPU = { willReadFrequently: true };
   function canvas(w, h) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
+    if (w * h <= 65536) c.getContext('2d', CPU);
     return c;
   }
 

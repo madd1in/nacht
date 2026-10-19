@@ -3,21 +3,23 @@
 // Die Buchstaben von NACHTMAHR entzünden sich einer nach dem anderen mit dem Ladefortschritt, Blut tropft herab.
 // Ist alles geladen, wartet er auf eine Taste: die schaltet den Ton frei, ein Blitz fährt in die Burg, ein Schwarm
 // Fledermäuse stürzt auf den Betrachter zu – und dahinter schlägt der Titel ein.
-// Das Spiel hält den Titel an, solange Boot.hold gilt, und zeichnet nicht, solange Boot.cover gilt (game.js).
+// Das Spiel hält den Titel an, solange Boot.hold gilt, und zeichnet nicht, solange Boot.cover gilt (game.js) – erst wenn
+// der Abgang ganz weiß ausgeblitzt ist, übernimmt der Titel: zeichnen beide zugleich, ruckeln beide.
+// Die Animation (bootEngine) läuft, wo möglich, in einem eigenen Thread (Web Worker mit OffscreenCanvas): Während der
+// Hauptthread das Spiel vorbaut – Helden, Gegner, Weltkarte, Hintergründe, Menüs –, bleibt der Ladebildschirm flüssig.
+// Ohne Worker-Leinwand läuft dieselbe Engine im Hauptthread, der Vorbau dann in kleinen Häppchen zwischen den Bildern.
 'use strict';
 
-var Boot = (() => {
-  const B = { hold: true, cover: true, state: 'load', onExit: null };
-  const el = document.getElementById('boot');
-  if (!el || /[?&]noboot\b/.test(location.search)) { if (el) el.remove(); B.hold = B.cover = false; B.state = 'gone'; return B; }
-  const cv = el.querySelector('canvas'), x = cv.getContext('2d');
+// io: { canvas, mk(w, h) → Leinwand, lang, touch, build, progress() → 0..1, jobsDone() → bool, emit('ready'|'done'), raf(f) }
+function bootEngine(io) {
+  const x = io.canvas.getContext('2d');
 
   // ---------------- Hilfen ----------------
   let seed = 7;
   const rnd = () => { seed = (seed + 0x6D2B79F5) | 0; let r = Math.imul(seed ^ (seed >>> 15), 1 | seed); r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r; return ((r ^ (r >>> 14)) >>> 0) / 4294967296; };
   const SR = (a, b) => a + rnd() * (b - a);            // reproduzierbar (Kulisse)
   const R = (a, b) => a + Math.random() * (b - a);     // frei (Effekte)
-  const cvs = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return c; };
+  const cvs = (w, h) => io.mk(Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(h)));
   const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   const mix = (a, b, k) => { const p = hex(a), q = hex(b); return `rgb(${Math.round(p[0] + (q[0] - p[0]) * k)},${Math.round(p[1] + (q[1] - p[1]) * k)},${Math.round(p[2] + (q[2] - p[2]) * k)})`; };
   const harden = (c) => { // weiche Kanten hart machen: Pixel-Look
@@ -91,14 +93,9 @@ var Boot = (() => {
     es: { sub: 'UNA SAGA DE CAZAVAMPIROS', load: 'LA NOCHE DESPIERTA', key: 'PULSA UNA TECLA', tap: 'TOCA PARA ENTRAR',
       tips: ['LAS VELAS ESCONDEN CORAZONES, ORO Y ARMAS.', 'AZOTA LOS ANILLOS EN DIAGONAL.', 'EL DASH TAMBIEN FUNCIONA EN EL AIRE.', 'EL CONDE ESPERA EN LA SALA DEL TRONO.'] },
   };
-  let lang = 'en';
-  try {
-    lang = ((navigator.languages && navigator.languages[0]) || navigator.language || 'en').slice(0, 2).toLowerCase();
-    const o = JSON.parse(localStorage.getItem('nachtmahr.opts') || '{}'); if (o.lang) lang = o.lang;
-  } catch (e) { /* privater Modus */ }
-  const T = TXT[lang] || TXT.en;
+  const T = TXT[io.lang] || TXT.en;
   ['sub', 'load', 'key', 'tap'].forEach(k => { T[k] = norm(T[k]); }); T.tips = T.tips.map(norm);
-  const touch = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  const touch = io.touch;
 
   // ---------------- Kulisse (bei jeder Größenänderung neu gebaut) ----------------
   let W = 0, H = 0, PX = 3, S = 4, K = 1, BY = 0, CX = 0, MR = 0, MX = 0, TY = 0, sky = null;
@@ -108,14 +105,7 @@ var Boot = (() => {
   const CRAG = [[-160, -90], [-140, -40], [-122, -18], [-108, -4], [-100, -2], [-92, -7], [-80, -2], [-72, 0], [74, 0], [86, -3], [98, -2], [110, -9], [124, -20], [140, -44], [160, -90]];
   const WINS = [[-6, 40, 2, 4], [4, 40, 2, 4], [-1, 56, 2, 5], [-37, 30, 2, 4], [-37, 44, 2, 3], [39, 36, 2, 4], [36, 22, 2, 3], [-66, 20, 2, 3], [67, 26, 2, 3], [15, 66, 1, 3], [-15, 66, 1, 3], [-100, 14, 1, 3], [-24, 12, 2, 3], [26, 12, 2, 3]];
 
-  function fit() {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    PX = vw >= vh ? Math.max(2, Math.round(Math.min(vw / 420, vh / 236))) : Math.max(2, Math.round(Math.min(vw / 200, vh / 400)));
-    W = Math.ceil(vw / PX); H = Math.ceil(vh / PX);
-    cv.width = W; cv.height = H; cv.style.width = W * PX + 'px'; cv.style.height = H * PX + 'px';
-    el.style.setProperty('--s', PX + 'px'); el.style.setProperty('--a', (PX * 0.6) + 'px');
-    build();
-  }
+  function resize(w, h) { W = w; H = h; io.canvas.width = W; io.canvas.height = H; build(); } // Pixelgröße und CSS setzt der Hauptthread
   function build() {
     seed = 7;
     S = Math.max(1, Math.min(6, Math.floor(W * 0.86 / 71)));
@@ -242,21 +232,10 @@ var Boot = (() => {
   }
 
   // ---------------- Zustand ----------------
-  let t = 0, disp = 0, loaded = false, loadT = 0, readyT = 0, exitT = 0, flash = 0, flare = 0, shake = 0, bolt = null, boltT = 0, nextBolt = 110, tip0 = Math.floor(Math.random() * 7);
+  let state = 'load', t = 0, disp = 0, readyT = 0, exitT = 0, flash = 0, flare = 0, shake = 0, bolt = null, boltT = 0, nextBolt = 110, tip0 = Math.floor(Math.random() * 7);
   const parts = [], bats = [], swarm = [];
   const BAT = [['1000001', '1100011', '0110110', '0011100', '0001000'], ['0000000', '0001000', '1111111', '1011101', '0001000'], ['0000000', '0001000', '0011100', '0110110', '1100011']];
   const spark = (px, py, vx, vy, life, col, sz = 1, g = 0, add = true) => { if (parts.length < 500) parts.push({ x: px, y: py, vx, vy, life, max: life, col, sz, g, add }); };
-  const gameReady = () => { try { return typeof Game !== 'undefined' && !!Game.ctx; } catch (e) { return false; } };
-  let jobs = null, jobsN = 0; // Vorbau-Schritte des Spiels (Ton, Karte, erste Stage, Menüs) – laufen hier statt als Ruckler später
-  const progress = () => { // 0–80 %: fertig geladene Skripte und Bilder (27 Skripte + 9 Atlanten), 80–100 %: Vorbau
-    if (jobs) return 0.8 + 0.2 * (jobsN ? (jobsN - jobs.length) / jobsN : 1);
-    if (loaded) return 0.8;
-    let n = 0; const es = performance.getEntriesByType ? performance.getEntriesByType('resource') : [];
-    for (const e of es) if (/\/(js|img)\/[^?]+\.(js|png)/.test(e.name)) n++;
-    return Math.min(0.94, n / Math.max(36, n + 2)) * 0.8;
-  };
-  window.addEventListener('load', () => { loaded = true; loadT = t; });
-
   const keepTop = () => BY - 112 * K;
   const mkBolt = (x0, x1, y1) => {
     const pts = [[x0, -4]], n = 16;
@@ -276,34 +255,26 @@ var Boot = (() => {
   };
 
   function exit() {
-    B.state = 'exit'; B.hold = false; exitT = 0; flare = 1.3; shake = 6; flash = 1.3; strike(true);
+    state = 'exit'; exitT = 0; flare = 1.3; shake = 6; flash = 1.3; strike(true);
     for (let i = 0; i < 48; i++) { const a = R(0, Math.PI * 2), v = R(0.4, 1.5); swarm.push({ x: CX + R(-8, 8) * K, y: BY - R(40, 95) * K, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6 - 0.25, sz: R(0.8, 1.6), g: R(1.035, 1.065), ph: R(0, 8) }); }
     letters.forEach(L => { if (L.on < 0) L.on = t; });
-    try { if (typeof Audio8 !== 'undefined') { Audio8.init(); Audio8.sfx('thunder'); } } catch (e) { /* ohne Ton weiter */ }
-    try { if (B.onExit) B.onExit(); } catch (e) { /* Titel noch nicht da */ }
   }
-  function finish() { B.state = 'gone'; B.cover = false; B.hold = false; el.remove(); window.removeEventListener('resize', onResize); }
-  const press = () => { if (B.state === 'ready') exit(); };
-  window.addEventListener('keydown', press); window.addEventListener('pointerdown', press);
-  let resized = false; const onResize = () => { resized = true; }; window.addEventListener('resize', onResize);
+  function finish() { state = 'gone'; io.emit('done'); }
+  const press = () => { if (state === 'ready') exit(); };
 
   // ---------------- Takt ----------------
   function update() {
     t++;
-    if (B.state === 'load') {
-      const target = progress();
+    if (state === 'load') {
+      const target = io.progress();
       if (target > disp) disp = Math.min(target, disp + Math.min(0.011, (target - disp) * 0.12 + 0.0015));
       letters.forEach((L, i) => { if (L.on < 0 && disp >= (i + 1) / 9 - 0.001) ignite(i); });
-      if (!jobs && loaded && gameReady()) { try { jobs = Game.bootJobs ? Game.bootJobs() : []; } catch (e) { console.warn(e); jobs = []; } jobsN = jobs.length; }
-      if (disp >= 0.999 && ((jobs && !jobs.length) || (loaded && !gameReady() && t - loadT > 240))) { B.state = 'ready'; readyT = t; flare = 0.8; strike(true); }
-    } else if (B.state === 'ready' && navigator.getGamepads) {
-      for (const p of navigator.getGamepads()) if (p && p.buttons.some(b => b.pressed)) { exit(); break; }
-    } else if (B.state === 'exit') {
+      if (disp >= 0.999 && io.jobsDone()) { state = 'ready'; readyT = t; flare = 0.8; strike(true); io.emit('ready'); }
+    } else if (state === 'exit') {
       exitT++;
-      if (exitT === 6) { el.classList.add('out'); B.cover = false; }
-      if (exitT > 44) { finish(); return; }
+      if (exitT > 44) { finish(); return; } // zuletzt ganz weiß – darunter schlägt der Titel ein
     }
-    if (t >= nextBolt && B.state !== 'exit') { strike(Math.random() < 0.4); nextBolt = t + R(160, 340); }
+    if (t >= nextBolt && state !== 'exit') { strike(Math.random() < 0.4); nextBolt = t + R(160, 340); }
     if (boltT > 0) { boltT--; if (boltT === 6) flash = Math.max(flash, 0.75); }
     flash *= 0.86; if (flash < 0.01) flash = 0;
     flare *= 0.9; if (flare < 0.03) flare = 0;
@@ -337,7 +308,7 @@ var Boot = (() => {
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.imageSmoothingEnabled = false;
     x.fillStyle = '#000'; x.fillRect(0, 0, W, H);
     const sx = shake ? Math.round(R(-shake, shake)) : 0, sy = shake ? Math.round(R(-shake, shake) * 0.6) : 0;
-    const z = B.state === 'exit' ? 1 + Math.pow(Math.min(1, exitT / 40), 2) * 0.5 : 1; // beim Eintreten stürzt die Kamera auf die Burg zu
+    const z = state === 'exit' ? 1 + Math.pow(Math.min(1, exitT / 40), 2) * 0.5 : 1; // beim Eintreten stürzt die Kamera auf die Burg zu
     x.setTransform(z, 0, 0, z, (1 - z) * CX + sx, (1 - z) * keepTop() + sy);
     const drift = Math.sin(t * 0.004) * 4 * K, fade = Math.min(1, t / 30);
     // Himmel, Sterne, Mond
@@ -399,8 +370,8 @@ var Boot = (() => {
     // Anzeigen (ohne Kamerafahrt)
     x.setTransform(1, 0, 0, 1, 0, 0);
     const yS = H - 40;
-    if (B.state === 'load' || (B.state === 'ready' && t - readyT < 24)) {
-      const a = B.state === 'load' ? fade : 1 - (t - readyT) / 24, bw = Math.min(Math.round(W * 0.5), 170), bx2 = CX - (bw >> 1), by2 = yS + 11, fw = Math.round(bw * disp);
+    if (state === 'load' || (state === 'ready' && t - readyT < 24)) {
+      const a = state === 'load' ? fade : 1 - (t - readyT) / 24, bw = Math.min(Math.round(W * 0.5), 170), bx2 = CX - (bw >> 1), by2 = yS + 11, fw = Math.round(bw * disp);
       text(T.load + ' ' + Math.floor(disp * 100) + '%', CX, yS, '#d0b8e0', '#000', a);
       x.globalAlpha = a; x.fillStyle = '#1a0c20'; x.fillRect(bx2 - 1, by2 - 1, bw + 2, 5); x.fillStyle = '#3c2848'; x.fillRect(bx2 - 1, by2 - 1, bw + 2, 1);
       if (fw > 0) {
@@ -412,31 +383,144 @@ var Boot = (() => {
       x.fillStyle = '#c89020'; for (const ex of [bx2 - 5, bx2 + bw + 4]) { x.fillRect(ex, by2 + 1, 1, 1); x.fillRect(ex - 1, by2 + 2, 3, 1); x.fillRect(ex, by2 + 3, 1, 1); x.fillRect(ex - 1, by2, 3, 1); }
       x.globalAlpha = 1;
     }
-    if (B.state === 'ready' || B.state === 'exit') {
-      const k = Math.min(1, (t - readyT) / 20), sc = W >= 320 ? 2 : 1, msg = touch ? T.tap : T.key, pulse = B.state === 'exit' ? 1 : 0.55 + 0.45 * Math.sin((t - readyT) * 0.1);
+    if (state === 'ready' || state === 'exit') {
+      const k = Math.min(1, (t - readyT) / 20), sc = W >= 320 ? 2 : 1, msg = touch ? T.tap : T.key, pulse = state === 'exit' ? 1 : 0.55 + 0.45 * Math.sin((t - readyT) * 0.1);
       text('> ' + msg + ' <', CX, yS + 4 - (sc - 1) * 4, '#fce0a8', '#400008', k * pulse, sc);
     }
     const tc = T.tips.length, tn = Math.floor(t / 300), ti = (tip0 + tn) % tc, tt = t % 300, ta = Math.min(1, tt / 30, (300 - tt) / 30) * fade;
     const lines = wrap(T.tips[ti], Math.floor((W - 10) / 6));
     lines.forEach((ln, j) => text(ln, CX, H - 16 - (lines.length - 1 - j) * 9, '#8c7a9c', '#000', ta * 0.95));
-    const ver = 'V' + norm(String(window.BUILD || '')); text(ver, W - ver.length * 3 - 3, 3, '#3c3050', null, fade);
-    if (B.state === 'exit' && flash > 0.6) { x.fillStyle = `rgba(255,250,255,${Math.min(0.85, (flash - 0.6) * 1.6)})`; x.fillRect(0, 0, W, H); }
+    const ver = 'V' + norm(String(io.build || '')); text(ver, W - ver.length * 3 - 3, 3, '#3c3050', null, fade);
+    if (state === 'exit' && flash > 0.6) { x.fillStyle = `rgba(255,250,255,${Math.min(0.85, (flash - 0.6) * 1.6)})`; x.fillRect(0, 0, W, H); }
+    if (state === 'exit' && exitT > 26) { x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.fillStyle = `rgba(255,248,240,${Math.min(1, (exitT - 26) / 14)})`; x.fillRect(0, 0, W, H); } // Ausblitzen
   }
 
   let acc = 0, last = performance.now();
   function frame(now) {
-    if (B.state === 'gone') return;
-    requestAnimationFrame(frame);
-    if (resized) { resized = false; fit(); }
+    if (state === 'gone') return;
+    io.raf(frame);
+    if (io.stats) { const gap = now - (frame.prev || now); frame.prev = now; io.stats.n++; if (gap > 34) { io.stats.long++; (io.stats.at = io.stats.at || []).push([Math.round(performance.timeOrigin + now - gap), Math.round(gap)]); } io.stats.max = Math.max(io.stats.max, gap); if (io.stats.n % 60 === 0) io.emit({ stats: io.stats }); } // ?bootstats: Bildtakt messen
     acc += Math.min(100, now - last); last = now;
-    let n = 0; while (acc >= 1000 / 60 && n < 4) { acc -= 1000 / 60; n++; update(); if (B.state === 'gone') return; }
-    if (jobs && jobs.length) { // Vorbau: pro Bild so viel, wie in ~10 ms passt (mindestens ein Schritt)
-      const t0 = performance.now();
-      do { try { jobs.shift()(); } catch (e) { console.warn(e); } } while (jobs.length && performance.now() - t0 < 10);
-      last = performance.now(); // die Zeit des Vorbaus nicht als Spielzeit nachholen
-    }
+    let n = 0; while (acc >= 1000 / 60 && n < 4) { acc -= 1000 / 60; n++; update(); if (state === 'gone') return; }
     render();
   }
-  fit(); render(); requestAnimationFrame(frame);
+  return { resize, press, start() { render(); last = performance.now(); io.raf(frame); }, idle: () => { last = performance.now(); } };
+}
+
+var Boot = (() => {
+  const B = { hold: true, cover: true, state: 'load', onExit: null, worker: false };
+  const el = document.getElementById('boot');
+  if (!el || /[?&]noboot\b/.test(location.search)) { if (el) el.remove(); B.hold = B.cover = false; B.state = 'gone'; return B; }
+  const cv = el.querySelector('canvas');
+  let lang = 'en';
+  try {
+    lang = ((navigator.languages && navigator.languages[0]) || navigator.language || 'en').slice(0, 2).toLowerCase();
+    const o = JSON.parse(localStorage.getItem('nachtmahr.opts') || '{}'); if (o.lang) lang = o.lang;
+  } catch (e) { /* privater Modus */ }
+  const touch = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches), build = String(window.BUILD || '');
+  const measure = () => { // Pixelgröße und Leinwand-Maße (CSS) im Hauptthread
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const PX = vw >= vh ? Math.max(2, Math.round(Math.min(vw / 420, vh / 236))) : Math.max(2, Math.round(Math.min(vw / 200, vh / 400)));
+    const W = Math.ceil(vw / PX), H = Math.ceil(vh / PX);
+    cv.style.width = W * PX + 'px'; cv.style.height = H * PX + 'px';
+    el.style.setProperty('--s', PX + 'px'); el.style.setProperty('--a', (PX * 0.6) + 'px');
+    return [W, H];
+  };
+
+  // ---------------- Fortschritt und Vorbau (Hauptthread) ----------------
+  let loaded = false, loadT = 0, jobs = null, jobsN = 0, done = false;
+  const gameReady = () => { try { return typeof Game !== 'undefined' && !!Game.ctx; } catch (e) { return false; } };
+  window.addEventListener('load', () => { loaded = true; loadT = performance.now(); });
+  const progress = () => { // 0–80 %: fertig geladene Skripte und Bilder, 80–100 %: Vorbau
+    if (jobs) return 0.8 + 0.2 * (jobsN ? (jobsN - jobs.length) / jobsN : 1);
+    if (loaded) return 0.8;
+    let n = 0; const es = performance.getEntriesByType ? performance.getEntriesByType('resource') : [];
+    for (const e of es) if (/\/(js|img)\/[^?]+\.(js|png)/.test(e.name)) n++;
+    return Math.min(0.94, n / Math.max(36, n + 2)) * 0.8;
+  };
+
+  // ---------------- Animation: eigener Thread, sonst hier ----------------
+  let eng = null, worker = null;
+  const onEngine = (type) => {
+    if (type && type.stats) { B.stats = type.stats; return; }
+    if (type === 'ready') { if (B.state === 'load') B.state = 'ready'; }
+    else if (type === 'done') finish();
+  };
+  const workerMain = function () { // läuft im Worker: Leinwand und Takt kommen per Nachricht
+    let eng = null, prog = 0, ok = false;
+    // Bildtakt: requestAnimationFrame des Workers – Chrome hält es aber an, solange der Hauptthread an einem großen Vorbau-
+    // Stück rechnet; dann springt nach 24 ms ein Zeitgeber ein (was zuerst kommt, gilt), so läuft das Ladebild weiter
+    const raf = (f) => {
+      let done = false; const run = (t) => { if (!done) { done = true; f(typeof t === 'number' ? t : performance.now()); } };
+      if (self.requestAnimationFrame) self.requestAnimationFrame(run);
+      setTimeout(run, 24);
+    };
+    self.onmessage = (e) => {
+      const m = e.data;
+      if (m.init) {
+        eng = bootEngine({ canvas: m.canvas, lang: m.lang, touch: m.touch, build: m.build, progress: () => prog, jobsDone: () => ok, stats: m.stats ? { n: 0, long: 0, max: 0 } : null,
+          mk: (w, h) => { const c = new OffscreenCanvas(w, h); c.getContext('2d', { willReadFrequently: true }); return c; },
+          emit: (t) => self.postMessage(t), raf });
+        eng.resize(m.W, m.H); eng.start();
+      } else if (m.size) eng.resize(m.W, m.H);
+      else if (m.press) eng.press();
+      else { prog = m.p; ok = m.done; }
+    };
+  };
+  if (cv.transferControlToOffscreen && window.Worker && window.OffscreenCanvas && !/[?&]bootsync\b/.test(location.search)) {
+    try {
+      const url = URL.createObjectURL(new Blob(['"use strict";\n' + bootEngine.toString() + '\n(' + workerMain.toString() + ')();'], { type: 'text/javascript' }));
+      worker = new Worker(url);
+      const off = cv.transferControlToOffscreen(), [W, H] = measure();
+      worker.onmessage = (e) => onEngine(e.data);
+      worker.postMessage({ init: true, canvas: off, W, H, lang, touch, build, stats: /[?&]bootstats\b/.test(location.search) }, [off]);
+      B.worker = true;
+    } catch (e) { console.warn('Ladebildschirm ohne Worker', e); worker = null; }
+  }
+  if (!worker) {
+    eng = bootEngine({ canvas: cv, lang, touch, build, progress, jobsDone: () => done, emit: onEngine, raf: (f) => requestAnimationFrame(f), stats: /[?&]bootstats\b/.test(location.search) ? { n: 0, long: 0, max: 0 } : null,
+      mk: (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d', { willReadFrequently: true }); return c; } });
+    const [W, H] = measure(); eng.resize(W, H); eng.start();
+  }
+  const send = (m) => { if (worker) worker.postMessage(m); };
+  const onResize = () => { const [W, H] = measure(); if (worker) send({ size: true, W, H }); else eng.resize(W, H); };
+  window.addEventListener('resize', onResize);
+
+  // Taste, Klick oder Tippen: Ton freischalten (Nutzergeste – nur hier im Hauptthread möglich), dann der Abgang
+  const press = () => {
+    if (B.state !== 'ready') return;
+    B.state = 'exit';
+    try { if (typeof Audio8 !== 'undefined') { Audio8.init(); Audio8.sfx('thunder'); } } catch (e) { /* ohne Ton weiter */ }
+    if (worker) send({ press: true }); else eng.press();
+  };
+  window.addEventListener('keydown', press); window.addEventListener('pointerdown', press);
+  function finish() { // Ladebild steht ganz weiß: jetzt übernimmt der Titel (Logo-Einschlag), das Weiß blendet kurz aus
+    B.state = 'gone'; B.cover = false; B.hold = false;
+    try { if (B.onExit) B.onExit(); } catch (e) { /* Titel noch nicht da */ }
+    el.classList.add('out'); setTimeout(() => el.remove(), 400); window.removeEventListener('resize', onResize);
+    window.removeEventListener('keydown', press); window.removeEventListener('pointerdown', press);
+    if (worker) worker.terminate();
+  }
+
+  // Vorbau: mit Worker in großen Stücken (die Animation läuft ja woanders) – inklusive allem, was sonst erst im Titel
+  // nachgebaut würde; ohne Worker wie bisher etwa 10 ms pro Bild
+  const pump = () => {
+    if (B.state === 'gone') return;
+    if (!jobs && loaded && gameReady()) {
+      try { jobs = Game.bootJobs ? Game.bootJobs() : []; } catch (e) { console.warn(e); jobs = []; }
+      if (worker && Game.warmJobs && Game.warmJobs.length) { jobs = jobs.concat(Game.warmJobs.splice(0)); Game.warmTotal = 0; }
+      jobsN = jobs.length;
+    }
+    if (jobs && jobs.length) {
+      const t0 = performance.now(), budget = worker ? 45 : 10;
+      do { try { jobs.shift()(); } catch (e) { console.warn(e); } } while (jobs.length && performance.now() - t0 < budget);
+      if (eng) eng.idle(); // die Zeit des Vorbaus nicht als Animationszeit nachholen
+    }
+    done = (!!jobs && !jobs.length) || (loaded && !gameReady() && performance.now() - loadT > 4000);
+    send({ p: progress(), done });
+    if (B.state === 'ready' && navigator.getGamepads) for (const p of navigator.getGamepads()) if (p && p.buttons.some(b => b.pressed)) { press(); break; }
+    if (worker) setTimeout(pump, 4); else requestAnimationFrame(pump);
+  };
+  pump();
   return B;
 })();
