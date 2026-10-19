@@ -76,12 +76,23 @@ const Sprites = (() => {
     return { w, h, c: src, f, pad: outline ? 1 : 0, white: null };
   }
 
+  // Bedarfs-Sprite: Leinwand, Kontur und Spiegelbild entstehen erst beim ersten Zugriff auf c/f (beim Zeichnen) – beim
+  // Laden werden so nur die Maße festgehalten. Viele Pixel-Sprites (alte 2D-Gegner, die das Rig ersetzt) werden nie gebaut.
+  function lazy(w, h, mk, outline) {
+    const spr = { w, h, pad: outline ? 1 : 0, white: null };
+    let done = null;
+    const real = () => done || (done = finish(mk(), outline));
+    Object.defineProperty(spr, 'c', { enumerable: true, get: () => real().c, set: (v) => { real().c = v; } });
+    Object.defineProperty(spr, 'f', { enumerable: true, get: () => real().f, set: (v) => { real().f = v; } });
+    return spr;
+  }
   // layers: [{rows, x, y}] -> sprite
   function compose(w, h, layers, pal, outline = true) {
-    const c = canvas(w, h);
-    const x = c.getContext('2d');
-    layers.forEach(l => paint(x, l.rows, l.x || 0, l.y || 0, pal));
-    return finish(c, outline);
+    return lazy(w, h, () => {
+      const c = canvas(w, h), x = c.getContext('2d');
+      layers.forEach(l => paint(x, l.rows, l.x || 0, l.y || 0, pal));
+      return c;
+    }, outline);
   }
 
   function make(rows, pal, outline = true) {

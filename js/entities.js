@@ -76,7 +76,7 @@ const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 class Player {
   constructor() {
     this.w = 10; this.h = 28;
-    this.setHero(HEROES.get(Options.character));
+    this.setHeroId(Options.character);
     this.maxHp = Options.maxHp; this.hp = this.maxHp;
     this.hearts = Options.infHearts ? 99 : 5; this.sub = null; this.whip = Options.maxWhip ? 3 : 1;
     this.reset(40, 176);
@@ -130,9 +130,12 @@ class Player {
     }
   }
   // Ziel-Hilfe (nur Touch, in der Luft): Ring in Reichweite über dem Spieler → automatisch dorthin peitschen
-  setHero(H) { // Waffenart aus dem Helden: Peitsche, Schwert oder Hellebarde (die sich wie ein langes Schwert führt)
-    this.H = H; this.def = H.def; this.pole = this.def.weapon === 'halberd'; this.sword = this.def.weapon === 'sword' || this.pole;
-  }
+  setHero(H) { this.setHeroId(H.def.id); this._H = H; }
+  // Waffenart aus dem Helden: Peitsche, Schwert oder Hellebarde (die sich wie ein langes Schwert führt); die Figur selbst
+  // (alle Posen) wird erst beim ersten Zeichnen gebaut
+  setHeroId(id) { this.heroId = id; this._H = null; this.def = HEROES.def(id); this.pole = this.def.weapon === 'halberd'; this.sword = this.def.weapon === 'sword' || this.pole; }
+  get H() { return this._H || (this._H = HEROES.get(this.heroId)); }
+  set H(v) { this._H = v; }
   get wlen() { return (this.pole ? POLE_LEN : this.sword ? SWORD_LEN : WHIP_LEN)[this.whip]; }
   ringAssist() {
     if (!W.rings || !W.rings.length) return;

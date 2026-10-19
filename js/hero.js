@@ -401,8 +401,14 @@ const HEROES = (() => {
   }
 
   // ---------------- Gegner & Bosse aus dem Rig ----------------
+  // Gegnerfiguren aus dem Rig: erst beim ersten Zugriff gebaut (Sprites.S.skel usw. sind Getter) und nach dem Laden der
+  // 3D-Atlanten nur einmal neu – nicht bei jedem einzelnen Atlas
+  const MON = {}, MON_OVR = {}, MON_KEYS = ['skel', 'skelThrow', 'knight', 'ghul', 'fish', 'fishShoot', 'giant', 'count', 'gknight'];
+  let monReady = false;
+  const ensureMonsters = () => { if (!monReady) buildMonsters(); };
+  MON_KEYS.forEach(k => Object.defineProperty(Sprites.S, k, { configurable: true, enumerable: true, get() { ensureMonsters(); return MON[k] || MON_OVR[k]; }, set(v) { MON_OVR[k] = v; } }));
   function buildMonsters() {
-    const S = Sprites.S, M = MONSTERS;
+    const S = MON, M = MONSTERS; monReady = true;
     const walk2 = (def, arms, sc = 1) => [0, 4].map((i, k) => frame(def, { legs: walkLegs(i), ...arms(k) }, sc));
     S.skel = walk2(M.skel, k => ({ fa: { a: [k ? 20 : -15, 35] }, ba: { a: [k ? -15 : 20, 30] } }));
     S.skelThrow = frame(M.skel, { legs: STANCE, fa: { t: [20, 1], bend: 'back' }, ba: { a: [30, 30] } });
@@ -429,17 +435,16 @@ const HEROES = (() => {
       crouch: frame(SUN, { legs: [[14, 22], [-14, 22]], fa: { a: [70, 40] }, ba: { a: [-10, 60] }, lean: 1 }, 2), // Ausholen / benommen
     };
   }
-  buildMonsters();
-
   const list = [HENRIK, RAGNOR, KASPAR];
-  const built = {};
-  list.forEach(d => { built[d.id] = build(d); });
-  Sprites.S.heroes = built;
-  Sprites.S.hero = built.henrik;
+  const built = {}; // Helden erst bei Bedarf (und nach dem Laden ihres 3D-Atlas neu) bauen
+  const defOf = (id) => list.find(x => x.id === id) || list[0];
+  const get = (id) => { const d = defOf(id); return built[d.id] || (built[d.id] = build(d)); };
+  Object.defineProperty(Sprites.S, 'heroes', { configurable: true, get: () => { list.forEach(d => get(d.id)); return built; } });
+  Object.defineProperty(Sprites.S, 'hero', { configurable: true, get: () => get('henrik'), set() {} });
   // Gelenke aller Posen (für den Blender-Export): ein Held per id, oder alle Gegner aus dem Rig ('monsters')
   function exportRig(id) {
     REC = [];
-    if (id === 'monsters') buildMonsters(); else build(list.find(x => x.id === id));
+    if (id === 'monsters') { buildMonsters(); monReady = false; } else build(list.find(x => x.id === id));
     const out = REC; REC = null; const seen = new Set();
     return out.filter(r => { const k = r.id + '@' + r.S + ':' + r.key; return !seen.has(k) && seen.add(k); });
   }
@@ -448,13 +453,12 @@ const HEROES = (() => {
     const img = new Image();
     img.onload = () => {
       R3D[id + '@' + S] = { img, map };
-      const d = list.find(x => x.id === id);
-      if (d) {
-        built[id] = build(d); Sprites.S.heroes = built; Sprites.S.hero = built.henrik;
-        if (typeof W !== 'undefined' && W.player && W.player.def && W.player.def.id === id) { W.player.H = built[id]; }
-      } else { Sprites.S.rig3d = true; buildMonsters(); }
+      if (list.some(x => x.id === id)) { // Held: beim nächsten Zugriff mit 3D-Bildern neu bauen
+        delete built[id];
+        if (typeof W !== 'undefined' && W.player && W.player.heroId === id) W.player.H = null;
+      } else { Sprites.S.rig3d = true; monReady = false; } // Gegner: einmal neu, sobald sie gebraucht werden
     };
     img.src = url;
   }
-  return { list, get: (id) => built[id] || built.henrik, exportRig, load3d };
+  return { list, get, def: (id) => defOf(id), ensureMonsters, exportRig, load3d };
 })();

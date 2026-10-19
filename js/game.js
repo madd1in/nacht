@@ -607,7 +607,7 @@ const Game = {
       Font.draw(ctx, e.n, cx - 76, y, c);
       Font.draw(ctx, String(e.s).padStart(6, '0'), cx + 34, y, c, { align: 'right' });
       Font.draw(ctx, e.st > Levels.STAGES.length ? tr('allClear') : String(e.st), cx + 66, y, c, { align: 'center' });
-      const hd = HEROES.get(e.c).def; // Kopf-Symbol des Helden
+      const hd = HEROES.def(e.c); // Kopf-Symbol des Helden
       hd.icon.forEach((row, yy) => [...row].forEach((ch, xx) => { if (hd.iconPal[ch]) { ctx.fillStyle = hd.iconPal[ch]; ctx.fillRect(cx + 94 + xx, y + yy, 1, 1); } }));
     });
     if ((this.t >> 5) % 2) Font.draw(ctx, tr('pressStart'), cx, 224, '#bcbcbc', { align: 'center', shadow: '#000' });
@@ -822,6 +822,7 @@ const Game = {
   // Ladebildschirm (js/boot.js): alles, was sonst beim ersten Anzeigen von Menü, Karte und erster Stage gebaut würde
   bootJobs() {
     const c = Sprites.canvas(View.w, 240), x = c.getContext('2d'), jobs = [() => Audio8.prepare(), () => Mode7.mapData(), () => PS2.prewarmMap()];
+    jobs.push(() => HEROES.get(Options.character), () => HEROES.ensureMonsters()); // gewählter Held und Gegnerfiguren – jetzt mit 3D-Atlanten, nur einmal
     this.prewarmStage(0); jobs.push(...this.warmJobs.filter((j, i, a) => i < a.length - 1)); this.warmJobs = null; this.warmTotal = 0; // Raum gibt es noch nicht
     const st = this.state, t = this.t, s = W.stage;
     jobs.push(() => { this.drawSkyScene(x); this.drawCharSel(x); }, () => this.drawIntro(x));
@@ -1005,7 +1006,7 @@ const Game = {
     for (let i = 0; i < 70; i++) ctx.fillRect(x - 30 + i, y + 32 - Math.round(Math.sin(i / 70 * Math.PI) * 10), 1, 30);
     for (let i = 0; i < 8; i++) {
       const sx = x + 3 - i * 2, sy = y + 1 + Math.round(Math.sin(this.t * 0.2 + i * 0.9) * (0.5 + i * 0.3));
-      const scf = HEROES.get(Options.character).def.scarf;
+      const scf = HEROES.def(Options.character).scarf;
       ctx.fillStyle = i % 3 === 0 ? scf.b : scf.a; ctx.fillRect(sx, sy, i > 5 ? 1 : scf.w, i > 5 ? 1 : scf.w);
     }
     const H = HEROES.get(Options.character), sc = H.def.scarf;
@@ -1175,7 +1176,7 @@ const Game = {
     const cx = View.cx;
     this.drawSkyScene(ctx);
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, View.w, 176);
-    const text = [...tr('intro'), '', ...tr('intro' + Game.cap(HEROES.get(Options.character).def.id))];
+    const text = [...tr('intro'), '', ...tr('intro' + Game.cap(HEROES.def(Options.character).id))];
     const slow = I18N.cjk ? 6 : 3; // CJK: weniger Zeichen, gleiches Erzähltempo
     let budget = Math.floor(this.t / slow);
     text.forEach((l, i) => {
@@ -1221,7 +1222,7 @@ const Game = {
     }
     const lines = [
       ...tr('ending').map(l => [l, '#fcfcfc']),
-      ['', ''], [tr('end' + Game.cap(HEROES.get(Options.character).def.id)), '#f8b800'], [tr('endUntil'), '#f8b800'],
+      ['', ''], [tr('end' + Game.cap(HEROES.def(Options.character).id)), '#f8b800'], [tr('endUntil'), '#f8b800'],
       ['', ''], ['', ''], ['NACHTMAHR', '#d82800'], [tr('subtitle'), '#bcbcbc'], ['', ''],
       [tr('credits'), '#7c7c7c'], [tr('madeWith'), '#bcbcbc'], [tr('voiceBy'), '#7c7c7c'], ['', ''],
       [tr('inspired'), '#7c7c7c'], ['CASTLEVANIA - BLOODSTAINED - INFERNAX', '#bcbcbc'], ['MONKEY ISLAND', '#bcbcbc'], ['', ''],
