@@ -1824,11 +1824,11 @@ const Tiles = (() => {
           px(x, '#c89020', X, sag, 1, 1); if (X % 2 === 0) px(x, '#f8b800', X, sag + 1, 1, 2);
         } });
       }
-      if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); else [0, 256].forEach(cx => pillar(x, cx, 22, 208)); // Halle: ruhiger Rhythmus – Fenster, Ahnenbild, Pfeiler, Fenster
+      if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); // Halle: die Pfeiler stehen als PS2-3D-Säulen davor (drawHallPillars)
       add('wall', c, 0.5, { vtile });
       if (theme === 'hall') L.push({ name: 'win3d', custom: drawHallWindows, par: 0.5, c: C(1, 1) }); // tiefe Fensternischen (Pseudo-3D)
       if (theme === 'throne') L.push({ name: 'hall3d', custom: drawThroneHall, par: 1, c: C(1, 1) }); // PS2-3D-Halle: Marmorboden, Säulen, Lichtbahnen
-      else L.push({ name: 'cols3d', custom: (cx2, cam, f) => drawDepthColumns(cx2, cam, f, theme), par: 1, c: C(1, 1) });
+      else L.push({ name: 'pillars3d', custom: (cx2, cam) => drawHallPillars(cx2, cam), par: 1, c: C(1, 1) }); // Bündelsäulen in PS2-3D
       if (theme === 'throne') { // Kronleuchter vorne
         const n = C(512, 208), x2 = n.getContext('2d');
         [100, 360].forEach(cx => {
@@ -2236,7 +2236,70 @@ const Tiles = (() => {
     }
   }
 
-  // ---------------- Säulen in der Tiefe (PS1-Look) für Halle, Eingangshalle, Thronsaal und Gruft ----------------
+  // ---------------- Halle und Glockenturm: Bündelsäulen als PS2-3D ----------------
+  // Echte Körper statt gemalter Pfeiler: 16-seitiger Schaft mit Kanneluren (leicht verjüngt), Plinthe und Wulst unten,
+  // Blattkapitell mit Deckplatte oben – im Glockenturm Stockwerk über Stockwerk. Sie stehen dicht vor der Wand (z = 186,
+  // Wand bei 200, Spielebene bei 0; Fluchtpunkt Bildmitte/y 60 wie die Fensternischen), genau dort, wo früher die Pfeiler
+  // in der Wandtextur saßen. Warmes Kerzenlicht von vorn links, kühles Fensterlicht als Umgebung, Dunst in der Tiefe;
+  // volle Auflösung (Sparmodus: halbe), neu gerastert nur, wenn die Kamera weiterzieht oder ein Blitz aufflammt.
+  const PIL = { f: 200, VY: 60, Z: 186, R: 21, story: 384, capY: -12, us: [11, 267] };
+  const PIL_ENV = { static: true, sun: (() => { const v = [-0.55, 0.42, -0.72], l = Math.hypot(...v); return v.map(c => c / l); })(), sunC: [1.25, 0.92, 0.62], amb: [0.36, 0.34, 0.48], sky: [0.12, 0.12, 0.2], fog: [30, 14, 26], fogD: 0.00045 };
+  const PIL_ENV_F = Object.assign({}, PIL_ENV, { amb: [0.8, 0.8, 1.05], sky: [0.3, 0.3, 0.44] }); // Blitz
+  let pilBuf = null, pilMesh = null;
+  function buildHallPillars(room, VX) { // ein Netz je Säule und Stockwerk: gezeichnet werden nur die sichtbaren
+    const parts = [], { Z, R, story, capY } = PIL;
+    let m = null;
+    const Yf = (room.h - 2) * T, top = -260, bottom = Yf + 260;
+    const STONE = [182, 176, 190], FLUTE = [118, 112, 132], CAP = [204, 190, 168], LEAF = [128, 150, 104], BASE = [164, 156, 170];
+    const xs = [];
+    for (let k = -2; k <= Math.ceil(room.w * T / 1024) + 2; k++) for (const u of PIL.us) xs.push(2 * u - VX + k * 1024); // wie die Wandtextur (Parallaxe 0.5)
+    const lv = []; for (let y = capY; y > top - story; y -= story) lv.unshift(y); for (let y = capY + story; y < bottom + story; y += story) lv.push(y); // Kapitell-Höhen (Welt, y nach unten)
+    const shaft = (x, yb, yt) => { // Kanneluren: abwechselnd heller Steg und dunkle Rille
+      const n = 16, b = [], t = [], C = [x, (-yb - yt) / 2, Z];
+      for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; b.push(PS2.vtx(m, x + Math.cos(a) * R, -yb, Z + Math.sin(a) * R)); t.push(PS2.vtx(m, x + Math.cos(a) * R * 0.93, -yt, Z + Math.sin(a) * R * 0.93)); }
+      for (let i = 0; i < n; i++) { const j = (i + 1) % n; PS2.face(m, [b[i], b[j], t[j], t[i]], i % 2 ? FLUTE : STONE, C); }
+    };
+    for (const x of xs) {
+      for (let s = 0; s < lv.length; s++) {
+        const yc = lv[s], yBase = s + 1 < lv.length ? lv[s + 1] - 30 : bottom; // Schaft endet am Kapitell, beginnt über der Basis des nächsten Stockwerks
+        m = PS2.mesh(); parts.push({ m, x, y0: yc - 12, y1: s + 1 < lv.length ? lv[s + 1] : bottom });
+        if (s + 1 < lv.length) { // Basis: quadratische Plinthe, darauf ein Wulst
+          const by = lv[s + 1] - 16;
+          PS2.box(m, x, -(by + 14), Z, R * 2.5, 14, R * 2.5, BASE);
+          PS2.prism(m, x, -by, Z, R * 1.22, 7, 16, BASE, { rTop: R * 1.05 });
+          PS2.prism(m, x, -by + 7, Z, R * 1.02, 5, 16, STONE, { rTop: R * 0.96 });
+        }
+        if (yBase - 4 > yc + 22) shaft(x, Math.min(yBase - 4, bottom), yc + 22);
+        // Kapitell: Halsring, kelchförmiger Korb mit Blattkranz, Deckplatte
+        PS2.prism(m, x, -(yc + 22), Z, R * 0.98, 4, 16, CAP);
+        PS2.prism(m, x, -(yc + 18), Z, R * 0.96, 16, 16, CAP, { rTop: R * 1.34 });
+        for (let i = 0; i < 8; i++) { // Blätter: spitze Lappen, die sich nach außen biegen
+          const a = (i + 0.5) / 8 * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+          const p0 = PS2.vtx(m, x + ca * R * 0.98 - sa * 6, -(yc + 17), Z + sa * R * 0.98 + ca * 6), p1 = PS2.vtx(m, x + ca * R * 0.98 + sa * 6, -(yc + 17), Z + sa * R * 0.98 - ca * 6);
+          const p2 = PS2.vtx(m, x + ca * R * 1.5, -(yc + 1), Z + sa * R * 1.5);
+          PS2.face(m, [p0, p1, p2], LEAF, [x + ca * R * 1.3, -(yc + 9), Z + sa * R * 1.3], { two: true });
+        }
+        PS2.box(m, x, -(yc - 2), Z, R * 2.7, 8, R * 2.7, CAP); // Deckplatte (Abakus)
+      }
+    }
+    return { parts, key: room.w + '|' + room.h + '|' + VX };
+  }
+  function drawHallPillars(ctx, cam) {
+    const room = W.room; if (!room) return;
+    const w = View.w, VX = w / 2, dv = View.lite ? 2 : 1, Wb = Math.ceil(w / dv), Hb = Math.ceil(208 / dv); // volle Auflösung: Kanneluren bleiben scharf
+    if (!pilMesh || pilMesh.key !== room.w + '|' + room.h + '|' + VX) pilMesh = buildHallPillars(room, VX);
+    if (!pilBuf || pilBuf.c.width !== Wb) { const c = document.createElement('canvas'); c.width = Wb; c.height = Hb; pilBuf = { c, key: null }; pilBuf.x = c.getContext('2d'); } // Grafikkarten-Leinwand: nur Flächen, kein Zurücklesen
+    const flash = FX.stormOn(W.storm) ? 1 : 0, key = Math.round(cam.x * 2 / dv) + '|' + Math.round(cam.y * 2 / dv) + '|' + Wb + '|' + flash + '|' + pilMesh.key;
+    if (pilBuf.key !== key) {
+      pilBuf.key = key; pilBuf.x.clearRect(0, 0, Wb, Hb);
+      const k = PIL.f / (PIL.f + PIL.Z), sx = (x) => VX + (x - cam.x - VX) * k, sy = (y) => PIL.VY + (y - cam.y - PIL.VY) * k;
+      const vis = pilMesh.parts.filter(q => Math.abs(sx(q.x) - VX) < VX + PIL.R * 2 && sy(q.y1) > -4 && sy(q.y0) < 212).map(q => q.m);
+      PS2.render(pilBuf.x, Wb, Hb, vis, { x: cam.x + VX, y: -(cam.y + PIL.VY), z: -PIL.f, yaw: 0, pitch: 0, f: PIL.f / dv, near: 20, hy: PIL.VY / 208 }, flash ? PIL_ENV_F : PIL_ENV);
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(pilBuf.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
+  }
+
+  // ---------------- Säulen in der Tiefe (PS1-Look) für Eingangshalle, Thronsaal und Gruft ----------------
   // Eine Reihe runder Säulen zwischen Wand und Spielebene (Tiefe z): sie wandern mit 1/z, schrumpfen zur Bildmitte hin
   // und werden streifenweise beleuchtet – Mondlicht von hinten links als Saum, warmes Licht von vorn, ein Glanzlicht,
   // das mit dem Blickwinkel wandert. Im Blitz flammen sie auf.
