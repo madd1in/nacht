@@ -1279,12 +1279,14 @@ const PORTRAITS = (() => {
   };
   // Ölgemälde: die Pixelmalerei wird weich ineinander vermalt, Pinselstriche folgen einem Strichfeld, warmer Firnis mit
   // dunklem Rand, feines Craquelé, Glanzlicht auf dem Lack; der Goldrahmen bekommt eine plastische Kante (Licht oben links)
-  const oil = (c) => {
+  const oil = (c, blur = true) => { // blur: Pixelmalerei weich vermalen (beim 3D-Bild nicht – das bleibt scharf)
     const x = c.getContext('2d'), M = 9, w = FW - M * 2, h = FH - M * 2;
-    const soft = Sprites.canvas(w, h), sx = soft.getContext('2d'), half = Sprites.canvas(Math.ceil(w / 2), Math.ceil(h / 2)), hx = half.getContext('2d');
-    hx.imageSmoothingEnabled = true; hx.drawImage(c, M, M, w, h, 0, 0, half.width, half.height);
-    sx.imageSmoothingEnabled = true; sx.drawImage(half, 0, 0, half.width, half.height, 0, 0, w, h);
-    x.save(); x.globalAlpha = 0.55; x.drawImage(soft, M, M); x.restore(); // vermalte Farbe, Details bleiben durchscheinend
+    if (blur) {
+      const soft = Sprites.canvas(w, h), sx = soft.getContext('2d'), half = Sprites.canvas(Math.ceil(w / 2), Math.ceil(h / 2)), hx = half.getContext('2d');
+      hx.imageSmoothingEnabled = true; hx.drawImage(c, M, M, w, h, 0, 0, half.width, half.height);
+      sx.imageSmoothingEnabled = true; sx.drawImage(half, 0, 0, half.width, half.height, 0, 0, w, h);
+      x.save(); x.globalAlpha = 0.55; x.drawImage(soft, M, M); x.restore(); // vermalte Farbe, Details bleiben durchscheinend
+    }
     let sd = 7; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
     x.save(); x.beginPath(); x.rect(M, M, w, h); x.clip(); x.lineCap = 'round';
     for (let i = 0; i < 260; i++) { // Pinselstriche
@@ -1308,8 +1310,13 @@ const PORTRAITS = (() => {
     x.restore();
     return c;
   };
+  // PS2-3D aus Blender (img/portraits3d.png): Büsten im geschnitzten Goldrahmen, Augenhöhlen genau unter den lebenden Augen;
+  // bis das Bild geladen ist (und nur dann), wird die alte Pixelmalerei gebaut
+  const art = [null, null, null];
+  { const img = new Image(); img.onload = () => [0, 1, 2].forEach(v => { const c = Sprites.canvas(FW, FH); c.getContext('2d').drawImage(img, v * 97, 0, FW, FH, 0, 0, FW, FH); art[v] = oil(c, false); }); img.src = 'img/portraits3d.png'; }
+  const artOf = (v) => art[v] || (art[v] = oil(mk(v)));
   // Augen: linke obere Ecke der Augäpfel (6×4), Mund: Mitte und Höhe
-  return { FW, FH, art: [mk(0), mk(1), mk(2)].map(oil), eyes: [[cx - 11, fy - 2], [cx + 5, fy - 2]], mouth: [cx, fy + 14] };
+  return { FW, FH, art, artOf, eyes: [[cx - 11, fy - 2], [cx + 5, fy - 2]], mouth: [cx, fy + 14] };
 })();
 class Portrait extends Ent {
   // d: wx, wy = Lage in der Wandebene (Parallaxe 0.5, wiederholt sich alle 512 px wie Fenster und Vorhänge), v = erstes Motiv;
@@ -1350,7 +1357,7 @@ class Portrait extends Ent {
       if (btr[0] > X + FW) quad([tr, br, bbr, btr], '#3c2408');
       if (btl[1] < Y) quad([tl, tr, btr, btl], '#d8a040');
       if (bbl[1] > Y + FH) quad([bl, br, bbr, bbl], '#2c1806');
-      ctx.drawImage(P.art[v], X, Y);
+      ctx.drawImage(P.artOf(v), X, Y);
       const hot = red || v === 2;
       for (const [ex, ey] of P.eyes) { // Augäpfel mit Pupillen, die dem Helden folgen
         const dx = px - (X + ex + 3), dy = py - (Y + ey + 2), l = Math.hypot(dx, dy) || 1, ox = Math.round(dx / l * 2), oy = Math.round(dy / l * 1);
