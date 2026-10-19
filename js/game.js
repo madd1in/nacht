@@ -819,16 +819,17 @@ const Game = {
     x.setTransform(1, 0, 0, 1, 0, 0); x.imageSmoothingEnabled = false;
     const f = W.frame; W.draw(x); W.frame = f;
   },
-  // Ladebildschirm (js/boot.js): alles, was sonst beim ersten Anzeigen von Menü, Karte und erster Stage gebaut würde
+  // Ladebildschirm (js/boot.js): nur, was Titel und Ton sofort brauchen. Alles Weitere (gewählter Held, Gegnerfiguren, Weltkarte,
+  // erste Stage, Heldenwahl, Vorspann, Kapitelkarte) baut sich nebenher als Hintergrund-Vorbau, während Ladebild und Titel
+  // laufen (runWarm, ~8 ms pro Bild); startet man sehr schnell, wartet die Kapitelkarte mit ihrem Ladebalken.
   bootJobs() {
-    const c = Sprites.canvas(View.w, 240), x = c.getContext('2d'), jobs = [() => Audio8.prepare(), () => Mode7.mapData(), () => PS2.prewarmMap()];
-    jobs.push(() => HEROES.get(Options.character), () => HEROES.ensureMonsters()); // gewählter Held und Gegnerfiguren – jetzt mit 3D-Atlanten, nur einmal
-    this.prewarmStage(0); jobs.push(...this.warmJobs.filter((j, i, a) => i < a.length - 1)); this.warmJobs = null; this.warmTotal = 0; // Raum gibt es noch nicht
-    const st = this.state, t = this.t, s = W.stage;
-    jobs.push(() => { this.drawSkyScene(x); this.drawCharSel(x); }, () => this.drawIntro(x));
-    jobs.push(() => { W.stage = 0; try { this.drawCard(x); } finally { W.stage = s; } }); // 3D-Karte und Kapitelschriften einmal zeichnen
-    jobs.push(() => { this.state = st; this.t = t; });
-    return jobs;
+    const c = Sprites.canvas(View.w, 240), x = c.getContext('2d'), s = W.stage;
+    const quiet = (fn) => () => { const st = this.state, t = this.t; try { fn(); } finally { this.state = st; this.t = t; } }; // Zeichnen ohne Zustandswechsel
+    this.prewarmStage(0); const stageJobs = this.warmJobs.filter((j, i, a) => i < a.length - 1); // den Raum gibt es noch nicht
+    this.warmJobs = [() => HEROES.get(Options.character), () => HEROES.ensureMonsters(), () => Mode7.mapData(), () => PS2.prewarmMap(), ...stageJobs,
+      quiet(() => this.drawCharSel(x)), quiet(() => this.drawIntro(x)), quiet(() => { W.stage = 0; try { this.drawCard(x); } finally { W.stage = s; } })];
+    this.warmTotal = this.warmJobs.length; this.warmDoneT = -1;
+    return [() => Audio8.prepare(), quiet(() => this.drawSkyScene(x))];
   },
   big(ctx, text, cx, y, scale, colors, shadow, outline) { // alle Großschriften (Ausrufe, Combo, Titel der Menüs, Boss-Namen): PS2-3D
     return this.text3d(ctx, text, cx, y, scale, colors, { shadow, outline: !!outline, depth: Math.max(2, scale + 1), wobble: 0.2, bob: 0.4 });
