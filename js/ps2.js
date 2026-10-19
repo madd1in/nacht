@@ -620,9 +620,14 @@ const PS2 = (() => {
     }
     const props = mesh(), glow = [];
     const STONE = [150, 144, 170], STONE2 = [110, 104, 132], ROOF = [150, 30, 44], DARKR = [60, 40, 70], GOLDM = [250, 210, 110], WHITE = [236, 230, 220];
-    D.POINTS.forEach(([px, py], k) => {
-      const y0 = H(px, py) - 0.5, B = (dx, dz, w, h, d, col, o) => box(props, px + dx, y0, py + dz, w, h, d, col, o);
-      if (k === 0) { B(0, 0, 16, 5, 16, STONE2, { top: STONE }); for (const [a, b] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) { prism(props, px + a, y0, py + b, 2.4, 10, 6, STONE, { top: STONE2 }); cone(props, px + a, y0 + 10, py + b, 3, 5, 6, ROOF); } prism(props, px, y0, py, 3.6, 15, 8, STONE); cone(props, px, y0 + 15, py, 4.4, 7, 8, ROOF); }
+    D.POINTS.forEach(([px, py], k0) => {
+      const y0 = H(px, py) - 0.5, B = (dx, dz, w, h, d, col, o) => box(props, px + dx, y0, py + dz, w, h, d, col, o), k = k0 - 1;
+      if (k < 0) { // Kapitel 1, die Ankunft: Mole mit angelegter Galeone, Laterne am Ende
+        const WOOD = [110, 70, 40], HULL = [74, 44, 28], SAIL = [226, 214, 190];
+        B(0, 0, 4, 1.2, 16, WOOD); B(-6, -2, 13, 3, 4.6, HULL, { top: WOOD }); beam(props, px - 12.5, y0 + 2.5, py - 2, px - 17, y0 + 4, py - 2, 0.5, 0.5, WOOD);
+        box(props, px - 1, y0 + 3, py - 2, 4, 2, 4, HULL, { top: WOOD }); prism(props, px - 6, y0 + 3, py - 2, 0.45, 13, 5, WOOD); box(props, px - 6, y0 + 5, py - 2, 0.4, 7, 7.5, SAIL); box(props, px - 6, y0 + 12, py - 2, 0.3, 0.6, 9, WOOD);
+        prism(props, px, y0, py + 7, 0.4, 4, 4, WOOD); cone(props, px, y0 + 4, py + 7, 0.9, 1.4, 4, [255, 200, 110], { e: 0.8 });
+      } else if (k === 0) { B(0, 0, 16, 5, 16, STONE2, { top: STONE }); for (const [a, b] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) { prism(props, px + a, y0, py + b, 2.4, 10, 6, STONE, { top: STONE2 }); cone(props, px + a, y0 + 10, py + b, 3, 5, 6, ROOF); } prism(props, px, y0, py, 3.6, 15, 8, STONE); cone(props, px, y0 + 15, py, 4.4, 7, 8, ROOF); }
       else if (k === 1) { B(0, 0, 10, 6, 7, STONE2, { top: STONE }); gable(props, px, y0 + 6, py, 7.4, 10.6, 3.5, DARKR); for (let g = 0; g < 6; g++) B(-12 + (g % 3) * 3.5, (g < 3 ? -6 : 6), 1.6, 2.4, 0.8, STONE); }
       else if (k === 2) { prism(props, px, y0, py, 4.2, 26, 8, STONE, { rTop: 3.8 }); cone(props, px, y0 + 26, py, 5, 9, 8, ROOF); for (const a of [-7, 7]) { prism(props, px + a, y0, py, 2.2, 11, 6, STONE2); cone(props, px + a, y0 + 11, py, 2.6, 4, 6, ROOF); } }
       else if (k === 3) { B(0, 0, 7, 9, 18, WHITE); gable(props, px, y0 + 9, py, 18, 7.4, 4, [120, 130, 170]); for (const a of [-4.5, 4.5]) { prism(props, px + a, y0, py - 9, 2, 16, 8, WHITE); cone(props, px + a, y0 + 16, py - 9, 2.3, 9, 8, [120, 130, 170]); cone(props, px + a, y0 + 25, py - 9, 0.5, 2, 4, GOLDM); } prism(props, px, y0 + 9, py + 2, 2.4, 8, 8, WHITE); cone(props, px, y0 + 17, py + 2, 2.8, 11, 8, GOLDM); }

@@ -232,9 +232,10 @@ const Game = {
     W.score = 0; W.lives = 3; W.nextLife = 20000;
     const p = W.player = new Player();
     if (hero !== Options.character) p.setHero(HEROES.get(hero)); // ohne die Einstellung zu speichern
-    W.stage = 0; W.time = Levels.STAGES[0].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0; W.miniDone = {};
+    const ds = Math.max(0, Levels.STAGES.findIndex(s => s.rooms.some(r => r.theme === 'courtyard')));
+    W.stage = ds; W.time = Levels.STAGES[ds].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0; W.miniDone = {};
     W.stats = { hits: 0, deaths: 0, combo: 0 };
-    W.loadRoom(0, Math.max(0, Levels.STAGES[0].rooms.findIndex(r => r.theme === 'courtyard'))); // Demo spielt im Burghof
+    W.loadRoom(ds, Math.max(0, Levels.STAGES[ds].rooms.findIndex(r => r.theme === 'courtyard'))); // Demo spielt im Burghof
     this.demo = { t: 0, lastX: p.x, stuck: 0 };
     Input.setDemo(() => this.demoInput());
     this.go('demo'); this.readyT = 0; this.annT = 0; this.hurryT = 0; this.bossName = 0; this.bars = null;
@@ -426,6 +427,7 @@ const Game = {
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('pause'); }
         break;
       case 'fade':
+        if (this.t === 18 && W.roomIdx + 1 >= W.stageDef.rooms.length) { this.state = 'play'; W.stageClear(); break; } // letzter Abschnitt ohne Bossarena (Ankunft am Burggraben): Kapitel geschafft
         if (this.t === 18) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); Audio8.play(W.songName(), null, 0.12); } // neuer Musikabschnitt: weich überblenden
         if (this.t > 30) this.state = 'play';
         break;

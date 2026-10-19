@@ -137,7 +137,7 @@ class Boss extends Enemy {
 class GiantBat extends Boss {
   constructor(ax, aw) {
     super(ax + aw / 2 - 24, 30, 48, 24, 16, 3);
-    this.ax = ax; this.aw = aw; this.state = 'sleep'; this.score = 3000;
+    this.ax = ax; this.aw = aw; this.state = 'sleep'; this.score = 3000; this.voice = 'boss1';
   }
   pickHover() { this.tx = this.ax + rnd(40, this.aw - 40); this.ty = rnd(40, 90); }
   update() {
@@ -202,7 +202,7 @@ class GiantBat extends Boss {
 class GiantSkeleton extends Boss {
   constructor(ax, aw) {
     super(ax + aw - 60, 176 - 64, 24, 64, 24, 3); // Riese in doppelter Heldengröße
-    this.ax = ax; this.aw = aw; this.state = 'rise'; this.face = -1; this.next = 'throw'; this.score = 4000;
+    this.ax = ax; this.aw = aw; this.state = 'rise'; this.face = -1; this.next = 'throw'; this.score = 4000; this.voice = 'boss2';
   }
   update() {
     this.tick();
