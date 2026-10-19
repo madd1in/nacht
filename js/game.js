@@ -799,6 +799,7 @@ const Game = {
     if (rooms.some(r => r.theme === 'cathedral' || r.theme === 'spire')) jobs.push(() => PS2.prewarm());
     if (rooms.some(r => r.theme === 'forest')) jobs.push(() => PS2.prewarmWoods());
     if (rooms.some(r => r.theme === 'expo')) jobs.push(() => Expo.prewarm());
+    if (rooms.some(r => r.theme === 'ballroom')) jobs.push(() => Ball.prewarm());
     [...new Set(rooms.map(r => r.theme))].forEach(th => jobs.push(() => FX.drawFog(this.warmCtx(), th, { x: 0, y: 0 }, 0))); // Bodennebel je Thema
     jobs.push(() => this.warmRoom());
     this.warmJobs = jobs; this.warmTotal = jobs.length; this.warmDoneT = -1;
@@ -1076,7 +1077,7 @@ const Game = {
   sectionList() {
     if (this.secList) return this.secList;
     const NAMES = { ship: 'SCHIFF', forest: 'WALD', courtyard: 'BURGHOF', foyer: 'EINGANGSHALLE', hall: 'HALLE', crypt: 'GRUFT', cave: 'HÖHLE', tower: 'UHRTURM', library: 'BIBLIOTHEK',
-      glass: 'GLASTURM', gallery: 'GALERIE', bridge: 'BRÜCKE', vortex: 'STRUDEL', throne: 'THRONSAAL', cathedral: 'SONNENKATHEDRALE', spire: 'SONNENTURM', expo: 'WINTERGARTEN' };
+      glass: 'GLASTURM', gallery: 'GALERIE', bridge: 'BRÜCKE', vortex: 'STRUDEL', throne: 'THRONSAAL', ballroom: 'BALLSAAL', cathedral: 'SONNENKATHEDRALE', spire: 'SONNENTURM', expo: 'WINTERGARTEN' };
     const L = [];
     Levels.STAGES.forEach((st, s) => {
       L.push({ head: true, s, label: (s + 1) + '  ' + tr(st.nameKey) });

@@ -571,6 +571,21 @@ const Levels = (() => {
     .enemy('raven', 70, 7).enemy('raven', 95, 7)
     .start(2, 8).exit(108).done();
 
+  // Ballsaal: der Ball der Toten. Durch den Spiegelsaal kreisen Geister-Tanzpaare – aus der Tiefe des Saals durch die
+  // Spielebene bis vor den Helden –, zum Geistertango zucken Blitze abwechselnd links und rechts durch die Fenster.
+  // In der Mitte eine Musikergalerie mit zwei Treppen, vergoldete Standleuchter, vor dem Thronsaal ein Kontrollpunkt.
+  const bs = room(112, 'ballroom')
+    .ground(0, 111)
+    .stair(38, 10, 4, 1).fill(42, 7, 58, 7, '=').stair(62, 10, 4, -1)     // Musikergalerie
+    .fill(14, 7, 18, 7, '=').fill(86, 7, 91, 7, '=').fill(100, 5, 104, 5, '=')
+    .prop('ghostball', { rings: [16, 52, 92], n: 5 })
+    .statue(70, 10)
+    .prop('candelabra', { x: 6, y: 10 }).prop('candelabra', { x: 26, y: 10 }).prop('candelabra', { x: 34, y: 10 }).prop('candelabra', { x: 76, y: 10 }).prop('candelabra', { x: 96, y: 10 })
+    .candle(10, 8, 'H').candle(16, 5).candle(22, 8, 'W').candle(46, 5, 'H').candle(50, 5, '$').candle(54, 5, 'H').candle(66, 8).candle(82, 8, 'W').candle(88, 5, 'H').candle(102, 3, '1').candle(108, 8)
+    .enemy('ghost', 30, 5).enemy('ghost', 74, 4).enemy('ghost', 98, 6).enemy('knight', 50, 6).enemy('bat', 20, 3).enemy('bat', 84, 3)
+    .music('ball').label('BALLSAAL')
+    .start(2, 10).exit(110).done();
+
   const r32 = room(88, 'throne')
     .ground(0, 15).ground(26, 87)
     .grand(21, 0, 134, 0.3, 0.8)
@@ -592,7 +607,7 @@ const Levels = (() => {
     { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
     { id: 'sun', nameKey: 'stageSun', bossKey: 'bossKnight', voice: 'stageSun', name: 'DIE SONNENKATHEDRALE', music: 'sun', time: 720, rooms: [sa, sp, sk], boss: 'SONNENWÄCHTER' },
     { id: 'expo', nameKey: 'stageExpo', bossKey: 'bossTrap', voice: 'stageExpo', name: 'DER WINTERGARTEN', music: 'expo', time: 900, rooms: [ex1, ex2, exk, exb], boss: 'MENSCHENFALLE' },
-    { id: 3, nameKey: 'stage4', bossKey: 'boss4', voice: 'stage4', name: 'DER THRON DER NACHT', music: 'chapel', time: 660, rooms: [vx, vg, br, r32], boss: 'GRAF NACHTMAHR' },
+    { id: 3, nameKey: 'stage4', bossKey: 'boss4', voice: 'stage4', name: 'DER THRON DER NACHT', music: 'chapel', time: 780, rooms: [vx, vg, br, bs, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
   return { STAGES };

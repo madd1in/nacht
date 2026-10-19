@@ -64,6 +64,7 @@ const W = {
         case 'lectern': this.spawn(new Lectern(d)); break;
         case 'globe': this.spawn(new Globe(d)); break;
         case 'fchand': this.spawn(new FallingChandelier(d)); break;
+        case 'ghostball': this.spawn(new GhostDance(d)); break;
         case 'armor': this.spawn(new ArmorSuit(d)); break;
         case 'pillar': this.spawn(new Pillar(d.x, d.y)); break;
         case 'raven': this.spawn(new Raven(d.x, d.y)); break;
@@ -537,7 +538,7 @@ const W = {
     if (theme === 'courtyard' || theme === 'ship' || theme === 'bridge') this.drawRain(ctx);
     if (flashOn) { this.drawStormShafts(ctx); ctx.fillStyle = `rgba(220,214,255,${dark ? 0.24 : 0.16})`; ctx.fillRect(0, 0, vw, 208); }
     const tl = (theme === 'cathedral' || theme === 'spire') && PS2.dayNight(this.frame); // Zeitraffer: nachts dunkel und blau, Kerzen leuchten
-    FX.render(ctx, this.collectLights(), theme, dark ? (flashOn ? dark[1] : dark[0]) : tl ? 0.05 + tl.night * 0.5 : undefined, tl && tl.night > 0.2 ? '6,8,34' : undefined); // zwischen den Blitzen dunkel, im Blitz taghell
+    FX.render(ctx, this.collectLights(), theme, theme === 'ballroom' ? Ball.amb() : dark ? (flashOn ? dark[1] : dark[0]) : tl ? 0.05 + tl.night * 0.5 : undefined, tl && tl.night > 0.2 ? '6,8,34' : undefined); // zwischen den Blitzen dunkel, im Blitz taghell
     Rays.draw(ctx, this.room, this.cam, this.frame);
     if (this.bloodT > 0) this.drawBloodMoon(ctx, vw);
     if (this.stopT > 0 && (this.stopT > 50 || (this.stopT & 4))) { ctx.fillStyle = 'rgba(120,150,230,0.16)'; ctx.fillRect(0, 0, vw, 208); } // angehaltene Zeit
