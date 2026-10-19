@@ -299,14 +299,15 @@ class Ambush extends Ent {
 }
 // ---------------- Schatztruhe (mit Peitsche öffnen) ----------------
 class Chest extends Ent {
-  constructor(d) { super(d.x * T, (d.y + 1) * T - 11, 16, 11); this.kind = 'candle'; this.loot = d.loot; this.opened = false; }
+  // Trefferfläche 20 hoch (die Truhe selbst 11): auch ein Schlag im Stehen trifft, nicht nur der Duckhieb
+  constructor(d) { super(d.x * T, (d.y + 1) * T - 20, 16, 20); this.kind = 'candle'; this.loot = d.loot; this.opened = false; }
   hit() {
     if (this.opened) return;
     this.opened = true;
-    Audio8.sfx('chest', this.cx); W.sparks(this.cx, this.y, 10);
+    Audio8.sfx('chest', this.cx); W.sparks(this.cx, this.y + 9, 10);
     const loot = { big: ['bagBig', 'bagBig', 'heartB', 'roast'], life: ['oneUp', 'bagBig', 'heartB'] }[this.loot] || ['bag', 'heartB', 'heartS', 'heartS'];
     loot.forEach((type, i) => {
-      const it = W.spawn(new Item(type, this.cx, this.y - 4));
+      const it = W.spawn(new Item(type, this.cx, this.y + 5));
       it.vx = (i - (loot.length - 1) / 2) * 0.9; it.vy = -2.6 - (i % 2) * 0.6;
     });
   }
@@ -335,7 +336,7 @@ class Chest extends Ent {
     return (Chest.MS = [build(false), build(true)]);
   }
   draw(ctx) {
-    const sx = this.x - W.cam.x, sy = this.y - W.cam.y;
+    const sx = this.x - W.cam.x, sy = this.y + 9 - W.cam.y; // gezeichnet ab Truhenoberkante
     PS2.drawLocal(ctx, this.g || (this.g = {}), Chest.meshes()[this.opened ? 1 : 0], sx, sy, [-28, -34, 72, 72], this.opened ? 'o' : 'c');
     if (this.opened && (this.t = (this.t || 0) + 1) && this.t % 9 < 4) { const [gx, gy] = PS2.projLocal(sx, sy, 8 + Math.sin(this.t * 0.37) * 5, -3, 8); ctx.fillStyle = '#fce0a8'; ctx.fillRect(Math.round(gx), Math.round(gy) - 2, 1, 1); } // Funkeln
   }
