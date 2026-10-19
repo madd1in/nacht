@@ -784,7 +784,7 @@ const W = {
     if (!d) return;
     const X = d.x * T + 10, Y = d.base * T, sx = X - this.cam.x, sy = Y - this.cam.y; // Tormitte und Schwelle (Welt / Bild)
     if (sx > View.w + 70 || sx < -70 || sy > 300 || sy < -10) return;
-    const dv = View.lite ? 1.5 : 1, BW = 132, BH = 108, bx = Math.round(sx) - BW / 2, by = Math.round(sy) - BH + 10, f = this.frame; // klein genug für volle Auflösung
+    const dv = 1, BW = 132, BH = 108, bx = Math.round(sx) - BW / 2, by = Math.round(sy) - BH + 10, f = this.frame; // klein genug für volle Auflösung (scharf)
     let B = this.doorBuf;
     if (!B || B.c.width !== BW / dv) { B = this.doorBuf = { c: Sprites.canvas(BW / dv, BH / dv), key: null }; B.x = B.c.getContext('2d', { willReadFrequently: true }); }
     const key = bx + '|' + by + '|' + View.w;

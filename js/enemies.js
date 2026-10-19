@@ -580,14 +580,16 @@ class Platform extends Ent {
     if (nx > this.x1 || nx < this.x0) { this.dir *= -1; nx = this.x + this.dir * 0.6; }
     this.dx = nx - this.x; this.x = nx;
   }
-  draw(ctx) {
-    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y);
-    ctx.fillStyle = PAL.G; ctx.fillRect(x, y, 32, 8);
-    ctx.fillStyle = PAL.W; ctx.fillRect(x, y, 32, 1);
-    ctx.fillStyle = PAL.g; ctx.fillRect(x + 1, y + 1, 30, 5);
-    ctx.fillStyle = PAL.k; for (let i = 4; i < 32; i += 8) ctx.fillRect(x + i, y + 2, 1, 4);
-    ctx.fillStyle = PAL.y; ctx.fillRect(x + 2, y + 6, 28, 1);
+  // PS2-3D: Steinplatte in einem Messingrahmen mit Nieten
+  static mesh() {
+    if (Platform.M) return Platform.M;
+    const { mesh, box } = PS2, m = mesh();
+    box(m, 16, -8, 11, 32, 6, 22, [92, 88, 96], { top: [150, 146, 156] });
+    box(m, 16, -2, 11, 32, 2, 22, [176, 128, 36], { top: [232, 180, 64] });
+    for (let k = 0; k < 4; k++) box(m, 4 + k * 8, -5.5, -0.3, 1.4, 1.4, 0.6, [232, 200, 120]);
+    return (Platform.M = [m]);
   }
+  draw(ctx) { PS2.drawLocal(ctx, this.g || (this.g = {}), Platform.mesh(), this.x - W.cam.x, this.y - W.cam.y, [-30, -32, 92, 70]); }
 }
 
 // ---------------- Spawner-Zonen ----------------

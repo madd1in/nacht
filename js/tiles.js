@@ -2853,6 +2853,35 @@ const Tiles = (() => {
     }
     ctx.setTransform(M);
   }
+  // Treppen in PS2-3D: jede Stufe bekommt eine Trittfläche und eine Setzstufe, die zum Fluchtpunkt in die Tiefe laufen
+  // (wie die Seiten der 3D-Kacheln); Farben aus der Treppenkachel des Themas. Davor liegt wie bisher die Kachel selbst.
+  function stairCols(t) {
+    if (t.stair3d) return t.stair3d;
+    const d = t.up.getContext('2d').getImageData(0, 0, 16, 16).data, at = (x, y) => { const i = (y * 16 + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
+    const mix = (c, k, a = 0) => `rgb(${c.map(v => Math.round(Math.min(255, v * k + a))).join(',')})`;
+    const top = at(3, 8), mid = at(3, 11);
+    return (t.stair3d = { tread: mix(top, 1.08, 18), riser: mix(mid, 0.55), under: mix(mid, 0.4) });
+  }
+  function draw3DStairs(ctx, room, t, x0, x1, y0, y1, ox, oy) {
+    if (room.theme === 'ship') return; // Wanten (Seile) bleiben flach
+    const g = room.grid, VX = View.w / 2, VY = 60, K = 0.1, col = stairCols(t);
+    const back = (x, y) => [x + (VX - x) * K, y + (VY - y) * K];
+    const quad = (pts, c) => { ctx.fillStyle = c; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill(); };
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
+      const ch = cx >= 0 && cx < room.w ? g[cy][cx] : '.';
+      if (ch !== '/' && ch !== '\\') continue;
+      const X = cx * T + ox, Y = cy * T + oy, up = ch === '/';
+      const steps = up ? [[X, X + 8, Y + 8], [X + 8, X + 16, Y]] : [[X + 8, X + 16, Y + 8], [X, X + 8, Y]]; // [links, rechts, Oberkante]: tief, hoch
+      for (const [a, b, ty] of steps) { // Setzstufe an der Seite zur tieferen Stufe hin
+        const rx = up ? a : b;
+        if (up ? rx > VX : rx < VX) quad([[rx, ty], [rx, ty + 8], back(rx, ty + 8), back(rx, ty)], col.riser);
+      }
+      for (const [a, b, ty] of steps) {
+        if (ty > VY) quad([[a, ty], [b, ty], back(b, ty), back(a, ty)], col.tread);           // Trittfläche (von oben)
+        else if (ty + 8 < VY) quad([[a, ty + 8], [b, ty + 8], back(b, ty + 8), back(a, ty + 8)], col.under); // Unterseite (von unten)
+      }
+    }
+  }
   // getönte Kopien der Kacheln (0 = Oberseite aufgehellt, 1 = Seite, 2 = Unterseite), einmal erzeugt
   const tonedC = new Map();
   function toned(img, tone) {
@@ -2871,7 +2900,7 @@ const Tiles = (() => {
     const x0 = Math.floor(cam.x / T), x1 = x0 + Math.ceil(View.w / T) + 1;
     const y0 = Math.max(0, Math.floor(cam.y / T)), y1 = Math.min(room.h - 1, y0 + 14);
     const ox = -Math.round(cam.x), oy = -Math.round(cam.y);
-    if (!FLAT3D.has(room.theme) && !View.lite3d) draw3DFaces(ctx, room, cam, t, x0 - 2, x1 + 2, y0, y1, ox, oy);
+    if (!FLAT3D.has(room.theme) && !View.lite3d) { draw3DFaces(ctx, room, cam, t, x0 - 2, x1 + 2, y0, y1, ox, oy); draw3DStairs(ctx, room, t, x0 - 2, x1 + 2, y0, y1, ox, oy); }
     const deco = [];
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       const out = cx < 0 || cx >= room.w; // außerhalb schmaler Räume: Mauer (Bibliothek: Bücherwand)

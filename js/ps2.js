@@ -792,5 +792,26 @@ const PS2 = (() => {
 
   const prewarm = () => { if (!city) city = buildCity(); };
   const prewarmMap = () => { if (!world) world = buildWorld(); }; // Ladebildschirm: Kartenlandschaft vorab bauen
-  return { mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawChandelier, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
+  // ---------------- Kleine Objekte in Kachel-Perspektive ----------------
+  // Auge 200 vor der Spielebene, Fluchtpunkt (Bildmitte, 60) – wie die 3D-Kacheln (Rückseiten bei 22 Tiefe auf 0,9 verkleinert).
+  // Mesh relativ zum Anker (sx, sy auf dem Bild): x rechts, y hoch, z in die Tiefe (0 = Spielebene). Gerastert wird nur der
+  // Bildausschnitt box ([links, oben, Breite, Höhe] um den Anker) in einen eigenen Puffer o – und nur, wenn sich das Objekt
+  // im Bild verschoben oder sein Zustand (key) geändert hat.
+  const LENV = { static: true, sun: null, sunC: [0.8, 0.74, 0.66], amb: [0.44, 0.42, 0.5], sky: [0.16, 0.15, 0.2], fog: [0, 0, 0], fogD: 0 };
+  { const v = [-0.35, 0.8, -0.5], l = Math.hypot(...v); LENV.sun = v.map(c => c / l); }
+  function drawLocal(ctx, o, meshes, sx, sy, box, key = '', env = LENV) {
+    const dv = 1, [bl, bt, BW, BH] = box, bx = Math.round(sx) + bl, by = Math.round(sy) + bt; // winzige Puffer: immer volle Auflösung (scharf)
+    if (bx > View.w || bx + BW < 0 || by > 216 || by + BH < -8) return;
+    const w = Math.ceil(BW / dv), h = Math.ceil(BH / dv);
+    if (!o.c || o.c.width !== w || o.c.height !== h) { o.c = document.createElement('canvas'); o.c.width = w; o.c.height = h; o.x = o.c.getContext('2d', CPU2D); o.key = null; }
+    const VX = View.w / 2, k = bx + '|' + by + '|' + View.w + '|' + key;
+    if (o.key !== k) {
+      o.key = k; o.x.clearRect(0, 0, w, h);
+      render(o.x, w, h, typeof meshes === 'function' ? meshes() : meshes, { x: VX - sx, y: sy - 60, z: -200, yaw: 0, pitch: 0, f: 200 / dv, near: 30, cx: (VX - bx) / dv, cy: (60 - by) / dv }, env);
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = dv !== 1; ctx.drawImage(o.c, 0, 0, w, h, bx, by, BW, BH); ctx.restore();
+  }
+  const projLocal = (sx, sy, x, y, z) => { const VX = View.w / 2, k = 200 / (200 + z); return [VX + (sx + x - VX) * k, 60 + (sy - y - 60) * k]; }; // Punkt des Meshes → Bild
+
+  return { mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawLocal, projLocal, LENV, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawChandelier, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
 })();

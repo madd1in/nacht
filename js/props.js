@@ -82,16 +82,27 @@ class Elevator extends Ent {
     if (ny >= this.yLow) { ny = this.yLow; this.dir = -1; this.wait = 60; }
     this.dy = ny - this.y; this.y = ny;
   }
+  // PS2-3D: Rahmen aus Eisen, Riffelblech mit Rillen, gelbe Warnleiste vorn, Messingschäkel für die Seile
+  static mesh() {
+    if (Elevator.M) return Elevator.M;
+    const { mesh, box, prism } = PS2, m = mesh();
+    box(m, 16, -8, 11, 32, 5, 22, [74, 74, 84], { top: [112, 112, 124] });
+    box(m, 16, -3, 11, 31, 3, 21, [124, 128, 140], { top: [172, 176, 190] });
+    for (let k = 0; k < 6; k++) box(m, 3.5 + k * 5, 0, 11, 1.4, 0.5, 19, [92, 96, 108]);
+    box(m, 16, -7.6, -0.4, 31, 1.8, 0.9, [248, 184, 0]);
+    for (let k = 0; k < 4; k++) box(m, 4 + k * 8, -7.6, -0.6, 3, 1.8, 0.6, [36, 32, 30]); // schwarze Schrägen der Warnleiste
+    for (const x of [5, 27]) prism(m, x, 0, 11, 1.7, 3.2, 6, [176, 120, 24]);
+    return (Elevator.M = [m]);
+  }
   draw(ctx) {
-    const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y);
-    ctx.fillStyle = '#3c3c3c'; ctx.fillRect(x + 5, 0, 1, y); ctx.fillRect(x + 26, 0, 1, y);
-    ctx.fillStyle = '#6c6c6c'; for (let yy = (y % 6); yy < y; yy += 6) { ctx.fillRect(x + 5, yy, 1, 2); ctx.fillRect(x + 26, yy, 1, 2); }
-    ctx.fillStyle = '#2c2c2c'; ctx.fillRect(x, y, 32, 8);
-    ctx.fillStyle = '#8c8c8c'; ctx.fillRect(x, y, 32, 1);
-    ctx.fillStyle = '#5c5c5c'; ctx.fillRect(x + 1, y + 1, 30, 5);
-    ctx.fillStyle = '#f8b800'; ctx.fillRect(x + 1, y + 6, 30, 1);
-    ctx.fillStyle = '#9c6400'; ctx.fillRect(x + 13, y + 2, 6, 3);
-    if (this.wait > 0 && this.wait < 20 && (this.t & 4)) { ctx.fillStyle = '#d82800'; ctx.fillRect(x + 15, y + 3, 2, 1); }
+    const sx = this.x - W.cam.x, sy = this.y - W.cam.y;
+    for (const ax of [5, 27]) { // Seile senkrecht nach oben (bleiben in der Tiefe der Schäkel)
+      const [cx, cy] = PS2.projLocal(sx, sy, ax, 3, 11), x = Math.round(cx);
+      ctx.fillStyle = '#3c3c3c'; ctx.fillRect(x, 0, 1, Math.round(cy)); ctx.fillStyle = '#6c6c6c';
+      for (let yy = ((Math.round(cy) % 6) + 6) % 6; yy < cy; yy += 6) ctx.fillRect(x, yy, 1, 2);
+    }
+    PS2.drawLocal(ctx, this.g || (this.g = {}), Elevator.mesh(), sx, sy, [-30, -32, 92, 70]);
+    if (this.wait > 0 && this.wait < 20 && (this.t & 4)) { const [lx, ly] = PS2.projLocal(sx, sy, 16, -4, -0.5); ctx.fillStyle = '#d82800'; ctx.fillRect(Math.round(lx) - 1, Math.round(ly), 3, 2); }
   }
 }
 
@@ -111,14 +122,20 @@ class Crumble extends Ent {
     } else if (this.state === 'gone' && --this.timer <= 0) { this.state = 'back'; this.timer = 40; this.y = this.home.y; }
     else if (this.state === 'back' && --this.timer <= 0) this.state = 'idle';
   }
+  // PS2-3D: zwei Steinquader mit Rissen (bröckeln, fallen, kommen blinkend wieder)
+  static mesh() {
+    if (Crumble.M) return Crumble.M;
+    const { mesh, box } = PS2, m = mesh(), D = [44, 36, 28];
+    box(m, 7.8, -8, 11, 15.4, 8, 22, [112, 96, 80], { top: [160, 146, 128] });
+    box(m, 24.2, -7.8, 11, 15.4, 7.8, 22, [104, 88, 72], { top: [152, 138, 120] });
+    box(m, 6.5, -5.5, -0.3, 0.9, 3.6, 0.6, D); box(m, 7.6, -3.2, -0.3, 2.4, 0.9, 0.6, D); box(m, 23.5, -7, -0.3, 0.9, 4.4, 0.6, D); box(m, 24.8, -3.4, -0.3, 3, 0.9, 0.6, D);
+    box(m, 20, 0, 18, 3, 0.8, 3, [92, 120, 64]); box(m, 4, 0, 6, 2.4, 0.6, 2.2, [92, 120, 64]); // Moos oben
+    return (Crumble.M = [m]);
+  }
   draw(ctx) {
     if (this.state === 'gone' || (this.state === 'back' && (this.t & 2))) return;
     const sh = this.state === 'shake' ? ((this.t >> 1) % 2 ? 1 : -1) : 0;
-    const x = Math.round(this.x - W.cam.x) + sh, y = Math.round(this.y - W.cam.y);
-    ctx.fillStyle = '#2c241c'; ctx.fillRect(x, y, 32, 8);
-    ctx.fillStyle = '#9c8c7c'; ctx.fillRect(x, y, 15, 1); ctx.fillRect(x + 16, y, 16, 1);
-    ctx.fillStyle = '#6c5c4c'; ctx.fillRect(x + 1, y + 1, 14, 6); ctx.fillRect(x + 17, y + 1, 14, 6);
-    ctx.fillStyle = '#2c241c'; ctx.fillRect(x + 6, y + 2, 1, 3); ctx.fillRect(x + 7, y + 4, 2, 1); ctx.fillRect(x + 23, y + 1, 1, 4); ctx.fillRect(x + 24, y + 4, 3, 1);
+    PS2.drawLocal(ctx, this.g || (this.g = {}), Crumble.mesh(), this.x - W.cam.x + sh, this.y - W.cam.y, [-30, -32, 92, 70]);
   }
 }
 
@@ -319,7 +336,35 @@ class Chest extends Ent {
       it.vx = (i - (loot.length - 1) / 2) * 0.9; it.vy = -2.6 - (i % 2) * 0.6;
     });
   }
-  draw(ctx) { Sprites.draw(ctx, Sprites.S.chest[this.opened ? 1 : 0], Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y)); }
+  // PS2-3D: Eichentruhe mit gewölbtem Deckel, Eisenbändern und Goldschloss; geöffnet klappt der Deckel nach hinten und
+  // das Gold darin glüht
+  static meshes() {
+    if (Chest.MS) return Chest.MS;
+    const { mesh, box, face, vtx } = PS2, WOOD = [146, 88, 42], WOOD2 = [118, 68, 32], IRON = [64, 64, 76], GOLD = [240, 184, 40], DARK = [44, 22, 10];
+    const build = (open) => {
+      const m = mesh();
+      box(m, 8, -11, 8, 16, 7, 12, WOOD, { top: DARK });
+      for (const x of [2.5, 13.5]) box(m, x, -11.2, 8, 1.6, 7.4, 12.6, IRON);
+      if (open) face(m, [vtx(m, 1.5, -4.3, 3), vtx(m, 14.5, -4.3, 3), vtx(m, 14.5, -4.3, 13), vtx(m, 1.5, -4.3, 13)], GOLD, [8, -10, 8], { e: 0.7 }); // Goldschatz
+      const tr = (dz, dy) => { let z = 8 + dz, y = -4 + dy; if (open) { const a = -1.95, rz = z - 14, ry = y + 4; z = 14 + rz * Math.cos(a) - ry * Math.sin(a); y = -4 + rz * Math.sin(a) + ry * Math.cos(a); } return [z, y]; };
+      const L = [], R = [], C = open ? [8, 0, 18] : [8, -4, 8];
+      for (let k = 0; k <= 6; k++) { const a = Math.PI - k / 6 * Math.PI, [z, y] = tr(Math.cos(a) * 6, Math.sin(a) * 4); L.push(vtx(m, 0, y, z)); R.push(vtx(m, 16, y, z)); }
+      for (let k = 0; k < 6; k++) face(m, [L[k], L[k + 1], R[k + 1], R[k]], k % 2 ? WOOD : WOOD2, C, { two: true });
+      face(m, L, WOOD, C, { two: true }); face(m, R.slice().reverse(), WOOD, C, { two: true });
+      for (const x of [2.5, 13.5]) for (let k = 0; k < 6; k++) { // Eisenbänder über den Deckel
+        const a0 = Math.PI - k / 6 * Math.PI, a1 = Math.PI - (k + 1) / 6 * Math.PI, [z0, y0] = tr(Math.cos(a0) * 6.3, Math.sin(a0) * 4.3), [z1, y1] = tr(Math.cos(a1) * 6.3, Math.sin(a1) * 4.3);
+        face(m, [vtx(m, x - 0.8, y0, z0), vtx(m, x - 0.8, y1, z1), vtx(m, x + 0.8, y1, z1), vtx(m, x + 0.8, y0, z0)], IRON, C, { two: true });
+      }
+      box(m, 8, -7.4, 1.6, 3.2, 3.2, 1.2, GOLD); box(m, 8, -6.6, 0.9, 1, 1.2, 0.5, [60, 36, 0]); // Schloss
+      return [m];
+    };
+    return (Chest.MS = [build(false), build(true)]);
+  }
+  draw(ctx) {
+    const sx = this.x - W.cam.x, sy = this.y - W.cam.y;
+    PS2.drawLocal(ctx, this.g || (this.g = {}), Chest.meshes()[this.opened ? 1 : 0], sx, sy, [-28, -34, 72, 72], this.opened ? 'o' : 'c');
+    if (this.opened && (this.t = (this.t || 0) + 1) && this.t % 9 < 4) { const [gx, gy] = PS2.projLocal(sx, sy, 8 + Math.sin(this.t * 0.37) * 5, -3, 8); ctx.fillStyle = '#fce0a8'; ctx.fillRect(Math.round(gx), Math.round(gy) - 2, 1, 1); } // Funkeln
+  }
 }
 
 // ---------------- Seilrutsche (Schiff): im Sprung ans Seil greifen oder am Start „hoch“ drücken ----------------
