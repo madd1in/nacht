@@ -355,8 +355,10 @@ class Player {
       if (this.atkT > 0 || this.crouch) this.vx = 0;
       else { const tv = mx * WALK; this.vx += (tv - this.vx) * (mx ? 0.38 : 0.5); if (Math.abs(this.vx) < 0.06) this.vx = 0; if (mx) this.face = mx; }
       this.coyote = 7;
+      if (this.ridePlat && this.ridePlat.passable && I.down) { if (++this.passT > 12) return this.dropThrough(); } else this.passT = 0; // Unten halten reicht auch
       if ((P.jump || (this.jumpBuf > 0 && I.jump)) && this.atkT === 0) {
         this.jumpBuf = 0;
+        if (I.down && this.ridePlat && this.ridePlat.passable) return this.dropThrough(); // durchlässige Plattform (Rankenblatt): hindurchfallen
         if (I.down && !this.findStair(true)) return this.startSlide(); // Rutschen: Unten + Sprung
         this.setCrouch(false);
         this.vy = JUMP; this.onGround = false; this.jumping = true;
@@ -514,11 +516,13 @@ class Player {
     }
   }
 
+  dropThrough() { this.dropT = 14; this.passT = 0; this.ridePlat = null; this.onGround = false; this.vy = 1; this.setCrouch(false); }
   checkPlatforms() {
     const was = this.ridePlat; this.ridePlat = null;
+    if (this.dropT > 0) this.dropT--;
     if (this.vy < 0) return;
     for (const p of W.platforms) {
-      if (p.solid === false) continue;
+      if (p.solid === false || (p.passable && this.dropT > 0)) continue;
       const prevFeet = this.feet - this.vy - 0.5;
       let top = p.y, inX = this.x + this.w > p.x && this.x < p.x + p.w;
       if (p.surfaceAt) { const s = p.surfaceAt(this.cx); inX = s !== null; top = s === null ? 0 : s; } // schräge Fläche

@@ -146,6 +146,7 @@ const I18N = (() => {
     plantThirst: { de: 'DIE PFLANZE SIEHT... DURSTIG AUS.', en: 'THE PLANT LOOKS... THIRSTY.', fr: "LA PLANTE A L'AIR... ASSOIFFÉE.", es: 'LA PLANTA PARECE... SEDIENTA.', ja: 'この植物…のどが渇いているようだ。', zh: '这株植物看起来……很渴。' },
     plantDrink: { de: 'GLUCK, GLUCK, GLUCK... *RÜLPS!*', en: 'GLUG, GLUG, GLUG... *BURP!*', fr: 'GLOU, GLOU, GLOU... *ROT !*', es: 'GLU, GLU, GLU... ¡*EEEERP*!', ja: 'ゴクゴクゴク…ゲップ！', zh: '咕咚，咕咚，咕咚……*嗝！*' },
     plantBreak: { de: 'SIE WÄCHST BIS IN DIE STERNWARTE!', en: 'IT GROWS ALL THE WAY TO THE OBSERVATORY!', fr: "ELLE POUSSE JUSQU'À L'OBSERVATOIRE !", es: '¡CRECE HASTA EL OBSERVATORIO!', ja: '天文台まで伸びていく！', zh: '它一直长到了天文台！' },
+    vineHint: { de: 'HINUNTER: UNTEN HALTEN ODER UNTEN + SPRINGEN', en: 'TO GET DOWN: HOLD DOWN OR DOWN + JUMP', fr: 'DESCENDRE : MAINTENIR BAS OU BAS + SAUT', es: 'BAJAR: MANTÉN ABAJO O ABAJO + SALTO', ja: '降りる: 下を長押し か 下+ジャンプ', zh: '下去: 按住下 或 下+跳' },
     scopeNote: { de: 'EIN FERNROHR. DER MOND IST HEUTE BLUTROT.', en: 'A TELESCOPE. THE MOON IS BLOOD RED TONIGHT.', fr: 'UN TÉLESCOPE. LA LUNE EST ROUGE SANG CE SOIR.', es: 'UN TELESCOPIO. LA LUNA ESTÁ ROJA COMO LA SANGRE.', ja: '望遠鏡だ。今夜の月は血のように赤い。', zh: '一架望远镜。今晚的月亮血红。' },
     monkeyNote: { de: 'SCHAU HINTER DICH, EIN DREIKÖPFIGER AFFE!', en: 'LOOK BEHIND YOU, A THREE-HEADED MONKEY!', fr: 'DERRIÈRE TOI, UN SINGE À TROIS TÊTES !', es: '¡DETRÁS DE TI, UN MONO DE TRES CABEZAS!', ja: '後ろを見ろ！三つ首のサルだ！', zh: '快看身后，一只三头猴！' },
     kraken: { de: 'DER KRAKE!', en: 'THE KRAKEN!', fr: 'LE KRAKEN !', es: '¡EL KRAKEN!', ja: 'クラーケンだ！', zh: '海怪克拉肯！' },

@@ -225,10 +225,11 @@ const Expo = (() => {
   // sichtbar), 1 Einheit = 1 Pixel, Ursprung unten in der Mitte des Puffers
   const PENV = { sun: null, sunC: [0.62, 0.72, 0.9], amb: [0.38, 0.4, 0.48], sky: [0.2, 0.22, 0.28], fog: [0, 0, 0], fogD: 0 };
   { const v = [0.55, 0.75, -0.45], l = Math.hypot(...v); PENV.sun = v.map(c => c / l); }
-  function propRender(buf, w, h, list, env = PENV) {
+  // r0/fullH: nur ein Fenster (Zeilen r0 … r0 + h) eines fullH hohen Bildes rastern – für lange Objekte, die nur teils im Bild sind
+  function propRender(buf, w, h, list, env = PENV, fullH = h, r0 = 0) {
     if (!buf.c || buf.c.width !== w || buf.c.height !== h) { buf.c = Sprites.canvas(w, h); buf.x = buf.c.getContext('2d', CPU); }
     buf.x.clearRect(0, 0, w, h);
-    render(buf.x, w, h, list, { x: 0, y: h / 2 + 500, z: -1500, yaw: 0, pitch: 0, f: 1500, near: 100, hy: 0.5 - 500 / h }, env);
+    render(buf.x, w, h, list, { x: 0, y: fullH / 2 + 500, z: -1500, yaw: 0, pitch: 0, f: 1500, near: 100, cy: fullH / 2 - 500 - r0 }, env);
     return buf.c;
   }
 
@@ -488,7 +489,7 @@ class ThornRoot extends Ent {
 // als Riesenranke durch die Kuppel schießen: Sie sprengt den Boden der versiegelten Sternwarte, ihre Blätter tragen den Helden
 // hinauf zu Fernrohr, Truhe und 1UP. (Gruß an ein altes Gruselvillen-Abenteuer mit einer sehr durstigen Zimmerpflanze.)
 class VineLeaf extends Ent { // Blattspreite als Plattform (gezeichnet von der Pflanze)
-  constructor(x, y) { super(x, y, 28, 6); this.kind = 'platform'; this.solid = false; this.dx = 0; this.dy = 0; this.pop = 0; }
+  constructor(x, y) { super(x, y, 28, 6); this.kind = 'platform'; this.solid = false; this.passable = true; this.dx = 0; this.dy = 0; this.pop = 0; } // Unten (+ Sprung): hindurchfallen
   update() {}
   draw() {}
 }
@@ -502,7 +503,7 @@ class ThirstyPlant extends Ent {
       const y = Math.round(y0 - (y0 - y1) * i / n), side = y < (d.hole[3] + 1) * T + 64 ? 0 : i % 2 ? 1 : -1, l = new VineLeaf(this.sx - 14 + side * 16, y);
       l.side = side; return l;
     });
-    this.body = {}; this.bodySpr = null; this.bodyKey = '';
+    this.body = {}; this.bodyBig = {}; this.bodySpr = null; this.bodyKey = ''; this.hinted = false;
   }
   ease(g) { return 1 - Math.pow(1 - g, 2.2); }
   len() { return this.state === 'grow' || this.state === 'grown' ? 14 + (this.full - 14) * this.ease(this.g) : 14; }
@@ -526,10 +527,11 @@ class ThirstyPlant extends Ent {
       const tip = this.base - 16 - this.len();
       for (const l of this.leaves) if (l.solid === false && tip < l.y - 10) { l.solid = true; l.pop = 1; Audio8.sfx('flap', l.cx); }
       if (!this.broke && tip < (this.d.hole[3] + 1) * T) this.breakFloor();
-      if (this.g >= 1) { this.state = 'grown'; this.st = 0; }
+      if (this.g >= 1) { this.state = 'grown'; this.st = 0; for (const l of this.leaves) { l.solid = true; l.pop = 12; } } // fertig: alle Blätter ganz offen (Ranke wird nur noch einmal gerastert)
     } else {
       this.look = p.cx < this.sx ? -1 : 1;
       this.open += ((p.alive && Math.abs(p.cy - (this.base - 16 - this.len())) < 70 ? 0.7 : 0.25 + 0.1 * Math.sin(this.t * 0.06)) - this.open) * 0.1;
+      if (!this.hinted && p.ridePlat instanceof VineLeaf && p.ridePlat.y < this.d.hole[3] * T + 80) { this.hinted = true; Game.note('vineHint'); } // oben: wie man wieder hinunterkommt
     }
     for (const l of this.leaves) if (l.pop > 0 && l.pop < 12) l.pop++;
   }
@@ -569,13 +571,19 @@ class ThirstyPlant extends Ent {
     const sx = Math.round(this.sx - W.cam.x), by = Math.round(this.base - W.cam.y), len = this.len(), H = Math.ceil(len) + 24, tp = Expo.S.tp;
     this.plate(ctx, sx, by);
     if (sx < -70 || sx > View.w + 70 || by - H - 40 > 214 || by < -8) return;
-    const key = Math.round(len) + '|' + this.leaves.reduce((a, l) => a + l.pop, 0);
-    if (key !== this.bodyKey) { // Ranke und Blätter in 3D; steht sie still, bekommt sie die dunkle Kontur der Sprites (scharf)
-      this.bodyKey = key; Expo.propRender(this.body, 100, H, [this.bodyMesh(len)]);
-      this.bodySpr = this.state === 'grow' ? null : Sprites.fromCanvas(this.body.c, true);
+    // Ranke und Blätter in 3D: während des Wachsens in eine feste große Leinwand (keine neue je Bild) und nur jede dritte
+    // Längeneinheit neu; steht sie still, bekommt sie die dunkle Kontur der Sprites
+    const HF = Math.ceil(this.full) + 24, pops = this.leaves.reduce((a, l) => a + l.pop, 0);
+    if (this.state === 'grow') { // wachsend: nur der sichtbare Bildausschnitt (240 Zeilen) der langen Ranke
+      const r0 = clamp(HF - by - 16, 0, HF - 240), key = 'G' + Math.round(len / 3) + '|' + pops + '|' + r0;
+      if (key !== this.bodyKey) { this.bodyKey = key; Expo.propRender(this.bodyBig, 100, 240, [this.bodyMesh(len)], undefined, HF, r0); this.bodySpr = null; }
+      ctx.drawImage(this.bodyBig.c, sx - 50, by - HF + r0);
+    } else { // ruhend bzw. ausgewachsen: einmal ganz rastern; die kurze Ranke bekommt die Kontur der Sprites (bei der langen
+      // wäre die Pixel-Kontur ein spürbarer Hänger)
+      const big = this.state === 'grown', BH = big ? HF : H, buf = big ? this.bodyBig : this.body, key = (big ? 'B' : 'S') + Math.round(len) + '|' + pops;
+      if (key !== this.bodyKey) { this.bodyKey = key; Expo.propRender(buf, 100, BH, [this.bodyMesh(len)]); this.bodySpr = big ? null : Sprites.fromCanvas(buf.c, true); }
+      if (this.bodySpr) Sprites.draw(ctx, this.bodySpr, sx - 50, by - BH); else ctx.drawImage(buf.c, sx - 50, by - BH);
     }
-    if (!this.bodySpr && this.state !== 'grow') this.bodySpr = Sprites.fromCanvas(this.body.c, true); // nach dem Wachsen einmal nachziehen
-    if (this.bodySpr) Sprites.draw(ctx, this.bodySpr, sx - 50, by - H); else ctx.drawImage(this.body.c, sx - 50, by - H);
     if (!tp) return;
     Sprites.draw(ctx, tp.pot, sx - 16, by - 22);
     const hs = this.headSprite(), tx = sx + Math.round(this.wob(len)), ty = by - 15 - Math.round(len), fl = this.look < 0; // Angel des Kopfs auf der Rankenspitze
