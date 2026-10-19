@@ -765,7 +765,7 @@ const PS2 = (() => {
     const cy = Math.cos(yaw), sy = Math.sin(yaw), P = (x, y, z) => [x * cy - z * sy, y, x * sy + z * cy];
     const ring = (r, y, n, w) => { for (let i = 0; i < n; i++) { const a0 = i / n * Math.PI * 2, a1 = (i + 1) / n * Math.PI * 2, [x0, , z0] = P(Math.cos(a0) * r, y, Math.sin(a0) * r), [x1, , z1] = P(Math.cos(a1) * r, y, Math.sin(a1) * r); beam(m, x0, y, z0, x1, y, z1, w, w * 1.3, BR); } };
     const w = Math.max(1.4, R * 0.075);
-    ring(R, 0, 16, w); if (tiers > 1) ring(R * 0.58, -R * 0.34, 12, w * 0.8);
+    ring(R, 0, 18, w); if (tiers > 1) ring(R * 0.58, -R * 0.34, 12, w * 0.8);
     prism(m, 0, -R * 0.5, 0, R * 0.09, R * 0.78, 6, BR2, { rTop: R * 0.05 }); cone(m, 0, -R * 0.5, 0, R * 0.1, -R * 0.2, 6, BR); // Nabe und Zapfen
     const n = R > 30 ? 10 : 6;
     for (let i = 0; i < n; i++) {
@@ -779,12 +779,28 @@ const PS2 = (() => {
     for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2 + 0.3, [x, , z] = P(Math.cos(a) * R, 0, Math.sin(a) * R); beam(m, x, 0, z, 0, R * 0.85, 0, w * 0.4, w * 0.4, IRON); } // Ketten zur Aufhängung
     return m;
   }
-  // (x, y) = Bildposition der Reifmitte; o: { yaw, tiers, lit, holder } – holder behält den eigenen Puffer des Objekts
+  const chandView = (R) => { const S = 2, D = R * 9; return { S, Wc: Math.ceil((R * 2.3 + 16) * S), Hc: Math.ceil((R * 2.1 + 16) * S), cam: { x: 0, y: D * Math.tan(0.5), z: -D, yaw: 0, pitch: -0.5, f: D * 1.13 * S, near: 4, hy: 0.42 } }; };
+  // Kleine Kronleuchter (6 Arme, 3 Ketten, Reif aus 18 Gliedern) sehen nach einer Dritteldrehung wieder gleich aus: jede der
+  // CH_N Drehstellungen wird nur einmal gerastert – geteilt von allen Kronleuchtern gleicher Bauart – und danach nur kopiert
+  const CH_N = 60, CH_PER = Math.PI * 2 / 3, CHC = new Map();
+  function chandFrame(R, tiers, lit, i) {
+    const k = R + '|' + tiers + '|' + (lit ? 1 : 0);
+    let set = CHC.get(k);
+    if (!set) { const v = chandView(R); set = { v, f: [], p: project(v.cam, v.Wc, v.Hc, 0, 0, 0) }; CHC.set(k, set); }
+    let c = set.f[i];
+    if (!c) { c = set.f[i] = Sprites.canvas(set.v.Wc, set.v.Hc); render(c.getContext('2d', CPU2D), set.v.Wc, set.v.Hc, [chandMesh(R, i / CH_N * CH_PER, tiers, lit)], set.v.cam, CHENV); }
+    return { c, set };
+  }
+  // (x, y) = Bildposition der Reifmitte; o: { yaw, tiers, lit, holder } – holder behält den eigenen Puffer des Objekts (große Leuchter)
   function drawChandelier(ctx, x, y, R, o = {}) {
-    const S = 2, Wc = Math.ceil((R * 2.3 + 16) * S), Hc = Math.ceil((R * 2.1 + 16) * S), h = o.holder || o;
+    if (R <= 30) {
+      const i = ((Math.round((o.yaw || 0) / CH_PER * CH_N) % CH_N) + CH_N) % CH_N, { c, set } = chandFrame(R, o.tiers || 1, !!o.lit, i), v = set.v;
+      ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(c, 0, 0, v.Wc, v.Hc, x - set.p[0] / v.S, y - set.p[1] / v.S, v.Wc / v.S, v.Hc / v.S); ctx.restore();
+      return;
+    }
+    const { S, Wc, Hc, cam } = chandView(R), h = o.holder || o;
     let B = h._chb;
     if (!B || B.c.width !== Wc) { B = h._chb = { c: Sprites.canvas(Wc, Hc), k: null }; B.x = B.c.getContext('2d', CPU2D); }
-    const D = R * 9, cam = { x: 0, y: D * Math.tan(0.5), z: -D, yaw: 0, pitch: -0.5, f: D * 1.13 * S, near: 4, hy: 0.42 };
     const key = Math.round((o.yaw || 0) * 30) + '|' + (o.lit ? 1 : 0) + '|' + R;
     if (B.k !== key) { B.k = key; B.x.clearRect(0, 0, Wc, Hc); render(B.x, Wc, Hc, [chandMesh(R, o.yaw || 0, o.tiers || 1, o.lit)], cam, CHENV); B.p = project(cam, Wc, Hc, 0, 0, 0); }
     ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, Wc, Hc, x - B.p[0] / S, y - B.p[1] / S, Wc / S, Hc / S); ctx.restore();

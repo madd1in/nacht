@@ -176,7 +176,7 @@ class Statue extends Ent {
   }
 }
 
-// ---------------- Wald: Rastfeuer, Leiche mit Fund, Fallbaum, Hinterhalt, Nebelwand ----------------
+// ---------------- Wald: Rastfeuer, Leiche mit Fund, Fallbaum, Hinterhalt ----------------
 // Rastfeuer: Kontrollpunkt wie die Statue. Glimmt, bis man es erreicht – dann lodert es auf, heilt ganz, und das Bild hält
 // kurz inne (Schriftzug in der Mitte).
 class Campfire extends Statue {
@@ -297,32 +297,6 @@ class Ambush extends Ent {
   }
   draw() {}
 }
-// Nebelwand vor dem Burggraben: milchig wabernd; hindurch geht es nur langsam, das Bild wird weiß
-class FogWall extends Ent {
-  constructor(d) { super(d.x * T, 0, 2 * T, W.room.h * T); this.kind = 'prop'; this.push = 0; }
-  update() {
-    this.t++;
-    const p = W.player, inside = p.alive && Phys.overlap(this, p);
-    if (inside) { p.x -= p.vx * 0.62; if (this.push < 0.05) Audio8.sfx('whoosh', this.cx); }
-    this.push += ((inside ? 1 : 0) - this.push) * 0.08;
-  }
-  lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: 120 - cy, r: 70, c: [220, 230, 240], a: 0.35 }); }
-  draw(ctx) {
-    const x0 = Math.round(this.x - W.cam.x), t = this.t;
-    if (x0 > View.w + 40 || x0 < -80) return;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 22; i++) {
-      const ph = (t * (0.004 + (i % 4) * 0.0015) + i * 0.137) % 1, y = 208 - ph * 240, x = x0 + 16 + Math.sin(t * 0.02 + i * 1.3) * 10 + Math.sin(ph * 9 + i) * 6, r = 14 + (i % 5) * 4;
-      const a = 0.16 * Math.sin(ph * Math.PI), g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, `rgba(220,226,236,${a.toFixed(3)})`); g.addColorStop(1, 'rgba(200,210,226,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    }
-    const band = ctx.createLinearGradient(x0 - 10, 0, x0 + 42, 0); band.addColorStop(0, 'rgba(200,210,226,0)'); band.addColorStop(0.5, `rgba(210,220,232,${(0.16 + 0.04 * Math.sin(t * 0.05)).toFixed(3)})`); band.addColorStop(1, 'rgba(200,210,226,0)');
-    ctx.fillStyle = band; ctx.fillRect(x0 - 10, 0, 52, 208);
-    ctx.restore();
-    if (this.push > 0.02) { ctx.fillStyle = `rgba(226,232,240,${(this.push * 0.45).toFixed(3)})`; ctx.fillRect(0, 0, View.w, 208); }
-  }
-}
-
 // ---------------- Schatztruhe (mit Peitsche öffnen) ----------------
 class Chest extends Ent {
   constructor(d) { super(d.x * T, (d.y + 1) * T - 11, 16, 11); this.kind = 'candle'; this.loot = d.loot; this.opened = false; }

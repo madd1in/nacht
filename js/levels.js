@@ -145,8 +145,8 @@ const Levels = (() => {
   // Von der Mole geht es durch einen dichten Wald zum Burggraben. Aufgebaut wie ein Weg, den man sich erkämpft:
   // ein einzelner Ritter bewacht die Anhöhe vor dem umgestürzten Riesenstamm (drunter durchrutschen oder hinüber – oben
   // liegt ein Toter mit einem Fund), dahinter ein Rastfeuer. Am zweiten Bach steht ein toter Baum: anpeitschen, und er
-  // wird zur Brücke. Unten am Waldboden lauert ein Hinterhalt, oben führt ein Astweg mit Truhe vorbei. Zuletzt eine
-  // Nebelwand, durch die man sich zum Burggraben schiebt.
+  // wird zur Brücke. Unten am Waldboden lauert ein Hinterhalt, oben führt ein Astweg mit Truhe vorbei. Zuletzt geht es
+  // an Schädeln auf Pfählen vorbei zum Burggraben.
   const wd = room(104, 'forest')
     .ground(0, 13).ground(18, 30).fill(14, 12, 17, 12, '~')            // Bach: breiter Graben mit Wasser
     .fill(22, 8, 27, 8, '=')                                             // Ast über dem Weg
@@ -168,7 +168,6 @@ const Levels = (() => {
     .prop('ambush', { x: 77, n: 3 })                                     // Hinterhalt am Waldboden
     .chest(84, 6)                                                        // Belohnung für den Astweg
     .prop('relic', { x: 90, y: 10, loot: 'heartB' })
-    .prop('fogwall', { x: 99 })
     .zone('ghoul', 86, 98, { interval: 220, max: 1 })
     .music('stage1')
     .start(2, 10).exit(102).noDoor().done();
