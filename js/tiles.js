@@ -1799,34 +1799,9 @@ const Tiles = (() => {
             if (wi === 0) moon(x, wx + 22, 66, 7);
             for (let i = 0; i < 6; i++) px(x, '#fcfcfc', wx + ri(2, 29), ri(46, 120));
           });
-          // Samtdraperien: goldene Stange mit Ringen und Endknäufen, oben breit in Falten gelegt, an der Raffkordel eingeschnürt,
-          // unten wieder ausgestellt; Glanz auf den Faltenrücken, zum Fenster hin ein kühler Mondlichtsaum, Quaste, Fransensaum
-          const VEL = ['#24030a', '#3e0612', '#5c0a1a', '#7c1222', '#a01c2c', '#c42c3c', '#e05050'];
-          px(x, '#7c5810', wx - 22, 33, 76, 3); px(x, '#c89020', wx - 22, 33, 76, 2); px(x, '#fce0a8', wx - 22, 33, 76, 1); // Stange
-          for (const ex of [wx - 25, wx + 53]) { px(x, '#7c5810', ex, 31, 4, 6); px(x, '#c89020', ex, 31, 3, 5); px(x, '#fce0a8', ex, 31, 2, 1); } // Endknäufe
-          for (const side of [-1, 1]) {
-            const outer = side < 0 ? wx - 20 : wx + 52, tie = 104, y0 = 36, y1 = 178; // Außenkante (zur Wand), Raffung, Saum
-            for (let Y = y0; Y < y1; Y++) {
-              const wd = Y < tie ? 17 + (6 - 17) * Math.pow((Y - y0) / (tie - y0), 1.4) : 6 + (14 - 6) * Math.pow((Y - tie) / (y1 - tie), 0.7);
-              const W2 = Math.max(3, Math.round(wd));
-              for (let i = 0; i < W2; i++) { // i: von der Wandseite zum Fenster
-                const X = side < 0 ? outer + i : outer - i - 1;
-                const f = Math.sin((i / W2) * Math.PI * (Y < tie ? 3 : 4) + (Y < tie ? 0 : (Y - tie) * 0.025)) * 0.5 + 0.5;
-                let l = 1 + f * 4.2 - (Y < y0 + 6 ? 1.2 : 0) - (Math.abs(Y - tie) < 6 ? 0.9 : 0);
-                if (i === W2 - 1) l += 1.3; // Innenkante im Fensterlicht
-                if (i === 0) l -= 1;
-                px(x, VEL[Math.max(0, Math.min(6, Math.round(l)))], X, Y);
-              }
-              if (Y > y0 + 4) px(x, (Y >> 1) % 3 ? '#6c74c4' : '#a4acf0', side < 0 ? outer + W2 : outer - W2 - 1, Y); // Mondlichtsaum
-              if (Y === y0) for (let i = 1; i < W2; i += 3) { const X = side < 0 ? outer + i : outer - i - 1; px(x, '#f8b800', X, 34, 1, 3); px(x, '#7c5810', X, 36, 1, 1); } // Ringe
-            }
-            const tx0 = side < 0 ? outer - 1 : outer - 7;
-            px(x, '#7c5810', tx0, tie - 1, 8, 3); px(x, '#f8b800', tx0, tie - 1, 8, 1); // Raffkordel
-            const qx = side < 0 ? outer - 2 : outer;
-            px(x, '#c89020', qx, tie, 2, 3); px(x, '#f8b800', qx - 1, tie + 3, 4, 2);
-            for (let k2 = 0; k2 < 4; k2++) px(x, k2 % 2 ? '#c89020' : '#fce0a8', qx - 1 + k2, tie + 5, 1, 4 + (k2 % 2)); // Quaste
-            for (let i = 0; i < 14; i += 2) px(x, i % 4 ? '#c89020' : '#f8b800', side < 0 ? outer + i : outer - i - 1, y1, 1, 2 + (i % 4 ? 0 : 1)); // Fransen
-          }
+          // Vorhangstange mit Endknäufen; die Samtdraperien selbst wehen als eigene Ebene im Wind (drawHallDrapes)
+          px(x, '#7c5810', wx - 22, 33, 76, 3); px(x, '#c89020', wx - 22, 33, 76, 2); px(x, '#fce0a8', wx - 22, 33, 76, 1);
+          for (const ex of [wx - 25, wx + 53]) { px(x, '#7c5810', ex, 31, 4, 6); px(x, '#c89020', ex, 31, 3, 5); px(x, '#fce0a8', ex, 31, 2, 1); }
           lightShaft(x, wx, 130, 32, 46, '#3c4ca8', 0.32);
         });
       } else {
@@ -1850,6 +1825,7 @@ const Tiles = (() => {
       if (theme === 'throne') [0, 128, 256, 384].forEach(cx => goldPillar(x, cx, 22, 208)); // Halle: die Pfeiler stehen als PS2-3D-Säulen davor (drawHallPillars)
       add('wall', c, 0.5, { vtile });
       if (theme === 'hall') L.push({ name: 'win3d', custom: drawHallWindows, par: 0.5, c: C(1, 1) }); // tiefe Fensternischen (Pseudo-3D)
+      if (theme === 'hall') L.push({ name: 'drapes', custom: drawHallDrapes, par: 0.5, c: C(1, 1) }); // Samtdraperien wehen im Wind
       if (theme === 'throne') L.push({ name: 'hall3d', custom: drawThroneHall, par: 1, c: C(1, 1) }); // PS2-3D-Halle: Marmorboden, Säulen, Lichtbahnen
       else L.push({ name: 'pillars3d', custom: (cx2, cam) => drawHallPillars(cx2, cam), par: 1, c: C(1, 1) }); // Bündelsäulen in PS2-3D
       if (theme === 'throne') { // Kronleuchter vorne
@@ -2156,6 +2132,69 @@ const Tiles = (() => {
   // Die Fenster sind in die Wandebene gemalt; hier bekommen sie Tiefe: die Scheiben liegen zurückgesetzt (zum Fluchtpunkt
   // verkleinert neu gezeichnet), dazwischen die Laibungen – Stein, die zum Mond gewandte Seite heller, unten die Fensterbank.
   const HALL_WINS = [64, 320];
+  // Samtdraperie neben den Hallenfenstern als eigenes Bild (linke Seite, Außenkante zur Wand bei x = DR.o; rechts gespiegelt):
+  // oben breit in Falten an den Ringen, an der Raffkordel eingeschnürt, unten ausgestellt; Glanz auf den Faltenrücken,
+  // Mondlichtsaum zum Fenster, goldene Quaste, Fransensaum
+  const DR = { w: 26, h: 150, o: 3, y0: 33, tie: 71 }; // y0: Oberkante in Wandkoordinaten (Ringe), tie: Raffung im Bild
+  let drapeImg = null, drapeGust = 0, drapeBell = null, drapeT = -1;
+  function drapeSprites() {
+    if (drapeImg) return drapeImg;
+    const c = C(DR.w, DR.h), x = c.getContext('2d'), O = DR.o, top = 3, tie = DR.tie, y1 = 145;
+    const VEL = ['#24030a', '#3e0612', '#5c0a1a', '#7c1222', '#a01c2c', '#c42c3c', '#e05050'];
+    for (let Y = top; Y < y1; Y++) {
+      const wd = Y < tie ? 17 + (6 - 17) * Math.pow((Y - top) / (tie - top), 1.4) : 6 + (14 - 6) * Math.pow((Y - tie) / (y1 - tie), 0.7);
+      const W2 = Math.max(3, Math.round(wd));
+      for (let i = 0; i < W2; i++) {
+        const f = Math.sin((i / W2) * Math.PI * (Y < tie ? 3 : 4) + (Y < tie ? 0 : (Y - tie) * 0.025)) * 0.5 + 0.5;
+        let l = 1 + f * 4.2 - (Y < top + 6 ? 1.2 : 0) - (Math.abs(Y - tie) < 6 ? 0.9 : 0);
+        if (i === W2 - 1) l += 1.3; if (i === 0) l -= 1;
+        px(x, VEL[Math.max(0, Math.min(6, Math.round(l)))], O + i, Y);
+      }
+      if (Y > top + 4) px(x, (Y >> 1) % 3 ? '#6c74c4' : '#a4acf0', O + W2, Y); // Mondlichtsaum zum Fenster
+      if (Y === top) for (let i = 1; i < W2; i += 3) { px(x, '#f8b800', O + i, 0, 1, 3); px(x, '#7c5810', O + i, 2, 1, 1); } // Ringe
+    }
+    px(x, '#7c5810', O - 1, tie - 1, 8, 3); px(x, '#f8b800', O - 1, tie - 1, 8, 1); // Raffkordel
+    px(x, '#c89020', O - 2, tie, 2, 3); px(x, '#f8b800', O - 3, tie + 3, 4, 2);
+    for (let k = 0; k < 4; k++) px(x, k % 2 ? '#c89020' : '#fce0a8', O - 3 + k, tie + 5, 1, 4 + (k % 2)); // Quaste
+    for (let i = 0; i < 14; i += 2) px(x, i % 4 ? '#c89020' : '#f8b800', O + i, y1, 1, 2 + (i % 4 ? 0 : 1)); // Fransen
+    const gpu = (flip) => { const g = document.createElement('canvas'); g.width = DR.w; g.height = DR.h; const gx = g.getContext('2d'); if (flip) { gx.translate(DR.w, 0); gx.scale(-1, 1); } gx.drawImage(c, 0, 0); return g; };
+    return (drapeImg = [gpu(false), gpu(true)]); // Grafikkarten-Kopien: werden jedes Bild in Scheiben gezeichnet
+  }
+  // Wind: die Draperien hängen fest an der Stange, darunter läuft eine Welle den Stoff hinab, unter der Raffung flattert er
+  // stärker und bläht sich zum Fenster hin; Glockenschlag und Blitz schicken eine Böe, im Blitz leuchtet der Samt auf
+  function drawHallDrapes(ctx, cam, frame) {
+    const L = layer('hall', 'wall'); if (!L) return;
+    const [imgL, imgR] = drapeSprites(), Hc = L.c.height, off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512;
+    const oy = W.room && W.room.h > 13 ? ((Math.floor(cam.y * 0.5) % Hc) + Hc) % Hc : 0;
+    const flash = W.storm && FX.stormOn(W.storm);
+    if (frame !== drapeT) { // einmal je Bild: Böen
+      drapeT = frame;
+      if (drapeBell !== null && W.bellCd > drapeBell + 40) drapeGust = 1;
+      drapeBell = W.bellCd;
+      if (flash && drapeGust < 0.5) drapeGust = 0.5;
+      drapeGust *= 0.985;
+    }
+    const t = frame, wind = 0.55 + 0.35 * Math.sin(t * 0.013) + 0.15 * Math.sin(t * 0.047) + drapeGust * 1.8;
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    for (let k = -1; k <= Math.ceil(View.w / 512) + 1; k++) for (const ty of oy ? [-oy, Hc - oy] : [0]) for (const wx of HALL_WINS) {
+      const X = wx - off + k * 512;
+      if (X > View.w + 40 || X + 80 < -40 || ty + DR.y0 > 212 || ty + DR.y0 + DR.h < -4) continue;
+      for (const side of [-1, 1]) {
+        const img = side < 0 ? imgL : imgR, outer = side < 0 ? X - 20 : X + 52, ph = wx * 0.07 + side * 1.3;
+        for (let r = 0; r < DR.h; r += 4) { // Scheiben zu 4 Zeilen
+          const sy = ty + DR.y0 + r; if (sy > 210 || sy < -4) continue;
+          const u = Math.max(0, r - 3) / (DR.h - 3), below = Math.max(0, (r - DR.tie) / 60);
+          const amp = (u * 1.8 + below * 2.6) * wind;
+          const dx = Math.sin(u * 6.5 - t * 0.075 + ph) * amp + Math.sin(t * 0.021 + ph) * u * 1.6 * wind;
+          const sc = 1 + 0.14 * Math.max(0, Math.sin(u * 4 - t * 0.05 + ph)) * Math.min(1, u * 3) * wind; // bläht sich zum Fenster
+          const wdt = Math.round(DR.w * sc), x0 = side < 0 ? Math.round(outer - DR.o * sc + dx * side * -1) : Math.round(outer + DR.o * sc - wdt - dx);
+          ctx.drawImage(img, 0, r, DR.w, 4, x0, sy, wdt, 4);
+          if (flash) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35; ctx.drawImage(img, 0, r, DR.w, 4, x0, sy, wdt, 4); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
+        }
+      }
+    }
+    ctx.restore();
+  }
   function drawHallWindows(ctx, cam) {
     const L = layer('hall', 'wall'); if (!L) return;
     const img = L.c, Hc = img.height, VX = View.w / 2, VY = 60, f = 0.11, off = ((Math.floor(cam.x * 0.5) % 512) + 512) % 512;

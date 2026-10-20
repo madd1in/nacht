@@ -161,7 +161,7 @@ class Player {
     if (this.atkT === 0) return;
     this.atkT++;
     if (this.atkSub && this.atkT === 9) this.throwSub();
-    if (!this.atkSub && this.atkT >= 6 && this.atkT <= 16 && this.tryLatch()) return; // Einhak-Fenster über mehrere Frames
+    if (!this.atkSub && this.atkT >= 1 && this.atkT <= 16 && this.tryLatch()) return; // Einhak-Fenster ab dem ersten Bild: kein Ausholen, das Seil schießt gerade zum Ring
     if (!this.atkSub && this.atkT === 13 && !this.sword) Audio8.sfx('crack');
     if (!this.atkSub && this.atkT >= 12 && this.atkT <= 17) this.whipHits();
     if (this.atkT > ATK_LEN) {
@@ -677,7 +677,8 @@ class Player {
     for (const r of near ? [near] : []) {
       const dx = wrapDx(r.cx - h.x), dy = r.cy - h.y, rel = wrapDx(this.cx - r.cx);
       if (!air && Math.abs(angDiff(Math.atan2(dy, dx), wa)) > 1.15) continue;
-      this.state = 'swing'; this.ring = r; this.atkT = 0; this.dangle = false; this.setCrouch(false);
+      this.state = 'swing'; this.ring = r; this.atkT = 0; this.dangle = false; this.setCrouch(false); this.ropeT = 0;
+      if (Math.abs(r.cx - this.cx) > 2) this.face = r.cx > this.cx ? 1 : -1; // zum Ring drehen: die Hand liegt auf seiner Seite
       this.swL = clamp(Math.hypot(rel, this.cy - r.cy), 26, RING_REACH); // langes Seil zieht sich danach sanft ein
       this.swA = Math.atan2(rel, this.cy - r.cy);
       this.swW = clamp((this.vx * Math.cos(this.swA) - this.vy * Math.sin(this.swA)) / this.swL, -0.08, 0.08);
@@ -702,7 +703,8 @@ class Player {
     const nx = r.cx + Math.sin(this.swA) * this.swL - this.w / 2, ny = r.cy + Math.cos(this.swA) * this.swL - this.h / 2;
     if (Phys.rectSolid(nx, ny, this.w, this.h)) this.swW *= -0.4;
     else { this.x = nx; this.y = ny; }
-    if (Math.abs(this.swW) > 0.004) this.face = this.swW > 0 ? 1 : -1;
+    if (Math.abs(this.swW) > 0.004 && this.ropeT > 6) this.face = this.swW > 0 ? 1 : -1;
+    this.ropeT = (this.ropeT || 0) + 1;
     if (W.frame % 18 === 0 && Math.abs(this.swW) > 0.05) Audio8.sfx('whoosh');
     if (P.jump || P.attack) this.releaseSwing(P.jump);
     this.clampRoom();
@@ -894,8 +896,8 @@ class Player {
     if (this.state === 'zip' && this.chicken) RubberChicken.paint(ctx, Math.round(this.cx - cam.x) - 6, Math.round(this.feet - 41 - cam.y), this.face < 0); // Huhn als Griff
     if (this.state === 'swing' && this.ring) { // Seil/Peitsche zum Ankerring
       const hx = this.cx + this.face * 3 - cam.x, hy = this.feet - 34 - cam.y, rx = this.ring.cx - cam.x, ry = this.ring.cy - cam.y;
-      const n = Math.ceil(Math.hypot(rx - hx, ry - hy) / 2);
-      for (let k = 0; k <= n; k++) {
+      const n = Math.ceil(Math.hypot(rx - hx, ry - hy) / 2), m = Math.ceil(n * Math.min(1, ((this.ropeT || 0) + 1) / 5)); // schießt in fünf Bildern hinaus
+      for (let k = 0; k <= m; k++) {
         ctx.fillStyle = this.sword ? (k % 2 ? '#8c6440' : '#c8a070') : this.whip === 1 ? (k % 3 ? PAL.b : PAL.B) : (k % 2 ? PAL.g : PAL.W);
         ctx.fillRect(Math.round(hx + (rx - hx) * k / n), Math.round(hy + (ry - hy) * k / n), 2, 2);
       }
