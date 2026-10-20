@@ -282,6 +282,16 @@ const Audio8 = (() => {
   const FILLP = 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 p:1 h:1 p:1 h:1 p:1 p:1 p:1 p:1';
   const toccata = (a, b, c) => { const up = (n) => n.replace(/\d/, d => +d + 1); return `${a}:1 ${b}:1 ${c}:1 ${b}:1 ${a}:1 ${b}:1 ${c}:1 ${up(a)}:1 ${c}:1 ${up(a)}:1 ${up(b)}:1 ${up(a)}:1 ${c}:1 ${b}:1 ${a}:1 ${b}:1`; };
 
+  // Graf – Bosslied (d-Moll): Akkorde, Pedalgrundtöne, Orgel-Lagen
+  const CT = { Dm: ['d4', 'f4', 'a4'], Bb: ['a#3', 'd4', 'f4'], Gm: ['g3', 'a#3', 'd4'], A: ['a3', 'c#4', 'e4'], F: ['f3', 'a3', 'c4'], C: ['c4', 'e4', 'g4'], Cdim: ['c#4', 'e4', 'g4'] };
+  const CT_B = { Dm: 'd2', Bb: 'a#1', Gm: 'g1', A: 'a1', F: 'f1', C: 'c2', Cdim: 'c#2' };
+  const CT_O = { Dm: 'd3+a3+d4+f4', Bb: 'a#2+f3+a#3+d4', Gm: 'g2+d3+g3+a#3', A: 'a2+e3+a3+c#4', F: 'f2+c3+f3+a3', C: 'c3+g3+c4+e4', Cdim: 'c#3+g3+a#3+e4' };
+  const CT_C = ['Dm', 'Bb', 'Gm', 'A', 'Dm', 'Bb', 'Cdim', 'A', 'Dm', 'F', 'C', 'Dm', 'Bb', 'Gm', 'A', 'A'];
+  const CT_C2 = ['Dm', 'Gm', 'Bb', 'A', 'Dm', 'Gm', 'A', 'A'];
+  const GFOUR = 'g:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 k:1 h:1 o:1 k:1 q:1 h:1 o:1 h:1'; // Gong auf der Eins
+  const DKD = 'k:1 d:1 s:1 d:1 k:1 d:1 s:1 d:1 k:1 d:1 s:1 d:1 k:1 d:1 s:1 d:1'; // Doppel-Kick unter Snare-Achteln
+  const GDKD = 'g:1' + DKD.slice(3), BDKD = 'b:1' + DKD.slice(3); // mit Gong bzw. Glocke auf der Eins
+
   const SONGS = {
     title: {
       bpm: 104, loop: true,
@@ -408,6 +418,30 @@ const Audio8 = (() => {
       pad: rep(CH_C.map(c => CH[c].join('+') + ':16').join(' '), 2),
       dr: rep([PFOUR, DK, FOUR, FILLS, PFOUR, DK, DK, FILLP].join(' '), 2) + ' ' + sectionB(), // galoppierende Kick schon im Choral-Teil
     },
+    // Der Graf – Bosslied (d-Moll, 152 BPM): Pauken-Wirbel und Orgel-Toccata-Auftakt (gemeinfreies Motiv), verminderter Akkord löst
+    // sich nach d-Moll auf, Gong; dann der Kampf: eigene Melodie, Orgel-Stakkato, rauschende Toccata-16tel, Pedalgalopp, Chor,
+    // Pauken; Höhepunkt eine Oktave höher über vollen Orgelakkorden, 32tel, Doppel-Kick, Glocken, Riser zurück zum Anfang
+    count: {
+      bpm: 152, loop: true, echo: { delay: 3, vol: 0.3 },
+      p1: ['a5:1 g5:1 a5:4 -:2 g5:1 f5:1 e5:1 d5:1 c#5:4', 'd5:8 -:8', 'a4:1 g4:1 a4:4 -:2 g4:1 f4:1 e4:1 d4:1 c#4:4', 'd4:8 -:4 a3:1 d4:1 f4:1 a4:1',
+        'd5:4 a5:4 f5:2 e5:2 d5:2 a4:2', 'a#4:4 f5:4 d5:2 c5:2 a#4:2 f4:2', 'g4:2 a#4:2 d5:4 g5:4 f5:2 d5:2', 'e5:6 c#5:2 a4:4 e5:4',
+        'f5:4 a5:4 d6:4 c6:2 a5:2', 'a#5:4 f5:2 d5:2 a#5:4 a5:2 g5:2', 'g5:4 e5:4 c#5:4 a#4:4', 'a4:2 c#5:2 e5:2 a5:2 c#6:4 a5:4',
+        'd6:6 c6:2 a5:4 f5:4', 'c6:4 a5:2 f5:2 c6:4 a5:4', 'g5:4 e5:2 c5:2 g5:4 e5:2 g5:2', 'a5:6 f5:2 d5:8',
+        'd5:2 f5:2 a#5:4 d6:4 c6:2 a#5:2', 'a#5:2 a5:2 g5:4 d5:4 g5:4', 'c#6:4 e6:4 a5:4 g5:2 e5:2', 'c#5:8 e5:4 a5:4',
+        'd6:8 e6:4 f6:4', 'g6:8 f6:4 d6:4', 'f6:8 d6:4 a#5:4', 'c#6:8 e6:8',
+        'f6:4 e6:4 d6:4 a5:4', 'a#5:4 d6:4 g6:8', 'e6:4 c#6:4 a5:4 e6:4', 'a6:12 -:4'].join(' '),
+      p2: ['-:16', rep('d4:1 f4:1 a4:1 d5:1', 4), '-:16', rep('c#4:1 e4:1 g4:1 a#4:1', 2) + ' ' + rep('d4:1 f4:1 a4:1 d5:1', 2)].join(' ') + ' ' +
+        CT_C.map(c => toccata(...CT[c])).join(' ') + ' ' + CT_C2.map(c => arp3f(...CT[c])).join(' '),
+      tri: 'a1:16 d2:16 a1:16 c#2:8 d2:8 ' + CT_C.map(c => gallop(CT_B[c], CT_B[c].replace(/\d/, d => +d + 1))).join(' ') + ' ' +
+        CT_C2.map(c => drive(CT_B[c], CT_B[c].replace(/\d/, d => +d + 1))).join(' '),
+      org: 'a2+a3:16 d2+a2+d3+f3+a3+d4:16 a1+a2:16 c#3+e3+g3+a#3:8 d3+f3+a3+d4:8 ' + // Auftakt: Orgelpunkt, volles d-Moll, verminderter Akkord
+        CT_C.map(c => { const v = CT_O[c]; return `${v}:2 -:2 ${v}:2 -:2 ${v}:4 ${v}:2 -:2`; }).join(' ') + ' ' + // Stakkato
+        CT_C2.map(c => CT_B[c].replace(/\d/, d => +d) + '+' + CT_O[c] + ':16').join(' '), // Höhepunkt: volle Akkorde mit Pedal
+      pad: 'd3+f3+a3:32 a2+c#3+e3:16 d3+f3+a3:16 ' + CT_C.map(c => CT[c].join('+') + ':16').join(' ') + ' ' + CT_C2.map(c => CT[c].join('+') + ':16').join(' '),
+      dr: ['p:1 -:7 p:1 p:1 p:1 p:1 p:1 p:1 p:1 p:1', 'g:1 -:15', 'p:1 -:7 p:1 p:1 p:1 p:1 p:1 p:1 p:1 p:1', 'g:1 -:11 t:1 t:1 u:1 u:1'].join(' ') + ' ' +
+        rep([GFOUR, FOUR, FOUR, FILLS, PFOUR, FOUR, FOUR, FILLP].join(' '), 2) + ' ' +
+        [GDKD, DKD, DKD, DKD, BDKD, DKD, DKD, 'k:1 h:1 s:1 h:1 p:1 p:1 p:1 p:1 w:8'].join(' '),
+    },
     // Sonnenkathedrale und Sonnenturm: aufsteigende Heldenmelodie, Galopp im Bass, im B-Teil rauschende 32tel
     sun: {
       bpm: 188, loop: true, echo: { delay: 3, vol: 0.3 },
@@ -497,7 +531,7 @@ const Audio8 = (() => {
   const parsed = {};
   for (const k in SONGS) {
     const s = SONGS[k];
-    const tracks = ['p1', 'p2', 'tri', 'dr', 'pad'].filter(t => s[t]).map(t => ({ name: t, ev: parse(s[t]) }));
+    const tracks = ['p1', 'p2', 'tri', 'dr', 'pad', 'org'].filter(t => s[t]).map(t => ({ name: t, ev: parse(s[t]) }));
     const lens = tracks.map(t => t.ev.reduce((a, e) => a + e.len, 0));
     if (new Set(lens).size > 1) console.warn('Songlänge ungleich', k, lens);
     parsed[k] = { bpm: s.bpm, loop: s.loop, echo: s.echo, tracks, steps: lens[0] };
@@ -520,6 +554,12 @@ const Audio8 = (() => {
       f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(9000, t + dur);
       const g = ac.createGain(); g.gain.setValueAtTime(0.01, t); g.gain.linearRampToValueAtTime(0.38, t + dur * 0.95); g.gain.linearRampToValueAtTime(0, t + dur);
       src.connect(f); f.connect(g); g.connect(musicBus); src.start(t); src.stop(t + dur + 0.02);
+      return;
+    }
+    if (n === 'b' || n === 'g') { // Röhrenglocke in D (unharmonische Teiltöne, langer Ausklang); g: dazu Pauke und Becken – der Gong-Schlag
+      [[1, 0.16], [2, 0.1], [2.76, 0.08], [5.4, 0.045], [8.9, 0.025]].forEach(([m, a]) => { const o = ac.createOscillator(), gg = ac.createGain(); o.type = 'sine'; o.frequency.value = 293.66 * m;
+        gg.gain.setValueAtTime(a, t); gg.gain.exponentialRampToValueAtTime(0.001, t + 2.8 / Math.sqrt(m)); o.connect(gg); gg.connect(musicBus); o.start(t); o.stop(t + 2.9); });
+      if (n === 'g') { cueQ.push(t); tone2('triangle', 120, 82, 0.55, 0.55, t); noise(0.18, 0.12, 'lowpass', 500, 120, t, musicBus); noise(1.3, 0.26, 'highpass', 5000, 2000, t, musicBus); }
       return;
     }
     if (n === 'r') { noise(0.06, 0.3, 'bandpass', 2000, 1100, t, musicBus); noise(0.06, 0.34, 'bandpass', 2000, 1100, t + dur / 2, musicBus); return; }
@@ -575,6 +615,21 @@ const Audio8 = (() => {
     o.start(t); o.stop(t + gate + 0.02);
   }
 
+  // Pfeifenorgel (Bosslied des Grafen): Register 16', 8', 4', 2 2/3', 2' – Grundton, Oktaven und Quinte, schnelle Ansprache,
+  // Tremulant, kurzer Nachklang; Akkorde wie beim Pad als „a+b+c:Länge"
+  function organNote(f, t, dur) {
+    const g = ac.createGain(), lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3400; lp.Q.value = 0.7;
+    const v = 0.017, rel = 0.14, end = t + Math.max(0.03, dur - 0.02);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.018); g.gain.setValueAtTime(v, end); g.gain.linearRampToValueAtTime(0, end + rel);
+    const trem = ac.createOscillator(), tg = ac.createGain(); trem.frequency.value = 5.6; tg.gain.value = v * 0.16;
+    trem.connect(tg); tg.connect(g.gain); trem.start(t); trem.stop(end + rel + 0.05);
+    [[0.5, 'square', 0.5], [1, 'square', 0.7], [2, 'triangle', 0.65], [3, 'sine', 0.35], [4, 'sine', 0.28]].forEach(([m, type, a]) => {
+      const o = ac.createOscillator(), og = ac.createGain(); o.type = type; o.frequency.value = f * m; og.gain.value = a;
+      o.connect(og); og.connect(lp); o.start(t); o.stop(end + rel + 0.05);
+    });
+    lp.connect(g); g.connect(melBus);
+  }
+
   // Orgel/Chor: verstimmte Sägezähne durch Tiefpass, langsamer Einsatz
   function padNote(f, t, dur) {
     const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 2;
@@ -590,6 +645,7 @@ const Audio8 = (() => {
   function playEvent(track, ev, t, stepDur) {
     if (ev.n === '-') return;
     if (track === 'pad') { ev.n.split('+').forEach(n => { const f = freq(n); if (f) padNote(f, t, ev.len * stepDur); }); return; }
+    if (track === 'org') { ev.n.split('+').forEach(n => { const f = freq(n); if (f) organNote(f, t, ev.len * stepDur); }); return; }
     if (track === 'dr') { drum(ev.n, t, ev.len * stepDur); return; }
     const f = freq(ev.n);
     if (!f) return;

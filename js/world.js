@@ -488,7 +488,7 @@ const W = {
     if (this.combo.pop > 0) this.combo.pop--;
     const b = this.boss;
     if (b && !b.dying && !this.bossEnraged && b.hp <= b.maxHp / 2) { // Phase 2: Musik eskaliert
-      this.bossEnraged = true; if (b.music === 'chapel') Audio8.tempo(1.1); else { Audio8.stop(); Audio8.play('boss2'); } Audio8.sfx('roar'); // Graf: dasselbe Stück, nur schneller
+      this.bossEnraged = true; if (b.music === 'chapel' || b.music === 'count') Audio8.tempo(1.1); else { Audio8.stop(); Audio8.play('boss2'); } Audio8.sfx('roar'); // Graf: dasselbe Stück, nur schneller
       this.zoomFx = { t: 0, len: 46, amp: 0.1, b };
       if (this.room.theme === 'throne') Voice.say('taunt'); // der Graf spottet
       this.flash = 8; this.shake = 18; this.spawn(new Shock(b.cx, b.cy, 110, '#a80020', 5)); Input.rumble(0.7, 0.4, 500);
