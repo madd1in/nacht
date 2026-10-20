@@ -66,6 +66,7 @@ const W = {
         case 'fchand': this.spawn(new FallingChandelier(d)); break;
         case 'ghostball': this.spawn(new GhostDance(d)); break;
         case 'coach': this.spawn(new GhostCoach(d)); break;
+        case 'curtains': this.spawn(new BelfryCurtains(d)); break;
         case 'armor': this.spawn(new ArmorSuit(d)); break;
         case 'pillar': this.spawn(new Pillar(d.x, d.y)); break;
         case 'raven': this.spawn(new Raven(d.x, d.y)); break;
@@ -506,7 +507,7 @@ const W = {
     if (this.room.theme in STORMY) FX.updateStorm(this.storm, View.w, () => {
       setTimeout(() => Audio8.sfx('thunder'), 150 + Math.random() * 700);
       Input.rumble(0.35, 0.15, 450); this.shake = Math.max(this.shake, 4);
-      if (this.room.theme === 'foyer') this.storm.cd = Math.min(this.storm.cd, 90 + Math.random() * 160); // in der Eingangshalle blitzt es öfter
+      if (this.room.theme === 'foyer' || this.room.bell) this.storm.cd = Math.min(this.storm.cd, 90 + Math.random() * 160); // in der Eingangshalle und im Glockenturm blitzt es öfter
     });
   },
 

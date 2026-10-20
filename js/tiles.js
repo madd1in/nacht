@@ -1799,10 +1799,33 @@ const Tiles = (() => {
             if (wi === 0) moon(x, wx + 22, 66, 7);
             for (let i = 0; i < 6; i++) px(x, '#fcfcfc', wx + ri(2, 29), ri(46, 120));
           });
-          for (let k = 0; k < 2; k++) {
-            const cx = k ? wx + 34 : wx - 10;
-            for (let X = 0; X < 8; X++) px(x, ['#680010', '#a80020', '#d82800', '#a80020'][X % 4], cx + X, 40, 1, 100 + (X % 2) * 2);
-            px(x, '#f8b800', cx, 104, 8, 2);
+          // Samtdraperien: goldene Stange mit Ringen und Endknäufen, oben breit in Falten gelegt, an der Raffkordel eingeschnürt,
+          // unten wieder ausgestellt; Glanz auf den Faltenrücken, zum Fenster hin ein kühler Mondlichtsaum, Quaste, Fransensaum
+          const VEL = ['#24030a', '#3e0612', '#5c0a1a', '#7c1222', '#a01c2c', '#c42c3c', '#e05050'];
+          px(x, '#7c5810', wx - 22, 33, 76, 3); px(x, '#c89020', wx - 22, 33, 76, 2); px(x, '#fce0a8', wx - 22, 33, 76, 1); // Stange
+          for (const ex of [wx - 25, wx + 53]) { px(x, '#7c5810', ex, 31, 4, 6); px(x, '#c89020', ex, 31, 3, 5); px(x, '#fce0a8', ex, 31, 2, 1); } // Endknäufe
+          for (const side of [-1, 1]) {
+            const outer = side < 0 ? wx - 20 : wx + 52, tie = 104, y0 = 36, y1 = 178; // Außenkante (zur Wand), Raffung, Saum
+            for (let Y = y0; Y < y1; Y++) {
+              const wd = Y < tie ? 17 + (6 - 17) * Math.pow((Y - y0) / (tie - y0), 1.4) : 6 + (14 - 6) * Math.pow((Y - tie) / (y1 - tie), 0.7);
+              const W2 = Math.max(3, Math.round(wd));
+              for (let i = 0; i < W2; i++) { // i: von der Wandseite zum Fenster
+                const X = side < 0 ? outer + i : outer - i - 1;
+                const f = Math.sin((i / W2) * Math.PI * (Y < tie ? 3 : 4) + (Y < tie ? 0 : (Y - tie) * 0.025)) * 0.5 + 0.5;
+                let l = 1 + f * 4.2 - (Y < y0 + 6 ? 1.2 : 0) - (Math.abs(Y - tie) < 6 ? 0.9 : 0);
+                if (i === W2 - 1) l += 1.3; // Innenkante im Fensterlicht
+                if (i === 0) l -= 1;
+                px(x, VEL[Math.max(0, Math.min(6, Math.round(l)))], X, Y);
+              }
+              if (Y > y0 + 4) px(x, (Y >> 1) % 3 ? '#6c74c4' : '#a4acf0', side < 0 ? outer + W2 : outer - W2 - 1, Y); // Mondlichtsaum
+              if (Y === y0) for (let i = 1; i < W2; i += 3) { const X = side < 0 ? outer + i : outer - i - 1; px(x, '#f8b800', X, 34, 1, 3); px(x, '#7c5810', X, 36, 1, 1); } // Ringe
+            }
+            const tx0 = side < 0 ? outer - 1 : outer - 7;
+            px(x, '#7c5810', tx0, tie - 1, 8, 3); px(x, '#f8b800', tx0, tie - 1, 8, 1); // Raffkordel
+            const qx = side < 0 ? outer - 2 : outer;
+            px(x, '#c89020', qx, tie, 2, 3); px(x, '#f8b800', qx - 1, tie + 3, 4, 2);
+            for (let k2 = 0; k2 < 4; k2++) px(x, k2 % 2 ? '#c89020' : '#fce0a8', qx - 1 + k2, tie + 5, 1, 4 + (k2 % 2)); // Quaste
+            for (let i = 0; i < 14; i += 2) px(x, i % 4 ? '#c89020' : '#f8b800', side < 0 ? outer + i : outer - i - 1, y1, 1, 2 + (i % 4 ? 0 : 1)); // Fransen
           }
           lightShaft(x, wx, 130, 32, 46, '#3c4ca8', 0.32);
         });

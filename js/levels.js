@@ -223,6 +223,7 @@ const Levels = (() => {
     .candle(12, 21, 'H').candle(21, 19).candle(12, 14).candle(15, 14, '3').candle(10, 7, 'W').candle(26, 4, 'H')
     .enemy('bat', 20, 12).enemy('bat', 6, 4)
     .zone('ghoul', 0, 27, { interval: 170, max: 1 })
+    .prop('curtains', {})                                               // durchscheinende Vorhänge wehen durch den Turm
     .bell()
     .start(2, 27).exitAt(25, 0, 27, 5).done();
 
