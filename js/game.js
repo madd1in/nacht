@@ -376,12 +376,14 @@ const Game = {
     switch (this.state) {
       case 'title':
         if (this.revealed && this.idleT > 60 * 20) { this.startScores(true); break; } // Attract-Modus
-        if (P.up || P.down) { this.menu = (this.menu + (P.down ? 1 : 3)) % 4; Audio8.sfx('select'); }
+        if (P.up || P.down) { this.menu = (this.menu + (P.down ? 1 : 4)) % 5; Audio8.sfx('select'); }
+        if (P.left || P.right) { Audio8.init(); this.menu = 2; this.cycleLang(P.left); Audio8.sfx('select'); break; } // Sprache: auf dem Titel jederzeit mit ◀ ▶
         if (P.start || P.jump || P.attack) {
           Audio8.init(); Audio8.sfx('select');
           if (this.menu === 1) { this.go('options'); this.optSel = 0; break; }
-          if (this.menu === 2) { this.startScores(false); break; }
-          if (this.menu === 3) { this.go('sections'); break; } // Abschnittswahl fürs Testspielen
+          if (this.menu === 2) { this.cycleLang(false); break; }
+          if (this.menu === 3) { this.startScores(false); break; }
+          if (this.menu === 4) { this.go('sections'); break; } // Abschnittswahl fürs Testspielen
           this.go('charsel');
         }
         break;
@@ -456,6 +458,11 @@ const Game = {
     }
   },
 
+  cycleLang(back) { // nächste Sprache – mit Hörprobe der Titelansage
+    const L = I18N.LANGS, i = L.indexOf(Options.lang);
+    Options.set('lang', L[(i + (back ? L.length - 1 : 1)) % L.length]);
+    this.applyLang(); Voice.stop(); Voice.preload(); Voice.say('title'); this.langFx = 30;
+  },
   updateOptions(P) {
     const n = OPTION_ITEMS.length;
     if (P.up) { this.optSel = (this.optSel + n - 1) % n; Audio8.sfx('select'); }
@@ -467,11 +474,7 @@ const Game = {
     if (it.key === 'music') {
       Options.set('music', clamp(Options.music + (left ? -1 : 1), 0, 10));
       Audio8.setMusicLevel(Options.music / 8);
-    } else if (it.key === 'lang') {
-      const L = I18N.LANGS, i = L.indexOf(Options.lang);
-      Options.set('lang', L[(i + (left ? L.length - 1 : 1)) % L.length]);
-      this.applyLang(); Voice.stop(); Voice.preload(); Voice.say('title'); // Hörprobe
-    } else if (it.key === 'voice') {
+    } else if (it.key === 'lang') this.cycleLang(left); else if (it.key === 'voice') {
       Options.toggle('voice');
       if (Options.voice) Voice.say('title'); else Voice.stop();
     } else if (it.key === 'crt') this.toggleCrt();
@@ -1061,14 +1064,23 @@ const Game = {
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     for (let k = 0; k < 4; k++) ctx.fillRect(r.x + sh + k, 30, 2, 28);
     Font.draw(ctx, tr('subtitle'), cx, 66, (this.t >> 2) % 40 === 0 ? '#fcfcfc' : '#bcbcbc', { align: 'center', shadow: '#000' });
-    [tr('start'), tr('options'), tr('hiTitle'), tr('sections')].forEach((m, i) => {
-      const on = this.menu === i;
-      Font.draw(ctx, m, cx - 30, 91 + i * 10, on ? '#fcfcfc' : i === 3 ? '#5c7c8c' : '#8c8c8c', { shadow: '#000', wave: on ? 1.4 : 0, t: this.t });
-      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 44, 90 + i * 10);
+    const langTxt = tr('optLang') + '  < ' + I18N.NAMES[Options.lang] + ' >', msp = I18N.cjk ? 10 : 9, my0 = 79; // CJK-Schrift ist höher
+    [tr('start'), tr('options'), langTxt, tr('hiTitle'), tr('sections')].forEach((m, i) => {
+      const on = this.menu === i, y = my0 + i * msp, lang = i === 2;
+      if (lang) { // Weltkugel vor dem Sprachpunkt, bei jedem Wechsel ein kurzes Aufleuchten
+        const gx = cx - 30 - 12, gy = y, k = (this.langFx = Math.max(0, (this.langFx || 0) - 1)) > 0 ? '#fcfcfc' : '#3cbcfc';
+        ctx.fillStyle = '#04284c'; ctx.fillRect(gx + 1, gy, 7, 9); ctx.fillRect(gx, gy + 1, 9, 7);
+        ctx.fillStyle = k; ctx.fillRect(gx + 2, gy + 1, 5, 7); ctx.fillRect(gx + 1, gy + 2, 7, 5);
+        ctx.fillStyle = '#58f898'; ctx.fillRect(gx + 2, gy + 2, 2, 2); ctx.fillRect(gx + 5, gy + 4, 2, 3); ctx.fillRect(gx + 3, gy + 6, 1, 1); // Kontinente
+        ctx.fillStyle = '#04284c'; ctx.fillRect(gx + 1, gy + 4, 7, 1); ctx.fillRect(gx + 4, gy + 1, 1, 7); // Netz
+      }
+      Font.draw(ctx, m, cx - 30, y, on ? '#fcfcfc' : lang ? '#fce0a8' : i === 4 ? '#5c7c8c' : '#8c8c8c', { shadow: '#000', wave: on ? 1.4 : 0, t: this.t });
+      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - (lang ? 56 : 44), y - 1);
     });
     const tags = [Options.easy && tr('tagEasy'), Options.maxWhip && tr('tagWhip'), Options.infHearts && tr('tagHearts')].filter(Boolean);
-    if (tags.length) Font.draw(ctx, tags.join(' + '), cx, 84, '#58f898', { align: 'center', shadow: '#000' });
-    const lines = this.controlLines(), lh = I18N.cjk ? 11 : 10, by = lines.length > 6 ? 130 : 136;
+    const mEnd = my0 + 5 * msp;
+    if (tags.length) Font.draw(ctx, tags.join(' + '), cx, mEnd, '#58f898', { align: 'center', shadow: '#000' });
+    const lines = this.controlLines(), lh = I18N.cjk ? 11 : 10, by = mEnd + (tags.length ? 11 : 3); // unter dem Menü (und den Schaltern)
     const bh = lines.length * lh + 6;
     ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(cx - 116, by, 232, bh);
     ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 116, by, 232, 1); ctx.fillRect(cx - 116, by + bh - 1, 232, 1);
