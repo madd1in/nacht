@@ -2375,12 +2375,11 @@ const Tiles = (() => {
   ];
   let castleBuf = null;
   function drawCastle3D(ctx, cam, frame) {
-    const w = View.w, P = 1229, Zc = 2.4, D = 130, baseY = 176, vx = w / 2, camX = cam.x * 0.6;
-    if (!castleBuf || castleBuf.c.width !== w) { castleBuf = { c: C(w, 208), key: null }; castleBuf.x = castleBuf.c.getContext('2d'); }
-    const flash = FX.stormOn(W.storm) ? 1 : 0, key = Math.round(camX / Zc / (View.lite ? 3 : 1)) + '|' + flash + '|' + (frame >> 5);
-    if (castleBuf.key !== key) {
-      castleBuf.key = key;
-      const x = castleBuf.x; x.clearRect(0, 0, w, 208);
+    const w = View.w, P = 1229, Zc = 2.4, D = 130, baseY = 176, vx = w / 2, camX = cam.x * 0.6, MC = 40;
+    if (!castleBuf) castleBuf = {};
+    const flash = FX.stormOn(W.storm) ? 1 : 0;
+    PS2.shiftCache(ctx, castleBuf, { w, h: 208, dv: 1, M: MC, par: 0.6 / Zc, tol: View.lite ? 40 : 24, camX: cam.x, key: flash + '|' + w, soft: frame >> 5, draw: (x) => { // Verschiebe-Puffer (Mauern und Türme liegen fast in einer Tiefe)
+      x.save(); x.translate(MC, 0);
       const pr = (X, Y, Z) => [vx + (X - camX - vx) / Z, baseY - Y / Z];
       const tone = (nx, nz, up = 0) => Math.max(0, nx * 0.72 - nz * 0.35 + up * 0.5) * (1 + flash * 0.9);
       const col = (l, k = 1) => `rgb(${Math.round((14 + 52 * l) * k)},${Math.round((8 + 30 * l) * k)},${Math.round((24 + 62 * l) * k)})`;
@@ -2433,8 +2432,8 @@ const Tiles = (() => {
           }
         }
       }
-    }
-    ctx.drawImage(castleBuf.c, 0, 0);
+      x.restore();
+    } });
   }
 
   // ---------------- Burghof: Bergketten im PS2-Look ----------------
@@ -2454,12 +2453,10 @@ const Tiles = (() => {
       }
       mtnMesh.sort((a, b) => b.z - a.z); seed = sd0;
     }
-    const w = View.w;
-    if (!mtnBuf || mtnBuf.c.width !== w) { mtnBuf = { c: C(w, 208), key: null }; mtnBuf.x = mtnBuf.c.getContext('2d'); }
-    const key = Math.round(cam.x * 0.6 / 3.6 / (View.lite ? 3 : 1));
-    if (mtnBuf.key !== key) {
-      mtnBuf.key = key;
-      const x = mtnBuf.x; x.clearRect(0, 0, w, 208);
+    const w = View.w, MM = 24;
+    if (!mtnBuf) mtnBuf = {};
+    PS2.shiftCache(ctx, mtnBuf, { w, h: 208, dv: 1, M: MM, par: 0.11, tol: View.lite ? 30 : 16, camX: cam.x, key: w, soft: 0, draw: (x) => { // Verschiebe-Puffer
+      x.save(); x.translate(MM, 0);
       const vx = w / 2, baseY = 152, Lm = [0.62, 0.6, 0.5], camX = cam.x * 0.6;
       const mix = (c, f, to) => c.map((v, i) => Math.round(v * (1 - f) + to[i] * f));
       const css = c => `rgb(${c[0]},${c[1]},${c[2]})`;
@@ -2467,7 +2464,7 @@ const Tiles = (() => {
         const haze = Math.min(0.72, (M.z - 2.5) / 11), sky = [44, 20, 72];
         for (let k = -1; k <= 1; k++) for (const pk of M.peaks) {
           const wx = M.ax + pk.dx + k * P, sx = vx + (wx - camX - vx) / M.z, half = pk.w / M.z;
-          if (sx + half < -20 || sx - half > w + 20) continue;
+          if (sx + half < -20 - MM || sx - half > w + 20 + MM) continue;
           const apex = [sx + M.skew * half, baseY - pk.h / M.z], foot = baseY + 14 / M.z * 10;
           const L0 = [sx - half, baseY], L1 = [sx - half * 0.35, foot], R1 = [sx + half * 0.4, foot], R0 = [sx + half, baseY];
           const faces = [[L0, L1, [-0.75, 0.45, 0.48]], [L1, R1, [0.05, 0.42, 0.9]], [R1, R0, [0.78, 0.45, 0.42]]];
@@ -2480,10 +2477,10 @@ const Tiles = (() => {
             x.fillStyle = g; x.beginPath(); x.moveTo(apex[0], apex[1]); x.lineTo(p[0], p[1]); x.lineTo(q[0], q[1]); x.closePath(); x.fill();
           }
         }
-        if (M.z < 6) { const g = x.createLinearGradient(0, 118, 0, 168); g.addColorStop(0, 'rgba(46,18,70,0)'); g.addColorStop(1, 'rgba(46,18,70,0.75)'); x.fillStyle = g; x.fillRect(0, 118, w, 90); } // Talnebel
+        if (M.z < 6) { const g = x.createLinearGradient(0, 118, 0, 168); g.addColorStop(0, 'rgba(46,18,70,0)'); g.addColorStop(1, 'rgba(46,18,70,0.75)'); x.fillStyle = g; x.fillRect(-MM, 118, w + 2 * MM, 90); } // Talnebel
       }
-    }
-    ctx.drawImage(mtnBuf.c, 0, 0);
+      x.restore();
+    } });
   }
 
   // ---------------- Marmorgalerie: Säulengang in echter Perspektive (PS1-Look) ----------------

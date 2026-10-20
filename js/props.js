@@ -811,7 +811,7 @@ class Gatehouse extends Ent {
   // Banner als Stoffnetz (PS2): Gitter aus Vierecken, das im Wind in die Tiefe schwingt; jedes Viereck nach seiner Neigung
   // zum Licht schattiert (Falten hell/dunkel), die Farbe kommt aus dem Wappenmuster (goldene Fledermaus auf Rot)
   drawBanner(ctx, bx, by) {
-    const NU = 11, NV = View.lite ? 18 : 28, t = this.t, Wd = 22, vtx = [];
+    const NU = 8, NV = View.lite ? 12 : 18, t = this.t, Wd = 22, vtx = []; // klein dargestellt (60–90 %): gröberes Netz reicht
     const zf = (u, v, len) => Math.sin(t * 0.09 - v * 0.05 + u * 0.2) * (v / len) * 7 + Math.sin(t * 0.13 - v * 0.09) * (v / len) * 2;
     for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) {
       const u = i / NU * Wd, len = 104 - Math.abs(u - 11) * 0.8, v = j / NV * len, z = zf(u, v, len);

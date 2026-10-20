@@ -397,17 +397,41 @@ const PS2 = (() => {
     drawCathedral(ctx, cam, frame, { theta: a + 2.2, R: 300, cx: 520, cz: 120, rise: 300, pitch: 0.16 });
   }
 
+  // Verschiebe-Puffer für teure Hintergrund-Ebenen: mit Rand M gerastert und beim Laufen nur verschoben (mittlere Parallaxe
+  // par: Bildpunkte je Kamerapixel). Neu gerastert wird, wenn die Kamera weiter als tol gezogen ist (sonst wäre der
+  // Tiefenfehler innerhalb der Ebene über ~1 Pixel) oder ein Animationsschritt (soft) fällig ist – beides darf ein Bild
+  // warten, wenn in diesem Bild schon eine andere Ebene neu gerastert hat – und sofort, wenn der Rand aufgebraucht ist oder
+  // sich Größe bzw. Zustand (key, z. B. Blitz) ändern.
+  let scStamp = -1, scBusy = false;
+  function shiftCache(ctx, B, o) { // o: { w, h, dv, M, par, tol, camX, key, soft, draw(x, Wb, Hb) }
+    const dv = o.dv, M = o.M, Wb = Math.ceil((o.w + 2 * M) / dv), Hb = Math.ceil(o.h / dv);
+    const stamp = document.timeline ? document.timeline.currentTime : 0;
+    if (stamp !== scStamp) { scStamp = stamp; scBusy = false; }
+    if (!B.c || B.c.width !== Wb || B.c.height !== Hb) { B.c = document.createElement('canvas'); B.c.width = Wb; B.c.height = Hb; B.x = B.c.getContext('2d'); B.key = null; }
+    let dx = B.key === null ? 0 : (o.camX - B.camX) * o.par;
+    const hard = B.key !== o.key || Math.abs(dx) > M - 2, soft = Math.abs(o.camX - B.camX) > o.tol || B.soft !== o.soft;
+    if (hard || (soft && !scBusy)) {
+      scBusy = true; B.key = o.key; B.soft = o.soft; B.camX = o.camX; dx = 0;
+      B.x.setTransform(1, 0, 0, 1, 0, 0); B.x.clearRect(0, 0, Wb, Hb);
+      o.draw(B.x, Wb, Hb);
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = dv > 1;
+    ctx.drawImage(B.c, 0, 0, Wb, Hb, dv > 1 ? -M - dx : Math.round(-M - dx), 0, Wb * dv, Hb * dv);
+    ctx.restore();
+  }
+
   // ---------------- Burghof: Low-Poly-Wald im Mondlicht ----------------
   // Tannen (Stamm + gestufte Kegel) und knorrige tote Bäume (verzweigte Balken) auf einer Ebene, echte Perspektive:
   // ferne Tannen hinter der Burg (band 0), nahe Bäume davor (band 1). Mondlicht von rechts hinten zeichnet die Kanten
-  // rötlich-violett nach, dazwischen violetter Dunst. Gerendert in halber Auflösung, weich hochskaliert.
+  // rötlich-violett nach, dazwischen violetter Dunst. Gerendert in halber Auflösung, weich hochskaliert; drei Tiefen-
+  // schichten (ferne Tannen, nahe Tannen, tote Bäume) mit eigenem Verschiebe-Puffer – beim Laufen wird nur geschoben.
   const FENV = { sun: null, sunC: [0.95, 0.55, 0.95], amb: [0.24, 0.17, 0.32], sky: [0.12, 0.08, 0.2], fog: [58, 28, 88], fogD: 0.0009 };
   { const v = [0.8, 0.5, -0.35], l = Math.hypot(...v); FENV.sun = v.map(c => c / l); }
   let forest = null;
-  const fbuf = [null, null];
+  const fbuf = [null, null, null], FBAND = [{ par: 0.19, tol: 20 }, { par: 0.37, tol: 10 }, { par: 0.575, tol: 26 }]; // Parallaxe je Schicht (200/z)
   function buildForest() {
     let s = 913; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
-    const far = mesh(), near = mesh(), PINE = [50, 84, 86], PINE2 = [66, 100, 96], BARK = [80, 54, 62], DEAD = [64, 42, 68];
+    const far = mesh(), near = mesh(), deadM = mesh(), PINE = [50, 84, 86], PINE2 = [66, 100, 96], BARK = [80, 54, 62], DEAD = [64, 42, 68];
     const pine = (m, x, z, k, tiers) => {
       prism(m, x, 0, z, 2.6 * k, 16 * k, 4, BARK, { cap: false });
       for (let t = 0; t < tiers; t++) cone(m, x, (10 + t * 13) * k, z, (17 - t * 4.5) * k, (24 - t * 3) * k, 6, t % 2 ? PINE2 : PINE, { rot: rnd() * 3 });
@@ -423,20 +447,17 @@ const PS2 = (() => {
     };
     for (let i = 0; i < 70; i++) pine(far, -900 + rnd() * 4200, 820 + rnd() * 520, 2.1 + rnd() * 1.4, 3);
     for (let i = 0; i < 26; i++) pine(near, -700 + rnd() * 3800, 430 + rnd() * 260, 1.4 + rnd() * 0.8, 3);
-    for (let i = 0; i < 9; i++) dead(near, -400 + i * 400 + rnd() * 160, 330 + rnd() * 40, 1.15 + rnd() * 0.35);
-    return [[far], [near]];
+    for (let i = 0; i < 9; i++) dead(deadM, -400 + i * 400 + rnd() * 160, 330 + rnd() * 40, 1.15 + rnd() * 0.35);
+    return [[far], [near], [deadM]];
   }
   function drawForest(ctx, cam, frame, band) {
     if (!forest) forest = buildForest();
-    const w = View.w, lite = View.lite, dv = lite ? 3 : 2, Wb = Math.ceil(w / dv), Hb = Math.ceil(208 / dv);
-    let B = fbuf[band];
-    if (!B || B.c.width !== Wb) { B = fbuf[band] = { c: Sprites.canvas(Wb, Hb), key: null }; B.x = B.c.getContext('2d', CPU2D); }
-    const camX = cam.x + w / 2, key = Math.round(cam.x / (lite ? 3 : 2)) + '|' + Wb;
-    if (B.key !== key) {
-      B.key = key; B.x.clearRect(0, 0, Wb, Hb);
-      render(B.x, Wb, Hb, forest[band], { x: camX, y: 118, z: 0, yaw: 0, pitch: 0, f: 200 / dv, near: 20, hy: 0.62 }, FENV);
+    const w = View.w, lite = View.lite, dv = lite ? 3 : 2;
+    for (const i of band === 0 ? [0] : [1, 2]) { // nahe Ebene: erst die Tannen, davor die toten Bäume
+      const B = fbuf[i] || (fbuf[i] = {}), S = FBAND[i];
+      shiftCache(ctx, B, { w, h: 208, dv, M: 48, par: S.par, tol: S.tol * (lite ? 1.5 : 1), camX: cam.x, key: w, soft: 0,
+        draw: (x, Wb, Hb) => render(x, Wb, Hb, forest[i], { x: cam.x + w / 2, y: 118, z: 0, yaw: 0, pitch: 0, f: 200 / dv, near: 20, hy: 0.62 }, FENV) });
     }
-    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(B.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
   }
 
   // ---------------- Schiff: Polygon-Meer und Krakenarme im PS2-Look ----------------
@@ -839,5 +860,5 @@ const PS2 = (() => {
   }
   const projLocal = (sx, sy, x, y, z) => { const VX = View.w / 2, k = 200 / (200 + z); return [VX + (sx + x - VX) * k, 60 + (sy - y - 60) * k]; }; // Punkt des Meshes → Bild
 
-  return { mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawLocal, projLocal, LENV, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawChandelier, chandJobs, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
+  return { shiftCache, mesh, vtx, face, box, prism, cone, gable, beam, render, project, drawLocal, projLocal, LENV, drawMoon, drawCathedral, drawSpireBg, drawForest, drawSea, drawWorldMap, drawChandelier, chandJobs, drawWoods, prewarmWoods, Tower, ENV, prewarm, prewarmMap, dayNight };
 })();
