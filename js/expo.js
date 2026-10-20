@@ -485,8 +485,8 @@ class ManTrap extends Boss {
     return m;
   }
   draw(ctx) {
-    const w = View.w, dv = View.lite ? 3 : 2, Wb = Math.ceil(w / dv), Hb = Math.ceil(208 / dv);
-    if (!this.buf || this.buf.c.width !== Wb) { this.buf = { c: Sprites.canvas(Wb, Hb) }; this.buf.x = this.buf.c.getContext('2d', { willReadFrequently: true }); }
+    const w = View.w, dv = 1, Wb = w, Hb = 208; // immer volle Auflösung (auch im Sparmodus): scharfe Kanten – die Arena hat sonst wenig zu zeichnen
+    if (!this.buf || this.buf.c.width !== Wb) { const c = document.createElement('canvas'); c.width = Wb; c.height = Hb; this.buf = { c, x: c.getContext('2d') }; }
     const x = this.buf.x, cam = { x: W.cam.x + w / 2, y: -(W.cam.y + 104), z: -2000, yaw: 0, pitch: 0, f: 2000 / dv, near: 100, hy: 0.5 };
     const env = { sun: ManTrap.SUN, sunC: [0.9, 0.85, 0.8], amb: [0.42, 0.4, 0.46], sky: [0.16, 0.18, 0.2], fog: [0, 0, 0], fogD: 0 };
     x.clearRect(0, 0, Wb, Hb);
@@ -500,7 +500,7 @@ class ManTrap extends Boss {
     }
     for (const h of this.heads) if (h.glow > 0.05) { const sx = (h.x - W.cam.x) / dv, sy = (h.y - W.cam.y) / dv, r = 14 / dv * (1 + h.glow), g = x.createRadialGradient(sx, sy, 0, sx, sy, r * 2); g.addColorStop(0, `rgba(255,80,60,${(0.5 * h.glow).toFixed(2)})`); g.addColorStop(1, 'rgba(255,40,40,0)'); x.fillStyle = g; x.fillRect(sx - r * 2, sy - r * 2, r * 4, r * 4); }
     x.restore();
-    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(this.buf.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
+    ctx.save(); ctx.imageSmoothingEnabled = dv > 1; ctx.drawImage(this.buf.c, 0, 0, Wb, Hb, 0, 0, w, 208); ctx.restore();
     this.lastDraw = { s: { c: this.buf.c, f: this.buf.c, w: Wb, h: Hb }, x: W.cam.x, y: W.cam.y, flip: false };
   }
 }

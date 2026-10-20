@@ -365,8 +365,10 @@ const Audio8 = (() => {
       tri: SEA_C.map(c => { const [lo, hi] = SEA_B[c]; return `${lo}:2 ${lo}:1 ${hi}:2 ${lo}:1 ${lo}:2 ${lo}:1 ${hi}:2 ${lo}:1`; }).join(' ') + ' ' + // Galopp
         SEA_C.map(c => { const [lo, hi] = SEA_B[c]; return rep(`${lo}:1 ${lo}:1 ${hi}:1`, 4); }).join(' '), // pumpend
       pad: rep(SEA_C.map(c => SEA[c].join('+') + ':12').join(' '), 2),
-      dr: SEA_C.map((c, i) => i % 4 === 3 ? 'k:1 h:1 q:1 h:1 k:1 k:1 q:1 h:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 h:1 o:1 h:1 k:1 h:1 q:1 h:1 o:1 k:1 k:1 h:1' : 'k:1 h:1 o:1 h:1 k:1 h:1 q:1 h:1 o:1 k:1 k:1 h:1').join(' ') + ' ' +
-        SEA_C.map((c, i) => i === 15 ? 'k:1 h:1 q:1 h:1 t:1 u:1 w:6' : i % 4 === 3 ? 'k:1 k:1 q:1 h:1 k:1 k:1 q:1 q:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 h:1 k:1 h:1 k:1 k:1 q:1 h:1 k:1 k:1 o:1 k:1' : 'k:1 h:1 k:1 h:1 k:1 k:1 q:1 h:1 k:1 k:1 o:1 k:1').join(' '), // B-Teil: Doppel-Kick
+      // Schlagzeug im 12/8-Shuffle wie Melodie, Galopp und Arpeggien: vier Schläge zu je drei Schritten – Bassdrum auf 1 und 3,
+      // Snare auf 2 und 4, Becken auf den Shuffle-Achteln; im B-Teil schiebt ein Vorschlag-Kick vor jede Snare
+      dr: SEA_C.map((c, i) => i % 4 === 3 ? 'k:2 h:1 s:2 h:1 k:1 h:1 s:1 t:1 t:1 u:1' : i % 8 === 0 ? 'x:2 h:1 s:2 h:1 k:2 h:1 s:2 o:1' : 'k:2 h:1 s:2 h:1 k:2 h:1 s:2 o:1').join(' ') + ' ' +
+        SEA_C.map((c, i) => i === 15 ? 'k:2 h:1 s:2 h:1 t:1 u:1 w:4' : i % 4 === 3 ? 'k:2 k:1 s:2 s:1 k:1 s:1 s:1 t:1 t:1 u:1' : i % 8 === 0 ? 'x:2 k:1 s:2 h:1 k:2 k:1 s:2 o:1' : 'k:2 k:1 s:2 h:1 k:2 k:1 s:2 o:1').join(' '),
     },
     // Miniboss auf dem Schiff: der lila Tentakel
     kraken: {
