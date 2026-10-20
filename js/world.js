@@ -67,6 +67,7 @@ const W = {
         case 'ghostball': this.spawn(new GhostDance(d)); break;
         case 'coach': this.spawn(new GhostCoach(d)); break;
         case 'curtains': this.spawn(new BelfryCurtains(d)); break;
+        case 'icicle': this.spawn(new FallingIcicle(d)); break;
         case 'armor': this.spawn(new ArmorSuit(d)); break;
         case 'pillar': this.spawn(new Pillar(d.x, d.y)); break;
         case 'raven': this.spawn(new Raven(d.x, d.y)); break;

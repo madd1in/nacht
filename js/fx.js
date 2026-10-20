@@ -30,8 +30,8 @@ const FX = (() => {
     return c;
   }
 
-  const AMB = { expo: 0.3, forest: 0.36, cathedral: 0.06, spire: 0.05, gallery: 0.38, bridge: 0.26, library: 0.5, foyer: 0.6, glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3, ballroom: 0.34 };
-  const TINT = { expo: '0,12,30', forest: '0,12,18', cathedral: '40,10,0', spire: '40,10,0', gallery: '10,6,30', bridge: '18,0,34', library: '20,8,2', foyer: '8,4,26', glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14', ballroom: '26,4,32' };
+  const AMB = { expo: 0.3, forest: 0.36, cathedral: 0.06, spire: 0.05, gallery: 0.38, bridge: 0.26, library: 0.5, foyer: 0.6, glass: 0.34, ship: 0.32, vortex: 0.2, courtyard: 0.3, hall: 0.34, cave: 0.42, crypt: 0.42, tower: 0.36, throne: 0.3, ballroom: 0.34, ice: 0.36 };
+  const TINT = { expo: '0,12,30', forest: '0,12,18', cathedral: '40,10,0', spire: '40,10,0', gallery: '10,6,30', bridge: '18,0,34', library: '20,8,2', foyer: '8,4,26', glass: '20,8,40', ship: '4,6,30', vortex: '26,0,40', courtyard: '12,0,32', hall: '24,0,12', cave: '10,4,0', crypt: '0,6,28', tower: '8,8,20', throne: '28,0,14', ballroom: '26,4,32', ice: '0,14,40' };
   const lc = Sprites.canvas(256, 208), lx = lc.getContext('2d');
   let vignette = null;
 
@@ -92,7 +92,7 @@ const FX = (() => {
 
   // ---------------- Nebel ----------------
   const fogCache = {};
-  const FOG = { expo: [150, 200, 180, 0.24], forest: [60, 116, 100, 0.42], bridge: [130, 90, 170, 0.42], ship: [90, 110, 180, 0.3], vortex: [160, 60, 220, 0.45], courtyard: [120, 70, 170, 0.5], cave: [70, 110, 60, 0.32], crypt: [90, 120, 220, 0.42], tower: [110, 110, 130, 0.22], ballroom: [150, 170, 236, 0.26] }; // Ballsaal: fahler Geisternebel über dem Parkett
+  const FOG = { expo: [150, 200, 180, 0.24], forest: [60, 116, 100, 0.42], bridge: [130, 90, 170, 0.42], ship: [90, 110, 180, 0.3], vortex: [160, 60, 220, 0.45], courtyard: [120, 70, 170, 0.5], cave: [70, 110, 60, 0.32], crypt: [90, 120, 220, 0.42], tower: [110, 110, 130, 0.22], ballroom: [150, 170, 236, 0.26], ice: [170, 220, 250, 0.3] }; // Ballsaal: fahler Geisternebel über dem Parkett
   function fogStrip(theme) {
     if (fogCache[theme]) return fogCache[theme];
     const f = FOG[theme];
@@ -193,6 +193,9 @@ const FX = (() => {
       ? ({ x: c.x + Math.random() * View.w, y: c.y - 4, vx: 0.1, vy: 0.28, life: 700, col: '#d8ccb0', kind: 'page' })
       : ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 190, vx: 0.06, vy: 0.03, life: 320, col: '#fce0a8', kind: 'dust' }) },
     hall: { max: 26, rate: 0.25, make: (c) => ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 176, vx: 0.08, vy: 0.04, life: 300, col: '#fce0a8', kind: 'dust' }) },
+    ice: { max: 34, rate: 0.32, make: (c) => Math.random() < 0.75 // Schneeflocken rieseln, ab und zu glitzert Eisstaub
+      ? ({ x: c.x + Math.random() * (View.w + 40), y: c.y - 4, vx: -0.18, vy: 0.32, life: 620, col: Math.random() < 0.3 ? '#ffffff' : '#c8e4f4', kind: 'ash' })
+      : ({ x: c.x + Math.random() * View.w, y: c.y + Math.random() * 190, vx: 0.02, vy: -0.02, life: 160, col: '#e8fcff', kind: 'dust' }) },
     cave: { max: 18, rate: 0.2, make: (c) => Math.random() < 0.35
       ? ({ x: c.x + Math.random() * View.w, y: c.y, vx: 0, vy: 2.6, life: 120, col: '#3cbcfc', kind: 'drip' })
       : ({ x: c.x + Math.random() * View.w, y: c.y + 140 + Math.random() * 60, vx: 0, vy: -0.25, life: 220, col: '#58f898', kind: 'spore' }) },

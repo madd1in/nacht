@@ -115,27 +115,30 @@ class Crumble extends Ent {
   onStand() { if (this.state === 'idle') { this.state = 'shake'; this.timer = 34; Audio8.sfx('crumble', this.cx); } }
   update() {
     this.t++; this.dy = 0;
-    if (this.state === 'shake' && --this.timer <= 0) { this.state = 'fall'; this.vy = 0; W.debris(this.cx, this.y + 4, '#8c7c6c', 6); }
+    if (this.state === 'shake' && --this.timer <= 0) { this.state = 'fall'; this.vy = 0; W.debris(this.cx, this.y + 4, W.room.theme === 'ice' ? '#c8f4fc' : '#8c7c6c', 6); }
     else if (this.state === 'fall') {
       this.vy = Math.min(this.vy + 0.25, 5); this.y += this.vy;
       if (this.y > this.home.y + 300) { this.state = 'gone'; this.timer = 180; }
     } else if (this.state === 'gone' && --this.timer <= 0) { this.state = 'back'; this.timer = 40; this.y = this.home.y; }
     else if (this.state === 'back' && --this.timer <= 0) this.state = 'idle';
   }
-  // PS2-3D: zwei Steinquader mit Rissen (bröckeln, fallen, kommen blinkend wieder)
-  static mesh() {
-    if (Crumble.M) return Crumble.M;
-    const { mesh, box } = PS2, m = mesh(), D = [44, 36, 28];
-    box(m, 7.8, -8, 11, 15.4, 8, 22, [112, 96, 80], { top: [160, 146, 128] });
-    box(m, 24.2, -7.8, 11, 15.4, 7.8, 22, [104, 88, 72], { top: [152, 138, 120] });
+  // PS2-3D: zwei Steinquader mit Rissen (bröckeln, fallen, kommen blinkend wieder); in der Eishöhle rissige Eisplatten mit
+  // Schneedecke und kleinen Zapfen darunter
+  static mesh(ice) {
+    const key = ice ? 'MI' : 'M';
+    if (Crumble[key]) return Crumble[key];
+    const { mesh, box, cone } = PS2, m = mesh(), D = ice ? [40, 110, 170] : [44, 36, 28];
+    box(m, 7.8, -8, 11, 15.4, 8, 22, ice ? [120, 196, 236] : [112, 96, 80], { top: ice ? [240, 252, 255] : [160, 146, 128] });
+    box(m, 24.2, -7.8, 11, 15.4, 7.8, 22, ice ? [100, 176, 224] : [104, 88, 72], { top: ice ? [232, 248, 255] : [152, 138, 120] });
     box(m, 6.5, -5.5, -0.3, 0.9, 3.6, 0.6, D); box(m, 7.6, -3.2, -0.3, 2.4, 0.9, 0.6, D); box(m, 23.5, -7, -0.3, 0.9, 4.4, 0.6, D); box(m, 24.8, -3.4, -0.3, 3, 0.9, 0.6, D);
-    box(m, 20, 0, 18, 3, 0.8, 3, [92, 120, 64]); box(m, 4, 0, 6, 2.4, 0.6, 2.2, [92, 120, 64]); // Moos oben
-    return (Crumble.M = [m]);
+    if (ice) for (const [cx, h] of [[4, 6], [11, 4], [19, 7], [28, 5]]) cone(m, cx, -8, 4, 1.5, -h, 4, [200, 240, 255]); // Zapfen unten
+    else { box(m, 20, 0, 18, 3, 0.8, 3, [92, 120, 64]); box(m, 4, 0, 6, 2.4, 0.6, 2.2, [92, 120, 64]); } // Moos oben
+    return (Crumble[key] = [m]);
   }
   draw(ctx) {
     if (this.state === 'gone' || (this.state === 'back' && (this.t & 2))) return;
     const sh = this.state === 'shake' ? ((this.t >> 1) % 2 ? 1 : -1) : 0;
-    PS2.drawLocal(ctx, this.g || (this.g = {}), Crumble.mesh(), this.x - W.cam.x + sh, this.y - W.cam.y, [-30, -32, 92, 70]);
+    PS2.drawLocal(ctx, this.g || (this.g = {}), Crumble.mesh(W.room.theme === 'ice'), this.x - W.cam.x + sh, this.y - W.cam.y, [-30, -32, 92, 70]);
   }
 }
 

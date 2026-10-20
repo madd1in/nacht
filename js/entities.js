@@ -361,8 +361,8 @@ class Player {
 
     const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
     if (this.onGround) {
-      if (this.atkT > 0 || this.crouch) this.vx = 0;
-      else { const tv = mx * WALK; this.vx += (tv - this.vx) * (mx ? 0.38 : 0.5); if (Math.abs(this.vx) < 0.06) this.vx = 0; if (mx) this.face = mx; }
+      if (this.atkT > 0 || this.crouch) { if (W.room.ice) this.vx *= 0.975; else this.vx = 0; } // auf Eis rutscht man beim Hieb und Ducken weiter
+      else { const tv = mx * WALK, ice = W.room.ice; this.vx += (tv - this.vx) * (ice ? (mx ? 0.045 : 0.018) : (mx ? 0.38 : 0.5)); if (Math.abs(this.vx) < 0.06) this.vx = 0; if (mx) this.face = mx; } // Eis: träge anfahren, lange nachrutschen
       this.coyote = 7;
       if (this.ridePlat && this.ridePlat.passable && I.down) { if (++this.passT > 12) return this.dropThrough(); } else this.passT = 0; // Unten halten reicht auch
       if ((P.jump || (this.jumpBuf > 0 && I.jump)) && this.atkT === 0) {

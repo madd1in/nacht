@@ -773,6 +773,10 @@ const Audio8 = (() => {
       ambNoise(nodes, out, 'lowpass', 220);
       ambLfo(nodes, out.gain, 0.09, 0.012);
       level = 0.03;
+    } else if (theme === 'ice') { // Eishöhle: Wind heult durch die Spalten, darüber ein klirrend kaltes Schimmern
+      const bp = ambNoise(nodes, out, 'bandpass', 600, 4); ambLfo(nodes, bp.frequency, 0.07, 340);
+      ambDrone(nodes, out, 'sine', 1318.5, 0.05); ambDrone(nodes, out, 'sine', 1975.5, 0.035);
+      ambLfo(nodes, out.gain, 0.06, 0.01); level = 0.026;
     } else if (theme === 'crypt') { // kaltes Dröhnen, leicht schwebend
       ambDrone(nodes, out, 'sine', 55, 0.6); ambDrone(nodes, out, 'sine', 55.7, 0.6); ambDrone(nodes, out, 'triangle', 82.4, 0.25);
       level = 0.034;
@@ -824,6 +828,10 @@ const Audio8 = (() => {
       if (Math.random() < 0.0018) { tone('sine', 430, 390, 0.32, 0.03, 0, t); tone('sine', 410, 360, 0.5, 0.03, 0, t + 0.45); }
       if (Math.random() < 0.0012) noise(0.06, 0.04, 'bandpass', 1800, 0, t);
     } else if (theme === 'cave' && Math.random() < 0.006) drip(null, 0.6);
+    else if (theme === 'ice' && Math.random() < 0.012) { // Eiskristalle klingen
+      const f = [1568, 2093, 2349, 2637, 3136][Math.floor(Math.random() * 5)];
+      tone('sine', f, 0, 0.7, 0.018, 0, t); tone('sine', f * 2.01, 0, 0.35, 0.007, 0, t);
+    } else if (theme === 'ice' && Math.random() < 0.004) drip(null, 0.5);
     else if (theme === 'crypt' && Math.random() < 0.0025) { // ferne Ketten
       for (let i = 0; i < 5; i++) noise(0.05, 0.035, 'bandpass', 3000 + Math.random() * 2000, 0, t + i * 0.07 + Math.random() * 0.03);
     } else if (theme === 'glass' && Math.random() < 0.003) { // Glas klingt

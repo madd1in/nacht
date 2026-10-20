@@ -42,6 +42,7 @@ const Levels = (() => {
       ring(x, y) { r.ents.push({ type: 'ring', x, y }); return api; },
       // Turmglocke: schlägt regelmäßig, der ganze Turm schwankt (Mode-7-Drehung des Bildes)
       bell() { r.bell = true; return api; },
+      ice() { r.ice = true; return api; }, // spiegelglatter Boden: träge anfahren, lange nachrutschen
       chest(x, y, loot = 'rnd') { r.ents.push({ type: 'chest', x, y, loot }); return api; },
       cargo(x, y) { r.ents.push({ type: 'cargo', x, y }); return api; },
       sign(x, y, w, text) { r.ents.push({ type: 'sign', x, y, w, text }); return api; },
@@ -274,6 +275,26 @@ const Levels = (() => {
     .zone('fish', 7, 27, { interval: 220, max: 1 })
     .prop('waterfall', { x: 17, y0: 0, y1: 28, w: 32 })
     .start(2, 27).exitAt(24, 0, 27, 4).done();
+
+  // Eishöhle: gefrorene Grotte unter den Katakomben – spiegelglatter Boden (man rutscht nach), Eiszapfen, die herabstürzen,
+  // wenn man darunter läuft, Eisdornen in den Spalten, Eisschollen und bröckelnde Platten über dem Abgrund; in der Tiefe
+  // glitzern riesige Eiskristalle (PS2-3D, js/ice.js)
+  const ih = room(100, 'ice')
+    .ground(0, 14).fill(15, 12, 19, 12, '^')                             // Dornenspalte
+    .ground(20, 34).fill(24, 8, 28, 8, '=')                              // Eissims über dem Gleitstück
+    .fill(35, 12, 46, 12, '^')                                           // breite Dornengrube: über Eisschollen
+    .fill(37, 9, 38, 9, '=').fill(41, 8, 42, 8, '=').fill(45, 9, 46, 9, '=')
+    .ground(47, 55).ground(56, 62, 9)                                    // Eisstufe
+    .fill(63, 12, 70, 12, '^').crumble(65, 9).crumble(68, 9)             // Spalte mit bröckelnden Eisplatten
+    .ground(71, 99).fill(80, 8, 85, 8, '=')
+    .prop('icicle', { x: 8 }).prop('icicle', { x: 22 }).prop('icicle', { x: 27 }).prop('icicle', { x: 31 }).prop('icicle', { x: 50 })
+    .prop('icicle', { x: 53 }).prop('icicle', { x: 74 }).prop('icicle', { x: 77 }).prop('icicle', { x: 89 }).prop('icicle', { x: 92 })
+    .candle(4, 9).candle(10, 9, 'H').candle(23, 9).candle(26, 6, 'W').candle(33, 9, '$').candle(41, 6, 'H').candle(51, 9)
+    .candle(59, 7, '1').candle(66, 7).candle(76, 9, 'H').candle(83, 6, '$').candle(94, 9)
+    .enemy('bat', 30, 4).enemy('skel', 52, 9).enemy('ghost', 66, 4).enemy('bat', 78, 3).enemy('skel', 88, 9)
+    .chest(84, 7)
+    .ice().label('EISHÖHLE')
+    .start(2, 10).exit(98).done();
 
   const r22 = room(96, 'crypt')
     .ground(0, 95)
@@ -611,7 +632,7 @@ const Levels = (() => {
     // Kapitel etwa gleich lang (je ~3–5 Abschnitte, ~3–5 Minuten): die Ankunft (Schiff, Kraken, Wald) endet am Burggraben
     { id: 'arrival', nameKey: 'stageArrival', bossKey: 'bossKraken', voice: 'stageArrival', name: 'DIE ANKUNFT', music: 'sea', time: 480, rooms: [r09, r10, wd], boss: 'DER KRAKE' },
     { id: 0, nameKey: 'stage1', bossKey: 'boss1', voice: 'stage1', name: 'DER BURGHOF', music: 'stage1', time: 480, rooms: [r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
-    { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 420, rooms: [r21, v2, r22], boss: 'KNOCHENRIESE' },
+    { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 540, rooms: [r21, v2, ih, r22], boss: 'KNOCHENRIESE' },
     { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
     { id: 'sun', nameKey: 'stageSun', bossKey: 'bossKnight', voice: 'stageSun', name: 'DIE SONNENKATHEDRALE', music: 'sun', time: 720, rooms: [sa, sp, sk], boss: 'SONNENWÄCHTER' },
     { id: 'expo', nameKey: 'stageExpo', bossKey: 'bossTrap', voice: 'stageExpo', name: 'DER WINTERGARTEN', music: 'expo', time: 900, rooms: [ex1, ex2, exk, exb], boss: 'MENSCHENFALLE' },

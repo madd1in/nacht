@@ -800,6 +800,7 @@ const Game = {
     [...new Set(rooms.map(r => r.theme))].forEach(th => jobs.push(() => Tiles.build(th)));
     rooms.forEach(r => r.ents.forEach(e => { if (e.type === 'gears') jobs.push(() => buildGearTrain(e.list)); }));
     if (rooms.some(r => r.arena && r.arena.boss === 'count')) jobs.push(() => COUNT_ART.get());
+    if (rooms.some(r => r.theme === 'ice')) jobs.push(() => IceCave.prewarm && W.room && W.room.theme === 'ice' && IceCave.prewarm());
     if (rooms.some(r => r.arena && r.arena.boss === 'medusa')) jobs.push(() => MEDUSA_ART.get());
     if (rooms.some(r => r.theme === 'cathedral' || r.theme === 'spire')) jobs.push(() => PS2.prewarm());
     if (rooms.some(r => r.theme === 'forest')) jobs.push(() => PS2.prewarmWoods());
@@ -1096,7 +1097,7 @@ const Game = {
   sectionList() {
     if (this.secList) return this.secList;
     const NAMES = { ship: 'SCHIFF', forest: 'WALD', courtyard: 'BURGHOF', foyer: 'EINGANGSHALLE', hall: 'HALLE', crypt: 'GRUFT', cave: 'HÖHLE', tower: 'UHRTURM', library: 'BIBLIOTHEK',
-      glass: 'GLASTURM', gallery: 'GALERIE', bridge: 'BRÜCKE', vortex: 'STRUDEL', throne: 'THRONSAAL', ballroom: 'BALLSAAL', cathedral: 'SONNENKATHEDRALE', spire: 'SONNENTURM', expo: 'WINTERGARTEN' };
+      glass: 'GLASTURM', gallery: 'GALERIE', bridge: 'BRÜCKE', vortex: 'STRUDEL', throne: 'THRONSAAL', ballroom: 'BALLSAAL', ice: 'EISHÖHLE', cathedral: 'SONNENKATHEDRALE', spire: 'SONNENTURM', expo: 'WINTERGARTEN' };
     const L = [];
     Levels.STAGES.forEach((st, s) => {
       L.push({ head: true, s, label: (s + 1) + '  ' + tr(st.nameKey) });

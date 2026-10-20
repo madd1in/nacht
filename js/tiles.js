@@ -14,6 +14,7 @@ const Tiles = (() => {
   const PALS = {
     courtyard: { a: ['#e0e0e8', '#acacb8', '#80808c', '#56566a', '#201c2c'], b: ['#d4d4e4', '#a0a0b8', '#747490', '#4c4c68', '#1c1c30'], moss: ['#2c6c1c', '#58a02c', '#9cd84c'] },
     hall: { a: ['#f08850', '#c85020', '#982010', '#601008', '#1c0404'], b: ['#d8d8d8', '#a8a8a8', '#7c7c7c', '#505050', '#1c1c1c'] },
+    ice: { a: ['#f0fcff', '#b8e8fc', '#78c4ec', '#3c88c4', '#14386c'], b: ['#e0f4fc', '#a4d4ec', '#6ca4cc', '#386c9c', '#102c4c'], moss: ['#f4fcff', '#c4e4f4', '#ffffff'] },
     cave: { a: ['#d4a858', '#a07028', '#704818', '#44280c', '#180c04'], b: ['#bcbcbc', '#8c8c8c', '#646464', '#404040', '#141414'], moss: ['#1c5c2c', '#38983c', '#78d860'] },
     crypt: { a: ['#9cb4fc', '#6078cc', '#3c4c94', '#24305c', '#0a0e22'], b: ['#c8c8e4', '#9898b8', '#6c6c8c', '#46465e', '#141426'] },
     tower: { a: ['#c8c8c8', '#9a9a9a', '#6e6e6e', '#464646', '#141414'], b: ['#a4e4fc', '#3cbcfc', '#0078f8', '#0040a8', '#001038'] },
@@ -333,6 +334,22 @@ const Tiles = (() => {
     }
     return c;
   }
+  function iceTile(p, o = {}) { // Eisblock: schräger Glanzstreifen, Fugen, Risse, eingeschlossene Luftbläschen; top: Schneedecke mit Glitzer
+    const c = C(16, 16), x = c.getContext('2d'), [hl, lt, md, dk, sh] = p;
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
+      const d = (X + y) % 16;
+      px(x, d === 3 || d === 4 ? hl : d === 5 || (X * 3 + y * 5) % 13 === 0 ? lt : y > 12 || X > 13 ? dk : md, X, y);
+    }
+    px(x, sh, 0, 15, 16, 1); px(x, sh, 15, 0, 1, 16); px(x, lt, 0, 0, 15, 1); px(x, lt, 0, 0, 1, 15); // Fugen
+    if (o.crack) { let cx = ri(3, 12), cy = 2; for (let i = 0; i < 10; i++) { px(x, dk, cx, cy); px(x, hl, cx + 1, cy); cy++; cx += ri(-1, 1); } }
+    for (let i = 0; i < 3; i++) px(x, '#f0fcff', ri(2, 13), ri(3, 12)); // Bläschen
+    if (o.top) { // Schneedecke
+      for (let X = 0; X < 16; X++) { const h = 3 + (hn(X, 7, 3) > 0.5 ? 1 : 0); px(x, '#f4fcff', X, 0, 1, h); px(x, '#c4e4f4', X, h, 1, 1); }
+      for (let i = 0; i < 3; i++) px(x, '#ffffff', ri(0, 15), ri(0, 2));
+      px(x, '#a8d8f0', 0, 0, 1, 4);
+    }
+    return c;
+  }
   function spikes() {
     const c = C(16, 16), x = c.getContext('2d');
     px(x, '#141414', 0, 10, 16, 6); px(x, '#3c3c3c', 0, 10, 16, 1);
@@ -370,6 +387,10 @@ const Tiles = (() => {
       if (v === 1) { px(x, '#e8dcc0', 4, 3, 1, 3); px(x, '#c81818', 2, 1, 5, 2); px(x, '#fcfcfc', 3, 1, 1, 1); px(x, '#e8dcc0', 11, 4, 1, 2); px(x, '#c81818', 10, 3, 3, 1); }
       else if (v === 3) { px(x, '#a8e8fc', 6, 3, 1, 3); px(x, '#3cbcfc', 5, 2, 3, 1); px(x, '#a8e8fc', 6, 1, 1, 1); px(x, '#3cbcfc', 12, 4, 2, 1); }
       else if (v === 2) for (let i = 0; i < 6; i++) { px(x, m[1], 8 - i, 5 - (i >> 1), 1, 1); px(x, m[1], 8 + i, 5 - (i >> 1), 1, 1); px(x, m[2], 8, 5 - i, 1, 1); }
+    } else if (theme === 'ice') { // Schneewehen und kleine Eiskristalle
+      for (let X = 0; X < 16; X++) if (rand() < 0.6) { const h = ri(1, 2); px(x, '#f4fcff', X, 6 - h, 1, h); }
+      if (v === 1) { px(x, '#c8f4fc', 6, 1, 2, 5); px(x, '#ffffff', 6, 1, 1, 3); px(x, '#58b8e8', 7, 3, 1, 3); px(x, '#a4e4fc', 9, 3, 1, 3); }
+      else if (v === 3) { px(x, '#a4e4fc', 3, 3, 1, 3); px(x, '#ffffff', 3, 3, 1, 1); px(x, '#c8f4fc', 11, 4, 2, 2); }
     } else if (theme === 'cave') {
       for (let X = 0; X < 16; X++) if (rand() < 0.7) { const h = ri(1, 2); px(x, m[0], X, 6 - h, 1, h); if (rand() < 0.4) px(x, m[1], X, 6 - h, 1, 1); }
       if (v === 1) { px(x, '#d8d8a0', 9, 2, 3, 1); px(x, '#a8a870', 10, 3, 1, 3); px(x, '#58f898', 10, 2, 1, 1); }
@@ -378,7 +399,9 @@ const Tiles = (() => {
   }
   function hanger(theme, v) { // hängende Ranken / Spinnweben unter Kanten (16x10)
     const c = C(16, 10), x = c.getContext('2d');
-    if (theme === 'expo') { // Efeu und Luftwurzeln hängen von den Laufgängen
+    if (theme === 'ice') { // Eiszapfen unter Kanten: oben breit und weiß, spitz und blau
+      for (let X = 1; X < 15; X += ri(2, 4)) { const len = ri(3, v === 0 ? 10 : 7); for (let y = 0; y < len; y++) px(x, y < 2 ? '#e8fcfc' : '#a4e4fc', X, y, y < len * 0.45 ? 2 : 1, 1); px(x, '#ffffff', X, 0, 1, Math.max(1, len >> 1)); px(x, '#58b8e8', X + 1, 1, 1, Math.max(1, len >> 2)); }
+    } else if (theme === 'expo') { // Efeu und Luftwurzeln hängen von den Laufgängen
       if (v === 2) return null;
       const m = PALS.expo.moss;
       for (let X = 1; X < 16; X += 3) { const len = ri(3, v ? 9 : 6); for (let y = 0; y < len; y++) px(x, y % 3 ? m[0] : m[1], X + ((y >> 2) & 1), y); px(x, m[2], X, len - 1); }
@@ -1842,6 +1865,37 @@ const Tiles = (() => {
         });
         add('chandelier', n, 0.75);
       }
+    } else if (theme === 'ice') { // Eishöhle: blaue Eiswand mit leuchtenden Adern und gefrorenen Wasserfällen, in der Tiefe Riesenkristalle
+      // in PS2-3D (js/ice.js) und funkelnde Lichtpunkte, vorn Eiszapfen und Eisstalagmiten – nahtlos gekachelt
+      const vn = (X, Y, s, sd) => {
+        const nx = 512 / s, ny = Math.round(208 / s), gx = X / s, gy = Y / s, x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+        const a = hn(x0 % nx, y0 % ny, sd), b = hn((x0 + 1) % nx, y0 % ny, sd), c = hn(x0 % nx, (y0 + 1) % ny, sd), d = hn((x0 + 1) % nx, (y0 + 1) % ny, sd);
+        return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+      };
+      const f = C(512, 208), x = f.getContext('2d');
+      for (let Y = 0; Y < 208; Y++) for (let X = 0; X < 512; X++) {
+        const n = vn(X, Y, 16, 71) * 0.55 + vn(X, Y, 8, 72) * 0.3 + vn(X, Y, 4, 73) * 0.15;
+        const st = Math.sin(Y / 208 * Math.PI * 10 + vn(X, Y, 16, 74) * 6), v = n * 0.75 + st * 0.1;
+        let c = v > 0.62 ? '#1e4468' : v > 0.5 ? '#173858' : v > 0.38 ? '#112a46' : '#0a1a30';
+        if (Math.abs(st) < 0.05 && n > 0.46) c = '#4c94c8'; // leuchtende Eisader
+        if (n > 0.68 && bay(X, Y) < (n - 0.68) * 3) c = '#2c5c88'; // vorstehende Eisnasen
+        px(x, c, X, Y);
+      }
+      [[110, 28], [350, 36]].forEach(([wx, ww]) => { // gefrorene Wasserfälle
+        for (let Y = 0; Y < 208; Y++) for (let X = 0; X < ww; X++) {
+          const u = X / ww, w2 = Math.sin(u * Math.PI), wob = Math.sin(Y * 0.09 + X * 0.3) * 0.08;
+          if (bay(wx + X, Y) > w2 * 0.9 + wob) continue;
+          px(x, (X * 3 + (Y >> 1)) % 11 === 0 ? '#f0fcff' : u < 0.25 ? '#b4e4f8' : u > 0.8 ? '#3c7cb0' : '#78bce4', wx + X, Y);
+        }
+      });
+      add('far', f, 0.3, { vtile: true });
+      L.push({ name: 'crystals3d', custom: (c2, cam) => IceCave.drawCrystals(c2, cam), par: 0.5, c: C(1, 1) }); // Riesenkristalle (PS2-3D)
+      L.push({ name: 'glints', custom: (c2, cam, fr) => IceCave.drawGlints(c2, cam, fr), par: 0.4, c: C(1, 1) });
+      const n = C(512, 208), x2 = n.getContext('2d');
+      const zapf = (sx, len, bw, down) => { for (let r = 0; r < len; r++) { const ww = Math.max(1, Math.round(bw * Math.pow(1 - r / len, 0.9))), y = down ? r : 207 - r, x0 = sx - (ww >> 1); px(x2, '#5ca8d8', x0, y, ww, 1); px(x2, '#d8f4fc', x0, y, 1, 1); if (ww > 2) px(x2, '#24609c', x0 + ww - 1, y, 1, 1); } };
+      for (let i = 0; i < 22; i++) zapf(ri(4, 508), ri(10, 52), ri(4, 12), true); // Eiszapfen von der Decke
+      for (let i = 0; i < 10; i++) zapf(ri(4, 508), ri(8, 30), ri(8, 16), false); // Eisstalagmiten
+      add('near', n, 0.6, { vtile: true });
     } else if (theme === 'cave') { // Grotte: geschichtete Felswand mit nassen Adern, Tropfsteinsäulen, unterirdischer Wasserfall,
       // Leuchtkristalle mit Lichthöfen, Glühpilze und herabhängende Wurzeln – nahtlos in beide Richtungen gekachelt
       const vn = (X, Y, s, sd) => {
@@ -1985,7 +2039,7 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), forest: () => earth(p.a), expo: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }), cathedral: (o) => marble(p.a, o), spire: (o) => marble(p.a, o), ballroom: (o) => marble(p.a, o) }[theme];
+    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), forest: () => earth(p.a), expo: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }), cathedral: (o) => marble(p.a, o), spire: (o) => marble(p.a, o), ballroom: (o) => marble(p.a, o), ice: (o) => iceTile(p.a, o) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
       : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true }))
@@ -1993,8 +2047,9 @@ const Tiles = (() => {
       : theme === 'library' ? [0, 1, 2, 3].map(() => parquet({ top: true }))
       : theme === 'forest' ? [0, 1, 2, 3].map(() => earth(p.a, { top: true }))
       : theme === 'expo' ? [0, 1, 2, 3].map(() => tilesTop())
+      : theme === 'ice' ? [0, 1, 2, 3].map(i => iceTile(p.a, { top: true, crack: i === 1 }))
       : theme === 'foyer' ? [checker({ top: true }), checker({ top: true, crack: true }), checker({ top: true }), checker({ top: true })] : ground;
-    const alt = theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [balcony(), balcony(), balcony()] : theme === 'throne' || theme === 'ballroom' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : theme === 'forest' ? [logTile(), logTile(), logTile()] : theme === 'expo' ? [ironGrate(), ironGrate(), ironGrate()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+    const alt = theme === 'ice' ? [0, 1, 2].map(() => iceTile(p.b, { top: true })) : theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [balcony(), balcony(), balcony()] : theme === 'throne' || theme === 'ballroom' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : theme === 'forest' ? [logTile(), logTile(), logTile()] : theme === 'expo' ? [ironGrate(), ironGrate(), ironGrate()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
@@ -2930,6 +2985,9 @@ const Tiles = (() => {
         for (let X = 0; X < 120; X++) { const h = 10 + Math.round(Math.sin(X / 120 * Math.PI) * -6 + 6 + (X % 8 < 4 ? 1 : 0)); px(x, '#1c0006', cx + X, 0, 1, h + 10); px(x, '#3c0010', cx + X, h + 9, 1, 1); }
         px(x, '#a87000', cx + 2, 0, 2, 30); px(x, '#a87000', cx + 116, 0, 2, 30);
       });
+    } else if (theme === 'ice') { // vorn: dunkle Eiszapfen oben, Schneewehen unten
+      for (let i = 0; i < 12; i++) { const sx = ri(0, 620), len = ri(10, 34), w = ri(4, 10); for (let r = 0; r < len; r++) { const ww = Math.max(1, Math.round(w * (1 - r / len))); px(x, '#0a1a30', sx + ((w - ww) >> 1), r, ww, 1); } }
+      for (let X = 0; X < 640; X++) { const h = 3 + Math.round(Math.abs(Math.sin(X * 0.05) * 4 + Math.sin(X * 0.13) * 2)); px(x, '#0c2034', X, 208 - h, 1, h); }
     } else if (theme === 'cave') {
       for (let i = 0; i < 12; i++) { const sx = ri(0, 620), len = ri(12, 36), w = ri(6, 14); for (let r = 0; r < len; r++) px(x, dark, sx + Math.floor((w - w * (1 - r / len)) / 2), r, Math.max(1, Math.round(w * (1 - r / len))), 1); }
       for (let i = 0; i < 9; i++) { const sx = ri(0, 620), w = ri(8, 18); for (let r = 0; r < 6; r++) px(x, dark, sx + r, 207 - r, w - r * 2, 1); }
