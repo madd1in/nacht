@@ -255,10 +255,25 @@ const Audio8 = (() => {
   const S3B = { Em: ['e2', 'e3'], C: ['c2', 'c3'], D: ['d2', 'd3'], B: ['b1', 'b2'], Am: ['a1', 'a2'] };
   const S3C = ['Em', 'Em', 'C', 'D', 'Em', 'Em', 'B', 'B', 'Am', 'Am', 'Em', 'Em', 'C', 'D', 'B', 'B'];
 
-  // Sonnenkathedrale – Sonnensturm (h-Moll, 188 BPM): Heldenmelodie über galoppierendem Oktavbass, Chor-Fläche, im B-Teil 32tel
-  const SU = { Bm: ['b3', 'd4', 'f#4'], G: ['g3', 'b3', 'd4'], D: ['d4', 'f#4', 'a4'], A: ['a3', 'c#4', 'e4'], Em: ['e4', 'g4', 'b4'], F: ['f#3', 'a#3', 'c#4'] };
-  const SU_B = { Bm: ['b1', 'b2'], G: ['g1', 'g2'], D: ['d2', 'd3'], A: ['a1', 'a2'], Em: ['e2', 'e3'], F: ['f#1', 'f#2'] };
-  const SU_C = ['Bm', 'G', 'D', 'A', 'Bm', 'G', 'Em', 'F', 'G', 'A', 'Bm', 'Bm', 'Em', 'G', 'F', 'F'];
+  // Sonnenkathedrale – Sonnenaufgang über der Kathedrale (D-Dur, 168 BPM): Akkorde, Bass, Orgel-Lagen; der B-Teil steht einen
+  // Ganzton höher (tp), die Brücke in E-Dur endet auf A-Dur und führt zurück an den Anfang
+  const NN = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
+  const tp = (str, k) => str.replace(/([a-g]#?)(\d)/g, (m, n, o) => { const v = NN.indexOf(n) + 12 * +o + k; return NN[((v % 12) + 12) % 12] + Math.floor(v / 12); });
+  const SD = { D: ['d4', 'f#4', 'a4'], A: ['c#4', 'e4', 'a4'], Bm: ['b3', 'd4', 'f#4'], 'F#m': ['c#4', 'f#4', 'a4'], G: ['b3', 'd4', 'g4'], Em: ['e4', 'g4', 'b4'] };
+  const SD_B = { D: ['d2', 'd3'], A: ['a1', 'a2'], Bm: ['b1', 'b2'], 'F#m': ['f#1', 'f#2'], G: ['g1', 'g2'], Em: ['e2', 'e3'] };
+  const SD_O = { D: 'd3+a3+d4+f#4', A: 'a2+e3+a3+c#4', Bm: 'b2+f#3+b3+d4', 'F#m': 'f#2+c#3+f#3+a3', G: 'g2+d3+g3+b3', Em: 'e3+b3+e4+g4' };
+  const SD_I = ['D', 'A', 'Bm', 'G'];
+  const SD_C = ['D', 'A', 'Bm', 'F#m', 'G', 'D', 'Em', 'A', 'D', 'A', 'Bm', 'F#m', 'G', 'A', 'D', 'D'];
+  const SBR = { 'C#m': ['c#4', 'e4', 'g#4'], A: ['c#4', 'e4', 'a4'], E: ['e4', 'g#4', 'b4'], B: ['d#4', 'f#4', 'b4'] };
+  const SBR_B = { 'C#m': ['c#2', 'c#3'], A: ['a1', 'a2'], E: ['e2', 'e3'], B: ['b1', 'b2'] };
+  const SBR_O = { 'C#m': 'c#3+g#3+c#4+e4', A: 'a2+e3+a3+c#4', E: 'e3+b3+e4+g#4', B: 'b2+f#3+b3+d#4' };
+  const SBR_C = ['C#m', 'A', 'E', 'B', 'C#m', 'A', 'B', 'A'];
+  const SUN_A = ['f#5:4 a5:4 d6:6 c#6:2', 'c#6:4 b5:2 a5:2 e5:8', 'd5:2 f#5:2 b5:4 d6:4 c#6:2 b5:2', 'a5:6 f#5:2 c#5:8',
+    'b5:4 d6:4 g6:6 f#6:2', 'f#6:4 e6:2 d6:2 a5:8', 'g5:2 b5:2 e6:4 g6:4 f#6:2 e6:2', 'e6:4 c#6:2 a5:2 e5:4 a5:4',
+    'f#5:4 a5:4 d6:4 f#6:4', 'e6:6 c#6:2 a5:4 c#6:4', 'd6:4 f#6:4 b6:6 a6:2', 'a6:4 f#6:2 e6:2 c#6:8',
+    'd6:2 e6:2 g6:4 b6:4 a6:2 g6:2', 'a6:6 g6:2 e6:4 c#6:4', 'd6:12 c#6:2 e6:2', 'd6:8 -:4 a5:2 d6:2'].join(' ');
+  const HALF = 'k:4 h:2 h:2 s:4 h:2 h:2', HALFG = 'g:1 -:3 h:2 h:2 s:4 h:2 h:2'; // Halftime für die Brücke
+
 
   // Krakenkampf – Seemannslied als Bosslied (d-Moll, 6/8, 12 Schritte pro Takt): Galopp im Bass, Tritonus-Schatten
   const KR = { Dm: ['d4', 'f4', 'a4'], Bb: ['a#3', 'd4', 'f4'], A: ['a3', 'c#4', 'e4'], Gm: ['g3', 'a#3', 'd4'], C: ['c4', 'e4', 'g4'] };
@@ -442,20 +457,23 @@ const Audio8 = (() => {
         rep([GFOUR, FOUR, FOUR, FILLS, PFOUR, FOUR, FOUR, FILLP].join(' '), 2) + ' ' +
         [GDKD, DKD, DKD, DKD, BDKD, DKD, DKD, 'k:1 h:1 s:1 h:1 p:1 p:1 p:1 p:1 w:8'].join(' '),
     },
-    // Sonnenkathedrale und Sonnenturm: aufsteigende Heldenmelodie, Galopp im Bass, im B-Teil rauschende 32tel
+    // Sonnenkathedrale und Sonnenturm: Sonnenaufgang – Fanfaren-Auftakt mit Kathedralglocken, Gong, Orgel und Chor; A-Teil mit
+    // Heldenmelodie über getragenen Orgelakkorden, Harfen-Achteln und Galopp; B-Teil einen Ganzton höher mit 32tel-Sonnenstrahlen;
+    // Brücke im Halftime mit langen Tönen, Paukenwirbel und Riser, endet auf A-Dur und führt zurück nach D-Dur
     sun: {
-      bpm: 188, loop: true, echo: { delay: 3, vol: 0.3 },
-      p1: contrastLead(SU_C, SU, [
-        'b5:2 f#5:1 b5:1 d6:2 c#6:2 b5:2 f#5:2 d5:2 f#5:2', 'g5:2 d5:1 g5:1 b5:2 a5:2 g5:2 d5:2 b4:2 d5:2',
-        'a5:2 d6:2 f#6:3 e6:1 d6:2 c#6:2 d6:2 a5:2', 'e6:4 c#6:2 a5:2 e5:4 a5:2 c#6:2',
-        'b5:2 b5:1 b5:1 d6:2 f#6:2 b6:4 a6:2 f#6:2', 'g6:3 f#6:1 e6:2 d6:2 b5:2 d6:2 g6:4',
-        'e6:2 g6:2 b6:2 g6:2 e6:2 b5:2 g5:2 e6:2', 'f#6:4 e6:2 c#6:2 a#5:4 f#5:4',
-        'd6:2 b5:2 g5:2 b5:2 d6:3 e6:1 g6:4', 'e6:2 c#6:2 a5:2 c#6:2 e6:3 f#6:1 a6:4',
-        'b6:4 a6:2 f#6:2 d6:2 f#6:2 b6:4', 'a6:2 f#6:2 d6:2 b5:2 f#5:4 b5:4',
-        'g6:2 f#6:2 e6:2 b5:2 g5:2 b5:2 e6:4', 'd6:2 e6:2 f#6:2 g6:2 b6:4 a6:2 g6:2',
-        'f#6:2 a#6:2 c#7:4 a#6:2 f#6:2 c#6:2 a#5:2', 'c#6:4 a#5:2 f#5:2 c#6:4 f#6:4',
-      ]),
-      p2: chordArps2(SU_C, SU), tri: chordBass(SU_C, SU_B, gallop), pad: chordPad(SU_C, SU), dr: section() + ' ' + sectionB(),
+      bpm: 168, loop: true, echo: { delay: 3, vol: 0.3 },
+      p1: ['a4:2 d5:2 f#5:2 a5:10', 'e5:2 a5:2 c#6:2 e6:10', 'f#5:2 b5:2 d6:2 f#6:10', 'g6:4 f#6:4 e6:4 d6:4'].join(' ') + ' ' + SUN_A + ' ' + tp(SUN_A, 2) + ' ' +
+        ['g#6:8 e6:8', 'e6:8 c#6:8', 'b5:8 e6:8', 'd#6:8 f#6:8', 'g#6:8 e6:4 c#6:4', 'c#6:8 e6:8', 'f#6:8 d#6:8', 'e6:8 c#6:4 a5:4'].join(' '),
+      p2: SD_I.map(c => arp4(...SD[c], 2, 2)).join(' ') + ' ' + SD_C.map(c => arp4(...SD[c], 2, 2)).join(' ') + ' ' +
+        tp(SD_C.map(c => arp3f(...SD[c])).join(' '), 2) + ' ' + SBR_C.map(c => arp3(...SBR[c])).join(' '),
+      tri: 'd2:16 c#2:16 b1:16 g1:16 ' + SD_C.map(c => gallop(...SD_B[c])).join(' ') + ' ' + tp(SD_C.map(c => drive(...SD_B[c])).join(' '), 2) + ' ' +
+        SBR_C.map(c => `${SBR_B[c][0]}:8 ${SBR_B[c][1]}:8`).join(' '),
+      org: SD_I.map(c => SD_O[c] + ':16').join(' ') + ' ' + SD_C.map(c => SD_O[c] + ':16').join(' ') + ' ' +
+        tp(SD_C.map(c => { const v = SD_O[c]; return `${v}:4 ${v}:4 ${v}:4 ${v}:4`; }).join(' '), 2) + ' ' + SBR_C.map(c => SBR_O[c] + ':16').join(' '),
+      pad: SD_I.map(c => SD[c].join('+') + ':16').join(' ') + ' ' + SD_C.map(c => SD[c].join('+') + ':16').join(' ') + ' ' +
+        tp(SD_C.map(c => SD[c].join('+') + ':16').join(' '), 2) + ' ' + SBR_C.map(c => SBR[c].join('+') + ':16').join(' '),
+      dr: ['g:1 -:15', 'p:1 -:15', 'b:1 -:15', 'p:1 -:7 p:1 p:1 p:1 p:1 p:1 p:1 p:1 p:1'].join(' ') + ' ' + section() + ' ' + sectionB() + ' ' +
+        [HALFG, HALF, HALF, HALF, HALFG, HALF, HALF, 'p:1 p:1 p:1 p:1 p:1 p:1 p:1 p:1 w:8'].join(' '),
     },
     // Bibliothek und Uhrturm: Cembalo-Toccata mit Ohrwurm-Melodie, im B-Teil 32tel-Arpeggien und galoppierende Kick
     library: {
