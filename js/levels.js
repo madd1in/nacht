@@ -296,6 +296,16 @@ const Levels = (() => {
     .ice().label('EISHÖHLE')
     .start(2, 10).exit(98).done();
 
+  // ICE TOWER SLIDE: Simple placeholder room for test menu
+  // Press 'I' during gameplay to trigger actual Ice Tower module
+  const iceT = room(40, 'tower')
+    .ground(0, 11)
+    .fill(10, 8, 12, 8, '=').fill(27, 8, 29, 8, '=')
+    .candle(15, 9, 'H').candle(24, 9)
+    .statue(20, 10)
+    .label('ICE TOWER')
+    .start(2, 10).exit(38).done();
+
   const r22 = room(96, 'crypt')
     .ground(0, 95)
     .stair(8, 10, 5, 1).fill(13, 6, 26, 6, '=').stair(31, 10, 5, -1)
