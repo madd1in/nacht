@@ -296,15 +296,16 @@ const Levels = (() => {
     .ice().label('EISHÖHLE')
     .start(2, 10).exit(98).done();
 
-  // ICE TOWER SLIDE: Simple placeholder room for test menu
-  // Press 'I' during gameplay to trigger actual Ice Tower module
-  const iceT = room(40, 'tower')
-    .ground(0, 11)
-    .fill(10, 8, 12, 8, '=').fill(27, 8, 29, 8, '=')
-    .candle(15, 9, 'H').candle(24, 9)
-    .statue(20, 10)
-    .label('ICE TOWER')
-    .start(2, 10).exit(38).done();
+  // ICE TOWER SLIDE: Trigger room for vertical descent
+  // Simple transition room that activates IceTower module
+  const iceT = room(80, 'ice')
+    .ground(0, 79)
+    .fill(20, 8, 25, 8, '=').fill(54, 8, 59, 8, '=')
+    .statue(30, 10).statue(48, 10)
+    .candle(15, 9, 'H').candle(35, 9).candle(43, 9, 'W').candle(64, 9, 'H')
+    .prop('icicle', { x: 25 }).prop('icicle', { x: 55 })
+    .ice().label('ICE TOWER')
+    .start(5, 10).exit(75).done();
 
   const r22 = room(96, 'crypt')
     .ground(0, 95)
@@ -642,8 +643,8 @@ const Levels = (() => {
     // Kapitel etwa gleich lang (je ~3–5 Abschnitte, ~3–5 Minuten): die Ankunft (Schiff, Kraken, Wald) endet am Burggraben
     { id: 'arrival', nameKey: 'stageArrival', bossKey: 'bossKraken', voice: 'stageArrival', name: 'DIE ANKUNFT', music: 'sea', time: 480, rooms: [r09, r10, wd], boss: 'DER KRAKE' },
     { id: 0, nameKey: 'stage1', bossKey: 'boss1', voice: 'stage1', name: 'DER BURGHOF', music: 'stage1', time: 480, rooms: [r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
-    { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 540, rooms: [r21, v2, ih, r22], boss: 'KNOCHENRIESE' },
-    { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, iceT, gw, mg], boss: 'MEDUSA' },
+    { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 540, rooms: [r21, v2, ih, iceT, r22], boss: 'KNOCHENRIESE' },
+    { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
     { id: 'sun', nameKey: 'stageSun', bossKey: 'bossKnight', voice: 'stageSun', name: 'DIE SONNENKATHEDRALE', music: 'sun', time: 720, rooms: [sa, sp, sk], boss: 'SONNENWÄCHTER' },
     { id: 'expo', nameKey: 'stageExpo', bossKey: 'bossTrap', voice: 'stageExpo', name: 'DER WINTERGARTEN', music: 'expo', time: 900, rooms: [ex1, ex2, exk, exb], boss: 'MENSCHENFALLE' },
     { id: 3, nameKey: 'stage4', bossKey: 'boss4', voice: 'stage4', name: 'DER THRON DER NACHT', music: 'chapel', time: 780, rooms: [vx, vg, br, bs, r32], boss: 'GRAF NACHTMAHR' },
