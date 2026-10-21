@@ -4,7 +4,7 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 
 > Anno 1691. Alle hundert Jahre erwacht Graf Nachtmahr unter dem Blutmond …
 
-**Live:** https://madd1in.github.io/nacht/
+**Live:** https://madouki.github.io/nacht/
 
 ## Steuerung
 
@@ -25,9 +25,10 @@ Gothic-Action-Platformer im Stil von Castlevania (NES-Look mit SNES-Effekten) �
 
 ## Inhalt
 
-- **2 Helden**: Henrik (Peitsche) und Ragnor, Barbar aus dem Norden (Breitschwert + Wurfseil)
+- **3 Helden**: Henrik (Peitsche), Ragnor, Barbar aus dem Norden (Breitschwert + Wurfseil), und Kaspar, die Marionette ohne Fäden (Hellebarde) – gewählt vor der Kulisse des Ladebildschirms: Blutmond, Burg, Regen und Blitze, die Überschrift in glühenden, blutenden Lettern wie der Titel
 - **Tutorial auf dem Achterschiff**: acht Stationen bringen die Moves bei – Laufen, Angriff, Spezialwaffe, Doppelsprung, Kante packen (Kistenturm), Rutschen (niedrige Luke unter der Kajüte), Dash (gebrochenes Deck) und Wandsprung (Schacht vor der Kampanje); jede Station schafft man nur mit ihrem Move, eine Tafel zeigt die Tasten für das gerade benutzte Gerät – Tastatur, Xbox-Controller oder Touch – und wechselt sofort mit
-- **4 Stages, 17 Räume** – Burghof, Katakomben, Bergfried, Thron der Nacht – inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
+- **7 Kapitel, 28 Abschnitte** – Ankunft, Burghof, Katakomben, Bergfried, Sonnenkathedrale, Wintergarten, Thron der Nacht – inkl. Kletterschächten und dem *Seelenstrudel* mit drehender Walze wie in Super Castlevania IV
+- **Eisturm** (Kapitel 3-4): ein Abstieg rund um einen Turm aus blauem Gletschereis im PS2-Look, wie der Sonnenturm, nur abwärts – die Eisfläche glitzert im Kavernenlicht, schräge Eisrampen lassen den Helden rutschen (mit Schwung abspringen!), dazwischen Abgründe mit Eisdornen, Ankerringe zum Hinüberschwingen, Dash-Lücken, bröckelnde Schollen und Kanten zum Hochziehen; Engelsstatuen als Kontrollpunkte – und hinter dem Helden rollt eine **Lawine** den Weg herab, wer trödelt, wird eingeholt
 - **Glasturm** vor dem Thronsaal: senkrechter Aufstieg in einer Mode-7-Röhre aus riesigen gotischen Buntglasfenstern und Bündelpfeilern – die Röhre dreht sich stetig und beim Treppensteigen vor und zurück, dazu eine Orgel-Toccata – König, Königin, Ritter, Schlachtross, Engel, der Drachentöter gegen den Drachen – und ein Pirat mit Gummihuhn gegen den lila Tentakel, jede Figur unter einem Baldachin mit Maßwerkrosette, Schwarzlot-Malerei und lateinischem Inschriftband; das Glas leuchtet auf und ab, wenn Wolken am Mond vorbeiziehen, Blitze lassen es aufflammen, ferner Chor. Die drehenden Rosetten (Mode 7) sitzen im Thronsaal
 - **Grüße an Monkey Island** auf dem Schiff – wer genau hinsieht, findet sie
 - **Treppen wie im modernen Castlevania**: mitten auf die Stufen springen und mitten von der Treppe abspringen (Unten gedrückt: hindurchfallen); das Wurfkreuz wirbelt sichtbar

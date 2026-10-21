@@ -189,6 +189,8 @@ const I18N = (() => {
     toTitle: { de: 'ZUM TITEL', en: 'TITLE SCREEN', fr: 'ÉCRAN TITRE', es: 'MENÚ PRINCIPAL', ja: 'タイトルへ', zh: '返回标题' },
     plusLife: { de: '+LEBEN', en: '+LIFE', fr: '+VIE', es: '+VIDA', ja: '+回復', zh: '+生命' },
     mash: { de: 'VERSTEINERT! TASTEN HÄMMERN!', en: 'PETRIFIED! MASH BUTTONS!', fr: 'PÉTRIFIÉ ! MARTÈLE LES TOUCHES !', es: '¡PETRIFICADO! ¡PULSA RÁPIDO!', ja: '石化！ボタン連打！', zh: '石化！快速连按！' },
+    hintRamp: { de: 'EISRAMPE: AM ENDE ABSPRINGEN = WEITER SATZ!', en: 'ICE RAMP: JUMP AT THE END FOR A LONG LEAP!', fr: 'RAMPE DE GLACE : SAUTE AU BOUT !', es: '¡RAMPA DE HIELO: SALTA AL FINAL!', ja: '氷の坂: 端でジャンプすると遠くへ!', zh: '冰坡: 在尽头起跳可跳得更远!' },
+    avalanche: { de: 'LAWINE!', en: 'AVALANCHE!', fr: 'AVALANCHE !', es: '¡AVALANCHA!', ja: '雪崩だ!', zh: '雪崩!' },
     hintRing: { de: 'RING ÜBER DIR? OBEN + PEITSCHE = SCHWINGEN', en: 'RING ABOVE? UP + WHIP = SWING', fr: 'ANNEAU AU-DESSUS ? HAUT + FOUET = BALANCER', es: '¿ARO ARRIBA? ARRIBA + LÁTIGO = BALANCEO', ja: '上に輪? 上+ムチでスイング', zh: '上方有环? 上+鞭=摆荡' },
     hintSlide: { de: 'ZU NIEDRIG? UNTEN + SPRINGEN = RUTSCHEN', en: 'TOO LOW? DOWN + JUMP = SLIDE', fr: 'TROP BAS ? BAS + SAUT = GLISSADE', es: '¿MUY BAJO? ABAJO + SALTO = DESLIZAR', ja: '低い? 下+ジャンプでスライディング', zh: '太低? 下+跳=滑铲' },
     'tutDev.keys': { de: 'TASTATUR', en: 'KEYBOARD', fr: 'CLAVIER', es: 'TECLADO', ja: 'キーボード', zh: '键盘' },

@@ -2925,6 +2925,10 @@ const Tiles = (() => {
   // onSky: wird nach den Himmelsebenen aufgerufen (Blitze hinter Burg & Bäumen)
   function drawBg(ctx, room, cam, frame = 0, onSky = null, onWall = null) {
     const vt = room.h > 13;
+    if (room.wrap && room.theme === 'ice') { // Eisturm: die Höhle kreist um den Turm – eine Runde = 5120 px Hintergrund (für alle Ebenen nahtlos)
+      const C = room.w * T, a = ((((cam.x + View.w / 2) % C) + C) % C) / C;
+      cam = { x: a * 5120 - View.w / 2, y: cam.y };
+    }
     build(room.theme).bg.forEach(l => {
       drawLayer(ctx, l, cam, frame, vt);
       if (onSky && l.name === 'clouds') onSky(ctx);

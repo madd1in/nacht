@@ -11,6 +11,8 @@
 'use strict';
 
 // io: { canvas, mk(w, h) → Leinwand, lang, touch, build, progress() → 0..1, jobsDone() → bool, emit('ready'|'done'), raf(f) }
+// io.backdrop: nur die Kulisse (Himmel, Blutmond, Burg, Wolken, Blitze, Regen) ohne Titel und Anzeigen – das Spiel taktet sie
+// selbst (tick/paint) und legt sie unter die Heldenwahl; dazu leiht es sich die Schrift (label) und die glühenden Lettern (heavy).
 function bootEngine(io) {
   const x = io.canvas.getContext('2d');
 
@@ -49,6 +51,7 @@ function bootEngine(io) {
     5: [31, 16, 30, 1, 1, 17, 14], 6: [6, 8, 16, 30, 17, 17, 14], 7: [31, 1, 2, 4, 8, 8, 8], 8: [14, 17, 17, 14, 17, 17, 14], 9: [14, 17, 17, 15, 1, 2, 12],
     '.': [0, 0, 0, 0, 0, 12, 12], ',': [0, 0, 0, 0, 12, 4, 8], '!': [4, 4, 4, 4, 4, 0, 4], '?': [14, 17, 1, 2, 4, 0, 4], '-': [0, 0, 0, 31, 0, 0, 0],
     ':': [0, 12, 12, 0, 12, 12, 0], '%': [24, 25, 2, 4, 8, 19, 3], "'": [4, 4, 8, 0, 0, 0, 0], '>': [16, 24, 28, 30, 28, 24, 16], '<': [1, 3, 7, 15, 7, 3, 1],
+    '/': [1, 1, 2, 4, 8, 16, 16], '=': [0, 0, 31, 0, 31, 0, 0], '+': [0, 4, 4, 31, 4, 4, 0], '(': [2, 4, 8, 8, 8, 4, 2], ')': [8, 4, 2, 2, 2, 4, 8],
     ' ': [0, 0, 0, 0, 0, 0, 0],
   };
   const norm = (s) => { // Großbuchstaben; Akzente fallen weg, Umlaute bleiben
@@ -95,7 +98,7 @@ function bootEngine(io) {
   };
   const T = TXT[io.lang] || TXT.en;
   ['sub', 'load', 'key', 'tap'].forEach(k => { T[k] = norm(T[k]); }); T.tips = T.tips.map(norm);
-  const touch = io.touch;
+  const touch = io.touch, backdrop = !!io.backdrop;
 
   // ---------------- Kulisse (bei jeder Größenänderung neu gebaut) ----------------
   let W = 0, H = 0, PX = 3, S = 4, K = 1, BY = 0, CX = 0, MR = 0, MX = 0, TY = 0, sky = null;
@@ -118,6 +121,7 @@ function bootEngine(io) {
     stars = []; for (let i = 0; i < Math.round(W * H / 1100); i++) stars.push([SR(0, W), SR(0, BY * 0.75), SR(0, 6.3), rnd() < 0.08]);
     moon = mkMoon(MR); mts = mkMountains(); mkCastle(); clouds = mkClouds(); fog = mkFog(); fg = mkForeground();
     rain = []; for (let i = 0; i < Math.round(W * H / 1500); i++) rain.push([SR(0, W), SR(0, H), SR(3.5, 5.5)]);
+    if (backdrop) return;
     const on = letters.map(L => L.on); mkLetters(); letters.forEach((L, i) => { if (on[i] !== undefined) L.on = on[i]; });
   }
   function mkMoon(r) { // Blutmond: Kugelschattierung, Krater und Meere aus Rauschen, Bayer-Raster zwischen sechs Rottönen
@@ -232,7 +236,7 @@ function bootEngine(io) {
   }
 
   // ---------------- Zustand ----------------
-  let state = 'load', t = 0, disp = 0, readyT = 0, exitT = 0, flash = 0, flare = 0, shake = 0, bolt = null, boltT = 0, nextBolt = 110, tip0 = Math.floor(Math.random() * 7);
+  let state = backdrop ? 'backdrop' : 'load', t = backdrop ? 240 : 0, disp = 0, readyT = 0, exitT = 0, flash = 0, flare = 0, shake = 0, bolt = null, boltT = 0, nextBolt = 110, tip0 = Math.floor(Math.random() * 7);
   const parts = [], bats = [], swarm = [];
   const BAT = [['1000001', '1100011', '0110110', '0011100', '0001000'], ['0000000', '0001000', '1111111', '1011101', '0001000'], ['0000000', '0001000', '0011100', '0110110', '1100011']];
   const spark = (px, py, vx, vy, life, col, sz = 1, g = 0, add = true) => { if (parts.length < 500) parts.push({ x: px, y: py, vx, vy, life, max: life, col, sz, g, add }); };
@@ -344,6 +348,7 @@ function bootEngine(io) {
     const fo = (t * 0.25) % W; x.drawImage(fog, -fo, H - fog.height); x.drawImage(fog, W - fo, H - fog.height);
     x.drawImage(fg, Math.round(-12 - drift * 1.6), 0);
     x.fillStyle = 'rgba(170,160,230,0.32)'; for (const [rx, ry] of rain) { x.fillRect(Math.round(rx), Math.round(ry), 1, 2); x.fillRect(Math.round(rx) - 1, Math.round(ry) + 2, 1, 2); }
+    if (backdrop) { for (const p of parts) { x.globalAlpha = Math.min(1, p.life / p.max * 1.6); x.fillStyle = p.col; x.fillRect(Math.round(p.x), Math.round(p.y), p.sz, p.sz); } x.globalAlpha = 1; return; }
     // Titel
     x.globalAlpha = fade;
     letters.forEach((L, i) => {
@@ -404,7 +409,28 @@ function bootEngine(io) {
     let n = 0; while (acc >= 1000 / 60 && n < 4) { acc -= 1000 / 60; n++; update(); if (state === 'gone') return; }
     render();
   }
-  return { resize, press, start() { render(); last = performance.now(); io.raf(frame); }, idle: () => { last = performance.now(); } };
+  // Überschrift in der Art des Titels: 5x7-Lettern mit doppelter Strichstärke (6x7) aus Blöcken der Größe B, glühend rot nach unten verlaufend, mit Tiefe und
+  // hellem Saum; je Letter eine eigene Leinwand (zum Wippen) und ein Tropfpunkt am Fuß fürs Blut
+  const heavy = (s, B) => {
+    s = norm(s); const D = B + 1, ey = 0.85, out = [];
+    for (let i = 0; i < s.length; i++) {
+      const g = F5[s[i]] || F5[' '], on = (cx, cy) => cy >= 0 && cy < 7 && cx >= 0 && cx < 6 && !!((g[cy] & (16 >> cx)) || (cx > 0 && g[cy] & (16 >> (cx - 1))));
+      if (s[i] === ' ') { out.push(null); continue; }
+      const c = cvs(6 * B + 1, 7 * B + Math.ceil(ey * D) + 2), q = c.getContext('2d');
+      for (let d = D; d >= 1; d--) { q.fillStyle = mix('#160003', '#8c1420', 1 - (d - 1) / D); for (let cy = 0; cy < 7; cy++) for (let cx = 0; cx < 6; cx++) if (on(cx, cy)) q.fillRect(cx * B, Math.round(cy * B + ey * d), B, B); }
+      for (let cy = 0; cy < 7; cy++) for (let cx = 0; cx < 6; cx++) if (on(cx, cy)) {
+        for (let k = 0; k < B; k++) { const yy = cy * B + k; q.fillStyle = LOGO[Math.min(6, Math.floor(yy / (7 * B) * 7))]; q.fillRect(cx * B, yy, B, 1); }
+        if (!on(cx, cy - 1)) { q.fillStyle = '#fff0d8'; q.fillRect(cx * B, cy * B, B, 1); }
+        if (!on(cx - 1, cy) && B > 2) { q.fillStyle = 'rgba(255,230,200,0.5)'; q.fillRect(cx * B, cy * B, 1, B); }
+        if (!on(cx, cy + 1) && B > 2) { q.fillStyle = 'rgba(0,0,0,0.35)'; q.fillRect(cx * B, cy * B + B - 1, B, 1); }
+      }
+      const feet = []; for (let cx = 0; cx < 6; cx++) if (on(cx, 6)) feet.push(cx);
+      out.push({ c, x: i * 7 * B, drip: feet.length ? feet[(i * 3) % feet.length] * B : -1, depth: Math.round(D * ey) });
+    }
+    return { letters: out, w: s.length * 7 * B - B, h: 7 * B };
+  };
+  return { resize, press, start() { render(); last = performance.now(); io.raf(frame); }, idle: () => { last = performance.now(); },
+    tick: update, paint: render, label, norm, heavy, canvas: io.canvas };
 }
 
 var Boot = (() => {

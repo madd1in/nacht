@@ -276,6 +276,7 @@ class Player {
       const surf = s.by - pos;
       if (prev <= surf + 3 && feet >= surf - 1) {
         this.state = 'stairs'; this.stair = s; this.stairPos = pos; this.atkT = 0;
+        if (W.room.iceRamps) this.rampV = -Math.min(3.2, Math.hypot(this.vx, this.vy) * 0.6); // auf die Eisrampe: Schwung mitnehmen
         this.vy = 0; this.vx = 0; this.onGround = false; this.jumping = false; this.canDouble = true; this.flipT = 0;
         this.stairUpPose = this.face === s.dir;
         this.placeOnStair(); this.landT = 5; W.dust(this.cx, this.feet, 3); Audio8.sfx('step', this.cx);
@@ -636,11 +637,36 @@ class Player {
     this.face = Math.sign(d); this.x += Math.sign(d) * 1.3; this.walkT++;
   }
 
+  // Eisrampe (Eisturm): hinauf geht nichts – man rutscht abwärts und wird immer schneller; Gegenlenken bremst etwas.
+  // Ein Sprung von der Rampe nimmt den Schwung mit (weiter Satz wie ein Dash-Sprung), unten schlittert man aufs Eis.
+  updateIceRamp(I, P, s) {
+    const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0), down = -s.dir;
+    this.rampV = Math.max(-3.6, Math.min(0, (this.rampV || 0) - 0.11 + (mx === -down ? 0.07 : 0)));
+    if (P.jump) {
+      const sp = Math.abs(this.rampV);
+      this.state = 'normal'; this.stair = null; this.stairCool = 14; this.rampV = 0;
+      this.vy = JUMP * 0.95; this.vx = down * Math.max(WALK, sp * 0.85); this.dashCarry = sp > 1.6; this.face = down;
+      this.onGround = false; this.jumping = true; this.canDouble = true; this.coyote = 0;
+      Audio8.sfx('djump'); W.puff && W.puff(this.cx, this.feet);
+      return;
+    }
+    this.stairPos += this.rampV; this.face = down; this.stairUpPose = false;
+    if (W.frame % 2 === 0) W.spawn(new Particle(this.cx - down * 4, this.feet - 1, -down * rnd(0.3, 1.3), -rnd(0.4, 1.4), Math.random() < 0.5 ? '#e8f8ff' : '#9cd4f4', 18, 1, 0.12)); // Eisstaub
+    if (W.frame % 9 === 0) Audio8.sfx('spin', this.cx);
+    if (this.stairPos <= 0) { // unten: mit Schwung aufs Eis
+      this.stairPos = 0; this.placeOnStair();
+      this.state = 'normal'; this.onGround = true; this.vy = 0; this.vx = down * Math.abs(this.rampV) * 0.9; this.rampV = 0; this.walkT = 0;
+      return;
+    }
+    this.placeOnStair();
+  }
+
   updateStairs(I, P) {
     const s = this.stair;
     if (P.sub) this.tryAttack(true, true);
     else if (P.attack) this.tryAttack(false, false);
     if (this.atkT > 0) { this.tickAttack(); return; }
+    if (W.room.iceRamps) return this.updateIceRamp(I, P, s);
     if (P.jump) { // mitten von der Treppe abspringen – in die gedrückte Richtung oder senkrecht
       const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
       this.state = 'normal'; this.stair = null; this.stairCool = 14;
@@ -850,6 +876,7 @@ class Player {
     if (this.state === 'climb') return this.climbT <= 10 ? H.climb : H.crouch;
     if (this.slideT > 0) return H.slide ? H.slide[(W.frame >> 2) & 1] : H.crouch;
     if (this.state === 'stairs') {
+      if (W.room.iceRamps && !this.atkT) return H.crouch; // geduckt auf der Eisrampe abwärts
       if (this.atkT) return (this.stairUpPose ? H.satkUp : H.satkDown)[p];
       return (this.stairUpPose ? H.stairUp : H.stairDown)[Math.floor(this.stairPos / 8) % 2];
     }

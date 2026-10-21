@@ -296,9 +296,56 @@ const PS2 = (() => {
   // jede Bildspalte zeigt die Wand unter dem Winkel asin(dx/R); Vorsprünge sind kleine Kästen mit Seitenflächen,
   // Gegner hinter dem Turm verschwinden. Dahinter kreist die Stadt (eine volle Turmrunde = ein voller Kreis).
   const Tower = (() => {
-    let tex = null, texKey = '', shade = null, shadeW = 0;
+    let tex = null, texKey = '', shade = null, shadeW = 0, shadeKey = '';
     const R = (room) => room.w * T / (Math.PI * 2);
+    // Eisturm (Kapitel 3, abwärts): Mantel aus blauem Gletschereis – unregelmäßige Eisquader mit Lichtkante und Schattenfuge,
+    // Risse, Reif, leuchtende Adern wie in der Eishöhle, alle 192 px ein vereister Ring mit Eiszapfen; die Textur schließt
+    // nahtlos rundherum (jedes Element wird bei Bedarf ein zweites Mal um den Umfang versetzt gemalt)
+    function buildIceTex(room) {
+      const Wd = room.w * T, Hd = room.h * T, c = Sprites.canvas(Wd, Hd), x = c.getContext('2d');
+      let s = 4111; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+      const twice = (X, w, f) => { f(X); if (X + w > Wd) f(X - Wd); if (X < 0) f(X + Wd); };
+      const g0 = x.createLinearGradient(0, 0, 0, Hd); g0.addColorStop(0, '#2c5c9c'); g0.addColorStop(0.5, '#244c8c'); g0.addColorStop(1, '#1a3a74');
+      x.fillStyle = g0; x.fillRect(0, 0, Wd, Hd);
+      for (let y = 0; y < Hd;) { // Eisquader in unregelmäßigen Lagen
+        const lh = 14 + Math.floor(rnd() * 10);
+        for (let X = -Math.floor(rnd() * 30); X < Wd;) {
+          const bw = 18 + Math.floor(rnd() * 26), v = rnd(), col = [56 + v * 40, 112 + v * 50, 176 + v * 50];
+          twice(X, bw, (bx) => {
+            const g = x.createLinearGradient(bx, y, bx + bw, y + lh); g.addColorStop(0, `rgb(${col.map((n, i) => Math.min(255, n + 40 - i * 4) | 0)})`); g.addColorStop(1, `rgb(${col.map(n => n * 0.8 | 0)})`);
+            x.fillStyle = g; x.fillRect(bx + 1, y + 1, bw - 2, lh - 2);
+            x.fillStyle = 'rgba(214,240,255,0.55)'; x.fillRect(bx + 1, y + 1, bw - 2, 1); x.fillRect(bx + 1, y + 1, 1, lh - 2); // Lichtkante
+            x.fillStyle = 'rgba(8,24,60,0.55)'; x.fillRect(bx + 1, y + lh - 2, bw - 2, 1); x.fillRect(bx + bw - 2, y + 1, 1, lh - 2); // Schattenfuge
+            if (rnd() < 0.35) { x.strokeStyle = 'rgba(200,236,255,0.45)'; x.lineWidth = 0.7; x.beginPath(); const cx0 = bx + 3 + rnd() * (bw - 6); x.moveTo(cx0, y + 2); x.lineTo(cx0 + (rnd() - 0.5) * 8, y + lh * 0.5); x.lineTo(cx0 + (rnd() - 0.5) * 10, y + lh - 2); x.stroke(); } // Riss
+            for (let k = 0; k < 4; k++) { x.fillStyle = 'rgba(240,252,255,0.5)'; x.fillRect(bx + 2 + rnd() * (bw - 4), y + 1 + rnd() * 3, 1, 1); } // Reif
+          });
+          X += bw;
+        }
+        y += lh;
+      }
+      for (let i = 0; i < 26; i++) { // leuchtende Adern im Eis
+        const x0 = rnd() * Wd, y0 = rnd() * Hd, len = 60 + rnd() * 140, a = Math.PI / 2 + (rnd() - 0.5) * 1.2;
+        twice(x0 - 80, 160, (ox) => {
+          const bx = ox + 80;
+          for (const [lw, col] of [[4, 'rgba(90,200,255,0.18)'], [1.4, 'rgba(160,236,255,0.8)']]) {
+            x.strokeStyle = col; x.lineWidth = lw; x.beginPath(); x.moveTo(bx, y0);
+            let px = bx, py = y0; for (let k = 1; k <= 8; k++) { px += Math.cos(a + Math.sin(k * 1.7 + i) * 0.6) * len / 8; py += Math.sin(a + Math.sin(k * 1.7 + i) * 0.6) * len / 8; x.lineTo(px, py); }
+            x.stroke();
+          }
+        });
+      }
+      for (let y = 0; y < Hd; y += 192) { // vereiste Ringe mit Eiszapfen
+        const gy = y + 180, gr = x.createLinearGradient(0, gy, 0, gy + 10); gr.addColorStop(0, '#e8f8ff'); gr.addColorStop(0.4, '#9cd0f4'); gr.addColorStop(1, '#3c74b4');
+        x.fillStyle = gr; x.fillRect(0, gy, Wd, 10);
+        for (let X = 0; X < Wd; X += 7 + Math.floor(rnd() * 9)) {
+          const len = 6 + rnd() * 18, w2 = 2 + rnd() * 3;
+          x.fillStyle = 'rgba(200,236,255,0.9)'; x.beginPath(); x.moveTo(X, gy + 10); x.lineTo(X + w2, gy + 10); x.lineTo(X + w2 / 2, gy + 10 + len); x.closePath(); x.fill();
+        }
+      }
+      return c;
+    }
     function buildTex(room) {
+      if (room.theme === 'ice') return buildIceTex(room);
       const Wd = room.w * T, Hd = room.h * T, c = Sprites.canvas(Wd, Hd), x = c.getContext('2d');
       let s = 77; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
       x.fillStyle = '#c8a874'; x.fillRect(0, 0, Wd, Hd);
@@ -322,9 +369,21 @@ const PS2 = (() => {
       for (let y = 0; y < Hd; y += 192) { x.fillStyle = '#a88858'; x.fillRect(0, y + 186, Wd, 6); x.fillStyle = '#f4e0b0'; x.fillRect(0, y + 186, Wd, 1); } // Gesimse
       return c;
     }
-    function shadeFor(w, r) { // Rundung: Ränder dunkel, Glanzlicht links (Sonne), warmes Streiflicht an der Kante
+    function shadeFor(w, r, ice) { // Rundung: Ränder dunkel, Glanzlicht links (Sonne), warmes Streiflicht an der Kante
       shadeW = w; shade = Sprites.canvas(w, 1);
       const x = shade.getContext('2d'), cx = w / 2;
+      if (ice) { // Kavernenlicht: kaltes Licht von links vorn, schmaler weißer Glanz, rechts violetter Kristallschein
+        for (let X = 0; X < w; X++) {
+          const s = (X + 0.5 - cx) / r; if (Math.abs(s) >= 1) continue;
+          const c = Math.sqrt(1 - s * s), lit = Math.max(0, -s * 0.55 + c * 0.83);
+          x.fillStyle = `rgba(4,10,34,${Math.min(0.85, 0.1 + 0.8 * (1 - lit) ** 1.5).toFixed(3)})`; x.fillRect(X, 0, 1, 1);
+          const spec = Math.max(0, lit - 0.88) * 8.5;
+          if (spec > 0) { x.fillStyle = `rgba(230,250,255,${(spec * 0.42).toFixed(3)})`; x.fillRect(X, 0, 1, 1); }
+          if (s > 0.86) { x.fillStyle = `rgba(170,120,255,${((s - 0.86) * 2.6).toFixed(3)})`; x.fillRect(X, 0, 1, 1); }
+          if (s < -0.9) { x.fillStyle = `rgba(110,220,255,${((-s - 0.9) * 3).toFixed(3)})`; x.fillRect(X, 0, 1, 1); }
+        }
+        return;
+      }
       for (let X = 0; X < w; X++) {
         const s = (X + 0.5 - cx) / r; if (Math.abs(s) >= 1) continue;
         const c = Math.sqrt(1 - s * s), lit = Math.max(0, -s * 0.62 + c * 0.78); // Lambert zur Sonne links vorn
@@ -340,10 +399,10 @@ const PS2 = (() => {
     // Welt-x → Winkel relativ zur Bildmitte
     function angleOf(room, cam, wx) { const C = room.w * T, rel = wrap(wx - (cam.x + View.w / 2) + C / 2, C) - C / 2; return rel / C * Math.PI * 2; }
     function draw(ctx, room, cam, frame, t) {
-      const key = room.w + 'x' + room.h;
+      const key = room.w + 'x' + room.h + room.theme, ice = room.theme === 'ice';
       if (!tex || texKey !== key) { tex = buildTex(room); texKey = key; }
       const w = View.w, r = R(room), cx = w / 2, C = room.w * T, camC = cam.x + w / 2;
-      if (!shade || shadeW !== w) shadeFor(w, r);
+      if (!shade || shadeW !== w || shadeKey !== key) { shadeFor(w, r, ice); shadeKey = key; }
       // Turmmantel: jede Spalte aus der abgewickelten Wand, zum Rand hin perspektivisch gestaucht (Ober- und Unterkante wölben sich)
       const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(w, Math.ceil(cx + r)), Hd = room.h * T;
       ctx.save(); ctx.beginPath();
@@ -367,19 +426,51 @@ const PS2 = (() => {
       }
       items.sort((a, b) => a[0] - b[0]); // hintere (seitliche) zuerst
       for (const [cm, ch, cxT, cy, a0, a1] of items) {
+        if (ice && (ch === '/' || ch === '\\')) { iceRamp(ctx, cx, r, D, persp(r, cm), cy, cam, ch, a0, a1); continue; }
         const k = persp(r, cm), Y = H0 + (cy * T - cam.y - H0) * k, TH = T * k, img = ch === '/' ? t.up : ch === '\\' ? t.down : ch === '^' ? t.spikes : ch === '=' ? t.alt[(cxT + cy) % 3] : (g[cy - 1] && g[cy - 1][cxT] === ch ? t.ground : t.groundTop)[(cxT * 7 + cy * 3) % 4];
         const fx0 = cx + (r + D) * Math.sin(a0), fx1 = cx + (r + D) * Math.sin(a1);
         const sideA = a0 > 0 ? a0 : a1, sx0 = cx + r * Math.sin(sideA), sx1 = cx + (r + D) * Math.sin(sideA);
         if (Math.abs(sx1 - sx0) > 0.6 && ch !== '/' && ch !== '\\') { // Seitenfläche (zur Bildmitte hin sichtbar)
           ctx.drawImage(img, 0, 0, 2, 16, Math.min(sx0, sx1), Y, Math.abs(sx1 - sx0) + 0.6, TH);
-          ctx.fillStyle = 'rgba(40,16,24,0.45)'; ctx.fillRect(Math.min(sx0, sx1), Y, Math.abs(sx1 - sx0) + 0.6, TH);
+          ctx.fillStyle = ice ? 'rgba(6,18,50,0.45)' : 'rgba(40,16,24,0.45)'; ctx.fillRect(Math.min(sx0, sx1), Y, Math.abs(sx1 - sx0) + 0.6, TH);
         }
         const top = Y > H0 ? Math.min(6, (Y - H0) * 0.06) : 0, above = g[cy - 1] && g[cy - 1][cxT];
-        if (top > 0.5 && (!above || above === '.')) { ctx.drawImage(img, 0, 0, 16, 2, Math.min(fx0, fx1), Y - top, Math.abs(fx1 - fx0) + 0.6, top); ctx.fillStyle = 'rgba(255,236,190,0.22)'; ctx.fillRect(Math.min(fx0, fx1), Y - top, Math.abs(fx1 - fx0) + 0.6, top); }
+        if (top > 0.5 && (!above || above === '.')) { ctx.drawImage(img, 0, 0, 16, 2, Math.min(fx0, fx1), Y - top, Math.abs(fx1 - fx0) + 0.6, top); ctx.fillStyle = ice ? 'rgba(225,248,255,0.4)' : 'rgba(255,236,190,0.22)'; ctx.fillRect(Math.min(fx0, fx1), Y - top, Math.abs(fx1 - fx0) + 0.6, top); }
         ctx.drawImage(img, Math.min(fx0, fx1), Y, Math.abs(fx1 - fx0) + 0.6, TH);
         const c = Math.cos((a0 + a1) / 2), am = (a0 + a1) / 2, lit = Math.max(0, -Math.sin(am) * 0.62 + c * 0.78); // wie der Mantel beleuchten
-        if (lit < 0.95) { ctx.fillStyle = `rgba(30,14,24,${Math.min(0.7, (1 - lit) * 0.75).toFixed(3)})`; ctx.fillRect(Math.min(fx0, fx1), Y, Math.abs(fx1 - fx0) + 0.6, TH); }
+        if (lit < 0.95) { ctx.fillStyle = ice ? `rgba(4,12,40,${Math.min(0.7, (1 - lit) * 0.75).toFixed(3)})` : `rgba(30,14,24,${Math.min(0.7, (1 - lit) * 0.75).toFixed(3)})`; ctx.fillRect(Math.min(fx0, fx1), Y, Math.abs(fx1 - fx0) + 0.6, TH); }
       }
+      if (ice) drawGlitter(ctx, room, cam, frame, r, cx);
+    }
+    // Eisrampe: schräge Eisplatte statt Stufe – Oberkante von Ecke zu Ecke der Kachel, darunter eine Plattendicke,
+    // weißer Glanz auf der Kante; benachbarte Kacheln fügen sich zur durchgehenden Rampe
+    function iceRamp(ctx, cx, r, D, k, cy, cam, ch, a0, a1) {
+      const fx0 = cx + (r + D) * Math.sin(a0), fx1 = cx + (r + D) * Math.sin(a1), Y = H0 + (cy * T - cam.y - H0) * k, TH = T * k, th = 6 * k;
+      const yl = ch === '/' ? Y + TH : Y, yr = ch === '/' ? Y : Y + TH; // '/' steigt nach rechts, '\\' nach links
+      const g = ctx.createLinearGradient(0, Math.min(yl, yr), 0, Math.max(yl, yr) + th);
+      g.addColorStop(0, '#d8f4ff'); g.addColorStop(0.25, '#8cc8f0'); g.addColorStop(1, '#2c5c9c');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(fx0, yl); ctx.lineTo(fx1 + 0.6, yr); ctx.lineTo(fx1 + 0.6, yr + th); ctx.lineTo(fx0, yl + th); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(fx0, yl + 0.5); ctx.lineTo(fx1 + 0.6, yr + 0.5); ctx.stroke();
+      ctx.fillStyle = 'rgba(6,18,50,0.5)'; ctx.fillRect(Math.min(fx0, fx1), Math.max(yl, yr) + th - 1, Math.abs(fx1 - fx0) + 0.6, 1);
+    }
+    // Glitzern auf dem Eismantel: feste Punkte auf der Oberfläche, die im Kavernenlicht aufblitzen – auf der beleuchteten
+    // Seite öfter und heller; sie drehen sich mit dem Turm
+    let glit = null;
+    function drawGlitter(ctx, room, cam, frame, r, cx) {
+      const C = room.w * T, Hd = room.h * T;
+      if (!glit || glit.key !== C + 'x' + Hd) { glit = { key: C + 'x' + Hd, p: [] }; let s = 99; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; for (let i = 0; i < Hd / 6; i++) glit.p.push([rnd() * C, rnd() * Hd, rnd() * 6.283, 0.5 + rnd() * 0.9]); }
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (const [u, v, ph, sp] of glit.p) {
+        if (v < cam.y - 60 || v > cam.y + 270) continue;
+        const a = angleOf(room, cam, u), c = Math.cos(a); if (c < 0.2) continue;
+        const k = persp(r, c), Y = H0 + (v - cam.y - H0) * k; if (Y < -4 || Y > 212) continue;
+        const lit = Math.max(0, -Math.sin(a) * 0.55 + c * 0.83), tw = Math.max(0, Math.sin(frame * 0.05 * sp + ph) - (0.9 - lit * 0.25)) / (0.1 + lit * 0.25);
+        if (tw <= 0) continue;
+        const X = Math.round(cx + r * Math.sin(a)), y = Math.round(Y), rr = Math.round(1 + tw * 2.5 * lit);
+        ctx.fillStyle = `rgba(200,240,255,${(0.85 * tw).toFixed(2)})`; ctx.fillRect(X - rr, y, rr * 2 + 1, 1); ctx.fillRect(X, y - rr, 1, rr * 2 + 1);
+        ctx.fillStyle = `rgba(255,255,255,${Math.min(1, tw).toFixed(2)})`; ctx.fillRect(X, y, 1, 1);
+      }
+      ctx.restore();
     }
     // Figuren auf dem Zylinder: Bildposition berechnen, verdeckt hinter dem Turm → nicht zeichnen
     function place(room, cam, e) {

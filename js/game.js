@@ -394,6 +394,7 @@ const Game = {
       case 'sections': this.updateSections(P); break;
       case 'pausesec': this.updateSections(P, true); break;
       case 'charsel': {
+        if (this.bootBg) this.bootBg.tick();
         if (P.left || P.right) {
           const ids = HEROES.list.map(d => d.id), i = ids.indexOf(Options.character);
           Options.set('character', ids[(i + (P.right ? 1 : ids.length - 1)) % ids.length]); Audio8.sfx('select');
@@ -1168,30 +1169,83 @@ const Game = {
   },
 
   cap: (id) => id[0].toUpperCase() + id.slice(1),
+  // Kulisse und Schrift des Ladebildschirms (boot.js) – Blutmond, Burg, Wolken, Blitze, Regen; einmal gebaut, je Bildbreite neu
+  bootScene() {
+    if (typeof bootEngine === 'undefined') return null;
+    if (!this.bootBg) {
+      const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d', { willReadFrequently: true }); return c; };
+      const cv = document.createElement('canvas'); cv.width = View.w; cv.height = 240; // die Kulisse selbst: GPU-Leinwand, nur die Bauteile lesbar
+      this.bootBg = bootEngine({ canvas: cv, mk, backdrop: true, lang: 'en', touch: false, build: '', progress: () => 1, jobsDone: () => true, emit: () => {}, raf: () => {} });
+      this.bootBgW = 0;
+    }
+    if (this.bootBgW !== View.w) { this.bootBg.resize(View.w, 240); this.bootBgW = View.w; this.bootHead = null; }
+    return this.bootBg;
+  },
+  bootText(ctx, s, x, y, col, sh = '#000', align = 'center') { // 5x7-Schrift des Ladebildschirms; CJK über die Spielschrift
+    const B = this.bootBg;
+    if (!B || I18N.cjk) { Font.draw(ctx, s, x, y, col, { align, shadow: sh }); return; }
+    const n = B.norm(s), c = B.label(n, col, sh), w = n.length * 6 - 1;
+    ctx.drawImage(c, Math.round(align === 'center' ? x - w / 2 : align === 'right' ? x - w : x), Math.round(y));
+  },
+  drawBootHeading(ctx, s, cx, y) { // glühende Lettern wie NACHTMAHR, wippend, mit Glut dahinter und Blut, das herabläuft
+    const B = this.bootBg;
+    if (!B || I18N.cjk) { this.big(ctx, s, cx, y, 2, LOGO, null, '#000'); return; }
+    if (!this.bootHead || this.bootHead.s !== s) { // passt die Zeile nur mit Winzlettern, bricht sie am mittleren Leerzeichen um
+      const n = B.norm(s), fit = (len) => Math.max(1, Math.min(3, Math.floor((View.w - 12) / (len * 7))));
+      let parts = [n], bs = fit(n.length);
+      if (bs < 2 && n.includes(' ')) {
+        let best = -1; for (let i = 0; i < n.length; i++) if (n[i] === ' ' && (best < 0 || Math.abs(i - n.length / 2) < Math.abs(best - n.length / 2))) best = i;
+        parts = [n.slice(0, best), n.slice(best + 1)]; bs = fit(Math.max(parts[0].length, parts[1].length));
+      }
+      this.bootHead = { s, B: bs, lines: parts.map(ln => B.heavy(ln, bs)) };
+    }
+    const H = this.bootHead, t = this.t, lh = 7 * H.B + H.B + 4, y0 = y - (H.lines.length - 1) * Math.round(lh * 0.4);
+    let k0 = 0;
+    H.lines.forEach((ln, li) => {
+      const x0 = Math.round(cx - ln.w / 2), ly = y0 + li * lh;
+      ln.letters.forEach((L, j) => {
+        const i = k0 + j; if (!L) return;
+        const X = x0 + L.x, Y = ly + Math.round(Math.sin(t * 0.06 + i * 0.75) * Math.max(1, H.B * 0.3)), mx = X + 3 * H.B, my = Y + 3.5 * H.B, r = 6 * H.B * (1 + 0.08 * Math.sin(t * 0.1 + i));
+        const gl = ctx.createRadialGradient(mx, my, 0, mx, my, r); gl.addColorStop(0, `rgba(255,60,30,${0.22 + 0.3 * Math.max(0, 1 - t / 40)})`); gl.addColorStop(1, 'rgba(255,40,20,0)');
+        ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = gl; ctx.fillRect(mx - r, my - r, r * 2, r * 2); ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(L.c, X, Y);
+        if (L.drip >= 0 && i % 3 === 1) { // Blut läuft von einem Fuß herab
+          const len = Math.round(Math.min(H.B * 3, t * 0.04 * H.B)), dw = Math.max(1, Math.round(H.B / 2)), dx = X + L.drip + Math.round((H.B - dw) / 2), dy = Y + 7 * H.B + L.depth - 1;
+          ctx.fillStyle = '#8c0c14'; ctx.fillRect(dx, dy, dw, len); ctx.fillStyle = '#d82820'; ctx.fillRect(dx, dy + len - 1, dw, 1);
+          const k = (t + i * 37) % 120; if (len >= H.B * 3 && k < 40) { ctx.fillStyle = '#c41420'; ctx.fillRect(dx, dy + len + Math.round(k * k * 0.03), dw, dw); }
+        }
+      });
+      k0 += ln.letters.length + 1;
+    });
+  },
+  cap: (id) => id[0].toUpperCase() + id.slice(1),
   drawCharSel(ctx) {
-    const cx = View.cx;
-    this.drawSkyScene(ctx);
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, View.w, 176);
-    this.big(ctx, tr('choose'), cx, 40, 2, LOGO, null, '#000');
+    const cx = View.cx, bg = this.bootScene();
+    if (bg) { bg.paint(); ctx.drawImage(bg.canvas, 0, 0); } else this.drawSkyScene(ctx);
+    this.drawBootHeading(ctx, tr('choose'), cx, 18);
     // Karussell: der gewählte Held in der Mitte, die anderen daneben (gleitet beim Wechseln, passt auf jede Bildbreite)
     const sel = Math.max(0, HEROES.list.findIndex(d => d.id === Options.character));
     this.selX = this.selX === undefined ? sel : this.selX + (sel - this.selX) * 0.25;
     HEROES.list.forEach((d, i) => {
-      const on = Options.character === d.id, pw = 134, px = Math.round(cx - pw / 2 + (i - this.selX) * (pw + 8)), py = 58, mid = px + pw / 2;
+      const on = Options.character === d.id, pw = 134, px = Math.round(cx - pw / 2 + (i - this.selX) * (pw + 8)), py = 52, ph = 150, mid = px + pw / 2;
       if (px > View.w || px + pw < 0) return;
-      ctx.fillStyle = on ? 'rgba(200,144,32,0.22)' : 'rgba(0,0,0,0.6)'; ctx.fillRect(px, py, pw, 148);
-      ctx.fillStyle = on ? '#f8b800' : '#4c4c4c';
-      ctx.fillRect(px, py, pw, 1); ctx.fillRect(px, py + 147, pw, 1); ctx.fillRect(px, py, 1, 148); ctx.fillRect(px + pw - 1, py, 1, 148);
+      ctx.fillStyle = on ? 'rgba(42,6,22,0.5)' : 'rgba(6,2,10,0.7)'; ctx.fillRect(px, py, pw, ph); // Rahmen wie der Ladebalken: dunkles Violett, goldene Zier
+      ctx.fillStyle = on ? '#c89020' : '#3c2848';
+      ctx.fillRect(px, py, pw, 1); ctx.fillRect(px, py + ph - 1, pw, 1); ctx.fillRect(px, py, 1, ph); ctx.fillRect(px + pw - 1, py, 1, ph);
+      if (on) { ctx.fillStyle = '#fce0a8'; for (const [ex, ey] of [[px, py], [px + pw - 1, py], [px, py + ph - 1], [px + pw - 1, py + ph - 1]]) { ctx.fillRect(ex - 1, ey, 3, 1); ctx.fillRect(ex, ey - 1, 1, 3); } }
       const H = HEROES.get(d.id), spr = on ? H.walk[Math.floor(this.t / 5) % 8] : H.idle[Math.floor(this.t / 40) % 2];
       ctx.imageSmoothingEnabled = false;
+      if (!on) ctx.globalAlpha = 0.7;
       ctx.drawImage(spr.c, mid - spr.c.width, py + 10, spr.c.width * 2, spr.c.height * 2);
-      Font.draw(ctx, d.name, mid, py + 96, on ? '#fcfcfc' : '#8c8c8c', { align: 'center' });
-      Font.draw(ctx, tr(d.id + 'Title'), mid, py + 107, on ? '#f8b800' : '#6c6c6c', { align: 'center' });
-      tr(d.id + 'Desc').forEach((l, k) => Font.draw(ctx, l, mid, py + 120 + k * 11, on ? '#bcbcbc' : '#5c5c5c', { align: 'center' }));
-      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, mid - 4, py + 140);
+      ctx.globalAlpha = 1;
+      this.bootText(ctx, d.name, mid, py + 96, on ? '#fce0a8' : '#8c7a9c', on ? '#400008' : '#000');
+      this.bootText(ctx, tr(d.id + 'Title'), mid, py + 108, on ? '#fc7460' : '#5c4a6c', '#14000c');
+      tr(d.id + 'Desc').forEach((l, k) => this.bootText(ctx, l, mid, py + 121 + k * 11, on ? '#e8d4f0' : '#5c4a6c', '#14000c'));
+      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, mid - 4, py + ph - 8);
     });
-    if ((this.t >> 4) % 2 === 0) { Font.draw(ctx, '<', 6, 128, '#f8b800'); Font.draw(ctx, '>', View.w - 11, 128, '#f8b800'); }
-    Font.draw(ctx, tr(Input.device === 'pad' ? 'selPad' : 'selKey'), cx, 214, '#9c9c9c', { align: 'center' });
+    const pulse = 0.55 + 0.45 * Math.sin(this.t * 0.1);
+    ctx.globalAlpha = pulse; this.bootText(ctx, '<', 8, 124, '#fce0a8', '#400008', 'left'); this.bootText(ctx, '>', View.w - 8, 124, '#fce0a8', '#400008', 'right'); ctx.globalAlpha = 1;
+    this.bootText(ctx, tr(Input.device === 'pad' ? 'selPad' : 'selKey'), cx, 214, '#d0b8e0', '#000');
   },
 
   drawIntro(ctx) {
