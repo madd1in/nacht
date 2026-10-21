@@ -363,8 +363,9 @@ class Player {
     const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
     if (this.onGround) {
       if (this.atkT > 0 || this.crouch) { if (W.room.ice) this.vx *= 0.975; else this.vx = 0; } // auf Eis rutscht man beim Hieb und Ducken weiter
-      else { const tv = mx * WALK, ice = W.room.ice; this.vx += (tv - this.vx) * (ice ? (mx ? 0.045 : 0.018) : (mx ? 0.38 : 0.5)); if (Math.abs(this.vx) < 0.06) this.vx = 0; if (mx) this.face = mx; } // Eis: träge anfahren, lange nachrutschen
+      else { const tv = mx * WALK, ice = W.room.ice; if (W.room.iceRamps && mx && Math.sign(this.vx) === mx && Math.abs(this.vx) > WALK) this.vx *= 0.993; else this.vx += (tv - this.vx) * (ice ? (mx ? 0.045 : 0.018) : (mx ? 0.38 : 0.5)); if (Math.abs(this.vx) < 0.06) this.vx = 0; if (mx) this.face = mx; } // Eis: träge anfahren, lange nachrutschen; im Eisturm hält der Rampenschwung
       this.coyote = 7;
+      this.iceV = !!W.room.iceRamps && Math.abs(this.vx) > WALK + 0.1; // Rutschschwung, der mit in die Luft geht (Schanze)
       if (this.ridePlat && this.ridePlat.passable && I.down) { if (++this.passT > 12) return this.dropThrough(); } else this.passT = 0; // Unten halten reicht auch
       if ((P.jump || (this.jumpBuf > 0 && I.jump)) && this.atkT === 0) {
         this.jumpBuf = 0;
@@ -375,6 +376,7 @@ class Player {
       }
     } else {
       if (this.flingT > 0) { this.flingT--; this.vx += (mx * WALK - this.vx) * 0.05; } // Schwung nach dem Pendeln
+      else if (this.iceV && !this.dashCarry) { if (mx && mx !== Math.sign(this.vx)) this.vx += (mx * WALK - this.vx) * 0.1; else this.vx *= 0.997; if (Math.abs(this.vx) <= WALK) this.iceV = false; } // Eisturm: der Rutschschwung trägt über die Schanze, Gegenlenken bremst
       else this.vx = mx * (this.dashCarry ? DASH_AIR : WALK); // nach einem Dash bleibt der Schwung bis zur Landung
       if (mx && this.atkT === 0) this.face = mx;
       if (this.coyote > 0) this.coyote--;
@@ -387,7 +389,7 @@ class Player {
       else if (P.jump && !wall && this.wallT > 0 && this.atkT === 0) this.wallJump(this.wallLast); // knapp von der Wand gelöst: zählt noch
       else if (P.jump && !this.canDouble) this.jumpBuf = 8; // Sprungpuffer: kurz vor der Landung (oder der Wand) gedrückt
       else if (P.jump && this.canDouble) { // Doppelsprung (einmal pro Luftphase)
-        this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true;
+        this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true; this.iceV = false;
         if (this.atkT === 0) this.flipT = FLIP_LEN;
         Audio8.sfx('djump'); W.puff(this.cx, this.feet);
       }
@@ -412,7 +414,7 @@ class Player {
     if (this.stairCool > 0) this.stairCool--;
     else if (!this.onGround && this.vy > 0 && !Input.held.down && this.catchStair()) return; // im Fallen mitten auf der Treppe landen (Unten gedrückt: hindurchfallen)
     if (!this.onGround && this.tryLedge(mx)) return; // an der Kante festhalten
-    if (!this.onGround && wasGround && !this.jumping && this.vy > 0) this.vx = 0;
+    if (!this.onGround && wasGround && !this.jumping && this.vy > 0 && !this.iceV) this.vx = 0; // klassisch senkrecht von der Kante fallen – im Eisturm trägt der Rutschschwung über die Schanze
     this.clampRoom();
     this.hazards();
     this.trackSafe();
@@ -440,7 +442,7 @@ class Player {
       if (this.onGround) { this.vy = JUMP; this.onGround = false; this.jumping = true; return; }
       const wall = this.wallDir();
       if (wall) return this.wallJump(wall);
-      if (this.canDouble) { this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true; this.flipT = FLIP_LEN; Audio8.sfx('djump'); W.puff(this.cx, this.feet); }
+      if (this.canDouble) { this.canDouble = false; this.vy = JUMP * 0.92; this.jumping = true; this.iceV = false; this.flipT = FLIP_LEN; Audio8.sfx('djump'); W.puff(this.cx, this.feet); }
       return;
     }
     if (mx === -this.face) this.dashT = 0; // Gegenrichtung bricht ab
@@ -471,7 +473,7 @@ class Player {
     return 0;
   }
   wallJump(wall) {
-    this.vy = JUMP; this.vx = -wall * 2.1; this.flingT = 10; this.face = -wall; this.wallT = 0; this.jumpBuf = 0;
+    this.vy = JUMP; this.vx = -wall * 2.1; this.flingT = 10; this.iceV = false; this.face = -wall; this.wallT = 0; this.jumpBuf = 0;
     this.jumping = true; this.canDouble = true; this.wallSlide = 0; this.flipT = 0; this.ledgeCool = 8; this.coyote = 0; this.canAirDash = true; this.dashCarry = false; this.dashT = 0;
     Audio8.sfx('djump'); W.dust(this.cx + wall * 6, this.feet - 8, 4);
   }
@@ -645,7 +647,7 @@ class Player {
     if (P.jump) {
       const sp = Math.abs(this.rampV);
       this.state = 'normal'; this.stair = null; this.stairCool = 14; this.rampV = 0;
-      this.vy = JUMP * 0.95; this.vx = down * Math.max(WALK, sp * 0.85); this.dashCarry = sp > 1.6; this.face = down;
+      this.vy = JUMP * 0.95; this.vx = down * Math.max(WALK, sp * 0.85); this.dashCarry = false; this.iceV = sp * 0.85 > WALK; this.face = down;
       this.onGround = false; this.jumping = true; this.canDouble = true; this.coyote = 0;
       Audio8.sfx('djump'); W.puff && W.puff(this.cx, this.feet);
       return;

@@ -370,6 +370,7 @@ const Game = {
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
     const titleish = ['title', 'options', 'sections', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
     Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'demo') && W.room ? W.room.theme : null);
+    if (titleish && this.bootBg) this.bootBg.tick(); // Kulisse des Ladebildschirms unter den Menüs
     if (titleish) {
       FX.updateStorm(this.tStorm, View.w, () => { if (Audio8.ready()) setTimeout(() => Audio8.sfx('thunder'), 250 + Math.random() * 600); });
     }
@@ -394,7 +395,6 @@ const Game = {
       case 'sections': this.updateSections(P); break;
       case 'pausesec': this.updateSections(P, true); break;
       case 'charsel': {
-        if (this.bootBg) this.bootBg.tick();
         if (P.left || P.right) {
           const ids = HEROES.list.map(d => d.id), i = ids.indexOf(Options.character);
           Options.set('character', ids[(i + (P.right ? 1 : ids.length - 1)) % ids.length]); Audio8.sfx('select');
@@ -596,7 +596,7 @@ const Game = {
 
   drawScores(ctx) {
     const cx = View.cx;
-    this.drawSkyScene(ctx);
+    this.menuBg(ctx);
     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(cx - 120, 36, 240, 178);
     ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 120, 36, 240, 1); ctx.fillRect(cx - 120, 213, 240, 1); ctx.fillRect(cx - 114, 70, 228, 1);
     this.big(ctx, tr('hiTitle'), cx, 42, 2, LOGO, null, '#000');
@@ -621,7 +621,7 @@ const Game = {
 
   drawEntry(ctx) {
     const cx = View.cx, e = this.entry, A = Scores.ALPHA;
-    this.drawSkyScene(ctx);
+    this.menuBg(ctx);
     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(cx - 120, 40, 240, 156);
     ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 120, 40, 240, 1); ctx.fillRect(cx - 120, 195, 240, 1);
     const pop = this.t < 10 ? Math.round((10 - this.t) / 3) : 0;
@@ -1015,83 +1015,46 @@ const Game = {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, View.w, 32); ctx.fillRect(0, 208, View.w, 32);
   },
 
-  drawHeroOnRock(ctx, x, y) {
-    ctx.fillStyle = '#0a0410';
-    for (let i = 0; i < 70; i++) ctx.fillRect(x - 30 + i, y + 32 - Math.round(Math.sin(i / 70 * Math.PI) * 10), 1, 30);
-    for (let i = 0; i < 8; i++) {
-      const sx = x + 3 - i * 2, sy = y + 1 + Math.round(Math.sin(this.t * 0.2 + i * 0.9) * (0.5 + i * 0.3));
-      const scf = HEROES.def(Options.character).scarf;
-      ctx.fillStyle = i % 3 === 0 ? scf.b : scf.a; ctx.fillRect(sx, sy, i > 5 ? 1 : scf.w, i > 5 ? 1 : scf.w);
-    }
-    const H = HEROES.get(Options.character), sc = H.def.scarf;
-    Sprites.draw(ctx, H.idle[Math.floor(this.t / 40) % 2], x - H.stand.mx, y + 32 - H.stand.h);
-  },
-
   controlLines() { return tr(Input.device === 'pad' || Input.padName ? 'pad' : 'keys'); },
 
+  // Titelmenü im Look des Ladebildschirms: dieselbe Kulisse (Blutmond, Burg, Wolken, Blitze, Regen) und dieselben glühenden
+  // NACHTMAHR-Lettern an derselben Stelle – der Ladebildschirm blitzt weiß aus und blendet in genau dieses Bild über –, darunter
+  // Menü, Steuerung und Bestwert in seiner 5x7-Schrift, der Kasten mit violettem Rand und goldener Zier wie der Ladebalken.
   drawTitle(ctx) {
-    const cx = View.cx;
-    this.drawSkyScene(ctx);
-    if (!this.revealed) { // Dunkelheit vor dem ersten Blitz
-      ctx.fillStyle = `rgba(0,0,0,${0.85 - this.t / 200})`; ctx.fillRect(0, 32, View.w, 176);
-      if ((this.t >> 4) % 2) Font.draw(ctx, '...', cx, 120, '#4c4c5c', { align: 'center' });
-      return;
-    }
-    // Riesenfledermaus-Silhouette vor dem Mond
-    const bt = this.t % 900;
-    if (bt < 260) {
-      const s = Sprites.S.gbatX.flap[Math.floor(this.t / 4) % Sprites.S.gbatX.flap.length], bx = View.w + 40 - bt * (View.w + 120) / 260, by = 48 + Math.sin(bt / 30) * 10;
-      ctx.save(); ctx.filter = 'brightness(0)'; ctx.globalAlpha = 0.85; Sprites.draw(ctx, s, bx, by); ctx.restore();
-    }
-    if (this.t % 600 > 590) { ctx.fillStyle = 'rgba(164,164,252,0.3)'; ctx.fillRect(0, 32, View.w, 176); }
-    const fb = Sprites.S.bat.fly;
-    for (let i = 0; i < 3; i++) {
-      const bx = ((this.t * (0.6 + i * 0.25) + i * 120) % (View.w + 64)) - 32, by = 60 + i * 22 + Math.sin(this.t / 15 + i) * 6;
-      Sprites.draw(ctx, fb[(this.t >> 3) % 2], bx, by);
-    }
-    if (View.w >= 320) this.drawHeroOnRock(ctx, 30, 150);
-    const rv = this.revealT || 0, slam = rv < 16 ? Math.round((16 - rv) / 3) : 0; // Logo-Einschlag
-    const lw = (Font.width('NACHTMAHR') + 1) * 4;
-    Mode7.drawFire(ctx, cx - lw / 2 - 16, 6, lw + 32, 60, rv < 30 ? 1.3 : 0.9);
-    if (rv < 20) { ctx.save(); ctx.translate(Math.round((Math.random() - 0.5) * slam * 3), Math.round((Math.random() - 0.5) * slam * 2)); }
-    const r = this.big3d(ctx, 'NACHTMAHR', cx, 28 - slam * 2, 4 + Math.min(2, slam > 3 ? 1 : 0), LOGO, Math.sin(this.t * 0.011) * 0.2, 6); // PS1-Logo: extrudiert, dreht sich langsam
-    if (rv < 20) ctx.restore();
-    if (rv < 8) { ctx.fillStyle = `rgba(255,240,220,${0.6 - rv * 0.07})`; ctx.fillRect(0, 32, View.w, 176); }
-    for (let i = 0; i < 9; i++) { // Blutstropfen
-      const dx = r.x + 8 + i * 24, len = ((this.t / 3 + i * 13) % 40);
-      ctx.fillStyle = '#a80020'; ctx.fillRect(dx, 58, 2, Math.min(10, len / 3));
-      if (len > 30) ctx.fillRect(dx, 58 + len - 20, 2, 2);
-    }
-    const sh = (this.t % 240) * 3 - 60; // Glanzlicht über das Logo
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    for (let k = 0; k < 4; k++) ctx.fillRect(r.x + sh + k, 30, 2, 28);
-    Font.draw(ctx, tr('subtitle'), cx, 66, (this.t >> 2) % 40 === 0 ? '#fcfcfc' : '#bcbcbc', { align: 'center', shadow: '#000' });
-    const langTxt = tr('optLang') + '  < ' + I18N.NAMES[Options.lang] + ' >', msp = I18N.cjk ? 10 : 9, my0 = 79; // CJK-Schrift ist höher
+    const cx = View.cx, bg = this.menuBg(ctx, true), t = this.t;
+    if (!this.revealed) { ctx.fillStyle = `rgba(0,0,0,${Math.max(0, 0.85 - t / 200)})`; ctx.fillRect(0, 0, View.w, 240); return; } // Dunkelheit vor dem ersten Blitz
+    const rv = this.revealT || 0, L = bg ? bg.layout() : { sub: 66 };
+    this.bootText(ctx, tr('subtitle'), cx, L.sub, '#e8d4f0', '#14000c');
+    // Menü
+    const langTxt = tr('optLang') + '  < ' + I18N.NAMES[Options.lang] + ' >', msp = I18N.cjk ? 11 : 10;
+    const tags = [Options.easy && tr('tagEasy'), Options.maxWhip && tr('tagWhip'), Options.infHearts && tr('tagHearts')].filter(Boolean);
+    const lines = this.controlLines(), lh = I18N.cjk ? 11 : 9, bw = Math.min(View.w - 8, 240), bh = lines.length * lh + 7;
+    const by = 228 - bh, my0 = Math.min(L.sub + 13, by - 5 * msp - (tags.length ? 11 : 3));
+    const fx = (this.langFx = Math.max(0, (this.langFx || 0) - 1)) > 0;
     [tr('start'), tr('options'), langTxt, tr('hiTitle'), tr('sections')].forEach((m, i) => {
       const on = this.menu === i, y = my0 + i * msp, lang = i === 2;
-      if (lang) { // Weltkugel vor dem Sprachpunkt, bei jedem Wechsel ein kurzes Aufleuchten
-        const gx = cx - 30 - 12, gy = y, k = (this.langFx = Math.max(0, (this.langFx || 0) - 1)) > 0 ? '#fcfcfc' : '#3cbcfc';
-        ctx.fillStyle = '#04284c'; ctx.fillRect(gx + 1, gy, 7, 9); ctx.fillRect(gx, gy + 1, 9, 7);
-        ctx.fillStyle = k; ctx.fillRect(gx + 2, gy + 1, 5, 7); ctx.fillRect(gx + 1, gy + 2, 7, 5);
-        ctx.fillStyle = '#58f898'; ctx.fillRect(gx + 2, gy + 2, 2, 2); ctx.fillRect(gx + 5, gy + 4, 2, 3); ctx.fillRect(gx + 3, gy + 6, 1, 1); // Kontinente
-        ctx.fillStyle = '#04284c'; ctx.fillRect(gx + 1, gy + 4, 7, 1); ctx.fillRect(gx + 4, gy + 1, 1, 7); // Netz
+      const col = on ? (lang && fx ? '#ffffff' : '#fce0a8') : lang ? '#d0b8e0' : i === 4 ? '#5c4a6c' : '#8c7a9c';
+      if (on) { // Glut hinter dem gewählten Punkt
+        const w = (I18N.cjk ? Font.width(m) : m.length * 6) + 24, gr = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+        gr.addColorStop(0, 'rgba(120,10,30,0)'); gr.addColorStop(0.5, `rgba(150,20,40,${0.42 + 0.12 * Math.sin(t * 0.1)})`); gr.addColorStop(1, 'rgba(120,10,30,0)');
+        ctx.fillStyle = gr; ctx.fillRect(cx - w / 2, y - 2, w, msp);
       }
-      Font.draw(ctx, m, cx - 30, y, on ? '#fcfcfc' : lang ? '#fce0a8' : i === 4 ? '#5c7c8c' : '#8c8c8c', { shadow: '#000', wave: on ? 1.4 : 0, t: this.t });
-      if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - (lang ? 56 : 44), y - 1);
+      this.bootText(ctx, m, cx, y, col, on ? '#400008' : '#000');
+      if (on && (t >> 4) % 2 === 0) { const w = I18N.cjk ? Font.width(m) : m.length * 6 - 1; Sprites.draw(ctx, Sprites.S.heartS, Math.round(cx - w / 2 - 12), y - 1); }
     });
-    const tags = [Options.easy && tr('tagEasy'), Options.maxWhip && tr('tagWhip'), Options.infHearts && tr('tagHearts')].filter(Boolean);
-    const mEnd = my0 + 5 * msp;
-    if (tags.length) Font.draw(ctx, tags.join(' + '), cx, mEnd, '#58f898', { align: 'center', shadow: '#000' });
-    const lines = this.controlLines(), lh = I18N.cjk ? 11 : 10, by = mEnd + (tags.length ? 11 : 3); // unter dem Menü (und den Schaltern)
-    const bh = lines.length * lh + 6;
-    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(cx - 116, by, 232, bh);
-    ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 116, by, 232, 1); ctx.fillRect(cx - 116, by + bh - 1, 232, 1);
-    lines.forEach(([l, c], i) => Font.draw(ctx, l, cx - 110, by + 5 + i * lh + (I18N.cjk ? 2 : 0), c));
-    Font.draw(ctx, 'HI-SCORE ' + String(Math.max(this.hi, Scores.top())).padStart(6, '0'), cx, Math.max(214, by + bh + 2), '#7c7c7c', { align: 'center' });
+    if (tags.length) this.bootText(ctx, tags.join(' + '), cx, my0 + 5 * msp + 1, '#58f898', '#000');
+    // Steuerung im Kasten wie der Ladebalken
+    const bx = Math.round(cx - bw / 2);
+    ctx.fillStyle = 'rgba(6,2,10,0.74)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#3c2848'; ctx.fillRect(bx, by, bw, 1); ctx.fillRect(bx, by + bh - 1, bw, 1); ctx.fillRect(bx, by, 1, bh); ctx.fillRect(bx + bw - 1, by, 1, bh);
+    ctx.fillStyle = '#c89020'; for (const [ex, ey] of [[bx, by], [bx + bw - 1, by], [bx, by + bh - 1], [bx + bw - 1, by + bh - 1]]) { ctx.fillRect(ex - 1, ey, 3, 1); ctx.fillRect(ex, ey - 1, 1, 3); }
+    lines.forEach(([l, c], i) => this.bootText(ctx, l, bx + 6, by + 4 + i * lh, i === 0 ? '#fce0a8' : /^#(a4e4fc|3cbcfc|58f898|00e8d8)$/i.test(c) ? '#fca070' : '#d0b8e0', '#000', 'left'));
+    this.bootText(ctx, 'HI-SCORE ' + String(Math.max(this.hi, Scores.top())).padStart(6, '0'), 4, 3, '#8c7a9c', '#000', 'left'); // oben links, die Version oben rechts
     const pad = Input.padName;
-    const foot = !Audio8.ready() && this.t > 90 ? tr('soundOn') : pad ? tr('padReady', pad) : '© 1691  NACHTMAHR';
-    Font.draw(ctx, foot, cx, 226, pad && Audio8.ready() ? '#3cbcfc' : '#4c4c4c', { align: 'center' });
-    if (window.BUILD && View.w >= 320) Font.draw(ctx, 'V' + window.BUILD, View.w - 4, 232, '#2c2c3c', { align: 'right' }); // schmal: würde den Fußtext überdecken
+    const foot = !Audio8.ready() && t > 90 ? tr('soundOn') : pad ? tr('padReady', pad) : '© 1691  NACHTMAHR';
+    this.bootText(ctx, foot.replace('©', '(C)'), cx, 231, pad && Audio8.ready() ? '#fca070' : '#5c4a6c', '#000');
+    if (window.BUILD && View.w >= 320) this.bootText(ctx, 'V' + window.BUILD, View.w - 3, 3, '#3c3050', null, 'right'); // wie im Ladebildschirm oben rechts
+    if (rv < 14) { ctx.fillStyle = `rgba(255,248,240,${Math.max(0, 0.9 - rv * 0.065)})`; ctx.fillRect(0, 0, View.w, 240); } // das Weiß des Ladebildschirms blendet aus
   },
 
   // ---------------- Abschnittswahl (Testspielen): jeder Raum jeder Stage direkt anwählbar ----------------
@@ -1130,7 +1093,7 @@ const Game = {
   },
   drawSections(ctx, overlay = false) { // overlay: über dem eingefrorenen Spielbild (aus dem Pausenmenü)
     const cx = View.cx, L = this.sectionList(), rooms = L.filter(e => !e.head), sel = rooms[this.secSel || 0];
-    if (!overlay) this.drawSkyScene(ctx);
+    if (!overlay) this.menuBg(ctx);
     ctx.fillStyle = overlay ? 'rgba(0,0,0,0.82)' : 'rgba(0,0,0,0.72)'; ctx.fillRect(0, 32, View.w, overlay ? 208 : 176);
     this.big(ctx, tr('secTitle'), cx, 38, 2, LOGO, null, '#000');
     const idx = L.indexOf(sel), rows = 13, top = clamp(idx - 6, 0, Math.max(0, L.length - rows)), lx = Math.max(12, cx - 120);
@@ -1145,7 +1108,7 @@ const Game = {
 
   drawOptions(ctx) {
     const cx = View.cx;
-    this.drawSkyScene(ctx);
+    this.menuBg(ctx);
     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(cx - 124, 38, 248, 168);
     ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 124, 38, 248, 1); ctx.fillRect(cx - 124, 205, 248, 1); ctx.fillRect(cx - 118, 188, 236, 1);
     this.big(ctx, tr('options'), cx, 44, 2, LOGO, null, '#000');
@@ -1180,6 +1143,11 @@ const Game = {
     }
     if (this.bootBgW !== View.w) { this.bootBg.resize(View.w, 240); this.bootBgW = View.w; this.bootHead = null; }
     return this.bootBg;
+  },
+  menuBg(ctx, title = false) { // Kulisse des Ladebildschirms (mit den Titel-Lettern nur im Titelmenü)
+    const bg = this.bootScene();
+    if (!bg) { this.drawSkyScene(ctx); return null; }
+    bg.title(title); bg.paint(); ctx.drawImage(bg.canvas, 0, 0); return bg;
   },
   bootText(ctx, s, x, y, col, sh = '#000', align = 'center') { // 5x7-Schrift des Ladebildschirms; CJK über die Spielschrift
     const B = this.bootBg;
@@ -1220,8 +1188,8 @@ const Game = {
   },
   cap: (id) => id[0].toUpperCase() + id.slice(1),
   drawCharSel(ctx) {
-    const cx = View.cx, bg = this.bootScene();
-    if (bg) { bg.paint(); ctx.drawImage(bg.canvas, 0, 0); } else this.drawSkyScene(ctx);
+    const cx = View.cx;
+    this.menuBg(ctx);
     this.drawBootHeading(ctx, tr('choose'), cx, 18);
     // Karussell: der gewählte Held in der Mitte, die anderen daneben (gleitet beim Wechseln, passt auf jede Bildbreite)
     const sel = Math.max(0, HEROES.list.findIndex(d => d.id === Options.character));
@@ -1250,7 +1218,7 @@ const Game = {
 
   drawIntro(ctx) {
     const cx = View.cx;
-    this.drawSkyScene(ctx);
+    this.menuBg(ctx);
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, View.w, 176);
     const text = [...tr('intro'), '', ...tr('intro' + Game.cap(HEROES.def(Options.character).id))];
     const slow = I18N.cjk ? 6 : 3; // CJK: weniger Zeichen, gleiches Erzähltempo

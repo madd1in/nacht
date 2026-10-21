@@ -297,54 +297,60 @@ const Levels = (() => {
     .ice().label('EISHÖHLE')
     .start(2, 10).exit(98).done();
 
-  // Eisturm (3-4): Abstieg um einen Turm aus blauem Gletschereis, der im Kavernenlicht glitzert – wie der Sonnenturm
-  // ein abgewickelter Turmmantel (wrap), hier aber abwärts. Die Plattformen sind schräge Eisrampen (rutschen, mit Schwung
-  // abspringen) und spiegelglatte Simse, dazwischen Abgründe mit Eisdornen, Ankerringe zum Hinüberschwingen, Dash-Lücken,
-  // bröckelnde Eisschollen und Kanten zum Hochziehen; fünf Engelsstatuen als Kontrollpunkte. Hinter dem Helden rollt eine
-  // Lawine den Weg herab. Kachel-x 0–59 ist der volle Umfang; jede Runde liegt 24 Reihen tiefer als die vorige, damit sich
-  // die Runden nie in die Quere kommen (Runde A: Rampe, Abgrund, Ring, Rampe – Runde B: Kante, lange Rampe, Dash, Schollen/Ring).
-  const iceT = room(60, 'ice', 98)
-    // --- Runde 1 (A) ---
-    .fill(0, 6, 7, 6, '=').statue(4, 5)                                    // Gipfelsims, Kontrollpunkt
-    .stair(15, 13, 8, -1).fill(15, 14, 19, 14, '=')                        // Rampe (8,6) → (15,13), Auslauf
-    .fill(19, 18, 24, 18, '^').fill(24, 14, 30, 14, '=').statue(27, 13)    // Abgrund, Kontrollpunkt
-    .ring(35, 10).fill(30, 19, 41, 19, '^').fill(41, 14, 46, 14, '=')      // Ankerring über dem breiten Abgrund
-    .stair(54, 21, 8, -1).fill(54, 22, 59, 22, '=')                        // Rampe (47,14) → (54,21)
-    // --- Runde 2 (B) ---
-    .fill(0, 30, 5, 30, '=').fill(6, 34, 14, 34, '^').fill(8, 24, 14, 24, '=') // Kante 6 höher: Doppelsprung + hochziehen (darunter Dornen)
-    .stair(24, 33, 10, -1).fill(24, 34, 29, 34, '=')                       // lange Rampe (15,24) → (24,33)
-    .fill(30, 38, 38, 38, '^').fill(39, 34, 45, 34, '=').statue(42, 33)    // Dash-Lücke (9 Kacheln), Kontrollpunkt
-    .crumble(47, 36).crumble(50, 37).crumble(53, 38).fill(44, 42, 55, 42, '^') // bröckelnde Eisschollen
-    .fill(56, 40, 59, 40, '=')
-    // --- Runde 3 (A) ---
-    .fill(0, 54, 7, 54, '=')
-    .stair(19, 65, 12, -1).fill(19, 66, 20, 66, '=')                       // lange Rampe (8,54) → (19,65): am Ende abspringen!
-    .fill(21, 70, 26, 70, '^').fill(27, 66, 34, 66, '=').statue(31, 65)    // 6 Kacheln Abgrund, Kontrollpunkt
-    .ring(39, 62).fill(35, 71, 43, 71, '^').fill(44, 66, 49, 66, '=')
-    .stair(56, 72, 7, -1).fill(56, 73, 59, 73, '=')                        // Rampe (50,66) → (56,72)
-    // --- Runde 4 (B) ---
-    .fill(0, 78, 5, 78, '=').fill(6, 82, 14, 82, '^').fill(8, 72, 14, 72, '=') // Kante (darunter Dornen)
-    .stair(24, 81, 10, -1).fill(24, 82, 29, 82, '=')
-    .fill(30, 86, 38, 86, '^').fill(39, 82, 45, 82, '=').statue(42, 81)    // Dash-Lücke, Kontrollpunkt
-    .ring(51, 77).fill(44, 90, 55, 90, '^').fill(56, 86, 59, 86, '=')      // letzter Ring
-    .fill(59, 0, 59, 21, '#').fill(59, 23, 59, 39, '#').fill(59, 41, 59, 72, '#').fill(59, 74, 59, 85, '#') // Eissäule an der Naht: keine Abkürzung nach links
-    .ground(0, 59, 96)                                                     // Turmfuß
-    .prop('hint', { x: 8, y: 3, w: 3, h: 3, key: 'hintRamp' })
-    .prop('hint', { x: 28, y: 11, w: 3, h: 3, key: 'hintRing' })
-    .prop('hint', { x: 1, y: 27, w: 4, h: 3, key: 'hintLedge' })
-    .prop('hint', { x: 25, y: 31, w: 4, h: 3, key: 'hintDash' })
-    .prop('avalanche', { speed: 0.8, leash: 200, route: [ // Weg um den Turm, abgewickelt (x + 60 je Runde), Reihe = Standfläche
-      [2, 6], [7, 6], [15, 14], [19, 14], [24, 14], [30, 14], [41, 14], [46, 14], [54, 22], [59, 22],
-      [60, 30], [65, 30], [68, 24], [74, 24], [84, 34], [89, 34], [99, 34], [105, 34], [107, 36], [110, 37], [113, 38], [116, 40], [119, 40],
-      [120, 54], [127, 54], [139, 66], [140, 66], [147, 66], [154, 66], [164, 66], [169, 66], [176, 73], [179, 73],
-      [180, 78], [185, 78], [188, 72], [194, 72], [204, 82], [209, 82], [219, 82], [225, 82], [236, 86], [239, 86], [246, 96], [252, 96]] })
-    .candle(3, 4, 'H').candle(12, 8).candle(17, 12, 'W').candle(28, 12, '$').candle(44, 12, 'H').candle(57, 20)
-    .candle(2, 28, 'H').candle(11, 22, '3').candle(26, 32).candle(42, 31, 'H').candle(58, 38)
-    .candle(3, 52, 'H').candle(14, 58).candle(31, 63, '$').candle(46, 64, 'H').candle(58, 71, 'W')
-    .candle(2, 76, 'H').candle(11, 70).candle(27, 80, 'H').candle(42, 79).candle(58, 84, 'H').candle(30, 94, 'U')
-    .enemy('bat', 30, 8).enemy('bat', 50, 30).enemy('ghost', 10, 50).enemy('bat', 40, 60).enemy('bat', 26, 76)
+  // Eisturm (3-4): eine Rutschpartie rund um einen Turm aus blauem Gletschereis, der im Kavernenlicht glitzert – wie der
+  // Sonnenturm ein abgewickelter Turmmantel (wrap), hier aber abwärts. Fast der ganze Weg sind lange, schräge Eisrampen: der Held
+  // rutscht, wird immer schneller, und der Schwung trägt ihn über die Schanzen am Rampenende (auch ohne Sprung) auf die nächste
+  // Rampe; dazwischen Abgründe mit Eisdornen zum Drüberspringen, Ankerringe zum Hinüberschwingen, eine Kante zum Hochziehen und
+  // eine Dash-Lücke (aus dem Stand, nach der Kante); fünf Engelsstatuen als Kontrollpunkte. Kachel-x 0–59 ist der volle Umfang;
+  // die Runden liegen so weit untereinander, dass sie sich nirgends in die Quere kommen, und an der Naht gibt es keine Wand.
+  const iceT = room(60, 'ice', 107)
+    // --- Runde 1 ---
+    .fill(0, 6, 5, 6, '=')                                                   // Gipfelsims
+    .statue(3, 5)                                                            // Kontrollpunkt
+    .stair(14, 14, 9, -1)                                                    // Rampe (6,6) → (14,14)
+    .fill(14, 15, 16, 15, '=')                                               // Schanze
+    .fill(17, 25, 21, 25, '^')                                               // zu langsam: Dornen
+    .stair(29, 28, 10, -1)                                                   // Landung im Flug auf der zweiten Rampe
+    .fill(29, 29, 31, 29, '=')                                               // Auslauf
+    .fill(32, 33, 37, 33, '^')                                               // Abgrund (6): springen!
+    .fill(38, 29, 43, 29, '=').statue(41, 28)                                // Kontrollpunkt
+    .ring(48, 25)                                                            // Ankerring
+    .fill(44, 34, 53, 34, '^').fill(54, 29, 59, 29, '=')
+    // --- Runde 2 ---
+    .fill(0, 29, 1, 29, '=')                                                 // über die Naht
+    .stair(17, 44, 16, -1)                                                   // lange Rampe (2,29) → (17,44)
+    .fill(17, 45, 19, 45, '=').fill(20, 49, 27, 49, '^')                     // Kante 3 höher: springen und hochziehen (Dornen reichen unter die Kante: der Schwung trägt weit)
+    .fill(23, 42, 27, 42, '=').statue(25, 41)                                // Kontrollpunkt
+    .fill(28, 46, 36, 46, '^')                                               // Dash-Lücke (9) aus dem Stand
+    .fill(37, 42, 39, 42, '=').statue(38, 41)                                // Kontrollpunkt
+    .stair(47, 49, 8, -1)                                                    // Rampe (40,42) → (47,49)
+    .fill(47, 50, 49, 50, '=')                                               // Schanze
+    .fill(50, 56, 54, 56, '^').stair(59, 60, 7, -1)                          // Rampe (53,54) → (59,60) bis an die Naht
+    .fill(59, 61, 59, 61, '=')
+    // --- Runde 3 ---
+    .fill(0, 61, 2, 61, '=')                                                 // Auslauf über die Naht
+    .stair(14, 72, 12, -1)                                                   // lange Rampe (3,61) → (14,72)
+    .fill(14, 73, 16, 73, '=')                                               // Schanze
+    .fill(17, 79, 21, 79, '^').stair(27, 84, 8, -1)                          // Landung im Flug
+    .fill(27, 85, 33, 85, '=').statue(31, 84)                                // Kontrollpunkt
+    .ring(38, 81)                                                            // letzter Ankerring
+    .fill(34, 90, 43, 90, '^').fill(44, 85, 49, 85, '=').stair(59, 94, 10, -1) // Rampe (50,85) → (59,94)
+    .fill(59, 95, 59, 95, '=')
+    // --- Turmfuß ---
+    .fill(0, 95, 3, 95, '=')                                                 // über die Naht
+    .stair(13, 104, 10, -1)                                                  // letzte Rampe hinunter zum Fuß
+    .ground(0, 59, 105)
+    .prop('hint', { x: 7, y: 3, w: 3, h: 3, key: 'hintRamp' })
+    .prop('hint', { x: 39, y: 26, w: 3, h: 3, key: 'hintRing' })
+    .prop('hint', { x: 16, y: 42, w: 4, h: 3, key: 'hintLedge' })
+    .prop('hint', { x: 23, y: 39, w: 4, h: 3, key: 'hintDash' })
+    .candle(2, 4, 'H').candle(10, 7).candle(15, 13, 'W').candle(24, 20).candle(30, 27, '$').candle(42, 27, 'H').candle(57, 27)
+    .candle(6, 31).candle(12, 37).candle(18, 43, 'H').candle(26, 40, '3').candle(38, 40).candle(44, 43).candle(48, 48, 'H')
+    .candle(1, 59, 'H').candle(8, 64).candle(15, 71, '$').candle(23, 78).candle(29, 83, 'W').candle(46, 83, 'H').candle(54, 87)
+    .candle(2, 93, 'H').candle(9, 98).candle(30, 103, 'U')
+    .enemy('bat', 26, 12).enemy('bat', 50, 20).enemy('ghost', 30, 36).enemy('bat', 8, 66).enemy('bat', 40, 74)
     .wrap().ice().iceRamps().label('EISTURM')
-    .start(2, 5).exitAt(6, 90, 12, 95).done();
+    .start(2, 5).exitAt(22, 99, 28, 104).done();
 
   const r22 = room(96, 'crypt')
     .ground(0, 95)

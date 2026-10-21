@@ -11,8 +11,9 @@
 'use strict';
 
 // io: { canvas, mk(w, h) → Leinwand, lang, touch, build, progress() → 0..1, jobsDone() → bool, emit('ready'|'done'), raf(f) }
-// io.backdrop: nur die Kulisse (Himmel, Blutmond, Burg, Wolken, Blitze, Regen) ohne Titel und Anzeigen – das Spiel taktet sie
-// selbst (tick/paint) und legt sie unter die Heldenwahl; dazu leiht es sich die Schrift (label) und die glühenden Lettern (heavy).
+// io.backdrop: nur die Kulisse (Himmel, Blutmond, Burg, Wolken, Blitze, Regen) ohne Anzeigen – das Spiel taktet sie selbst
+// (tick/paint) und legt sie unter seine Menüs; title(true) zeigt dazu die glühenden NACHTMAHR-Lettern wie hier (Titelmenü),
+// layout() sagt, wo sie stehen. Das Spiel leiht sich außerdem die Schrift (label) und Überschrift-Lettern (heavy).
 function bootEngine(io) {
   const x = io.canvas.getContext('2d');
 
@@ -99,6 +100,7 @@ function bootEngine(io) {
   const T = TXT[io.lang] || TXT.en;
   ['sub', 'load', 'key', 'tap'].forEach(k => { T[k] = norm(T[k]); }); T.tips = T.tips.map(norm);
   const touch = io.touch, backdrop = !!io.backdrop;
+  let titleOn = false;
 
   // ---------------- Kulisse (bei jeder Größenänderung neu gebaut) ----------------
   let W = 0, H = 0, PX = 3, S = 4, K = 1, BY = 0, CX = 0, MR = 0, MX = 0, TY = 0, sky = null;
@@ -121,7 +123,6 @@ function bootEngine(io) {
     stars = []; for (let i = 0; i < Math.round(W * H / 1100); i++) stars.push([SR(0, W), SR(0, BY * 0.75), SR(0, 6.3), rnd() < 0.08]);
     moon = mkMoon(MR); mts = mkMountains(); mkCastle(); clouds = mkClouds(); fog = mkFog(); fg = mkForeground();
     rain = []; for (let i = 0; i < Math.round(W * H / 1500); i++) rain.push([SR(0, W), SR(0, H), SR(3.5, 5.5)]);
-    if (backdrop) return;
     const on = letters.map(L => L.on); mkLetters(); letters.forEach((L, i) => { if (on[i] !== undefined) L.on = on[i]; });
   }
   function mkMoon(r) { // Blutmond: Kugelschattierung, Krater und Meere aus Rauschen, Bayer-Raster zwischen sechs Rottönen
@@ -348,7 +349,7 @@ function bootEngine(io) {
     const fo = (t * 0.25) % W; x.drawImage(fog, -fo, H - fog.height); x.drawImage(fog, W - fo, H - fog.height);
     x.drawImage(fg, Math.round(-12 - drift * 1.6), 0);
     x.fillStyle = 'rgba(170,160,230,0.32)'; for (const [rx, ry] of rain) { x.fillRect(Math.round(rx), Math.round(ry), 1, 2); x.fillRect(Math.round(rx) - 1, Math.round(ry) + 2, 1, 2); }
-    if (backdrop) { for (const p of parts) { x.globalAlpha = Math.min(1, p.life / p.max * 1.6); x.fillStyle = p.col; x.fillRect(Math.round(p.x), Math.round(p.y), p.sz, p.sz); } x.globalAlpha = 1; return; }
+    if (backdrop && !titleOn) { for (const p of parts) { x.globalAlpha = Math.min(1, p.life / p.max * 1.6); x.fillStyle = p.col; x.fillRect(Math.round(p.x), Math.round(p.y), p.sz, p.sz); } x.globalAlpha = 1; return; }
     // Titel
     x.globalAlpha = fade;
     letters.forEach((L, i) => {
@@ -368,10 +369,11 @@ function bootEngine(io) {
     });
     x.globalAlpha = 1;
     const ySub = Math.round(TY + 8 * S + (S + 1) * 0.85 + 5);
-    text(T.sub, CX, ySub, '#e8d4f0', '#14000c', Math.min(1, t / 50) * (0.8 + 0.2 * Math.sin(t * 0.05)));
+    if (!backdrop) text(T.sub, CX, ySub, '#e8d4f0', '#14000c', Math.min(1, t / 50) * (0.8 + 0.2 * Math.sin(t * 0.05))); // im Spiel übersetzt es das Menü
     for (const p of parts) { x.globalAlpha = Math.min(1, p.life / p.max * 1.6); if (p.add) x.globalCompositeOperation = 'lighter'; x.fillStyle = p.col; x.fillRect(Math.round(p.x), Math.round(p.y), p.sz, p.sz); x.globalCompositeOperation = 'source-over'; }
     x.globalAlpha = 1;
     for (const b of swarm) drawBat(b.x, b.y, Math.floor(t / 3 + b.ph), Math.min(12, b.sz), '#000000');
+    if (backdrop) return;
     // Anzeigen (ohne Kamerafahrt)
     x.setTransform(1, 0, 0, 1, 0, 0);
     const yS = H - 40;
@@ -430,7 +432,9 @@ function bootEngine(io) {
     return { letters: out, w: s.length * 7 * B - B, h: 7 * B };
   };
   return { resize, press, start() { render(); last = performance.now(); io.raf(frame); }, idle: () => { last = performance.now(); },
-    tick: update, paint: render, label, norm, heavy, canvas: io.canvas };
+    tick: update, paint: render, label, norm, heavy, canvas: io.canvas,
+    title(on) { if (on === titleOn) return; titleOn = on; letters.forEach(L => { L.on = on ? Math.max(0, t - 400) : -1; }); }, // Lettern sofort ganz entflammt
+    layout: () => ({ TY, S, sub: Math.round(TY + 8 * S + (S + 1) * 0.85 + 5) }) };
 }
 
 var Boot = (() => {

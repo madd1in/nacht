@@ -51,7 +51,6 @@ const W = {
         case 'throne': this.spawn(new Throne(d)); break;
         case 'portrait': this.spawn(new Portrait(d)); break;
         case 'hint': this.spawn(new Hint(d)); break;
-        case 'avalanche': this.spawn(new Avalanche(d)); break;
         case 'tut': this.spawn(new TutorialSign(d)); break;
         case 'crawl': this.spawn(new Crawl(d)); break;
         case 'tubecocoons': this.spawn(new TubeCocoons(d)); break;
