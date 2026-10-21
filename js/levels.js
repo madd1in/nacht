@@ -632,7 +632,7 @@ const Levels = (() => {
     // Kapitel etwa gleich lang (je ~3–5 Abschnitte, ~3–5 Minuten): die Ankunft (Schiff, Kraken, Wald) endet am Burggraben
     { id: 'arrival', nameKey: 'stageArrival', bossKey: 'bossKraken', voice: 'stageArrival', name: 'DIE ANKUNFT', music: 'sea', time: 480, rooms: [r09, r10, wd], boss: 'DER KRAKE' },
     { id: 0, nameKey: 'stage1', bossKey: 'boss1', voice: 'stage1', name: 'DER BURGHOF', music: 'stage1', time: 480, rooms: [r11, eh, v1, r12], boss: 'RIESENFLEDERMAUS' },
-    { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 540, rooms: [r21, v2, ih, r22], boss: 'KNOCHENRIESE' },
+    { id: 1, nameKey: 'stage2', bossKey: 'boss2', voice: 'stage2', name: 'DIE KATAKOMBEN', music: 'stage2', time: 540, rooms: [r21, v2, ih, iceT, r22], boss: 'KNOCHENRIESE' },
     { id: 2, nameKey: 'stage3', bossKey: 'boss3', voice: 'stage3', name: 'DER BERGFRIED', music: 'stage3', time: 720, rooms: [r31, lb, gw, mg], boss: 'MEDUSA' },
     { id: 'sun', nameKey: 'stageSun', bossKey: 'bossKnight', voice: 'stageSun', name: 'DIE SONNENKATHEDRALE', music: 'sun', time: 720, rooms: [sa, sp, sk], boss: 'SONNENWÄCHTER' },
     { id: 'expo', nameKey: 'stageExpo', bossKey: 'bossTrap', voice: 'stageExpo', name: 'DER WINTERGARTEN', music: 'expo', time: 900, rooms: [ex1, ex2, exk, exb], boss: 'MENSCHENFALLE' },
