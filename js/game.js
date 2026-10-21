@@ -368,7 +368,7 @@ const Game = {
     }
     if (this.revealed && this.revealT !== undefined) this.revealT++;
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
-    const titleish = ['title', 'options', 'sections', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
+    const titleish = ['title', 'options', 'sections', 'secload', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
     Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'demo') && W.room ? W.room.theme : null);
     if (titleish && this.bootBg) this.bootBg.tick(); // Kulisse des Ladebildschirms unter den Menüs
     if (titleish) {
@@ -394,6 +394,13 @@ const Game = {
       case 'options': this.updateOptions(P); break;
       case 'sections': this.updateSections(P); break;
       case 'pausesec': this.updateSections(P, true); break;
+      case 'secload': // ein Bild Ladeanzeige ist schon zu sehen: jetzt den Abschnitt bauen (danach Kapitelkarte mit Ladebalken)
+        if (this.t >= 2 && this.secGo) {
+          const { e, ingame } = this.secGo; this.secGo = null;
+          if (ingame) { Audio8.setMusicVolume(0.5); Audio8.muffle(false); W.player.hp = W.player.maxHp; this.startStage(e.s, e.r); }
+          else this.newGame(e.s, e.r);
+        }
+        break;
       case 'charsel': {
         if (P.left || P.right) {
           const ids = HEROES.list.map(d => d.id), i = ids.indexOf(Options.character);
@@ -535,6 +542,7 @@ const Game = {
       case 'title': this.drawTitle(ctx); break;
       case 'options': this.drawOptions(ctx); break;
       case 'sections': this.drawSections(ctx); break;
+      case 'secload': this.drawSecLoad(ctx); break;
       case 'charsel': this.drawCharSel(ctx); break;
       case 'intro': this.drawIntro(ctx); break;
       case 'card': this.drawHud(ctx); this.drawCard(ctx); break;
@@ -815,7 +823,7 @@ const Game = {
   warming() { return !!(this.warmJobs && this.warmJobs.length); },
   // Vorbau-Schritte: pro gezeichnetem Bild so viele, wie in ~8 ms passen (mindestens einer) – nie mehrere schwere am Stück
   runWarm() {
-    if (!this.warming() || this.state === 'play') return;
+    if (!this.warming() || this.state === 'play' || (this.state === 'card' && this.t < 2)) return; // die Karte mit dem Ladebalken erst zeigen
     const t0 = performance.now();
     do { try { this.warmJobs.shift()(); } catch (e) { console.warn(e); } } while (this.warmJobs.length && performance.now() - t0 < 8);
     if (!this.warmJobs.length) this.warmDoneT = this.t;
@@ -949,16 +957,31 @@ const Game = {
     Font.draw(ctx, tr('bossIs', tr(st.bossKey)), cx, 190, '#b0b0b0', { align: 'center', shadow: '#000' });
     this.drawWarmBar(ctx, cx, 165);
   },
-  drawWarmBar(ctx, cx, y) { // kurzer Ladebalken, solange die Stage vorgebaut wird; danach blitzt er auf und verschwindet
+  drawSecLoad(ctx) { // Abschnitt gewählt: Kulisse des Ladebildschirms, Name des Abschnitts, Ladebalken bei 0 – sofort, bevor der Aufbau beginnt
+    const cx = View.cx, e = this.secGo && this.secGo.e;
+    this.menuBg(ctx);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 90, View.w, 56);
+    if (e) this.bootText(ctx, e.label, cx, 100, '#fce0a8', '#400008');
+    this.drawLoadBar(ctx, cx, 130, 0.03 + 0.02 * Math.sin(this.t * 0.3));
+  },
+  drawLoadBar(ctx, cx, y, k, flash = false, side = false) { // Ladebalken wie im Ladebildschirm: dunkles Bett, glühende Füllung, goldene Zier, Prozent darüber (side: rechts daneben)
+    const bw = Math.min(side ? 130 : 170, View.w - 80), bx = Math.round(cx - bw / 2), fw = Math.round(bw * Math.max(0, Math.min(1, k)));
+    if (side) this.bootText(ctx, Math.floor(k * 100) + '%', bx + bw + 10, y - 2, '#d0b8e0', '#000', 'left'); else this.bootText(ctx, Math.floor(k * 100) + '%', cx, y - 11, '#d0b8e0', '#000');
+    ctx.fillStyle = '#1a0c20'; ctx.fillRect(bx - 1, y - 1, bw + 2, 6); ctx.fillStyle = '#3c2848'; ctx.fillRect(bx - 1, y - 1, bw + 2, 1);
+    if (fw > 0) {
+      const g = ctx.createLinearGradient(bx, 0, bx + fw, 0); g.addColorStop(0, '#580008'); g.addColorStop(0.7, '#d82800'); g.addColorStop(1, '#fcbca0');
+      ctx.fillStyle = flash ? '#fcfcfc' : g; ctx.fillRect(bx, y, fw, 4);
+      const eg = ctx.createRadialGradient(bx + fw, y + 2, 0, bx + fw, y + 2, 8); eg.addColorStop(0, 'rgba(255,170,90,0.8)'); eg.addColorStop(1, 'rgba(255,60,20,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = eg; ctx.fillRect(bx + fw - 8, y - 6, 16, 16); ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.fillStyle = '#c89020'; for (const ex of [bx - 5, bx + bw + 4]) { ctx.fillRect(ex, y + 1, 1, 1); ctx.fillRect(ex - 1, y + 2, 3, 1); ctx.fillRect(ex, y + 3, 1, 1); ctx.fillRect(ex - 1, y, 3, 1); }
+  },
+  drawWarmBar(ctx, cx, y) { // Ladebalken, solange die Stage vorgebaut wird; danach blitzt er auf und verschwindet
     if (!this.warmTotal) return;
     const left = this.warmJobs ? this.warmJobs.length : 0, k = 1 - left / this.warmTotal, since = this.warmDoneT >= 0 ? this.t - this.warmDoneT : -1;
     if (since > 24) return;
-    const a = since < 0 ? 1 : 1 - since / 24, bw = 112, bx = Math.round(cx - bw / 2), fw = Math.round(bw * k);
-    ctx.save(); ctx.globalAlpha = a;
-    ctx.fillStyle = '#100810'; ctx.fillRect(bx - 1, y - 1, bw + 2, 5); ctx.fillStyle = '#5c4020'; ctx.fillRect(bx - 1, y - 1, bw + 2, 1);
-    const g = ctx.createLinearGradient(bx, 0, bx + Math.max(1, fw), 0); g.addColorStop(0, '#580008'); g.addColorStop(0.7, '#d82800'); g.addColorStop(1, '#fcbca0');
-    ctx.fillStyle = since >= 0 && since < 6 ? '#fcfcfc' : g; ctx.fillRect(bx, y, fw, 3);
-    ctx.fillStyle = '#c89020'; for (const ex of [bx - 4, bx + bw + 3]) { ctx.fillRect(ex, y, 1, 3); ctx.fillRect(ex - 1, y + 1, 3, 1); }
+    ctx.save(); ctx.globalAlpha = since < 0 ? 1 : 1 - since / 24;
+    this.drawLoadBar(ctx, cx, y, k, since >= 0 && since < 6, true); // auf der Kapitelkarte: Prozent rechts, darüber stehen die Stationen
     ctx.restore();
   },
 
@@ -1087,8 +1110,7 @@ const Game = {
       const e = rooms[this.secSel];
       try { localStorage.setItem('nachtmahr.sec', String(this.secSel)); } catch (err) { /* privat */ }
       Audio8.init(); Audio8.sfx('bigItem');
-      if (ingame) { Audio8.setMusicVolume(0.5); Audio8.muffle(false); W.player.hp = W.player.maxHp; this.startStage(e.s, e.r); }
-      else this.newGame(e.s, e.r);
+      this.secGo = { e, ingame }; this.go('secload'); // erst die Ladeanzeige zeigen – der Aufbau des Abschnitts dauert spürbar
     }
   },
   drawSections(ctx, overlay = false) { // overlay: über dem eingefrorenen Spielbild (aus dem Pausenmenü)
