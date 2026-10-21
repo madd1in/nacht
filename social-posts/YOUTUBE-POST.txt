@@ -1,0 +1,34 @@
+Title:
+NACHTMAHR - Ice Tower Slide | Ultra-Vertical Descent | 8-Bit Castlevania Game
+
+Description:
+🏔️ NEW UPDATE: Ice Caverns Tower Slide!
+
+Ultra-vertical 100m descent in my 8-bit Castlevania-inspired browser game.
+
+✨ Features:
+- Anor Londo-style vertical descent
+- Whip-grapple to 6 XXL chandeliers
+- 8 stained glass windows (8-bit pixel art)
+- 12 ice stalactites to dodge
+- 10 checkpoint system with healing
+- Avalanche chase mechanic
+- Enhanced movement (Coyote Time, Jump Buffer)
+- Screen shake & particle effects
+
+🎮 Play FREE: https://madouki.github.io/nacht/
+💻 Source: https://github.com/madouki/nacht
+
+Made with vanilla JavaScript - no frameworks!
+
+Timestamps:
+0:00 - Title Screen
+0:15 - Normal Gameplay
+1:30 - Ice Tower Entrance
+2:00 - Chandelier Grappling
+3:00 - Avalanche Chase
+4:30 - Perfect Completion
+
+#Castlevania #IndieGame #8Bit #WebGame #JavaScript #GameDev
+
+Tags: Castlevania, 8-bit, indie game, web game, JavaScript, game dev, retro gaming

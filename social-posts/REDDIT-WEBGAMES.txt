@@ -1,0 +1,21 @@
+[OC] NACHTMAHR - 8-bit Gothic Platformer with new Ice Tower Slide update
+
+Just released a major update to my browser-based Castlevania-inspired game!
+
+**New Ice Tower Slide:**
+- Ultra-vertical 100m descent
+- Whip-grapple to chandeliers
+- Avalanche chase mechanic
+- Enhanced movement polish (Coyote Time, Jump Buffer)
+- Screen shake & particle system
+
+**Tech Stack:**
+- Vanilla JavaScript (no frameworks!)
+- Canvas 2D API
+- Web Audio API for chiptune music
+- ~1.3MB total size
+
+**Play:** https://madouki.github.io/nacht/
+**Source:** https://github.com/madouki/nacht
+
+Would love feedback! 🎮
