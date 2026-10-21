@@ -296,16 +296,30 @@ const Levels = (() => {
     .ice().label('EISHÖHLE')
     .start(2, 10).exit(98).done();
 
-  // ICE TOWER SLIDE: Trigger room for vertical descent
-  // Simple transition room that activates IceTower module
-  const iceT = room(80, 'ice')
-    .ground(0, 79)
-    .fill(20, 8, 25, 8, '=').fill(54, 8, 59, 8, '=')
-    .statue(30, 10).statue(48, 10)
-    .candle(15, 9, 'H').candle(35, 9).candle(43, 9, 'W').candle(64, 9, 'H')
-    .prop('icicle', { x: 25 }).prop('icicle', { x: 55 })
+  // ICE TOWER SLIDE: Ultra-vertical descent through frozen tower
+  // Tall vertical room (100m = ~62 tiles high) with ice theme
+  // Chandelier grappling, stalactites, checkpoints, avalanche chase
+  const iceT = room(64, 'ice', 62)
+    .ground(0, 63, 61)
+    // Platform layers descending (every ~8-10 tiles)
+    .fill(10, 55, 15, 55, '=').fill(48, 55, 53, 55, '=')  // Top platforms
+    .fill(20, 48, 25, 48, '=').fill(38, 48, 43, 48, '=')  // Upper mid
+    .fill(8, 40, 13, 40, '=').fill(50, 40, 55, 40, '=')   // Mid platforms
+    .fill(18, 32, 23, 32, '=').fill(40, 32, 45, 32, '=')  // Lower mid
+    .fill(12, 24, 17, 24, '=').fill(46, 24, 51, 24, '=')  // Lower platforms
+    .fill(22, 16, 27, 16, '=').fill(36, 16, 41, 16, '=')  // Bottom platforms
+    .fill(28, 8, 35, 8, '=')                               // Final platform before ground
+    // Ice decorations
+    .prop('icicle', { x: 18 }).prop('icicle', { x: 32 }).prop('icicle', { x: 45 })
+    .statue(32, 61).statue(20, 50).statue(44, 42).statue(16, 34)
+    .candle(14, 54, 'H').candle(50, 54).candle(24, 47, 'W').candle(40, 47, 'H')
+    .candle(11, 39, 'H').candle(52, 39).candle(21, 31, '$').candle(42, 31)
+    .candle(15, 23, 'H').candle(48, 23, 'W').candle(25, 15).candle(38, 15, 'H')
+    .candle(31, 7, '3')
+    .enemy('bat', 22, 52).enemy('bat', 40, 45).enemy('bat', 28, 38)
+    .enemy('ghost', 35, 29).enemy('bat', 19, 20)
     .ice().label('ICE TOWER')
-    .start(5, 10).exit(75).done();
+    .start(32, 59).exit(62).done();
 
   const r22 = room(96, 'crypt')
     .ground(0, 95)
