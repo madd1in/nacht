@@ -176,6 +176,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 | **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 5 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher) auf Sockeln und bei Bossen, rissiges Gestein vor Zusatzräumen. Offen: automatischer Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
 | **3 RPG (teilweise erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand. Offen: MP, Ausrüstungsmenü, Bibliothekar-Shop | Statusbildschirm, Shop |
 | 4 Bosse & Siegel | Arenen mit Hintertür, Siegeltor, Ende, neue Verbindungsräume | Abspann im Schloss-Modus |
+| **4b Geschichte & Verzahnung (erledigt)** | drei Figuren mit absurden Gesprächen im Maniac-Mansion-Ton (zweiter Held, Bibliothekar, lila Tentakel), elf Szenen entlang der Relikte und Siegel; drei Schleifen (Geheimgang Kolosseum ↔ Brunnenschacht, Wehrgang Bergfried ↔ Glockenturm, Himmelsbrücke Kathedralendach ↔ Kuppel). Offen: weitere Figuren, Szene nach dem Grafen | jede Region über mindestens zwei Wege erreichbar |
 | 5 Kür | Warp-Spiegel, Schlosskarte, Geheimwände (`X`/`Y` gibt es schon), „Umgedrehtes Schloss" als Mode-7-Spiegelung | 200 % |
 
 ### Prototyp (Phase 0 + 1) benutzen
@@ -204,7 +205,28 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   Palmenhaus: Schleife Katakomben ↔ Wintergarten), Schatzkammer (Tür auf der linken Galerie der Bibliothek, Stufe 3), Verlies
   (Tür unten im Glasturm, Stufe 7). Kanal, Schatzkammer und Verlies sind mit rissigem Gestein verschlossen, das erst der
   Steinbrecher zerschlägt (vom Palmenhaus aus ist der Kanal offen; von innen bricht das Gestein). In jedem Zusatzraum
-  steht ein **Lebensgefäß** (max. HP +4 für immer).
+  steht ein **Lebensgefäß** (max. HP +4 für immer). Dazu zwei Zusatzräume ohne Gefäß, die Regionen verbinden: **Wehrgang**
+  (Stufe 3, Mauerkrone mit zwei Scharten) und **Himmelsbrücke** (Stufe 5, Steg über dem Wolkenmeer mit Lücken).
+- **Schleifen (2D-Open-World):** Geheimgang am rechten Ende des Kolosseums ↔ Tür im Brunnenschacht (Burghof ↔ Katakomben
+  ohne Kellertür); Tür im Bergfried-Turm (x 40) → Wehrgang → Tür auf der Plattform im Glockenturm (Bergfried ↔ Burghof);
+  Kathedralendach (hinter dem Sonnenwächter) → Himmelsbrücke → Kuppel (hinter der Menschenfalle). In eine Arena mit
+  lebendem Boss führt keine Schleife: solange er lebt, ist die Tür „VON DER ANDEREN SEITE VERRIEGELT" (Torbedingung
+  `beat`, für die Rückrichtung `back`).
+- **Geschichte** (Ton: schräg wie *Maniac Mansion* – trockene Pointen, absurde Alltagsdetails im Gruselschloss, die
+  Wegweiser-Infos stecken trotzdem in jeder Szene): Im Burghof wartet gleich nach dem Fluch der **zweite Held** (der nächste nach dem gespielten: Henrik →
+  Ragnor → Kaspar → Henrik) – auch ihn hat der Fluch getroffen. Er erzählt vom Grafen und den Relikten, schickt einen ins
+  Kolosseum und hält danach die Eingangshalle: nach jedem Relikt hat er dort Neues (wo der nächste Boss wartet, was hinter
+  der Kellertür, der Turmtür und den rissigen Mauern liegt), mit fünf Siegeln steht er auf der Galerie am Siegeltor. Der
+  **Bibliothekar** in der Bibliothek des Bergfrieds (neben dem Lesepult) kennt die Chronik des Grafen (einst Puppenspieler –
+  Kaspar hat eine eigene Zeile), verrät mit dem Steinbrecher die Schatzkammer und heilt bei jedem Gespräch (HP, Herzen auf 10).
+  Der **lila Tentakel** vom Schiff hat überlebt, wurde vom Grafen gefeuert und sitzt jetzt in einem Eimer Meerwasser: am
+  Eingang des Kolosseums (Plan zur Weltherrschaft, Schritt 1: Beine besorgen – und der Tipp zur Rabenfeder), später auf
+  der Himmelsbrücke (erobert die Wolken, zahlt 1000 Gold Schweigegeld, „nur leicht klebrig").
+  Neue Szene: „!" über der Figur und eine grüne Marke auf der Karte; das Gespräch beginnt beim Herantreten, die Welt steht
+  still. Sprung/Angriff/↑ schreibt die Seite fertig bzw. blättert, Start überspringt. Danach wiederholt ↑ vor der Figur
+  den Rat. Das Fenster zeigt Porträt (Figur links, Held rechts), Namen und Schreibmaschinentext; es steht oben, wenn die
+  Sprecher unten im Bild stehen. Gesehene Szenen liegen in `flag['story_<id>']`, Texte in allen sechs Sprachen in `i18n.js`
+  (`story_<id>` = Seiten „A:/H:/K:/L:/T:Text", `story_<id>Again`).
 - **Türen:** zurück in den vorigen Raum geht es am linken Rand (gegen den Rand laufen; ein goldener Pfeil erscheint),
   in Turmräumen ohne Rand (Sonnenturm, Kuppel-Aufstieg) mit ↑ an der Starttür. Torbögen mit ↑ betritt man ebenfalls mit ↑.
 - **Eingangshalle als Knoten:** Kellertür unten links → Katakomben, Turmtür auf dem Sims → Bergfried,
@@ -239,7 +261,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   „SPIEL STARTEN" beginnt auf Stufe 1. Treffer werden an der gesunkenen Energie der Gegner erkannt (keine Gegnerklasse
   geändert); STR/CON wirken über `Options.dmgMul` und `Player.hurt`, nur mit `?castle`.
 - Code: `js/castle.js` (Regionen `REGION_AT`, Verbindungen `LINKS`, Türen `CastleDoor`, Kammern `CHAMBERS`/`CastleChamber`,
-  Spielstand, Karte), Einbindung in `js/game.js` (`castleGo`/`castleEnter`, `nextRoom`, `startStage`, `startClear`,
-  Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map` und `warp`).
+  Szenen `BEATS`/`CastleNPC`, Spielstand, Karte), Einbindung in `js/game.js` (`castleGo`/`castleEnter`, `nextRoom`,
+  `startStage`, `startClear`, Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map`, `warp`, `status`, `talk`).
 - Daten: `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss, mini, warp, vessel, relic, crack, flag }`,
   `localStorage['nachtmahr.castle']` = Spielstand der letzten Speicherkammer; `Castle.reset()` in der Konsole löscht alles.

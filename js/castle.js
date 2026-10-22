@@ -11,6 +11,7 @@
 // RPG wie in SotN: besiegte Gegner geben EXP, Stufenaufstieg („LEVEL UP!") erhöht max. HP, STR (Schaden) und CON (Abwehr);
 // Treffer zeigen Schadenszahlen, Gegner lassen Gold, Herzen und Braten fallen. Pause → STATUS. Stufe, EXP, Besiegte und
 // Spielzeit speichert die Speicherkammer (wie in SotN geht Ungespeichertes nach Game Over verloren).
+// Geschichte: der zweite Held, der Bibliothekar und der lila Tentakel treiben sie in Gesprächen voran (Szenen an Relikten und Siegeln).
 'use strict';
 
 const Castle = (() => {
@@ -135,6 +136,32 @@ const Castle = (() => {
       .zone('skull', 10, 90, { interval: 260, max: 2 }).zone('ghoul', 10, 90, { interval: 150, max: 2 })
       .statue(48, 10).chest(92, 10, 'big').prop('vessel', { x: 60, y: 6 })
       .label('VERLIES').start(2, 10).done());
+    // Wehrgang (zwischen Glockenturm und Bergfried): Mauerkrone im Gewitter, zwei Scharten zum Überspringen, Raben und ein Ritter
+    add('wehrgang', 2, 3, [6, -3], R(72, 'courtyard')
+      .ground(0, 22).ground(26, 47).ground(51, 71)
+      .fill(12, 7, 15, 7, '=').fill(36, 7, 40, 7, '=').fill(60, 7, 63, 7, '=')
+      .candle(5, 9, 'H').candle(13, 5).candle(30, 9).candle(38, 5, '$').candle(44, 9, 'H').candle(61, 5).candle(68, 9)
+      .enemy('raven', 18, 6).enemy('knight', 34, 10).enemy('raven', 45, 5).enemy('skel', 58, 10).enemy('bat', 66, 3)
+      .statue(31, 10)
+      .label('WEHRGANG').start(2, 10).done());
+    // Himmelsbrücke (zwischen Kathedralendach und Wintergarten-Kuppel, offen nach beiden Bossen): Steg über dem Wolkenmeer
+    add('himmel', 'sun', 5, [30, -15], R(96, 'bridge')
+      .fill(0, 9, 5, 12, '#').fill(6, 9, 89, 9, '=').fill(90, 9, 95, 12, '#')
+      .fill(24, 9, 26, 9, '.').fill(52, 9, 55, 9, '.').fill(72, 9, 74, 9, '.')
+      .fill(42, 6, 47, 6, '=')
+      .candle(10, 6, 'H').candle(30, 6).candle(44, 4, '$').candle(60, 6, 'H').candle(80, 6)
+      .enemy('raven', 20, 7).enemy('raven', 64, 7).enemy('ghost', 40, 5).enemy('ghost', 84, 5)
+      .statue(46, 8)
+      .label('HIMMELSBRÜCKE').start(2, 8).done());
+    LINKS.push( // Schleifen: das Schloss als 2D-Open-World, Regionen über Nebenwege verzahnt
+      [['side', 'kolosseum'], 'right', [1, 1], { x: 4, y: 27, door: 'side' }, {}],              // Kolosseum → Geheimgang → Brunnenschacht
+      [[2, 0], { x: 40, y: 10, door: 'side' }, ['side', 'wehrgang'], 'start', {}],              // Bergfried → Wehrgang
+      [['side', 'wehrgang'], 'right', [0, 2], { x: 8, y: 15, door: 'side' }, {}],                // Wehrgang → Glockenturm
+      // Himmelsbrücke: Kathedralendach hinter dem Wächter ↔ Kuppel hinter der Menschenfalle; in eine Arena mit lebendem Boss führt
+      // sie nicht (beat: dieser Boss muss besiegt sein, sonst „von der anderen Seite verriegelt“; back: Bedingung der Rückrichtung)
+      [['sun', -1], 'right', ['side', 'himmel'], 'start', { boss: true, back: { beat: ['sun', -1] } }],
+      [['side', 'himmel'], 'right', ['expo', -1], 'right', { beat: ['expo', -1] }],
+    );
     LINKS.push( // crack: Tür mit rissigem Gestein verschlossen – erst der Steinbrecher (Medusas Relikt) zerschlägt es
       [[0, 0], { x: 37, y: 10, door: 'side' }, ['side', 'kolosseum'], 'start', {}],                  // Burghof → Kolosseum
       [[1, 4], { x: 5, y: 10, door: 'side' }, ['side', 'kanal'], 'start', { crack: 'kanal' }],       // Gruft → Kanal
@@ -243,7 +270,7 @@ const Castle = (() => {
       const a = ref(A), b = ref(B);
       if (!a || !b) continue;
       if (same(a, s, r) && pa !== 'exit') out.push({ place: pa, to: { s: b.s, r: b.r, place: pb }, gate: g });
-      if (same(b, s, r) && !g.oneway && pb !== 'exit') out.push({ place: pb, to: { s: a.s, r: a.r, place: pa } });
+      if (same(b, s, r) && !g.oneway && pb !== 'exit') out.push({ place: pb, to: { s: a.s, r: a.r, place: pa }, gate: g.back });
     }
     return (doorCache[k] = out);
   }
@@ -261,6 +288,7 @@ const Castle = (() => {
     if (d.gate.boss) return !!boss[roomKey(W.stage, W.roomIdx)];
     if (d.gate.seals) return seals() >= sealRooms().length;
     if (d.gate.crack) return !!crack[d.gate.crack];
+    if (d.gate.beat) { const a = ref(d.gate.beat); return !!(a && boss[roomKey(a.s, a.r)]); }
     return true;
   }
   // Art einer Tür: Rand (links/rechts durchgehen) oder ↑-Tür
@@ -528,12 +556,12 @@ const Castle = (() => {
 
   // nach jedem Raumaufbau (Tür, Kapitelstart, Wiedereinstieg nach dem Tod): Türen setzen, besiegte Bosse fernhalten,
   // bei Ankunft den Helden an die Tür stellen
-  let guard = false, push = 0, lastX = 0, lockT = 0;
+  let guard = false, push = 0, lastX = 0, lockT = 0, roomT = 0;
   function settle(arrive) {
     const s = W.stage, r = W.roomIdx, def = S()[s].rooms[r], key = roomKey(s, r);
     if (boss[key] && s < S().length - 1) W.room.arena = null; // Bossarena: Boss besiegt, der Raum ist frei
     if (mini[key]) W.miniDone[s + ':' + r] = true;
-    W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber));
+    W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber) && !(e instanceof CastleNPC));
     for (const d of doorsOf(s, r)) W.spawn(new CastleDoor(d, def));
     for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
     for (const e of def.ents) if (e.type === 'vessel') { const k = key + ':v' + e.x; if (!vessel[k]) W.spawn(new LifeVessel(e, k)); } // Lebensgefäße
@@ -544,6 +572,7 @@ const Castle = (() => {
       flag.curse = 1; save();
       Game.note('castleCurse'); announceGoal(260); W.flash = 10; W.shake = Math.max(W.shake, 14); Audio8.sfx('roar'); Audio8.sfx('thunder'); Input.rumble(0.8, 0.6, 600);
     }
+    spawnNpcs(s, r); roomT = 0; // Figuren der Geschichte (nach dem Fluch: der zweite Held wartet schon im Burghof)
     hpSeen.clear(); applyHp(W.player); // neuer Raum: Gegner des alten zählen nicht als besiegt
     inSave = arrive && arrive.place && arrive.place.chamber === 'save' ? roomKey(s, r) + ':save' : null; // beim Fortsetzen nicht gleich noch einmal speichern
     if (arrive && arrive.place !== 'start') {
@@ -592,8 +621,14 @@ const Castle = (() => {
     if (dirty) save();
     if (guard && !inExit()) { guard = false; W.exiting = false; }
     if (lockT > 0) lockT--;
+    roomT++;
     const p = W.player, def = S()[s].rooms[r];
     if (!p.alive || p.state !== 'normal' || W.arenaOn) { push = 0; lastX = p.x; return; }
+    for (const e of W.ents) { // Figuren: neue Szene beim Herantreten, danach ↑ für den Rat
+      if (!(e instanceof CastleNPC) || e.go || !p.onGround || Math.abs(p.feet - (e.y + e.h)) > 16) continue;
+      const dx = Math.abs(p.cx - e.cx), fresh = !beatDone(e.b);
+      if ((fresh && dx < 48 && roomT > (e.b.wait || 40)) || (!fresh && dx < 18 && P.up)) { push = 0; startTalk(e, !fresh); return; }
+    }
     for (const c of chambersOf(s, r)) { // Speicherkammer: hineingehen = speichern; Warpkammer: betreten schaltet frei, ↑ reist
       const at = atChamber(c, p);
       if (c.kind === 'save') {
@@ -612,7 +647,7 @@ const Castle = (() => {
       else use = I.right && p.onGround && p.cx > (def.w - 2.5) * T && push >= 6;
       if (!use) continue;
       if (!gateOpen(d)) {
-        if (!lockT) { lockT = 90; if (d.gate.seals) Game.note('castleSeals', seals(), sealRooms().length); else if (d.gate.crack) Game.note('castleCrackHard'); else Game.note('castleLocked'); Audio8.sfx('select'); }
+        if (!lockT) { lockT = 90; if (d.gate.seals) Game.note('castleSeals', seals(), sealRooms().length); else if (d.gate.crack) Game.note('castleCrackHard'); else if (d.gate.beat) Game.note('castleBarred'); else Game.note('castleLocked'); Audio8.sfx('select'); }
         push = 0; break;
       }
       push = 0; Game.castleGo(d.to); return;
@@ -797,6 +832,197 @@ const Castle = (() => {
     Font.draw(ctx, tr(g.where), cx, y + 11, '#d0c0a0', { align: 'center', shadow: '#000' });
   }
 
+  // ---------------- Geschichte: Figuren, die die Handlung vorantreiben ----------------
+  // Drei Figuren, absurd wie in Maniac Mansion: der zweite Held (der, den man gerade nicht spielt – auch ihn hat der Fluch am Tor
+  // getroffen; er hält die Eingangshalle und weiß nach jedem Relikt, wohin es weitergeht), der alte Bibliothekar im Bergfried
+  // (Chronik des Grafen, heilt bei jedem Gespräch) und der lila Tentakel vom Schiff (gefeuert, sitzt im Eimer, plant die
+  // Weltherrschaft). Szene = Figur, Ort ([Raum], Kachel-x, Standreihe), Bedingung; eine Figur steht dort, wo ihre letzte
+  // erfüllte Szene spielt. Neue Szene: das Gespräch beginnt beim Herantreten (die Welt steht still), danach wiederholt ↑ den Rat.
+  // Gesehene Szenen: flag['story_<id>']. Texte: i18n story_<id> (Seiten) und story_<id>Again (Wiederholung).
+  const BEATS = [
+    { id: 'meet', who: 'ally', at: [[0, 0], 4, 10], when: () => flag.curse, leave: true, wait: 70 },  // Burghof: gleich nach dem Fluch
+    { id: 'wait', who: 'ally', at: [[0, 1], 40, 17], when: () => flag.story_meet, lines: false },     // Eingangshalle: wartet
+    { id: 'feather', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.jump2 },
+    { id: 'cloak', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.dash },
+    { id: 'claw', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.wall },
+    { id: 'stone', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.breaker },
+    { id: 'seals', who: 'ally', at: [[0, 1], 32, 11], when: () => seals() >= sealRooms().length },  // auf der Galerie am Siegeltor
+    { id: 'lib', who: 'lib', at: [[2, 1], 15, 47], when: () => true, heal: true },                    // Bibliothek: neben dem Lesepult
+    { id: 'lib2', who: 'lib', at: [[2, 1], 15, 47], when: () => relic.breaker, heal: true, again: 'lib' },
+    { id: 'tent', who: 'tent', at: [['side', 'kolosseum'], 8, 10], when: () => flag.curse },          // Kolosseum: der gefeuerte Tentakel im Eimer
+    { id: 'tent2', who: 'tent', at: [['side', 'himmel'], 14, 8], when: () => relic.breaker, gold: 1000 }, // Himmelsbrücke: erobert die Wolken
+  ];
+  const WHO = ['ally', 'lib', 'tent'], VOICE = { ally: 'A', lib: 'L', tent: 'T' };
+  const allyId = () => { const ids = HEROES.list.map(d => d.id), i = Math.max(0, ids.indexOf(Options.character)); return ids[(i + 1) % ids.length]; };
+  const beatDone = (b) => b.lines === false || !!flag['story_' + b.id];
+  function beatNow(who) { let b = null; for (const x of BEATS) if (x.who === who && x.when()) b = x; return b; }
+
+  // Bibliothekar (1×, Mitte unten = Füße): Gelehrtenkappe, weißer Bart, Brille, violette Robe mit Goldsaum, aufgeschlagenes Buch
+  function drawLibrarian(ctx, cx, feet, t, flip) {
+    const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(flip ? cx - x - w : cx + x, feet + y, w, h); };
+    const bob = (t >> 5) % 2, turn = t % 170 < 12;
+    R(-5, -2, 4, 2, '#2c1c14'); R(1, -2, 4, 2, '#2c1c14'); // Schuhe
+    for (let k = 0; k < 20; k++) { const hw = 7 - Math.floor(k / 6); R(-hw, -2 - k, hw * 2, 1, '#4c3478'); R(-hw, -2 - k, 2, 1, '#2c1c4c'); }
+    R(-7, -3, 14, 1, '#d8a838'); R(0, -20, 1, 17, '#a07c28'); // Goldsaum
+    R(-5, -23 + bob, 10, 2, '#4c3478'); R(-5, -23 + bob, 2, 2, '#2c1c4c'); // Schultern
+    R(-3, -30 + bob, 7, 7, '#e8b088'); R(-3, -24 + bob, 7, 1, '#b87850'); // Gesicht
+    R(-3, -32 + bob, 7, 2, '#6c1c2c'); R(-2, -33 + bob, 5, 1, '#6c1c2c'); R(-1, -33 + bob, 2, 1, '#a03040'); // Kappe
+    R(-4, -30 + bob, 2, 5, '#e0e0e8'); R(4, -29 + bob, 1, 3, '#e0e0e8'); // Haar
+    R(1, -28 + bob, 3, 2, '#f8e070'); R(2, -27 + bob, 1, 1, '#1c1020'); R(4, -27 + bob, 1, 2, '#b87850'); // Brille, Nase
+    R(-2, -24 + bob, 6, 3, '#e0e0e8'); R(-1, -21 + bob, 5, 3, '#e0e0e8'); R(0, -18 + bob, 3, 3, '#c8c8d4'); R(1, -15 + bob, 1, 2, '#a0a0b0'); // Bart
+    R(2, -18, 4, 4, '#3c2868'); R(6, -16, 2, 2, '#e8b088'); // Ärmel, Hand
+    R(3, -14, 9, 2, '#7c2c1c'); R(3, -16, 9, 2, '#f4ecd4'); R(7, -16, 1, 2, '#c8bca0'); // Buch
+    if (turn) R(8, -19, 3, 3, '#f4ecd4'); // Seite wird umgeblättert
+    if ((t >> 3) % 6 === 0) R(9, -18, 1, 1, '#fce0a8'); // Funkeln über dem Buch
+  }
+  // Lila Tentakel (1×, Mitte unten = Füße): Holzeimer mit Meerwasser, daraus der Fangarm – wiegt sich, Saugnäpfe, ein Auge mit Schurkenbraue
+  function drawTentacle(ctx, cx, feet, t, flip) {
+    const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(flip ? cx - x - w : cx + x, feet + y, w, h); };
+    for (let k = 0; k < 24; k++) { // Arm von unten nach oben: schmaler, schwingt oben weiter aus
+      const y = -12 - k, hw = k < 16 ? 4 : k < 21 ? 3 : 2, sw = Math.round(Math.sin(t * 0.05 - k * 0.18) * k / 9);
+      R(-hw + sw, y, hw * 2, 1, '#7c2c98'); R(-hw + sw, y, 1, 1, '#4e1666'); R(hw - 2 + sw, y, 1, 1, '#ac58c8');
+      if (k % 4 === 1 && k < 20) R(hw - 1 + sw, y, 1, 1, '#f0bcd8'); // Saugnäpfe
+    }
+    const top = Math.round(Math.sin(t * 0.05 - 23 * 0.18) * 23 / 9);
+    R(top - 2, -37, 4, 1, '#7c2c98'); R(top + 1, -38, 3, 2, '#7c2c98'); R(top + 3, -37, 1, 2, '#ac58c8'); // eingerollte Spitze
+    const ex = Math.round(Math.sin(t * 0.05 - 17 * 0.18) * 17 / 9), blink = t % 140 < 6;
+    R(ex - 2, -31, 5, blink ? 1 : 4, blink ? '#4e1666' : '#fcfcfc'); // Auge
+    if (!blink) { R(ex + 1, -30, 2, 2, '#1c0418'); R(ex + 1, -30, 1, 1, '#fc6c9c'); }
+    R(ex - 3, -33, 3, 1, '#16041e'); R(ex, -34, 3, 1, '#16041e'); // böse Braue
+    R(ex - 1, -25, 4, 1, '#16041e'); R(ex - 1, -24, 1, 1, '#16041e'); // schiefer Mund
+    R(-7, -13, 14, 2, '#5c3418'); R(-6, -13, 12, 1, '#3c7cbc'); // Eimerrand mit Wasser
+    R(-6, -11, 12, 11, '#7c4c24'); R(-6, -11, 2, 11, '#4c2c14'); R(3, -11, 1, 11, '#9c6434'); // Holz
+    R(-7, -9, 14, 1, '#8c8c9c'); R(-7, -3, 14, 1, '#8c8c9c'); // Eisenbänder
+    if (t % 90 < 4) R(5, -15 - (t % 90), 1, 1, '#a4e4fc'); // ein Tropfen spritzt
+  }
+  class CastleNPC extends Ent {
+    constructor(b) { super(b.at[1] * T, (b.at[2] + 1) * T - 30, 16, 30); this.kind = 'prop'; this.b = b; this.face = -1; this.go = 0; this.walk = 0; }
+    update() {
+      this.t++;
+      if (this.go) { this.x += 1.6 * this.go; this.walk++; if (this.t > 36) this.dead = true; return; } // geht davon und verschwindet in den Schatten
+      const p = W.player; if (p) this.face = p.cx < this.cx ? -1 : 1;
+    }
+    lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: this.y - cy + 10, r: 30 + Math.sin(this.t * 0.05) * 2, c: this.b.who === 'lib' ? [252, 200, 130] : this.b.who === 'tent' ? [200, 110, 250] : [190, 200, 255], a: 0.4 }); }
+    draw(ctx) {
+      const cam = W.cam, feet = this.y + this.h;
+      if (this.b.who === 'lib') drawLibrarian(ctx, Math.round(this.cx - cam.x), Math.round(feet - cam.y), this.t, this.face < 0);
+      else if (this.b.who === 'tent') drawTentacle(ctx, Math.round(this.cx - cam.x), Math.round(feet - cam.y), this.t, this.face < 0);
+      else {
+        const H = HEROES.get(allyId()), spr = this.go ? H.walk[Math.floor(this.walk / 5) % 8] : H.idle[Math.floor(this.t / 40) % 2];
+        if (this.go) ctx.globalAlpha = clamp(1 - (this.t - 10) / 26, 0, 1);
+        Sprites.draw(ctx, spr, this.cx - 8 - (spr.mx || 0) - cam.x, Math.round(feet - spr.h - cam.y), this.go ? this.go < 0 : this.face < 0);
+        ctx.globalAlpha = 1;
+      }
+      if (this.go || (talk && talk.npc === this)) return;
+      const p = W.player, bx = Math.round(this.cx - cam.x) - 2, by = Math.round(this.y - cam.y) - 14 + Math.round(Math.sin(this.t * 0.12) * 2);
+      if (!beatDone(this.b)) Font.draw(ctx, '!', bx, by, '#f8b800', { shadow: '#000' }); // Neues zu erzählen
+      else if (Math.abs(p.cx - this.cx) < 18 && Math.abs(p.feet - feet) < 12) Font.draw(ctx, '↑', bx, by, '#fcfcfc', { shadow: '#000' });
+    }
+  }
+  function spawnNpcs(s, r) {
+    for (const who of WHO) {
+      const b = beatNow(who);
+      if (b && same(ref(b.at[0]), s, r) && !(b.leave && beatDone(b))) W.spawn(new CastleNPC(b));
+    }
+  }
+
+  // Gespräch: Textkasten unten mit Porträt (Figur links, Held rechts), Name und Schreibmaschinentext
+  let talk = null;
+  function wrap(s, maxW) { // Wortumbruch; Wörter ohne Leerzeichen (Japanisch/Chinesisch) und überlange Wörter Zeichen für Zeichen
+    const out = [];
+    let line = '';
+    const add = (tok, sep) => { const t = line ? line + sep + tok : tok; if (!line || Font.width(t) <= maxW) line = t; else { out.push(line); line = tok; } };
+    for (const word of s.split(' ')) {
+      if (Font.width(word) <= maxW) add(word, ' ');
+      else { let first = true; for (const ch of word) { add(ch, first ? ' ' : ''); first = false; } }
+    }
+    if (line) out.push(line);
+    return out;
+  }
+  const talkBox = () => { // unten im Bild – stehen die Sprecher dort, oben unter der Statusleiste
+    const w = Math.min(View.w - 12, 360), low = talk && talk.npc.y - W.cam.y > 96;
+    return { x: Math.round(View.cx - w / 2), y: low ? 32 : 164, w, h: 72 };
+  };
+  function page() { // aktuelle Seite, umbrochen (beim ersten Zugriff)
+    const pg = talk.pages[talk.i];
+    if (!pg.lines) { pg.lines = wrap(pg.text, talkBox().w - 62); pg.len = pg.lines.reduce((n, l) => n + [...l].length, 0); }
+    return pg;
+  }
+  function startTalk(npc, again) {
+    const b = npc.b, ally = HEROES.def(allyId()).name, hero = HEROES.def(Options.character).name;
+    const raw = again ? VOICE[b.who] + ':' + tr('story_' + (b.again || b.id) + 'Again') : tr('story_' + b.id);
+    const pages = (Array.isArray(raw) ? raw : [raw]).filter(s => s[0] !== 'K' || Options.character === 'kaspar')
+      .map(s => ({ who: s[0] === 'K' ? 'H' : s[0], text: s.slice(2).replace(/\{0\}/g, ally).replace(/\{1\}/g, hero) }));
+    const p = W.player;
+    talk = { npc, b, again, pages, i: 0, n: 0 };
+    npc.face = p.cx < npc.cx ? -1 : 1; p.face = -npc.face; p.vx = 0;
+    Audio8.sfx(b.who === 'lib' ? 'page' : b.who === 'tent' ? 'slime' : 'select');
+    Game.go('talk');
+  }
+  function endTalk() {
+    const { npc, b, again } = talk;
+    talk = null;
+    if (b.gold && !again && !beatDone(b)) { // Tentakel: klebriges Goldstück fürs Schweigen
+      const p = W.player;
+      W.addScore(b.gold); W.popup(p.cx, p.y - 8, '+' + b.gold + ' G', '#f8b800'); Audio8.sfx('money');
+    }
+    if (!again && !beatDone(b)) { flag['story_' + b.id] = 1; save(); announceGoal(50); }
+    if (b.leave && !again) { npc.go = 1; npc.t = 0; } // macht sich auf den Weg
+    if (b.heal) { // Bibliothekar: Kerzenschein heilt
+      const p = W.player;
+      p.hp = p.maxHp; if (!Options.infHearts) p.hearts = Math.max(p.hearts, 10);
+      W.popup(p.cx, p.y - 8, 'HP MAX', '#58f898'); Audio8.sfx('heart');
+      for (let i = 0; i < 14; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.y + rnd(0, 28), rnd(-0.4, 0.4), rnd(-1.4, -0.3), i % 2 ? '#58f898' : '#fce0a8', 40, 1, 0));
+    }
+    return true;
+  }
+  function talkInput(P) { // true = Gespräch vorbei (Sprung/Angriff/↑: Seite fertig schreiben bzw. weiterblättern, Start: alles überspringen)
+    if (!talk) return true;
+    if (Game.t < 6) return false;
+    const pg = page();
+    if (talk.n < pg.len) { talk.n = Math.min(pg.len, talk.n + 1); if (talk.n % 4 === 0) Audio8.sfx('tink'); }
+    if (P.start) return endTalk();
+    if (P.jump || P.attack || P.up) {
+      if (talk.n < pg.len) talk.n = pg.len;
+      else if (++talk.i >= talk.pages.length) return endTalk();
+      else { talk.n = 0; Audio8.sfx('select'); }
+    }
+    return false;
+  }
+  function portrait(ctx, who, x, y, t) { // 40×40: Figur in doppelter Größe, Kopf und Schultern
+    ctx.fillStyle = '#c89020'; ctx.fillRect(x - 2, y - 2, 44, 44);
+    ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, 42, 42);
+    ctx.fillStyle = who === 'L' ? '#24183c' : who === 'H' ? '#0c1c34' : who === 'T' ? '#0c2434' : '#1c1028'; ctx.fillRect(x, y, 40, 40);
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, 40, 40); ctx.clip();
+    if (who === 'L') { ctx.translate(x + 20, y + 70); ctx.scale(2, 2); drawLibrarian(ctx, 0, 0, t, false); }
+    else if (who === 'T') { ctx.translate(x + 18, y + 80); ctx.scale(2, 2); drawTentacle(ctx, 0, 0, t, false); }
+    else {
+      const H = HEROES.get(who === 'A' ? allyId() : Options.character), spr = H.idle[0], img = who === 'H' ? spr.f : spr.c;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, x + 20 - img.width, y + 4 - spr.pad * 2, img.width * 2, img.height * 2); // Bildmitte = Figurmitte (wie in der Heldenwahl)
+    }
+    ctx.restore();
+  }
+  function drawTalk(ctx, t) {
+    if (!talk) return;
+    const pg = page(), { x, y, w, h } = talkBox(), hero = pg.who === 'H';
+    ctx.fillStyle = 'rgba(4,2,16,0.94)'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + h - 1, w, 1); ctx.fillRect(x, y, 1, h); ctx.fillRect(x + w - 1, y, 1, h);
+    ctx.fillStyle = '#5c3c10'; ctx.fillRect(x + 2, y + 2, w - 4, 1); ctx.fillRect(x + 2, y + h - 3, w - 4, 1);
+    ctx.fillStyle = '#fce0a8'; for (const [ex, ey] of [[x, y], [x + w - 1, y], [x, y + h - 1], [x + w - 1, y + h - 1]]) { ctx.fillRect(ex - 1, ey, 3, 1); ctx.fillRect(ex, ey - 1, 1, 3); }
+    const px = hero ? x + w - 48 : x + 8, tx = hero ? x + 10 : x + 56;
+    portrait(ctx, pg.who, px, y + 10, t);
+    const name = pg.who === 'L' ? tr('npcLib') : pg.who === 'T' ? tr('bossTentacle') : HEROES.def(pg.who === 'A' ? allyId() : Options.character).name;
+    Font.draw(ctx, name, tx, y + 7, hero ? '#7cdcfc' : pg.who === 'L' ? '#c8a0fc' : pg.who === 'T' ? '#d880fc' : '#f8b800', { shadow: '#000' });
+    let left = Math.floor(talk.n);
+    pg.lines.forEach((l, i) => {
+      const ch = [...l], s = ch.slice(0, Math.max(0, left)).join('');
+      left -= ch.length;
+      if (s) Font.draw(ctx, s, tx, y + 21 + i * 11, '#fcfcfc', { shadow: '#000' });
+    });
+    if (talk.n >= pg.len && (t >> 4) % 2 === 0) Font.draw(ctx, talk.i + 1 < talk.pages.length ? '↓' : '·', hero ? x + w - 60 : x + w - 12, y + h - 12, '#f8b800', { shadow: '#000' });
+  }
+
   // ---------------- Erkundungsgrad ----------------
   function stats(s) { // [aufgedeckt, gesamt] der zählenden Zellen einer Region (oder eines Raums)
     let a = 0, n = 0;
@@ -931,6 +1157,13 @@ const Castle = (() => {
       if (dx) ctx.fillRect(ox + Math.max(ax, bx) * cs - 1, oy + ay * cs + Math.floor((cs - d) / 2), 2, d);
       else ctx.fillRect(ox + ax * cs + Math.floor((cs - d) / 2), oy + Math.max(ay, by) * cs - 1, d, 2);
     }
+    for (const who of WHO) { // Figuren mit neuer Szene: grüne Marke (sobald ihre Zelle aufgedeckt ist)
+      const b = beatNow(who), a = b && !beatDone(b) && ref(b.at[0]), rr = a && roomAt(a.s, a.r);
+      if (!rr) continue;
+      const cc = placeCell(rr, { x: b.at[1], y: b.at[2] }), m = Math.max(2, Math.round(cs / 3));
+      if (!vis(rr.key, cc.y * rr.cw + cc.x)) continue;
+      ctx.fillStyle = '#58f898'; ctx.fillRect(ox + (rr.ax + cc.x) * cs + Math.floor((cs - m) / 2), oy + (rr.ay + cc.y) * cs + Math.floor((cs - m) / 2), m, m);
+    }
     const c = heroCell(), rm = roomAt(W.stage, W.roomIdx);
     if (c && rm && (t >> 3) % 2 === 0) { // Held blinkt in seiner Zelle
       const i = cs >= 4 ? Math.max(1, Math.floor(cs / 4)) : 0;
@@ -979,7 +1212,7 @@ const Castle = (() => {
     on, update, settle, forward, bossBeaten, draw, openMap, mapInput, openWarp, warpInput, layout, castle, percent, roomPercent, firstVisit, seals,
     bossDone: (s, r) => !!boss[roomKey(s, r)],
     hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers,
-    newRun, drawStatus, expProgress, gainExp, get rpg() { return rpg; },
+    newRun, drawStatus, expProgress, gainExp, get rpg() { return rpg; }, talkInput, drawTalk, get talk() { return talk; }, get flags() { return flag; },
     tier: (s) => TIER[S()[s].id] || 1, side: SIDE, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
     reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
