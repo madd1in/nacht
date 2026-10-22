@@ -485,8 +485,9 @@ const Game = {
         if ((P.start || P.jump) && this.t > 8) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('map'); Audio8.sfx('pause'); break; }
         Castle.mapInput(P);
         break;
-      case 'status': // Statusbildschirm (nur ?castle): Sprung/Angriff/Start zurück zur Pause
+      case 'status': // Statusbildschirm (nur ?castle): ←→ Werte/Zauber, Sprung/Angriff/Start zurück zur Pause
         if ((P.start || P.jump || P.attack) && this.t > 8) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('status'); Audio8.sfx('pause'); }
+        else Castle.statusInput(P);
         break;
       case 'talk': { // Gespräch mit einer Figur (nur Schloss): die Welt steht still, Sprung/Angriff/↑ blättert, Start überspringt
         const r = Castle.talkInput(P);
@@ -583,6 +584,7 @@ const Game = {
     if (this.shoutT > 0) this.shoutT--;
     if (this.noteT > 0) this.noteT--;
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; } // Zeitlupe
+    if (Castle.on) Castle.preUpdate(P); // Schloss: Zauberbefehl erkannt → Angriff wird zum Zauber
     W.update(); this.updateBars();
     if (Castle.on && this.state === 'play') Castle.update(P); // Schloss: Kartenzellen aufdecken, Türen benutzen
     if (!W.cleared) W.stageFrames++;
@@ -981,6 +983,8 @@ const Game = {
     if (Castle.on) { // Schloss: Stufe mit EXP-Leiste statt Punkten, Gold in der Mitte statt der (stehenden) Zeit
       Font.draw(ctx, 'LV', 18, 3, label, { align: 'right' }); Font.draw(ctx, pad(Castle.rpg.lv, 2), 22, 3, val, { shadow: '#000' });
       const k = clamp(Castle.expProgress(), 0, 1); R('#000', 37, 4, 66, 5); R('#1c2c14', 38, 5, 64, 3); R('#58f898', 38, 5, Math.round(64 * k), 3); R('#b8fcd0', 38, 5, Math.round(64 * k), 1);
+      const mm = Castle.mpMax(); // MP, sobald ein Zauber gelernt ist
+      if (mm) { const m = clamp(Castle.mp / mm, 0, 1); Font.draw(ctx, 'MP', 108, 3, label); R('#000', 120, 4, 28, 5); R('#0c1c34', 121, 5, 26, 3); R('#3cbcfc', 121, 5, Math.round(26 * m), 3); R('#a4e4fc', 121, 5, Math.round(26 * m), 1); }
       Font.draw(ctx, pad(this.dispScore || 0, 6), boxCx, 3, this.dispScore < W.score ? '#fce0a8' : '#f8b800', { align: 'center', shadow: '#000' });
     } else {
       Font.draw(ctx, tr('hudScore'), 36, 3, label, { align: 'right' }); Font.draw(ctx, pad(this.dispScore || 0, 6), 40, 3, this.dispScore < W.score ? '#fce0a8' : val, { shadow: '#000' });

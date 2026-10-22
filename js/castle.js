@@ -12,7 +12,8 @@
 // Treffer zeigen Schadenszahlen, Gegner lassen Gold, Herzen und Braten fallen. Pause → STATUS. Stufe, EXP, Besiegte und
 // Spielzeit speichert die Speicherkammer (wie in SotN geht Ungespeichertes nach Game Over verloren).
 // Geschichte: der zweite Held, der Bibliothekar und der lila Tentakel treiben sie in Gesprächen voran (Szenen an Relikten und Siegeln).
-// Ausrüstung wie in SotN: Waffe, Rüstung, Amulett, Begleiter, Tränke (Pause → AUSRÜSTUNG), Funde, Beute und der Laden des Bibliothekars.
+// Ausrüstung wie in SotN: Waffe, Rüstung, Amulett, Begleiter, Tränke (Pause → AUSRÜSTUNG), Funde, Beute und der Laden des Bibliothekars;
+// MP und Zauber per Befehlseingabe (Zauberbücher im Laden).
 'use strict';
 
 const Castle = (() => {
@@ -547,7 +548,7 @@ const Castle = (() => {
   let inSave = null; // Schlüssel der Speicherkammer, in der der Held gerade steht (erst nach dem Verlassen wieder speichern)
   function saveAt(c) {
     const p = W.player;
-    p.hp = p.maxHp; if (!Options.infHearts) p.hearts = Math.max(p.hearts, 10);
+    p.hp = p.maxHp; mp = mpMax(); if (!Options.infHearts) p.hearts = Math.max(p.hearts, 10);
     const ok = writeSave(c);
     W.checkpoint = { stage: c.s, room: c.r, cx: (c.x + 1) * T, feet: (c.y + 1) * T };
     Game.note(ok ? 'castleSaved' : 'castleSaveFail'); Audio8.sfx('checkpoint'); Audio8.sfx('heart'); Input.rumble(0.3, 0.2, 150);
@@ -616,6 +617,7 @@ const Castle = (() => {
     if (!c) return;
     rpg.frames++; applyHp(W.player); trackHits(); // RPG: Spielzeit, max. HP der Stufe, Treffer und Besiegte
     famTick(); // Begleiter
+    if (rpg.frames % 45 === 0) mp = Math.min(mpMax(), mp + 1); // MP füllen sich langsam
     const hero = W.player; // Blutstein: alle vier Sekunden 1 HP
     if (gear('regen') && rpg.frames % 240 === 0 && hero.alive && hero.hp < hero.maxHp) { hero.hp = Math.min(hero.maxHp, hero.hp + 1); W.popup(hero.cx, hero.y - 6, '+10', '#d81830'); }
     if (!has('jump2')) W.player.canDouble = false; // ohne Rabenfeder kein Doppelsprung
@@ -746,7 +748,7 @@ const Castle = (() => {
       if (e.hp <= 0) defeated(e);
     }
   }
-  function newRun() { Object.assign(rpg, { lv: 1, exp: 0, kills: 0, frames: 0 }); hpSeen.clear(); }
+  function newRun() { Object.assign(rpg, { lv: 1, exp: 0, kills: 0, frames: 0 }); hpSeen.clear(); mp = mpMax(); }
   const expProgress = () => rpg.lv >= MAXLV ? 1 : (rpg.exp - expFor(rpg.lv)) / (expFor(rpg.lv + 1) - expFor(rpg.lv));
   const playTime = () => { const s = Math.floor(rpg.frames / 60), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h + ':' + String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
 
@@ -773,9 +775,13 @@ const Castle = (() => {
     batcard: { slot: 'fam', fam: 'bat', col: '#9c6cfc' },              // Junges der Riesenfledermaus (liegt nach dem Sieg in ihrer Arena)
     fairy: { slot: 'fam', fam: 'fairy', price: 7000, col: '#58f898' },  // Fee im Glas (Laden des Bibliothekars)
     tentling: { slot: 'fam', fam: 'tent', col: '#d880fc' },            // Neffe des Tentakels (Kolosseum, nach der Rabenfeder)
+    book_spirit: { spell: 'spirit', price: 2500, col: '#a4e4fc' },      // Zauberbücher (Laden): lehren je einen Zauber
+    book_hellfire: { spell: 'hellfire', price: 6000, col: '#fc7c1c' },
+    book_soulsteal: { spell: 'soulsteal', price: 12000, col: '#d880fc' },
   };
   const SLOTS = ['weapon', 'armor', 'acc', 'fam'], DRINKS = ['potion', 'elixir'];
-  const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'fairy', 'map'];
+  const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'fairy', 'map', 'book_spirit', 'book_hellfire', 'book_soulsteal'];
+  const once = (g) => !!(g.slot || g.key || g.spell); // gibt es nur einmal
   const BOSS_LOOT = [[[0, -1], 'batcard']];
   const FINDS = [ // Einzelstücke: [Raum, Gegenstand, Kachel-x, Standreihe]
     [['side', 'kolosseum'], 'leather', 12, 7], [['side', 'kanal'], 'bloodstone', 43, 7], [['side', 'schatz'], 'greedring', 25, 6],
@@ -794,7 +800,8 @@ const Castle = (() => {
     let worn = false;
     if (found && g.slot && !eq[g.slot]) { eq[g.slot] = id; worn = true; applyHp(W.player); }
     save();
-    if (found) { Game.note(worn ? 'castleFoundEq' : 'castleFound', itemName(id)); Audio8.sfx(g.slot || g.key ? 'bigItem' : 'item'); }
+    if (g.spell) mp = mpMax(); // erster Zauber: volle MP
+    if (found) { Game.note(worn ? 'castleFoundEq' : 'castleFound', itemName(id)); Audio8.sfx(once(g) ? 'bigItem' : 'item'); }
   }
   // Symbol 10×10: Klinge (Waffe), Brustpanzer (Rüstung), Ring (Amulett), Fläschchen (Trank), Rolle (Karte)
   function itemIcon(ctx, id, x, y) {
@@ -803,6 +810,7 @@ const Castle = (() => {
     else if (g.slot === 'armor') { R(1, 1, 3, 2, c); R(6, 1, 3, 2, c); R(2, 3, 6, 6, c); R(4, 1, 2, 1, '#000'); R(3, 4, 1, 4, '#fcfcfc'); R(2, 8, 6, 1, '#6c6c7c'); }
     else if (g.slot === 'acc') { R(2, 3, 6, 1, '#c89020'); R(2, 8, 6, 1, '#c89020'); R(1, 4, 1, 4, '#c89020'); R(8, 4, 1, 4, '#c89020'); R(3, 0, 4, 3, c); R(4, 1, 1, 1, '#fcfcfc'); }
     else if (g.slot === 'fam') { R(1, 0, 8, 10, c); R(2, 1, 6, 8, '#1c1028'); R(3, 3, 4, 3, c); R(4, 2, 2, 1, c); R(3, 7, 4, 1, '#c89020'); } // Begleiterkarte wie in SotN
+    else if (g.spell) { R(1, 1, 8, 8, '#3c1c5c'); R(1, 1, 8, 1, '#c89020'); R(1, 8, 8, 1, '#c89020'); R(2, 2, 6, 6, '#24103c'); R(4, 3, 2, 3, c); R(3, 4, 4, 1, c); R(8, 2, 1, 6, '#e8e0c8'); } // Zauberbuch
     else if (g.heal) { R(4, 0, 2, 1, '#8c5c2c'); R(4, 1, 2, 2, '#c8d8e8'); R(2, 3, 6, 6, '#c8d8e8'); R(3, 5, 4, 4, c); R(3, 4, 1, 2, '#fcfcfc'); }
     else { R(1, 2, 8, 6, c); R(0, 1, 2, 8, '#a89060'); R(8, 1, 2, 8, '#a89060'); R(3, 4, 4, 1, '#6c4410'); R(3, 6, 3, 1, '#6c4410'); }
   }
@@ -939,6 +947,112 @@ const Castle = (() => {
       }
     }
   }
+  // ---------------- Zauber wie in SotN: Befehl mit dem Steuerkreuz, dann Angriff (statt des Hiebs) ----------------
+  // Gelernt aus Zauberbüchern (Laden des Bibliothekars). MP: 24 + 3 je Stufe, füllt sich langsam (1 MP alle 0,75 s), in der
+  // Speicherkammer und beim Bibliothekar ganz. Befehle relativ zur Blickrichtung beim Angriff: F = vorwärts, B = rückwärts.
+  // Seelenruf: B F ↑ ↓ – eine verirrte Seele sucht sich einen Gegner. Höllenfeuer: ↑ ↓ ↘ → – drei Feuerbälle im Fächer.
+  // Seelenraub: B F ↘ ↓ ↙ B F – trifft alles im Bild und heilt pro Treffer. Schaden wächst mit der Stufe des Helden.
+  const SPELLS = {
+    spirit: { mp: 5, cmd: ['B', 'F', 'U', 'D'], col: '#a4e4fc' },
+    hellfire: { mp: 12, cmd: ['U', 'D', 'DF', 'F'], col: '#fc7c1c' },
+    soulsteal: { mp: 24, cmd: ['B', 'F', 'DF', 'D', 'DB', 'B', 'F'], col: '#d880fc' },
+  };
+  const SPELL_IDS = ['spirit', 'hellfire', 'soulsteal'];
+  const known = (id) => !!inv['book_' + id];
+  const mpMax = () => SPELL_IDS.some(known) ? 24 + 3 * (rpg.lv - 1) : 0;
+  let mp = 0, lastDir = '';
+  const hist = [];
+  const absDir = (s, face) => s.replace('F', face > 0 ? 'R' : 'L').replace('B', face > 0 ? 'L' : 'R');
+  function cmdMatch(cmd, face) { // Schritte in dieser Reihenfolge, je höchstens 24 Bilder auseinander (Zwischenschritte erlaubt)
+    let j = cmd.length - 1, last = rpg.frames;
+    for (let i = hist.length - 1; i >= 0 && j >= 0; i--) {
+      if (last - hist[i].f > 24) return false;
+      if (hist[i].c === absDir(cmd[j], face)) { last = hist[i].f; j--; }
+    }
+    return j < 0;
+  }
+  function preUpdate(P) { // vor W.update: Steuerkreuz mitschreiben; Angriff nach einem Befehl wird zum Zauber
+    const max = mpMax(), p = W.player;
+    if (!max || !p || !p.alive) return;
+    mp = Math.min(mp, max);
+    const I = Input.held, c = (I.up ? 'U' : I.down ? 'D' : '') + (I.right ? 'R' : I.left ? 'L' : '');
+    if (c !== lastDir) { if (c) { hist.push({ c, f: rpg.frames }); if (hist.length > 16) hist.shift(); } lastDir = c; }
+    if (!P.attack || p.state !== 'normal') return;
+    for (const id of ['soulsteal', 'hellfire', 'spirit']) {
+      if (!known(id) || !cmdMatch(SPELLS[id].cmd, p.face)) continue;
+      hist.length = 0; P.attack = false; // kein Hieb dazu
+      if (mp < SPELLS[id].mp) { W.popup(p.cx, p.y - 10, 'MP!', '#7c84a8'); Audio8.sfx('wall'); return; }
+      mp -= SPELLS[id].mp; cast(id);
+      return;
+    }
+  }
+  function cast(id) {
+    const p = W.player, lv = rpg.lv, col = SPELLS[id].col;
+    W.popup(p.cx, p.y - 14, tr('spell_' + id), col); p.powerT = Math.max(p.powerT || 0, 16); Input.rumble(0.3, 0.3, 120);
+    for (let i = 0; i < 14; i++) W.spawn(new Particle(p.cx + rnd(-10, 10), p.y + rnd(0, 30), rnd(-0.6, 0.6), rnd(-1.6, -0.2), i % 2 ? col : '#fcfcfc', 30, 1, 0));
+    if (id === 'spirit') { W.spawn(new CastleSpell('spirit', p.cx, p.y + 4, p.face * 1.5, -1.2, 2 + 0.12 * lv)); Audio8.sfx('holy'); }
+    else if (id === 'hellfire') {
+      for (const a of [-0.28, 0, 0.28]) W.spawn(new CastleSpell('fire', p.cx + p.face * 8, p.y + 12, Math.cos(a) * 3.4 * p.face, Math.sin(a) * 3.4, 2.2 + 0.1 * lv));
+      Audio8.sfx('fire'); Audio8.sfx('boom'); W.shake = Math.max(W.shake, 4);
+    } else { // Seelenraub: alles im Bild, jede Seele heilt
+      W.flash = 8; Audio8.sfx('rosary');
+      let n = 0;
+      for (const e of [...W.ents]) {
+        if (e.dead || (e.kind !== 'enemy' && e.kind !== 'boss') || !(e.hp > 0) || e.dying || !e.onScreen(0)) continue;
+        if (famStrike({ x: e.x, y: e.y, w: e.w, h: e.h }, 1.5 + 0.06 * lv)) { n++; W.spawn(new CastleSpell('soul', e.cx, e.cy, 0, -1, 0)); }
+      }
+      if (n) { const before = p.hp; p.hp = Math.min(p.maxHp, p.hp + Math.min(8, n * 1 + 1)); W.popup(p.cx, p.y - 4, '+' + Math.round((p.hp - before) * 10), '#58f898'); }
+    }
+  }
+  class CastleSpell extends Ent { // spirit: suchende Seele, fire: Feuerball, soul: geraubte Seele fliegt zum Helden
+    constructor(type, x, y, vx, vy, dmg) { super(x - 4, y - 4, 8, 8); this.kind = 'fx'; this.type = type; this.vx = vx; this.vy = vy; this.dmg = dmg; this.target = null; }
+    update() {
+      this.t++;
+      const p = W.player;
+      if (this.type === 'soul') { // zum Helden ziehen
+        const dx = p.cx - this.cx, dy = p.cy - this.cy, d = Math.hypot(dx, dy) || 1;
+        this.vx += dx / d * 0.5; this.vy += dy / d * 0.5; this.vx *= 0.9; this.vy *= 0.9;
+        if (d < 10 || this.t > 90) this.dead = true;
+      } else if (this.type === 'spirit') {
+        if (!this.target || this.target.dead || !(this.target.hp > 0)) this.target = this.t > 8 ? famTarget(this, 220, 140) : null;
+        if (this.target) { const dx = this.target.cx - this.cx, dy = this.target.cy - this.cy, d = Math.hypot(dx, dy) || 1; this.vx += dx / d * 0.35; this.vy += dy / d * 0.35; }
+        const sp = Math.hypot(this.vx, this.vy); if (sp > 3) { this.vx *= 3 / sp; this.vy *= 3 / sp; }
+        if (famStrike(this, this.dmg) || this.t > 200) { this.dead = true; W.sparks(this.cx, this.cy, 6); }
+      } else { // Feuerball: bis zur Wand oder zum ersten Treffer
+        const ch = Phys.tile(Math.floor(this.cx / T), Math.floor(this.cy / T));
+        if (famStrike(this, this.dmg) || SOLID.includes(ch) || this.t > 90) { this.dead = true; W.sparks(this.cx, this.cy, 8); Audio8.sfx('explode', this.cx); }
+        if (this.t % 3 === 0) W.spawn(new Particle(this.cx, this.cy, rnd(-0.3, 0.3), rnd(-0.6, 0), this.t % 2 ? '#fc7c1c' : '#f8b800', 14, 1, 0));
+      }
+      this.x += this.vx; this.y += this.vy;
+    }
+    lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: this.cy - cy, r: this.type === 'fire' ? 26 : 20, c: this.type === 'fire' ? [252, 140, 40] : this.type === 'soul' ? [216, 128, 252] : [164, 228, 252], a: 0.6 }); }
+    draw(ctx) {
+      const x = Math.round(this.cx - W.cam.x), y = Math.round(this.cy - W.cam.y), t = this.t;
+      const R = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x + a, y + b, w, h); };
+      if (this.type === 'fire') { R(-3, -3, 6, 6, '#fc7c1c'); R(-2, -2, 4, 4, '#f8b800'); R(-1, -1, 2, 2, '#fcfcfc'); if (t & 2) R(-4 - Math.sign(this.vx) * 2, -1, 2, 2, '#fc3c1c'); }
+      else if (this.type === 'soul') { R(-2, -2, 4, 4, '#d880fc'); R(-1, -1, 2, 2, '#fcfcfc'); }
+      else { // Seele: kleiner Schädel mit Schweif
+        ctx.globalAlpha = 0.5; R(-Math.round(this.vx * 2) - 2, -Math.round(this.vy * 2) - 1, 3, 3, '#a4e4fc'); ctx.globalAlpha = 1;
+        R(-3, -3, 6, 5, '#d8f4fc'); R(-2, 2, 4, 2, '#d8f4fc'); R(-2, -1, 1, 2, '#1c2c4c'); R(1, -1, 1, 2, '#1c2c4c'); if ((t >> 3) & 1) R(-1, 3, 2, 1, '#1c2c4c');
+      }
+    }
+  }
+  // Statusbildschirm, Seite 2: gelernte Zauber mit Befehl (Blick nach rechts) und MP-Kosten
+  function drawSpells(ctx) {
+    const cx = View.cx, lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16);
+    const ARROW = { F: '→', B: '←', U: '↑', D: '↓', DF: '↘', DB: '↙' };
+    Font.draw(ctx, 'MP ' + mp + '/' + mpMax(), cx, 40, '#7cdcfc', { align: 'center', shadow: '#000' });
+    SPELL_IDS.forEach((id, i) => {
+      const y = 60 + i * 34, k = known(id), s = SPELLS[id];
+      Font.draw(ctx, k ? tr('spell_' + id) : '???', lx, y, k ? s.col : '#5c5c6c', { shadow: '#000' });
+      Font.draw(ctx, s.mp + ' MP', rx, y, k ? '#7cdcfc' : '#5c5c6c', { align: 'right', shadow: '#000' });
+      if (k) {
+        Font.draw(ctx, s.cmd.map(c => ARROW[c]).join(' ') + '  + ' + tr('spellAttack'), lx + 8, y + 11, '#fcfcfc', { shadow: '#000' });
+        Font.draw(ctx, itemDesc('book_' + id), lx + 8, y + 21, '#b0a080');
+      } else Font.draw(ctx, tr('spellUnknown'), lx + 8, y + 11, '#5c5c6c');
+    });
+    Font.draw(ctx, tr('spellNote'), cx, 200, '#7c7c8c', { align: 'center' });
+  }
   let famEnt = null;
   function famTick() { // genau ein Begleiter, passend zum belegten Platz; nach Raumwechsel neu beim Helden
     const id = eq.fam || null;
@@ -1015,7 +1129,7 @@ const Castle = (() => {
     if (P.up || P.down) { shop.sel = (shop.sel + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
     if (P.jump || P.attack) {
       const id = STOCK[shop.sel], g = GEAR[id];
-      if ((g.slot || g.key) && inv[id]) { shop.say = 'shopOwned'; Audio8.sfx('wall'); }
+      if (once(g) && inv[id]) { shop.say = 'shopOwned'; Audio8.sfx('wall'); }
       else if (W.score < g.price) { shop.say = 'shopPoor'; Audio8.sfx('wall'); }
       else {
         W.score -= g.price; giveItem(id, false); Audio8.sfx('money');
@@ -1034,8 +1148,11 @@ const Castle = (() => {
     ctx.save(); ctx.translate(lx + 4, 72); ctx.scale(1, 1); drawLibrarian(ctx, 0, 0, t, false); ctx.restore();
     const say = wrap(tr(shop.say), rx - lx - 24);
     say.slice(0, 3).forEach((l, i) => Font.draw(ctx, l, lx + 20, 36 + i * 10, '#c8a0fc', { shadow: '#000' }));
-    STOCK.forEach((id, i) => {
-      const y = 78 + i * 13, on = i === shop.sel, g = GEAR[id], own = (g.slot || g.key) && inv[id], poor = W.score < g.price;
+    const top = clamp(shop.sel - 3, 0, Math.max(0, STOCK.length - 8)); // acht Zeilen sichtbar, die Liste rollt mit
+    if (top > 0) Font.draw(ctx, '↑', cx, 69, '#9c6cfc');
+    if (top + 8 < STOCK.length) Font.draw(ctx, '↓', cx, 178, '#9c6cfc');
+    STOCK.slice(top, top + 8).forEach((id, n) => {
+      const i = top + n, y = 78 + n * 13, on = i === shop.sel, g = GEAR[id], own = once(g) && inv[id], poor = W.score < g.price;
       if (on) { ctx.fillStyle = 'rgba(156,108,252,0.2)'; ctx.fillRect(lx - 6, y - 3, rx - lx + 12, 13); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y - 1); }
       itemIcon(ctx, id, lx + 8, y - 2);
       Font.draw(ctx, itemName(id) + (DRINKS.includes(id) && inv[id] ? '  ×' + inv[id] : ''), lx + 22, y, own ? '#5c5c6c' : on ? '#fcfcfc' : '#c8c8d8', { shadow: '#000' });
@@ -1047,8 +1164,11 @@ const Castle = (() => {
   }
 
   // Statusbildschirm (Pause → STATUS): Werte wie in SotN in zwei Spalten, darunter EXP-Leiste, Karte, Siegel, Warpkammern
+  let statusPage = 0; // 0 = Werte, 1 = Zauber (←→ blättert)
+  function statusInput(P) { if (P.left || P.right) { statusPage = 1 - statusPage; Audio8.sfx('select'); } }
   function drawStatus(ctx, t) {
     const w = View.w, cx = View.cx, p = W.player, v = values();
+    if (statusPage === 1) { panel(ctx, tr('spellTitle'), '#7cdcfc'); drawSpells(ctx); Font.draw(ctx, tr('statusHelp'), cx, 222, '#7c7c8c', { align: 'center' }); return; }
     ctx.fillStyle = 'rgba(2,4,18,0.97)'; ctx.fillRect(0, 0, w, 240);
     ctx.fillStyle = '#c89020';
     ctx.fillRect(6, 6, w - 12, 1); ctx.fillRect(6, 233, w - 12, 1); ctx.fillRect(6, 6, 1, 228); ctx.fillRect(w - 7, 6, 1, 228);
@@ -1278,7 +1398,7 @@ const Castle = (() => {
     if (b.leave && !again) { npc.go = 1; npc.t = 0; } // macht sich auf den Weg
     if (b.heal) { // Bibliothekar: Kerzenschein heilt
       const p = W.player;
-      p.hp = p.maxHp; if (!Options.infHearts) p.hearts = Math.max(p.hearts, 10);
+      p.hp = p.maxHp; mp = mpMax(); if (!Options.infHearts) p.hearts = Math.max(p.hearts, 10);
       W.popup(p.cx, p.y - 8, 'HP MAX', '#58f898'); Audio8.sfx('heart');
       for (let i = 0; i < 14; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.y + rnd(0, 28), rnd(-0.4, 0.4), rnd(-1.4, -0.3), i % 2 ? '#58f898' : '#fce0a8', 40, 1, 0));
     }
@@ -1525,7 +1645,7 @@ const Castle = (() => {
     if (typeof sv.whip === 'number' && !Options.maxWhip) p.whip = clamp(sv.whip, 1, 3);
     newRun();
     if (sv.lv >= 1) Object.assign(rpg, { lv: Math.min(MAXLV, sv.lv | 0), exp: sv.exp | 0, kills: sv.kills | 0, frames: sv.frames | 0 });
-    applyHp(p); p.hp = p.maxHp;
+    applyHp(p); p.hp = p.maxHp; mp = mpMax();
   }
 
   return {
@@ -1534,6 +1654,7 @@ const Castle = (() => {
     hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers,
     newRun, drawStatus, expProgress, gainExp, get rpg() { return rpg; }, talkInput, drawTalk, get talk() { return talk; }, get flags() { return flag; },
     openEquip, equipInput, drawEquip, openShop, shopInput, drawShop, get inv() { return inv; }, get eq() { return eq; }, giveItem,
+    preUpdate, statusInput, mpMax, get mp() { return mp; }, set mp(v) { mp = v; },
     tier: (s) => TIER[S()[s].id] || 1, side: SIDE, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
     reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
