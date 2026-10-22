@@ -173,7 +173,16 @@ const Game = {
     if (this.pendingView) this.applyView(this.pendingView);
     W.loadRoom(tg.s, tg.r); Castle.settle(tg); Audio8.play(W.songName(), null, 0.12);
   },
-  titleItems() { return Castle.on && Castle.hasSave() ? ['cont', 'start', 'options', 'lang', 'scores', 'sections'] : ['start', 'options', 'lang', 'scores', 'sections']; },
+  titleItems() { // Titelmenü; der Moduswechsel lädt die Seite mit bzw. ohne ?castle neu
+    if (!Castle.on) return ['start', 'castle', 'options', 'lang', 'scores', 'sections'];
+    return [...(Castle.hasSave() ? ['cont'] : []), 'start', 'arcade', 'options', 'lang', 'scores', 'sections'];
+  },
+  switchMode(castle) {
+    const u = new URL(location.href);
+    if (castle) u.searchParams.set('castle', ''); else u.searchParams.delete('castle');
+    u.searchParams.delete('stage'); u.searchParams.delete('room');
+    location.href = u.toString().replace(/=(?=&|$)/g, ''); // leere Schalter ohne „=“ (?castle&noboot)
+  },
   // Schloss-Modus: am Spielstand der letzten Speicherkammer weiterspielen (Titel: FORTSETZEN, und nach Game Over)
   castleContinue() {
     const sv = Castle.loadSave();
@@ -409,6 +418,7 @@ const Game = {
           Audio8.init(); Audio8.sfx('select');
           const it = items[this.menu];
           if (it === 'cont') { this.castleContinue(); break; }
+          if (it === 'castle' || it === 'arcade') { this.switchMode(it === 'castle'); break; } // Schloss-Modus (SotN) ⇄ Arcade
           if (it === 'options') { this.go('options'); this.optSel = 0; break; }
           if (it === 'lang') { this.cycleLang(false); break; }
           if (it === 'scores') { this.startScores(false); break; }
@@ -1019,7 +1029,10 @@ const Game = {
       ctx.fillRect(x, 150, 8, 8);
       if (i < n - 1) { ctx.fillStyle = '#3c3c3c'; ctx.fillRect(x + 12, 153, gap - 16, 2); }
     }
-    Font.draw(ctx, tr('lives', Math.max(0, W.lives)), cx, 176, '#e0e0e0', { align: 'center', shadow: '#000' });
+    if (Castle.on) { // Schloss: Gefahrenstufe der Region statt Leben (Sterne leuchten rot)
+      const k = Castle.tier(W.stage);
+      Font.draw(ctx, tr('castleDanger') + ' ' + '*'.repeat(k) + '   LV ' + Castle.rpg.lv, cx, 176, k >= 4 ? '#fc7460' : '#e0e0e0', { align: 'center', shadow: '#000' });
+    } else Font.draw(ctx, tr('lives', Math.max(0, W.lives)), cx, 176, '#e0e0e0', { align: 'center', shadow: '#000' });
     Font.draw(ctx, tr('bossIs', tr(st.bossKey)), cx, 190, '#b0b0b0', { align: 'center', shadow: '#000' });
     this.drawWarmBar(ctx, cx, 165);
   },
@@ -1121,10 +1134,10 @@ const Game = {
     const ids = this.titleItems(), ni = ids.length;
     const by = 228 - bh, my0 = Math.min(L.sub + 13, by - ni * msp - (tags.length ? 11 : 3));
     const fx = (this.langFx = Math.max(0, (this.langFx || 0) - 1)) > 0;
-    const LABEL = { cont: tr('castleCont'), start: tr('start'), options: tr('options'), lang: langTxt, scores: tr('hiTitle'), sections: tr('sections') };
+    const LABEL = { cont: tr('castleCont'), start: tr('start'), castle: tr('castleMode'), arcade: tr('arcadeMode'), options: tr('options'), lang: langTxt, scores: tr('hiTitle'), sections: tr('sections') };
     ids.map(id => LABEL[id]).forEach((m, i) => {
       const on = this.menu === i, y = my0 + i * msp, lang = ids[i] === 'lang';
-      const col = on ? (lang && fx ? '#ffffff' : '#fce0a8') : lang ? '#d0b8e0' : ids[i] === 'sections' ? '#5c4a6c' : ids[i] === 'cont' ? '#fca070' : '#8c7a9c';
+      const col = on ? (lang && fx ? '#ffffff' : '#fce0a8') : lang ? '#d0b8e0' : ids[i] === 'sections' ? '#5c4a6c' : ids[i] === 'cont' ? '#fca070' : ids[i] === 'castle' || ids[i] === 'arcade' ? '#a4b4fc' : '#8c7a9c';
       if (on) { // Glut hinter dem gewählten Punkt
         const w = (I18N.cjk ? Font.width(m) : m.length * 6) + 24, gr = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
         gr.addColorStop(0, 'rgba(120,10,30,0)'); gr.addColorStop(0.5, `rgba(150,20,40,${0.42 + 0.12 * Math.sin(t * 0.1)})`); gr.addColorStop(1, 'rgba(120,10,30,0)');

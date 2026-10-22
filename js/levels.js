@@ -717,5 +717,5 @@ const Levels = (() => {
     { id: 3, nameKey: 'stage4', bossKey: 'boss4', voice: 'stage4', name: 'DER THRON DER NACHT', music: 'chapel', time: 780, rooms: [vx, vg, br, bs, r32], boss: 'GRAF NACHTMAHR' },
   ];
 
-  return { STAGES };
+  return { STAGES, room }; // room: Baukasten auch für die Zusatzräume des Schloss-Modus (js/castle.js)
 })();

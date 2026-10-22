@@ -173,15 +173,32 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 | **0 (erledigt)** | `?castle`: Pause → KARTE, betretene Zellen aufdecken, Heldenposition, Erkundungsgrad, Speicherung in `localStorage` | Karte im Browser getestet, Arcade unverändert |
 | **1 (Prototyp erledigt)** | Kapitel werden Regionen eines Schlosses: Türen in beide Richtungen, Knoten Eingangshalle (Keller-, Turm-, Siegeltor), Wege hinter den Bossen, Einbahnen mit Rückweg, eine Karte für das ganze Schloss, Bosse geben Siegel und bleiben besiegt, kein Zeitlimit | alle Regionen frei begehbar, Thron hinter 5 Siegeln |
 | **1b (teilweise erledigt)** | erledigt: Speicherkammern mit Spielstand, „Fortsetzen" im Titel und nach Game Over, Warpkammern mit Schnellreise über die Karte. Offen: feste Raum-IDs, Regionsmusik ohne Neustart, Spielstand-Slots | Spielstand überlebt Umsortieren von `levels.js` |
-| 2 Relikte | `Player.has()`, Fluch-Szene, Reliktsockel, Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
+| **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 5 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher) auf Sockeln und bei Bossen, rissiges Gestein vor Zusatzräumen. Offen: automatischer Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
 | **3 RPG (teilweise erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand. Offen: MP, Ausrüstungsmenü, Bibliothekar-Shop | Statusbildschirm, Shop |
 | 4 Bosse & Siegel | Arenen mit Hintertür, Siegeltor, Ende, neue Verbindungsräume | Abspann im Schloss-Modus |
 | 5 Kür | Warp-Spiegel, Schlosskarte, Geheimwände (`X`/`Y` gibt es schon), „Umgedrehtes Schloss" als Mode-7-Spiegelung | 200 % |
 
 ### Prototyp (Phase 0 + 1) benutzen
 
-- `https://madouki.github.io/nacht/?castle` (lokal `index.html?castle`), optional mit `&stage=N&room=M`. Ohne `?castle`
-  bleibt alles wie im Arcade-Modus.
+- `https://madouki.github.io/nacht/?castle` (lokal `index.html?castle`), optional mit `&stage=N&room=M` – oder im Titel
+  **SCHLOSS-MODUS (SOTN)** wählen (lädt mit `?castle` neu; zurück über **ARCADE-MODUS**). Ohne `?castle` bleibt alles wie im
+  Arcade-Modus.
+- **Relikte:** Beim ersten Betreten des Burghofs raubt der Fluch des Grafen Doppelsprung, Dash, Wandsprung und Ring-Greifen
+  (Kante packen und Rutschen bleiben; im Prolog auf dem Schiff geht noch alles). Sie liegen als leuchtende Kugeln auf Sockeln:
+  Rabenfeder (Doppelsprung) am Ende des Kolosseums, Enterhaken (Ringe) in der Eishöhle; Schattenmantel (Dash) bei der
+  Riesenfledermaus, Katzenkralle (Wandsprung) beim Knochenriesen, Steinbrecher bei Medusa – der Boss lässt sein Relikt in der
+  Arena zurück. Empfohlene Reihenfolge: Kolosseum → Glockenturm → Riesenfledermaus → Katakomben → Knochenriese → Bergfried →
+  Medusa → Sonnenkathedrale / Wintergarten → Thron. Die Sperren stecken in `Player.startDash`, `wallDir`, `tryLatch` (in
+  `castle.js` umhüllt) und dem Doppelsprung-Flag `canDouble`; `entities.js` bleibt unverändert.
+- **Gefahrenstufen:** Prolog und Burghof 1, Katakomben 2, Bergfried 3, Sonnenkathedrale 4, Wintergarten 5, Thron 6, Verlies 7.
+  Je Stufe über 1: Gegner +50 % Lebensenergie (Bosse +30 %), +25 % Schaden (auch Geschosse), +60 % EXP. Die Regionskarte
+  zeigt GEFAHR *** und die eigene Stufe.
+- **Zusatzräume** (nur im Schloss-Modus, hinten an ihre Region gehängt, eigener Platz auf der Karte): Kolosseum (Tür im
+  Burghof, Stufe 2, Gegner kommen immer nach – zum Aufleveln), Unterirdischer Kanal (Tür in der Gruft, Stufe 3, führt ins
+  Palmenhaus: Schleife Katakomben ↔ Wintergarten), Schatzkammer (Tür auf der linken Galerie der Bibliothek, Stufe 3), Verlies
+  (Tür unten im Glasturm, Stufe 7). Kanal, Schatzkammer und Verlies sind mit rissigem Gestein verschlossen, das erst der
+  Steinbrecher zerschlägt (vom Palmenhaus aus ist der Kanal offen; von innen bricht das Gestein). In jedem Zusatzraum
+  steht ein **Lebensgefäß** (max. HP +4 für immer).
 - **Türen:** zurück in den vorigen Raum geht es am linken Rand (gegen den Rand laufen; ein goldener Pfeil erscheint),
   in Turmräumen ohne Rand (Sonnenturm, Kuppel-Aufstieg) mit ↑ an der Starttür. Torbögen mit ↑ betritt man ebenfalls mit ↑.
 - **Eingangshalle als Knoten:** Kellertür unten links → Katakomben, Turmtür auf dem Sims → Bergfried,
@@ -218,5 +235,5 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 - Code: `js/castle.js` (Regionen `REGION_AT`, Verbindungen `LINKS`, Türen `CastleDoor`, Kammern `CHAMBERS`/`CastleChamber`,
   Spielstand, Karte), Einbindung in `js/game.js` (`castleGo`/`castleEnter`, `nextRoom`, `startStage`, `startClear`,
   Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map` und `warp`).
-- Daten: `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss: {…}, mini: {…}, warp: {…} }`,
+- Daten: `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss, mini, warp, vessel, relic, crack, flag }`,
   `localStorage['nachtmahr.castle']` = Spielstand der letzten Speicherkammer; `Castle.reset()` in der Konsole löscht alles.

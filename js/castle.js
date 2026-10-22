@@ -33,19 +33,21 @@ const Castle = (() => {
   ];
 
   // ---------------- Spielstand: aufgedeckte Zellen, besiegte Bosse und Zwischengegner, freigeschaltete Warpkammern ----------------
-  let seen = {}, boss = {}, mini = {}, warp = {}; // Raumschlüssel "<kapitel-id>:<raum>" → Set der Zellnummern / 1
+  // seen: Raumschlüssel "<kapitel-id>:<raum>" → Set der Zellnummern; boss/mini/warp/vessel/relic/crack/flag: Schlüssel → 1
+  let seen = {}, boss = {}, mini = {}, warp = {}, vessel = {}, relic = {}, crack = {}, flag = {};
   try {
     const d = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (d && d.v === 1) {
       for (const k in d.rooms) seen[k] = new Set(d.rooms[k]);
-      boss = d.boss || {}; mini = d.mini || {}; warp = d.warp || {};
+      boss = d.boss || {}; mini = d.mini || {}; warp = d.warp || {}; vessel = d.vessel || {};
+      relic = d.relic || {}; crack = d.crack || {}; flag = d.flag || {};
     }
-  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; }
+  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; }
   function save() {
     try {
       const rooms = {};
       for (const k in seen) rooms[k] = [...seen[k]];
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp }));
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp, vessel, relic, crack, flag }));
     } catch (e) { /* privater Modus: gilt nur für diese Sitzung */ }
   }
   // Spielstand der Speicherkammer: Ort (Kapitel-id, Raum, Kammer), Held, Herzen, Spezialwaffe, Peitsche, Punkte, Leben
@@ -69,7 +71,8 @@ const Castle = (() => {
   const S = () => Levels.STAGES;
   const sIdx = (id) => S().findIndex(st => st.id === id);
   const roomKey = (s, r) => S()[s].id + ':' + r;
-  const ref = ([id, r]) => { const s = sIdx(id); return s < 0 ? null : { s, r: r < 0 ? S()[s].rooms.length + r : r }; };
+  const mainCount = (s) => S()[s].rooms.filter(d => !d.side).length; // ohne die Zusatzräume des Schloss-Modus
+  const ref = ([id, r]) => { if (id === 'side') return SIDE[r] || null; const s = sIdx(id); return s < 0 ? null : { s, r: r < 0 ? mainCount(s) + r : r }; };
   const same = (a, s, r) => a && a.s === s && a.r === r;
   const dims = (def) => ({ cw: Math.ceil(def.w / CW), ch: Math.ceil(def.h / CH) });
   const cellX = (x, cw) => clamp(Math.floor(x / CW), 0, cw - 1);
@@ -77,6 +80,73 @@ const Castle = (() => {
   const floorRow = (def, col, from) => { for (let y = Math.max(0, from); y < def.h; y++) if (SOLID.includes(def.grid[y][col])) return y; return def.h - 1; };
   // Einbahn: vom Schiff (Prolog), vom Eisturm (Rutschpartie) und von der einstürzenden Brücke führt kein Weg zurück
   const oneWay = (def) => !!(def.atSea || def.dock || def.iceRamps || def.ents.some(e => e.type === 'bridgerun'));
+
+  // ---------------- Zusatzräume: das Schloss wächst über die Kapitel hinaus ----------------
+  // Räume, die es nur im Schloss-Modus gibt: sie hängen hinten an ihrer Region (der Arcade-Modus lädt sie nie) und sind nur
+  // über Türen erreichbar. tier = Gefahrenstufe (stärkere Gegner, mehr EXP), at = Platz auf der Schlosskarte (Zellen, absolut).
+  // In jedem liegt ein Lebensgefäß (max. HP +4, einmal je Gefäß) – Erkunden lohnt sich wie in SotN.
+  const SIDE = {};
+  function buildSide() {
+    const R = Levels.room;
+    const add = (key, id, tier, at, def) => {
+      const s = sIdx(id);
+      if (s < 0) return;
+      def.side = key; def.tier = tier; def.mapAt = at;
+      S()[s].rooms.push(def); SIDE[key] = { s, r: S()[s].rooms.length - 1 };
+    };
+    // Kolosseum (unter dem Burghof): Kampfbahn mit Rittern und Skeletten, Zombies und Schädel kommen immer nach – zum Aufleveln
+    add('kolosseum', 0, 2, [0, 1], R(84, 'gallery')
+      .ground(0, 83)
+      .fill(10, 8, 14, 8, '=').fill(24, 7, 30, 7, '=').fill(40, 8, 44, 8, '=').fill(54, 7, 60, 7, '=').fill(70, 8, 74, 8, '=')
+      .candle(6, 9, 'H').candle(12, 6).candle(27, 5, '$').candle(42, 6, 'H').candle(57, 5).candle(72, 6, 'H')
+      .enemy('knight', 20, 10).enemy('skel', 34, 10).enemy('knight', 48, 10).enemy('skel', 62, 10).enemy('knight', 76, 10)
+      .enemy('ghost', 30, 4).enemy('ghost', 60, 4)
+      .zone('ghoul', 8, 80, { interval: 120, max: 3 }).zone('skull', 20, 70, { interval: 300, max: 1 })
+      .statue(4, 10).chest(78, 10, 'big').prop('vessel', { x: 72, y: 7 }) // am Ende liegt das erste Relikt (Doppelsprung)
+      .label('KOLOSSEUM').start(2, 10).done());
+    // Unterirdischer Kanal (unter dem Eisturm): von der Gruft zum Palmenhaus – zwei Becken mit Fischmenschen, Trittsteine, bröckelnde Steine
+    add('kanal', 1, 3, [14, 11], R(112, 'cave')
+      .ground(0, 14).fill(15, 11, 34, 12, '~')
+      .fill(17, 9, 20, 9, '=').fill(24, 8, 27, 8, '=').fill(31, 9, 33, 9, '=')
+      .ground(35, 52).fill(40, 8, 46, 8, '=')
+      .fill(53, 11, 70, 12, '~').crumble(55, 9).crumble(59, 8).crumble(63, 9).fill(67, 9, 69, 9, '=')
+      .ground(71, 111).fill(80, 8, 86, 8, '=').fill(94, 7, 100, 7, '=')
+      .candle(4, 9).candle(10, 9, 'H').candle(25, 6).candle(43, 6, 'H').candle(50, 9, '$').candle(68, 7, 'H').candle(83, 6).candle(105, 9, 'H')
+      .enemy('skel', 44, 10).enemy('skel', 90, 10).enemy('bat', 30, 3).enemy('bat', 76, 3).enemy('ghost', 60, 4).enemy('knight', 102, 10)
+      .zone('fish', 15, 34, { interval: 180, max: 2 }).zone('fish', 53, 70, { interval: 180, max: 2 })
+      .statue(37, 10).statue(73, 10).chest(95, 6, 'big').prop('vessel', { x: 98, y: 6 })
+      .label('UNTERIRDISCHER KANAL').start(2, 10).done());
+    // Schatzkammer (neben der Bibliothek): Empore mit dem Lebensgefäß, fliegende Bücher und ein Zauberbuch
+    add('schatz', 2, 3, [6, -6], R(40, 'library')
+      .ground(0, 39).stair(14, 10, 4, 1).fill(18, 7, 27, 7, '=').stair(31, 10, 4, -1)
+      .prop('lectern', { x: 8, y: 10 }).prop('globe', { x: 35, y: 10 })
+      .enemy('tome', 22, 4).enemy('book', 10, 9).enemy('book', 30, 9).enemy('book', 24, 6)
+      .candle(5, 9, 'H').candle(12, 9).candle(20, 5, '$').candle(26, 5, 'H').candle(37, 9)
+      .chest(37, 10, 'big').prop('vessel', { x: 22, y: 6 })
+      .label('SCHATZKAMMER').start(2, 10).done());
+    // Verlies (unter dem Glasturm): Ritter, Feuersäule, Geister – Stufe 7, für das Endspiel
+    add('verlies', 3, 7, [0, -19], R(96, 'crypt')
+      .ground(0, 95)
+      .fill(12, 8, 16, 8, '=').fill(26, 7, 31, 7, '=').fill(42, 8, 46, 8, '=').fill(58, 7, 63, 7, '=').fill(74, 8, 78, 8, '=')
+      .set(36, 10, 'X').set(36, 9, 'X')
+      .candle(5, 9, 'H').candle(14, 6).candle(28, 5, 'H').candle(44, 6, '$').candle(62, 5, 'H').candle(76, 6, 'R').candle(88, 9, 'H')
+      .enemy('knight', 22, 10).enemy('knight', 40, 10).enemy('pillar', 52, 10).enemy('knight', 68, 10).enemy('knight', 84, 10)
+      .enemy('ghost', 30, 4).enemy('ghost', 70, 4).enemy('bat', 50, 3).enemy('bat', 86, 3)
+      .zone('skull', 10, 90, { interval: 260, max: 2 }).zone('ghoul', 10, 90, { interval: 150, max: 2 })
+      .statue(48, 10).chest(92, 10, 'big').prop('vessel', { x: 60, y: 6 })
+      .label('VERLIES').start(2, 10).done());
+    LINKS.push( // crack: Tür mit rissigem Gestein verschlossen – erst der Steinbrecher (Medusas Relikt) zerschlägt es
+      [[0, 0], { x: 37, y: 10, door: 'side' }, ['side', 'kolosseum'], 'start', {}],                  // Burghof → Kolosseum
+      [[1, 4], { x: 5, y: 10, door: 'side' }, ['side', 'kanal'], 'start', { crack: 'kanal' }],       // Gruft → Kanal
+      [['side', 'kanal'], 'right', ['expo', 0], { x: 14, y: 27, door: 'side' }, {}],                  // Kanal → Palmenhaus (Schleife, von dort offen)
+      [[2, 1], { x: 1, y: 17, door: 'side' }, ['side', 'schatz'], 'start', { crack: 'schatz' }],     // Bibliothek → Schatzkammer
+      [[3, 1], { x: 4, y: 41, door: 'side' }, ['side', 'verlies'], 'start', { crack: 'verlies' }],   // Glasturm → Verlies
+    );
+  }
+  if (on && Levels.room) buildSide();
+  // Gefahrenstufe je Region: tiefer im Schloss mehr Lebensenergie, Schaden und EXP der Gegner
+  const TIER = { arrival: 1, 0: 1, 1: 2, 2: 3, sun: 4, expo: 5, 3: 6 };
+  const tierOf = (s, r) => { const d = S()[s].rooms[r]; return (d && d.tier) || TIER[S()[s].id] || 1; };
 
   // Zellen, die für den Erkundungsgrad zählen: dort kann man stehen (Luft über Boden, Treppen) oder etwas finden –
   // reine Himmelszellen über Schiff und Abgründen zählen nicht, damit 100 % erreichbar bleiben
@@ -112,7 +182,8 @@ const Castle = (() => {
     S()[s].rooms.forEach((def, i) => {
       const { cw, ch } = dims(def), sc = { x: cellX(def.start.x, cw), y: cellY(def.start.y, ch) };
       let gx = 0, gy = 0, link = null;
-      if (i > 0) {
+      if (def.side) { const at = REGION_AT[S()[s].id] || [0, 0]; gx = def.mapAt[0] - at[0]; gy = def.mapAt[1] - at[1]; } // Zusatzraum: fester Platz
+      else if (i > 0) {
         const p = out[i - 1], ax = p.gx + p.exit.x, ay = p.gy + p.exit.y, up = p.exit.dir === 'up';
         gx = up ? ax - sc.x : ax + 1 - sc.x; gy = up ? ay - 1 - sc.y : ay - sc.y;
         for (let n = 0; n < 64 && !fits(gx, gy, cw, ch); n++) { if (up) gy--; else gx++; }
@@ -167,7 +238,7 @@ const Castle = (() => {
     const k = s + ':' + r;
     if (doorCache[k]) return doorCache[k];
     const rooms = S()[s].rooms, out = [];
-    if (r > 0 && !oneWay(rooms[r - 1])) out.push({ place: 'start', to: { s, r: r - 1, place: 'exit' } }); // zurück in den vorigen Raum
+    if (r > 0 && !rooms[r].side && !oneWay(rooms[r - 1])) out.push({ place: 'start', to: { s, r: r - 1, place: 'exit' } }); // zurück in den vorigen Raum
     for (const [A, pa, B, pb, g] of LINKS) {
       const a = ref(A), b = ref(B);
       if (!a || !b) continue;
@@ -179,7 +250,7 @@ const Castle = (() => {
   // wohin führt der Ausgang des aktuellen Raums? (null = wie im Arcade-Modus)
   function forward() {
     const s = W.stage, r = W.roomIdx;
-    if (r + 1 < S()[s].rooms.length) return { s, r: r + 1, place: 'start' };
+    if (r + 1 < S()[s].rooms.length && !S()[s].rooms[r + 1].side) return { s, r: r + 1, place: 'start' };
     for (const [A, pa, B, pb] of LINKS) { const a = ref(A), b = ref(B); if (a && b && same(a, s, r) && pa === 'exit') return { s: b.s, r: b.r, place: pb }; }
     return null;
   }
@@ -189,6 +260,7 @@ const Castle = (() => {
     if (!d.gate) return true;
     if (d.gate.boss) return !!boss[roomKey(W.stage, W.roomIdx)];
     if (d.gate.seals) return seals() >= sealRooms().length;
+    if (d.gate.crack) return !!crack[d.gate.crack];
     return true;
   }
   // Art einer Tür: Rand (links/rechts durchgehen) oder ↑-Tür
@@ -339,6 +411,101 @@ const Castle = (() => {
       if (!save && Math.abs(p.cx - this.cx) < 14 && Math.abs(p.feet - bot - W.cam.y) < 8 && warp[this.c.key]) Font.draw(ctx, '↑', cx - 2, y - 12 + Math.round(Math.sin(t * 0.12) * 2), '#fcfcfc', { shadow: '#000' });
     }
   }
+  // Lebensgefäß (in jedem Zusatzraum): schwebendes rotes Herz in einem Glaskolben auf Goldsockel – berühren: max. HP +4 für immer
+  class LifeVessel extends Ent {
+    constructor(d, key) { super(d.x * T, (d.y + 1) * T - 24, 16, 24); this.kind = 'prop'; this.key = key; this.taken = false; }
+    update() {
+      this.t++;
+      const p = W.player;
+      if (this.taken || !p.alive || !Phys.overlap(this, p)) return;
+      this.taken = true; this.dead = true; vessel[this.key] = 1; save();
+      applyHp(p); p.hp = p.maxHp;
+      Game.note('castleVessel', vessels() * 4); Audio8.sfx('bigItem'); Audio8.sfx('oneUp'); Input.rumble(0.5, 0.4, 250);
+      W.popup(this.cx, this.y - 6, 'MAX HP +4', '#fc7460'); W.flash = 6;
+      for (let i = 0; i < 24; i++) W.spawn(new Particle(this.cx + rnd(-6, 6), this.y + rnd(0, 18), rnd(-1, 1), rnd(-2.2, -0.6), i % 2 ? '#fc3c3c' : '#fce0a8', 50, 1, 0));
+    }
+    lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: this.y - cy + 8, r: 26 + Math.sin(this.t * 0.08) * 4, c: [252, 80, 90], a: 0.6 }); }
+    draw(ctx) {
+      const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), bob = Math.round(Math.sin(this.t * 0.07) * 2), t = this.t;
+      ctx.fillStyle = '#6c4410'; ctx.fillRect(x + 1, y + 20, 14, 4); ctx.fillStyle = '#c89020'; ctx.fillRect(x + 2, y + 19, 12, 2); ctx.fillStyle = '#fce0a8'; ctx.fillRect(x + 2, y + 19, 12, 1); // Sockel
+      ctx.fillStyle = 'rgba(180,220,255,0.28)'; ctx.fillRect(x + 3, y + 3 + bob, 10, 15); ctx.fillStyle = 'rgba(230,245,255,0.6)'; ctx.fillRect(x + 4, y + 4 + bob, 1, 12); // Glaskolben
+      ctx.fillStyle = '#c89020'; ctx.fillRect(x + 5, y + 1 + bob, 6, 2);
+      const hx = x + 4, hy = y + 7 + bob, pulse = (t >> 4) % 2; // Herz
+      ctx.fillStyle = pulse ? '#fc3c3c' : '#d81830';
+      ctx.fillRect(hx, hy + 1, 3, 3); ctx.fillRect(hx + 5, hy + 1, 3, 3); ctx.fillRect(hx + 1, hy, 2, 1); ctx.fillRect(hx + 5, hy, 2, 1);
+      ctx.fillRect(hx, hy + 3, 8, 2); ctx.fillRect(hx + 1, hy + 5, 6, 1); ctx.fillRect(hx + 2, hy + 6, 4, 1); ctx.fillRect(hx + 3, hy + 7, 2, 1);
+      ctx.fillStyle = '#fcbca0'; ctx.fillRect(hx + 1, hy + 1, 1, 1);
+    }
+  }
+  // ---------------- Relikte: Fähigkeiten, die den Weg öffnen (wie in SotN) ----------------
+  // Am Burgtor raubt der Fluch des Grafen dem Helden Doppelsprung, Dash, Wandsprung und Ring-Greifen (Kante packen und Rutschen
+  // bleiben); im Prolog auf dem Schiff kann er noch alles. Die Relikte liegen im Schloss: Doppelsprung am Ende des Kolosseums,
+  // Dash bei der Riesenfledermaus, Ring-Greifen in der Eishöhle, Wandsprung beim Knochenriesen, Steinbrecher bei Medusa
+  // (zerschlägt rissiges Gestein vor Kanal, Schatzkammer und Verlies). So führt ein Relikt zum nächsten.
+  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker'];
+  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460' };
+  const RELIC_AT = [[['side', 'kolosseum'], 'jump2', 81, 10], [[1, 2], 'ring', 12, 10]];        // fest liegende Relikte
+  const BOSS_RELIC = [[[0, -1], 'dash'], [[1, -1], 'wall'], [[2, -1], 'breaker']];               // Belohnung der Regionsbosse
+  const inPrologue = () => !!(S()[W.stage] && S()[W.stage].id === 'arrival');
+  const has = (k) => !on || !!relic[k] || inPrologue();
+  if (on) { // Bewegungen hängen an den Relikten (Doppelsprung: siehe update)
+    const sd = Player.prototype.startDash, wd = Player.prototype.wallDir, tl = Player.prototype.tryLatch;
+    Player.prototype.startDash = function (...a) { if (has('dash')) return sd.apply(this, a); };
+    Player.prototype.wallDir = function () { return has('wall') ? wd.call(this) : 0; };
+    Player.prototype.tryLatch = function (...a) { return has('ring') ? tl.apply(this, a) : false; };
+  }
+  class RelicStone extends Ent { // Steinsockel, darüber schwebt das Relikt als leuchtende Kugel
+    constructor(k, x, y) { super(x * T, (y + 1) * T - 28, 16, 28); this.kind = 'prop'; this.k = k; }
+    update() {
+      this.t++;
+      const p = W.player;
+      if (relic[this.k] || !p.alive || !Phys.overlap(this, p)) return;
+      relic[this.k] = 1; save(); this.dead = true;
+      Game.note('castleRelic', tr('relic_' + this.k), tr('relicD_' + this.k));
+      Audio8.sfx('bigItem'); Audio8.sfx('rosary'); Input.rumble(0.6, 0.5, 400); W.flash = 8;
+      for (let i = 0; i < 30; i++) W.spawn(new Particle(this.cx + rnd(-8, 8), this.y + rnd(0, 20), rnd(-1.4, 1.4), rnd(-2.4, -0.4), i % 2 ? RELIC_COL[this.k] : '#fcfcfc', 56, 1, 0));
+    }
+    lightUp(L, cx, cy) { const c = RELIC_COL[this.k], v = parseInt(c.slice(1), 16); L.push({ x: this.cx - cx, y: this.y - cy + 6, r: 34 + Math.sin(this.t * 0.06) * 5, c: [v >> 16, (v >> 8) & 255, v & 255], a: 0.7 }); }
+    draw(ctx) {
+      const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), t = this.t, bob = Math.round(Math.sin(t * 0.07) * 2), c = RELIC_COL[this.k];
+      ctx.fillStyle = '#3c3448'; ctx.fillRect(x, y + 20, 16, 8); ctx.fillStyle = '#6c6480'; ctx.fillRect(x, y + 20, 16, 1); ctx.fillRect(x + 2, y + 18, 12, 2); // Sockel
+      ctx.globalAlpha = 0.35 + 0.15 * Math.sin(t * 0.1); ctx.fillStyle = c; ctx.fillRect(x + 2, y + 1 + bob, 12, 12); ctx.globalAlpha = 1; // Schein
+      ctx.fillStyle = c; ctx.fillRect(x + 5, y + 3 + bob, 6, 8); ctx.fillRect(x + 4, y + 4 + bob, 8, 6);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 6, y + 4 + bob, 2, 2);
+      for (let i = 0; i < 3; i++) { const a = t * 0.08 + i * 2.1; ctx.fillStyle = c; ctx.fillRect(Math.round(x + 8 + Math.cos(a) * 10), Math.round(y + 7 + bob + Math.sin(a) * 6), 1, 1); } // kreisende Funken
+    }
+  }
+  class CrackedSeal extends Ent { // rissiges Gestein in einem Torbogen: nur der Steinbrecher zerschlägt es (Peitsche oder Spezialwaffe)
+    constructor(key, cx, feet) { super(cx - 13, feet - 38, 26, 38); this.kind = 'candle'; this.key = key; this.cool = 0; }
+    update() { this.t++; if (this.cool > 0) this.cool--; }
+    hit() {
+      if (crack[this.key]) return;
+      if (!has('breaker')) { if (!this.cool) { this.cool = 50; Game.note('castleCrackHard'); Audio8.sfx('wall'); W.sparks(this.cx, this.cy, 4); } return; }
+      crack[this.key] = 1; save(); this.dead = true;
+      Audio8.sfx('crumble', this.cx); Audio8.sfx('boom'); W.shake = Math.max(W.shake, 12); Input.rumble(0.7, 0.6, 300);
+      for (let i = 0; i < 28; i++) W.spawn(new Particle(this.x + rnd(0, this.w), this.y + rnd(0, this.h), rnd(-2.4, 2.4), rnd(-3.4, -0.4), i % 3 ? '#8c8478' : '#5c5448', 60, 2, 0.18));
+    }
+    draw(ctx) {
+      const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), w = this.w, h = this.h;
+      ctx.fillStyle = '#5c5448'; ctx.fillRect(x, y + 6, w, h - 6); ctx.fillRect(x + 3, y + 2, w - 6, 4);
+      ctx.fillStyle = '#7c7464'; for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) ctx.fillRect(x + 2 + c * 12 + (r % 2) * 6, y + 7 + r * 8, 9, 6); // Quader
+      ctx.fillStyle = '#1c1814'; // Risse
+      for (const [a, b] of [[6, 8], [7, 12], [9, 15], [8, 20], [11, 24], [13, 29], [16, 12], [18, 17], [17, 22], [20, 27]]) ctx.fillRect(x + a, y + b, 2, 3);
+    }
+  }
+  function spawnRelics(s, r, def, arrive) {
+    const here = ([R]) => same(ref(R), s, r);
+    for (const e of RELIC_AT) if (here(e) && !relic[e[1]]) W.spawn(new RelicStone(e[1], e[2], e[3]));
+    for (const [R, k] of BOSS_RELIC) if (same(ref(R), s, r) && boss[roomKey(s, r)] && !relic[k]) W.spawn(new RelicStone(k, def.w - 10, def.start.y));
+    for (const d of doorsOf(s, r)) {
+      if (!d.gate || !d.gate.crack || crack[d.gate.crack]) continue;
+      const p = arrive && arrive.place;
+      if (p && typeof p === 'object' && p.x === d.place.x && p.y === d.place.y) { // von der anderen Seite her: das Gestein bricht von innen
+        crack[d.gate.crack] = 1; save(); Audio8.sfx('crumble'); W.shake = Math.max(W.shake, 8); continue;
+      }
+      const u = upSpot(def, d.place); W.spawn(new CrackedSeal(d.gate.crack, u.cx, u.feet));
+    }
+  }
   const atChamber = (c, p) => p.onGround && Math.abs(p.cx - (c.x + 1) * T) < 14 && Math.abs(p.feet - (c.y + 1) * T) < 8;
   let inSave = null; // Schlüssel der Speicherkammer, in der der Held gerade steht (erst nach dem Verlassen wieder speichern)
   function saveAt(c) {
@@ -362,6 +529,13 @@ const Castle = (() => {
     W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber));
     for (const d of doorsOf(s, r)) W.spawn(new CastleDoor(d, def));
     for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
+    for (const e of def.ents) if (e.type === 'vessel') { const k = key + ':v' + e.x; if (!vessel[k]) W.spawn(new LifeVessel(e, k)); } // Lebensgefäße
+    if (arrive && def.side) Game.note('castleSideRoom', def.label, '*'.repeat(def.tier)); // Zusatzraum: Name und Gefahrenstufe
+    spawnRelics(s, r, def, arrive);
+    if (S()[s].id === 0 && !flag.curse) { // Burgtor: der Fluch des Grafen raubt die Kräfte (einmal)
+      flag.curse = 1; save();
+      Game.note('castleCurse'); W.flash = 10; W.shake = Math.max(W.shake, 14); Audio8.sfx('roar'); Audio8.sfx('thunder'); Input.rumble(0.8, 0.6, 600);
+    }
     hpSeen.clear(); applyHp(W.player); // neuer Raum: Gegner des alten zählen nicht als besiegt
     inSave = arrive && arrive.place && arrive.place.chamber === 'save' ? roomKey(s, r) + ':save' : null; // beim Fortsetzen nicht gleich noch einmal speichern
     if (arrive && arrive.place !== 'start') {
@@ -401,6 +575,7 @@ const Castle = (() => {
     const c = heroCell(), s = W.stage, r = W.roomIdx, key = roomKey(s, r);
     if (!c) return;
     rpg.frames++; applyHp(W.player); trackHits(); // RPG: Spielzeit, max. HP der Stufe, Treffer und Besiegte
+    if (!has('jump2')) W.player.canDouble = false; // ohne Rabenfeder kein Doppelsprung
     let dirty = false;
     const set = seen[key] || (seen[key] = new Set()), i = c.y * c.cw + c.x;
     if (!set.has(i)) { set.add(i); dirty = true; }
@@ -427,7 +602,10 @@ const Castle = (() => {
       else if (k === 'edgeL') use = I.left && p.onGround && p.cx < (def.start.x + 1.5) * T && Math.abs(p.feet - (def.start.y + 1) * T) <= 2 * T && push >= 6;
       else use = I.right && p.onGround && p.cx > (def.w - 2.5) * T && push >= 6;
       if (!use) continue;
-      if (!gateOpen(d)) { if (!lockT) { lockT = 90; if (d.gate.seals) Game.note('castleSeals', seals(), sealRooms().length); else Game.note('castleLocked'); Audio8.sfx('select'); } push = 0; break; }
+      if (!gateOpen(d)) {
+        if (!lockT) { lockT = 90; if (d.gate.seals) Game.note('castleSeals', seals(), sealRooms().length); else if (d.gate.crack) Game.note('castleCrackHard'); else Game.note('castleLocked'); Audio8.sfx('select'); }
+        push = 0; break;
+      }
       push = 0; Game.castleGo(d.to); return;
     }
     const pushing = (I.left || I.right) && Math.abs(p.x - lastX) < 0.05;
@@ -442,6 +620,8 @@ const Castle = (() => {
     W.cleared = false; W.arenaOn = false; W.camLock = false; W.arenaW = 0; W.camEase = 1; W.boss = null; W.room.arena = null;
     W.ents = W.ents.filter(e => !(e instanceof CastleDoor));
     for (const d of doorsOf(s, W.roomIdx)) W.spawn(new CastleDoor(d, S()[s].rooms[W.roomIdx]));
+    const def = S()[s].rooms[W.roomIdx];
+    for (const [R, k] of BOSS_RELIC) if (same(ref(R), s, W.roomIdx) && !relic[k]) W.spawn(new RelicStone(k, def.w - 10, def.start.y)); // Relikt des Bosses
     Game.bossName = 0; Audio8.tempo(1); Audio8.play('fanfare', W.songName()); Audio8.sfx('bigItem');
     Game.note('castleSeal', seals(), sealRooms().length);
     return true;
@@ -450,7 +630,8 @@ const Castle = (() => {
   // ---------------- RPG: EXP, Stufe, Werte, Schadenszahlen, Beute ----------------
   const rpg = { lv: 1, exp: 0, kills: 0, frames: 0 }, MAXLV = 99;
   const expFor = (lv) => 15 * lv * (lv - 1); // Gesamt-EXP für Stufe lv: LV2 30, LV5 300, LV10 1350, LV20 5700
-  const values = () => { const b = rpg.lv - 1; return { str: 10 + b, con: 10 + b, hp: Options.maxHp + 2 * b }; };
+  const vessels = () => Object.keys(vessel).length;
+  const values = () => { const b = rpg.lv - 1; return { str: 10 + b, con: 10 + b, hp: Options.maxHp + 2 * b + 4 * vessels() }; };
   const strMul = () => 1 + (values().str - 10) * 0.05, conDiv = () => 1 + (values().con - 10) * 0.04;
   if (on) { // STR verstärkt Peitsche und Spezialwaffen, CON mindert erlittenen Schaden – nur im Schloss-Modus
     Object.defineProperty(Options, 'dmgMul', { get: () => (Options.easy ? 2 : 1) * strMul(), configurable: true });
@@ -479,14 +660,28 @@ const Castle = (() => {
   function defeated(e) {
     const big = e.kind === 'boss';
     rpg.kills++;
-    gainExp(Math.max(1, Math.round((e.score || 100) / (big ? 20 : 15))));
+    gainExp(Math.max(1, Math.round(big ? Math.max((e.score || 0) / 20, (e.maxHp || 20) * 6) : (e.score || 100) / 15 * (e.expMul || 1))));
     const r = Math.random(), drop = big ? 'bagBig' : r < 0.05 ? 'roast' : r < 0.12 ? 'bag' : r < 0.17 ? 'heartB' : null; // Beute wie in SotN
     if (drop) W.spawn(new Item(drop, e.cx, Math.min(e.cy, W.room.h * T - 24)));
+  }
+  // Gefahrenstufe: jeder Gegner (auch nachkommende und Geschosse) wird beim ersten Auftauchen einmal verstärkt
+  const scaled = new WeakSet();
+  function scale(e) {
+    scaled.add(e);
+    const t = tierOf(W.stage, W.roomIdx), k = t - 1;
+    if (k <= 0) return;
+    if (typeof e.dmg === 'number') e.dmg = Math.max(1, Math.round(e.dmg * (1 + 0.25 * k)));
+    if (e.kind === 'eproj') return;
+    const hm = e.kind === 'boss' ? 1 + 0.3 * k : 1 + 0.5 * k;
+    e.hp *= hm; if (e.maxHp) e.maxHp *= hm;
+    e.expMul = 1 + 0.6 * k;
   }
   function trackHits() {
     const live = new Set();
     for (const e of W.ents) {
+      if (e.kind === 'eproj' && !scaled.has(e)) { scale(e); continue; }
       if ((e.kind !== 'enemy' && e.kind !== 'boss') || typeof e.hp !== 'number') continue;
+      if (!scaled.has(e)) scale(e);
       live.add(e);
       const was = hpSeen.get(e);
       if (was !== undefined && e.hp < was) dmgNumber(e, was - e.hp);
@@ -532,7 +727,12 @@ const Castle = (() => {
     Font.draw(ctx, tr('castleSealsShort', seals(), sealRooms().length), cx, 156, '#c8a0fc', { align: 'center', shadow: '#000' });
     const wl = allChambers().filter(c => c.kind === 'warp');
     Font.draw(ctx, tr('warpCount', wl.filter(c => warp[c.key]).length, wl.length), cx, 170, '#7cdcfc', { align: 'center', shadow: '#000' });
-    Font.draw(ctx, tr('statusHelp'), cx, 218, '#7c7c8c', { align: 'center' });
+    const vAll = S().reduce((n, st) => n + st.rooms.reduce((m, d) => m + d.ents.filter(e => e.type === 'vessel').length, 0), 0);
+    Font.draw(ctx, tr('castleVesselCount', vessels(), vAll), cx, 184, '#fc7460', { align: 'center', shadow: '#000' });
+    const own = RELICS.filter(k => relic[k]); // Relikte: Anzahl, darunter je eine farbige Kugel (leer = noch nicht gefunden)
+    Font.draw(ctx, tr('castleRelicCount', own.length, RELICS.length), cx, 198, '#e0d0fc', { align: 'center', shadow: '#000' });
+    RELICS.forEach((k, i) => { const x = Math.round(cx - RELICS.length * 7 + i * 14 + 2), y = 208; ctx.fillStyle = '#1c1428'; ctx.fillRect(x - 1, y - 1, 10, 7); ctx.fillStyle = relic[k] ? RELIC_COL[k] : '#3c3448'; ctx.fillRect(x, y, 8, 5); });
+    Font.draw(ctx, tr('statusHelp'), cx, 222, '#7c7c8c', { align: 'center' });
   }
 
   // ---------------- Erkundungsgrad ----------------
@@ -706,7 +906,8 @@ const Castle = (() => {
     bossDone: (s, r) => !!boss[roomKey(s, r)],
     hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers,
     newRun, drawStatus, expProgress, gainExp, get rpg() { return rpg; },
+    tier: (s) => TIER[S()[s].id] || 1, side: SIDE, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
-    reset() { seen = {}; boss = {}; mini = {}; warp = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
+    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
   };
 })();
