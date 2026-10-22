@@ -561,6 +561,9 @@ class EProj extends Ent {
       const k = (this.t >> 3) & 1;
       ctx.fillStyle = '#f0e8d0'; ctx.fillRect(x, y + k, 7, 5 - k * 2); ctx.fillStyle = '#c8bca0'; ctx.fillRect(x + (k ? 6 : 0), y + k, 1, 5 - k * 2);
       ctx.fillStyle = '#8c3040'; ctx.fillRect(x + 1, y + 1 + k, 4, 1); if (!k) ctx.fillRect(x + 1, y + 3, 3, 1);
+    } else if (this.type === 'ice') { // Eissplitter der Eishexe: Spitze in Flugrichtung
+      const a = Math.atan2(this.vy, this.vx), c = Math.cos(a), s = Math.sin(a);
+      for (let k = -3; k <= 4; k++) { ctx.fillStyle = k > 2 ? '#ffffff' : k > -1 ? '#a8e8fc' : '#4c9cd8'; ctx.fillRect(Math.round(x + 3 + c * k), Math.round(y + 3 + s * k), 2, 2); }
     } else {
       const r = Math.floor(this.t / 5) % 4;
       Sprites.draw(ctx, S.bone, x, y, r === 1 || r === 3);

@@ -214,7 +214,8 @@ class Player {
     Audio8.sfx('hurt'); Input.rumble(0.45, 0.7, 200);
     if (this.hp <= 0) { this.hp = 0; this.die(); return; }
     this.inv = 100;
-    if (this.state === 'stairs' || this.state === 'toStair') { if (this.state === 'toStair') this.state = 'normal'; return; }
+    this.skiN = 0; this.skiT = 0;
+    if (this.state === 'stairs' || this.state === 'toStair') { if (this.state === 'toStair') this.state = 'normal'; if (W.room.iceRamps) this.rampV = (this.rampV || 0) * 0.35; return; }
     const dir = srcX < this.cx ? 1 : -1;
     this.setCrouch(false);
     this.state = 'hurt'; this.atkT = 0;
@@ -268,6 +269,16 @@ class Player {
     return null;
   }
 
+  skiLand() { // Eisturm: Landung nach einem Schanzenflug – Combo, Punkte, Ansage; mehrere hintereinander steigern sich
+    const onSpikes = Phys.tile(Math.floor(this.cx / T), Math.floor((this.feet + 1) / T)) === '^';
+    if (W.room.iceRamps && this.skiFly && (this.airT || 0) >= 22 && this.alive && !onSpikes) {
+      this.skiN = this.skiT > 0 ? (this.skiN || 0) + 1 : 1; this.skiT = 240;
+      W.comboHit(); W.addScore(100 * this.skiN);
+      W.popup(this.cx, this.y - 10, tr('skiJump') + (this.skiN > 1 ? ' x' + this.skiN : '') + ' +' + 100 * this.skiN, this.skiN > 2 ? '#fce0a8' : '#a4e4fc');
+      Audio8.sfx(this.skiN > 2 ? 'bigItem' : 'item', this.cx);
+    }
+    this.airT = 0; this.skiFly = false;
+  }
   catchStair() {
     const feet = this.feet, prev = feet - this.vy - 0.5;
     for (const s of W.stairs) {
@@ -276,7 +287,7 @@ class Player {
       const surf = s.by - pos;
       if (prev <= surf + 3 && feet >= surf - 1) {
         this.state = 'stairs'; this.stair = s; this.stairPos = pos; this.atkT = 0;
-        if (W.room.iceRamps) this.rampV = -Math.min(3.2, Math.hypot(this.vx, this.vy) * 0.6); // auf die Eisrampe: Schwung mitnehmen
+        if (W.room.iceRamps) { this.rampV = -Math.min(this.boostT > 0 ? 5 : 3.2, Math.hypot(this.vx, this.vy) * 0.6); this.skiLand(); } // auf die Eisrampe: Schwung mitnehmen
         this.vy = 0; this.vx = 0; this.onGround = false; this.jumping = false; this.canDouble = true; this.flipT = 0;
         this.stairUpPose = this.face === s.dir;
         this.placeOnStair(); this.landT = 5; W.dust(this.cx, this.feet, 3); Audio8.sfx('step', this.cx);
@@ -306,6 +317,8 @@ class Player {
 
     if (this.state === 'swing') return this.updateSwing(I, P);
     if (this.state === 'zip') return this.updateZip(P);
+    if (this.boostT > 0) this.boostT--; // Eisturm: Boost-Kristall und Schanzen-Serie laufen aus
+    if (this.skiT > 0 && --this.skiT === 0) this.skiN = 0;
     if (this.state === 'stairs') return this.updateStairs(I, P);
     if (this.state === 'toStair') return this.updateToStair(I);
     if (this.ledgeCool > 0) this.ledgeCool--;
@@ -362,21 +375,23 @@ class Player {
 
     const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
     if (this.onGround) {
-      if (this.atkT > 0 || this.crouch) { if (W.room.ice) this.vx *= 0.975; else this.vx = 0; } // auf Eis rutscht man beim Hieb und Ducken weiter
-      else { const tv = mx * WALK, ice = W.room.ice; if (W.room.iceRamps && mx && Math.sign(this.vx) === mx && Math.abs(this.vx) > WALK) this.vx *= 0.993; else this.vx += (tv - this.vx) * (ice ? (mx ? 0.045 : 0.018) : (mx ? 0.38 : 0.5)); if (Math.abs(this.vx) < 0.06) this.vx = 0; if (mx) this.face = mx; } // Eis: träge anfahren, lange nachrutschen; im Eisturm hält der Rampenschwung
+      if (this.atkT > 0 || this.crouch) { if (W.room.ice) this.vx *= W.room.iceRamps ? (this.crouch ? 0.998 : 0.993) : 0.975; else this.vx = 0; } // auf Eis rutscht man beim Hieb und Ducken weiter (im Eisturm geduckt fast ungebremst)
+      else { const tv = mx * WALK, ice = W.room.ice; if (W.room.iceRamps && mx && Math.sign(this.vx) === mx && Math.abs(this.vx) > WALK) this.vx *= this.boostT > 0 ? 0.999 : 0.993; else this.vx += (tv - this.vx) * (ice ? (mx ? 0.045 : 0.018) : (mx ? 0.38 : 0.5)); if (Math.abs(this.vx) < 0.06) this.vx = 0; if (mx) this.face = mx; } // Eis: träge anfahren, lange nachrutschen; im Eisturm hält der Rampenschwung
       this.coyote = 7;
       this.iceV = !!W.room.iceRamps && Math.abs(this.vx) > WALK + 0.1; // Rutschschwung, der mit in die Luft geht (Schanze)
       if (this.ridePlat && this.ridePlat.passable && I.down) { if (++this.passT > 12) return this.dropThrough(); } else this.passT = 0; // Unten halten reicht auch
       if ((P.jump || (this.jumpBuf > 0 && I.jump)) && this.atkT === 0) {
         this.jumpBuf = 0;
         if (I.down && this.ridePlat && this.ridePlat.passable) return this.dropThrough(); // durchlässige Plattform (Rankenblatt): hindurchfallen
-        if (I.down && !this.findStair(true)) return this.startSlide(); // Rutschen: Unten + Sprung
+        if (I.down && !this.findStair(true) && !(W.room.iceRamps && Math.abs(this.vx) > WALK)) return this.startSlide(); // Rutschen: Unten + Sprung (im Eisturm mit Tempo: Sprung)
         this.setCrouch(false);
         this.vy = JUMP; this.onGround = false; this.jumping = true;
+        if (W.room.iceRamps && Math.abs(this.vx) > 2.6) this.vx = Math.sign(this.vx) * 2.6; // Eisturm: abspringen bremst – so landet jeder Sprung auf der nächsten Rampe
       }
     } else {
+      if (W.room.iceRamps) this.airT = (this.airT || 0) + 1;
       if (this.flingT > 0) { this.flingT--; this.vx += (mx * WALK - this.vx) * 0.05; } // Schwung nach dem Pendeln
-      else if (this.iceV && !this.dashCarry) { if (mx && mx !== Math.sign(this.vx)) this.vx += (mx * WALK - this.vx) * 0.1; else this.vx *= 0.997; if (Math.abs(this.vx) <= WALK) this.iceV = false; } // Eisturm: der Rutschschwung trägt über die Schanze, Gegenlenken bremst
+      else if (this.iceV && !this.dashCarry) { if (this.airT === 1) this.skiFly = true; if (mx && mx !== Math.sign(this.vx)) this.vx += (mx * WALK - this.vx) * 0.1; else this.vx *= 0.997; if (Math.abs(this.vx) <= WALK) this.iceV = false; } // Eisturm: der Rutschschwung trägt über die Schanze, Gegenlenken bremst
       else this.vx = mx * (this.dashCarry ? DASH_AIR : WALK); // nach einem Dash bleibt der Schwung bis zur Landung
       if (mx && this.atkT === 0) this.face = mx;
       if (this.coyote > 0) this.coyote--;
@@ -406,13 +421,14 @@ class Player {
     const wasGround = this.onGround;
     const r = Phys.moveY(this, this.vy);
     this.onGround = r === 1;
+    if (this.onGround && !wasGround && W.room.iceRamps) this.skiLand();
     if (this.onGround && !wasGround && this.vy > 2.4) { this.landT = 7; W.dust(this.cx, this.feet, 5); }
     if (r !== 0) { this.vy = 0; }
     if (this.onGround) { this.jumping = false; this.canDouble = true; this.flipT = 0; this.flingT = 0; this.wallSlide = 0; this.canAirDash = true; this.dashCarry = false; }
     this.checkPlatforms();
     if (this.onGround) this.wallSlide = 0;
     if (this.stairCool > 0) this.stairCool--;
-    else if (!this.onGround && this.vy > 0 && !Input.held.down && this.catchStair()) return; // im Fallen mitten auf der Treppe landen (Unten gedrückt: hindurchfallen)
+    else if (!this.onGround && this.vy > 0 && (!Input.held.down || W.room.iceRamps) && this.catchStair()) return; // im Fallen mitten auf der Treppe landen (Unten gedrückt: hindurchfallen)
     if (!this.onGround && this.tryLedge(mx)) return; // an der Kante festhalten
     if (!this.onGround && wasGround && !this.jumping && this.vy > 0 && !this.iceV) this.vx = 0; // klassisch senkrecht von der Kante fallen – im Eisturm trägt der Rutschschwung über die Schanze
     this.clampRoom();
@@ -562,6 +578,10 @@ class Player {
   // Wasser, Stacheln und Abgründe kosten Leben und setzen auf den letzten sicheren Stand zurück.
   hazards() {
     const fc = Math.floor(this.cx / T);
+    if (W.room.iceRamps) { // Eisturm: wer mehr als 20 Reihen unter seinen letzten Halt fällt, stürzt in den Abgrund (nicht in die Runde darunter)
+      if (this.onGround || this.state === 'stairs' || this.state === 'swing' || this.state === 'ledge' || this.state === 'climb' || this.anchorFeet === undefined) this.anchorFeet = this.feet;
+      else if (this.alive && this.feet > this.anchorFeet + 20 * T) return this.fallPenalty(3);
+    }
     if (Phys.tile(fc, Math.floor((this.feet - 6) / T)) === '~') {
       W.splash(this.cx, Math.floor((this.feet - 6) / T) * T);
       return this.fallPenalty(4);
@@ -577,10 +597,17 @@ class Player {
     if (this.hp <= dmg) { this.hp = 0; this.die(true); return; }
     this.hp -= dmg;
     Audio8.sfx('hurt'); Input.rumble(0.5, 0.8, 250);
-    const s = this.lastSafe;
+    const s = this.lastSafe, rs = W.room.iceRamps && this.rampSafe && this.rampSafe.t >= (this.lastSafeT || 0) ? this.rampSafe.s : null;
     this.setCrouch(false);
-    this.state = 'normal'; this.atkT = 0; this.vx = 0; this.vy = 0; this.flipT = 0; this.plat = null;
-    this.x = s.cx - this.w / 2; this.y = s.feet - this.h; this.onGround = true; this.inv = 120;
+    this.state = 'normal'; this.atkT = 0; this.vx = 0; this.vy = 0; this.flipT = 0; this.plat = null; this.ring = null; this.ledge = null; this.boostT = 0; this.skiFly = false; this.airT = 0;
+    if (rs) { // Eisturm: oben auf die letzte Eisrampe – mit Anlauf zum nächsten Versuch
+      this.state = 'stairs'; this.stair = rs; this.stairPos = Math.max(6, rs.len - 10); this.rampV = -0.5; this.placeOnStair(); this.onGround = false;
+    } else {
+      const c = W.checkpoint, near = W.room.iceRamps && c && c.stage === W.stage && c.room === W.roomIdx && Math.abs(c.feet - s.feet) < 8 && Math.abs(wrapDx(c.cx - s.cx)) < 6 * T;
+      const t = near ? c : s; // Eisturm: lieber an der Statue auf demselben Sims als an der Kante (dort fehlt der Anlauf)
+      this.x = t.cx - this.w / 2; this.y = t.feet - this.h; this.onGround = true;
+    }
+    this.anchorFeet = this.feet; this.inv = 120;
     W.popup(this.cx, this.y - 6, '-' + dmg, '#fc7460'); W.puff(this.cx, this.feet); W.shake = 6;
   }
 
@@ -588,7 +615,8 @@ class Player {
     if (!this.onGround || this.plat || this.state !== 'normal') return;
     const row = Math.floor((this.feet + 1) / T);
     const ok = (c) => { const ch = Phys.tile(c, row); return ch === '#' || ch === '=' || ch === 'B'; };
-    if (ok(Math.floor((this.x - 3) / T)) && ok(Math.floor((this.x + this.w + 3) / T))) this.lastSafe = { cx: this.cx, feet: this.feet };
+    if (W.room.iceRamps && Math.abs(this.vx) > 1) return; // Eisturm: nur, wo man fast stand
+    if (ok(Math.floor((this.x - 3) / T)) && ok(Math.floor((this.x + this.w + 3) / T))) { this.lastSafe = { cx: this.cx, feet: this.feet }; this.lastSafeT = W.frame; }
   }
 
   // Sub-Taste halten (ab 10 Herzen) lädt den „Heiligen Sturm“; Loslassen entfesselt ihn.
@@ -642,12 +670,17 @@ class Player {
   // Eisrampe (Eisturm): hinauf geht nichts – man rutscht abwärts und wird immer schneller; Gegenlenken bremst etwas.
   // Ein Sprung von der Rampe nimmt den Schwung mit (weiter Satz wie ein Dash-Sprung), unten schlittert man aufs Eis.
   updateIceRamp(I, P, s) {
-    const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0), down = -s.dir;
-    this.rampV = Math.max(-3.6, Math.min(0, (this.rampV || 0) - 0.11 + (mx === -down ? 0.07 : 0)));
+    const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0), down = -s.dir, boost = this.boostT > 0, tuck = I.down; // Unten: ducken = schneller
+    const maxV = boost ? 5.2 : tuck ? 4.4 : 3.6, acc = boost ? 0.3 : tuck ? 0.16 : 0.11;
+    let v = (this.rampV || 0) - acc + (mx === -down ? 0.07 : 0);
+    if (v < -maxV) v = Math.min(-maxV, (this.rampV || 0) + 0.04); // schneller als erlaubt (nach dem Boost): klingt langsam ab
+    this.rampV = Math.max(-6, Math.min(0, v)); this.airT = 0;
+    if (!this.rampSafe || this.rampSafe.s !== s) this.rampSafe = { s, t: W.frame }; // Absturz danach: zurück oben auf diese Rampe
+    if (Math.abs(this.rampV) > 3.8 && W.frame % 2 === 0) W.spawn(new Particle(this.cx - down * 10, this.cy + rnd(-10, 6), -down * rnd(2, 3.5), 0, boost ? '#7cf4ff' : '#e8f8ff', 10, 1, 0)); // Fahrtwind
     if (P.jump) {
       const sp = Math.abs(this.rampV);
       this.state = 'normal'; this.stair = null; this.stairCool = 14; this.rampV = 0;
-      this.vy = JUMP * 0.95; this.vx = down * Math.max(WALK, sp * 0.85); this.dashCarry = false; this.iceV = sp * 0.85 > WALK; this.face = down;
+      this.vy = JUMP * 0.95; this.vx = down * Math.min(2.8, Math.max(WALK, sp * 0.85)); this.dashCarry = false; this.iceV = sp * 0.85 > WALK; this.face = down;
       this.onGround = false; this.jumping = true; this.canDouble = true; this.coyote = 0;
       Audio8.sfx('djump'); W.puff && W.puff(this.cx, this.feet);
       return;
@@ -667,7 +700,7 @@ class Player {
     const s = this.stair;
     if (P.sub) this.tryAttack(true, true);
     else if (P.attack) this.tryAttack(false, false);
-    if (this.atkT > 0) { this.tickAttack(); return; }
+    if (this.atkT > 0) { this.tickAttack(); if (!W.room.iceRamps) return; } // Eisturm: beim Peitschen rutscht man weiter
     if (W.room.iceRamps) return this.updateIceRamp(I, P, s);
     if (P.jump) { // mitten von der Treppe abspringen – in die gedrückte Richtung oder senkrecht
       const mx = (I.right ? 1 : 0) - (I.left ? 1 : 0);

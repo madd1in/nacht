@@ -302,7 +302,9 @@ const Levels = (() => {
   // rutscht, wird immer schneller, und der Schwung trägt ihn über die Schanzen am Rampenende (auch ohne Sprung) auf die nächste
   // Rampe; dazwischen Abgründe mit Eisdornen zum Drüberspringen, Ankerringe zum Hinüberschwingen, eine Kante zum Hochziehen und
   // eine Dash-Lücke (aus dem Stand, nach der Kante); fünf Engelsstatuen als Kontrollpunkte. Kachel-x 0–59 ist der volle Umfang;
-  // die Runden liegen so weit untereinander, dass sie sich nirgends in die Quere kommen, und an der Naht gibt es keine Wand.
+  // die Runden liegen so weit untereinander, dass sie sich nirgends in die Quere kommen, an der Naht gibt es keine Wand.
+  // Gefahren: Eiszapfen, die auf den Helden zielen (ducken = schneller = drunter durch), Eisbrocken und Eisskelette auf den
+  // Simsen; dazu Boost-Kristalle, Kerzenketten auf den Sprunglinien und Punkte für Schanzen-Serien. Unten wartet die Eishexe.
   const iceT = room(60, 'ice', 107)
     // --- Runde 1 ---
     .fill(0, 6, 5, 6, '=')                                                   // Gipfelsims
@@ -344,13 +346,33 @@ const Levels = (() => {
     .prop('hint', { x: 39, y: 26, w: 3, h: 3, key: 'hintRing' })
     .prop('hint', { x: 16, y: 42, w: 4, h: 3, key: 'hintLedge' })
     .prop('hint', { x: 23, y: 39, w: 4, h: 3, key: 'hintDash' })
+    .prop('hint', { x: 54, y: 26, w: 3, h: 3, key: 'hintTuck' })
+    .prop('hint', { x: 38, y: 39, w: 3, h: 3, key: 'hintBoost' })
+    // Eiszapfen über den Rampen (ty = Standfläche unter dem Zapfen): brechen so los, dass sie den Helden bei seinem Tempo treffen
+    .prop('ticicle', { x: 11, y: 4, ty: 11.5, len: 22 }).prop('ticicle', { x: 25, y: 17, ty: 24.5, len: 22 })
+    .prop('ticicle', { x: 7, y: 27, ty: 34.5, len: 22 }).prop('ticicle', { x: 13, y: 33, ty: 40.5, len: 22 })
+    .prop('ticicle', { x: 44, y: 39, ty: 46.5, len: 22 }).prop('ticicle', { x: 8, y: 59, ty: 66.5, len: 22 })
+    .prop('ticicle', { x: 12, y: 63, ty: 70.5, len: 22 }).prop('ticicle', { x: 55, y: 83, ty: 90.5, len: 22 })
+    .prop('ticicle', { x: 8, y: 92, ty: 99.5, len: 22 })
+    // Boost-Kristalle auf den Rampen (y = Standfläche)
+    .prop('boost', { x: 42, y: 44.5 }).prop('boost', { x: 6, y: 64.5 }).prop('boost', { x: 52, y: 87.5 })
+    // Kerzenketten entlang der Sprunglinien über den Schanzen und dem Abgrund
+    .prop('flames', { pts: [[18.2, 12.7], [19.4, 11.85], [20.6, 11.4], [21.8, 11.5], [23.0, 12.0], [24.2, 13.0]] })
+    .prop('flames', { pts: [[33.1, 26.7], [34.3, 25.8], [35.4, 25.4], [36.5, 25.4], [37.6, 25.9]] })
+    .prop('flames', { pts: [[51.2, 47.7], [52.4, 46.85], [53.6, 46.4], [54.8, 46.5], [56.0, 47.0], [57.2, 48.0]] })
+    .prop('flames', { pts: [[18.2, 70.7], [19.4, 69.85], [20.6, 69.4], [21.8, 69.5], [23.0, 70.0], [24.2, 71.0]] })
+    // Eisspalten über den langen Rampen: Brocken rollen voraus (überholen = drüberspringen); Eisskelette auf Kufen
+    .prop('rampchute', { bx: 18, by: 45 }).prop('rampchute', { bx: 15, by: 73 })
+    .enemy('iceskel', 42, 28).enemy('iceskel', 26, 41)
+    // Turmfuß: Eistor zur Gruft, versiegelt, bis die Eishexe besiegt ist
+    .prop('witchgate', { x0: 24, y0: 101, x1: 26, y1: 104 })
     .candle(2, 4, 'H').candle(10, 7).candle(15, 13, 'W').candle(24, 20).candle(30, 27, '$').candle(42, 27, 'H').candle(57, 27)
     .candle(6, 31).candle(12, 37).candle(18, 43, 'H').candle(26, 40, '3').candle(38, 40).candle(44, 43).candle(48, 48, 'H')
     .candle(1, 59, 'H').candle(8, 64).candle(15, 71, '$').candle(23, 78).candle(29, 83, 'W').candle(46, 83, 'H').candle(54, 87)
     .candle(2, 93, 'H').candle(9, 98).candle(30, 103, 'U')
     .enemy('bat', 26, 12).enemy('bat', 50, 20).enemy('ghost', 30, 36).enemy('bat', 8, 66).enemy('bat', 40, 74)
     .wrap().ice().iceRamps().label('EISTURM')
-    .start(2, 5).exitAt(22, 99, 28, 104).done();
+    .start(2, 5).exitAt(24, 101, 26, 104).done();
 
   const r22 = room(96, 'crypt')
     .ground(0, 95)

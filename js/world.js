@@ -28,7 +28,7 @@ const W = {
     this.room = { ...def, grid: def.grid.map(r => r.slice()) };
     this.ents = []; this.platforms = []; this.boss = null;
     this.camLock = false; this.camTarget = null; this.arenaOn = false; this.arenaX = 0; this.arenaW = 0; this.arenaBoss = null; this.camEase = 0;
-    this.tutSign = null; this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
+    this.tutSign = null; this.exitBlocked = false; this.cleared = false; this.crash = null; this.exiting = false; this.cinema = 0; this.slowmo = 0; this.bossEnraged = false; this.vortexBg = 0; this.stopT = 0;
     if (this.bloodT > 0) { this.bloodT = 0; Audio8.tempo(1); }
     this.sway = { a: 0, v: 0 }; this.zoomFx = null; this.bellCd = 200; this.tubeRot = 0; this.tubeRotS = 0;
     this.sail = def.dock || def.atSea ? 1 : 0; this.roll = 0; this.rollAmp = 0; this.heave = 0; this.docked = 0; this.dockT = 0; this.rogue = null; this.kraken = null; this.gust = 0;
@@ -68,6 +68,12 @@ const W = {
         case 'coach': this.spawn(new GhostCoach(d)); break;
         case 'curtains': this.spawn(new BelfryCurtains(d)); break;
         case 'icicle': this.spawn(new FallingIcicle(d)); break;
+        case 'ticicle': this.spawn(new TowerIcicle(d)); break;
+        case 'boost': this.spawn(new BoostCrystal(d)); break;
+        case 'flames': FlameChain.spawn(d); break;
+        case 'rampchute': this.spawn(new RampChute(d)); break;
+        case 'iceskel': this.spawn(new IceSkeleton(d.x, d.y)); break;
+        case 'witchgate': this.spawn(new WitchGate(d)); break;
         case 'armor': this.spawn(new ArmorSuit(d)); break;
         case 'pillar': this.spawn(new Pillar(d.x, d.y)); break;
         case 'raven': this.spawn(new Raven(d.x, d.y)); break;
@@ -388,8 +394,8 @@ const W = {
     if (b.mini) { // Miniboss: Kamera wieder frei, Beute statt Orb, weiter mit der Musik des Raums
       this.miniDone[this.stage + ':' + this.roomIdx] = true;
       this.camLock = false; this.arenaOn = false; this.arenaW = 0; this.camEase = 1; Game.bossName = 0;
-      const x = this.arenaX + 40;
-      ['roast', 'bagBig', 'heartB'].forEach((t, i) => this.spawn(new Item(t, x + i * 22, Tent.floorAt(x + i * 22) - 40)));
+      const x = b.lootY !== undefined ? b.cx - 22 : this.arenaX + 40; // Eishexe: Beute dort, wo sie fällt
+      ['roast', 'bagBig', 'heartB'].forEach((t, i) => this.spawn(new Item(t, x + i * 22, b.lootY !== undefined ? b.lootY : Tent.floorAt(x + i * 22) - 40)));
       Audio8.tempo(1); Audio8.play('fanfare', this.songName()); Game.note(b.nameKey + 'Note');
       return;
     }
@@ -500,7 +506,7 @@ const W = {
     this.ents = this.ents.filter(e => !e.dead);
 
     const ex = this.room.exit;
-    if (ex && p.alive && !this.exiting && p.cx >= ex.x0 * T && p.cx < (ex.x1 + 1) * T && p.feet > ex.y0 * T && p.feet <= (ex.y1 + 1) * T + 0.5) {
+    if (ex && p.alive && !this.exiting && !this.exitBlocked && p.cx >= ex.x0 * T && p.cx < (ex.x1 + 1) * T && p.feet > ex.y0 * T && p.feet <= (ex.y1 + 1) * T + 0.5) {
       this.exiting = true; Game.nextRoom();
     }
 

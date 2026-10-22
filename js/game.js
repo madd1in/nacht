@@ -437,7 +437,11 @@ const Game = {
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('pause'); }
         break;
       case 'fade':
-        if (this.t === 18 && W.roomIdx + 1 >= W.stageDef.rooms.length) { this.state = 'play'; W.stageClear(); break; } // letzter Abschnitt ohne Bossarena (Ankunft am Burggraben): Kapitel geschafft
+        if (this.t === 18 && W.roomIdx + 1 >= W.stageDef.rooms.length) { // letzter Abschnitt ohne Bossarena (Ankunft am Burggraben): Kapitel geschafft –
+          if (W.stage + 1 >= Levels.STAGES.length) { this.state = 'play'; W.stageClear(); break; } // ohne Abrechnungsbild (störte den Spielfluss), Bonus still gutgeschrieben
+          this.recordTime(); this.rateStage(); W.addScore(W.time * 10 + W.player.hearts * 100 + (this.rankBonus || 0));
+          W.player.hp = W.player.maxHp; this.startStage(W.stage + 1); break;
+        }
         if (this.t === 18) { if (this.pendingView) this.applyView(this.pendingView); W.loadRoom(W.stage, W.roomIdx + 1); Audio8.play(W.songName(), null, 0.12); } // neuer Musikabschnitt: weich überblenden
         if (this.t > 30) this.state = 'play';
         break;
