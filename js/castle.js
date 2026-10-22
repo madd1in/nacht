@@ -179,6 +179,16 @@ const Castle = (() => {
       .enemy('raven', 20, 7).enemy('raven', 64, 7).enemy('ghost', 40, 5).enemy('ghost', 84, 5)
       .statue(46, 8)
       .label('HIMMELSBRÜCKE').start(2, 8).done());
+    // Dachboden über der Eingangshalle: nur fliegend erreichbar – Sims unter der Decke zwischen zwei Kronleuchtern (Fledermausgestalt)
+    const foyer = sIdx(0) >= 0 && S()[sIdx(0)].rooms[1];
+    if (foyer) for (let x = 66; x <= 70; x++) foyer.grid[3][x] = '=';
+    add('attic', 0, 3, [7, -2], R(48, 'library')
+      .ground(0, 47).fill(9, 8, 14, 8, '=').fill(21, 7, 28, 7, '=').fill(35, 8, 40, 8, '=')
+      .candle(4, 9, 'H').candle(12, 6).candle(24, 5, '$').candle(38, 6, 'H').candle(44, 9)
+      .enemy('bat', 16, 3).enemy('bat', 32, 3).enemy('ghost', 26, 4).enemy('book', 40, 9)
+      .chest(44, 10, 'big').prop('vessel', { x: 24, y: 6 })
+      .label('DACHBODEN').start(2, 10).done());
+    LINKS.push([[0, 1], { x: 67, y: 2, door: 'side' }, ['side', 'attic'], 'start', {}]); // Eingangshalle, Sims unter der Decke → Dachboden
     LINKS.push( // Schleifen: das Schloss als 2D-Open-World, Regionen über Nebenwege verzahnt
       [['side', 'kolosseum'], 'right', [1, 1], { x: 4, y: 27, door: 'side' }, {}],              // Kolosseum → Geheimgang → Brunnenschacht
       [[2, 0], { x: 40, y: 10, door: 'side' }, ['side', 'wehrgang'], 'start', {}],              // Bergfried → Wehrgang
@@ -538,10 +548,10 @@ const Castle = (() => {
   // bleiben); im Prolog auf dem Schiff kann er noch alles. Die Relikte liegen im Schloss: Doppelsprung am Ende des Kolosseums,
   // Dash bei der Riesenfledermaus, Ring-Greifen in der Eishöhle, Wandsprung beim Knochenriesen, Steinbrecher bei Medusa
   // (zerschlägt rissiges Gestein vor Kanal, Schatzkammer und Verlies). So führt ein Relikt zum nächsten.
-  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker'];
-  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460' };
+  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker', 'bat'];
+  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460', bat: '#c8a0fc' };
   const RELIC_AT = [[['side', 'kolosseum'], 'jump2', 81, 10], [[1, 2], 'ring', 12, 10]];        // fest liegende Relikte
-  const BOSS_RELIC = [[[0, -1], 'dash'], [[1, -1], 'wall'], [[2, -1], 'breaker']];               // Belohnung der Regionsbosse
+  const BOSS_RELIC = [[[0, -1], 'dash'], [[1, -1], 'wall'], [[2, -1], 'breaker'], [['sun', -1], 'bat']]; // Belohnung der Regionsbosse (Sonnenwächter: Fledermausgestalt)
   const inPrologue = () => !!(S()[W.stage] && S()[W.stage].id === 'arrival');
   const has = (k) => !on || !!relic[k] || inPrologue();
   if (on) { // Bewegungen hängen an den Relikten (Doppelsprung: siehe update)
@@ -620,6 +630,7 @@ const Castle = (() => {
   let guard = false, push = 0, lastX = 0, lockT = 0, roomT = 0;
   function settle(arrive) {
     const s = W.stage, r = W.roomIdx, def = S()[s].rooms[r], key = roomKey(s, r);
+    if (W.player && W.player.batForm) { W.player.batForm = false; W.player.h = HERO_H; } // Raumwechsel: wieder in Menschengestalt (reset hat Ort und Größe gesetzt)
     if (boss[key] && s < S().length - 1) W.room.arena = null; // Bossarena: Boss besiegt, der Raum ist frei
     if (mini[key]) W.miniDone[s + ':' + r] = true;
     W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber) && !(e instanceof CastleNPC) && !(e instanceof CastleLoot));
@@ -711,8 +722,8 @@ const Castle = (() => {
       const k = kindOf(def, d.place);
       let use = false;
       if (k === 'up') { const u = upSpot(def, d.place); use = P.up && p.onGround && Math.abs(p.cx - u.cx) < 14 && Math.abs(p.feet - u.feet) < 8; }
-      else if (k === 'edgeL') use = I.left && p.onGround && p.cx < (def.start.x + 1.5) * T && Math.abs(p.feet - (def.start.y + 1) * T) <= 2 * T && push >= 6;
-      else use = I.right && p.onGround && p.cx > (def.w - 2.5) * T && push >= 6;
+      else if (k === 'edgeL') use = I.left && (p.onGround || p.batForm) && p.cx < (def.start.x + 1.5) * T && Math.abs(p.feet - (def.start.y + 1) * T) <= 2 * T && push >= 6;
+      else use = I.right && (p.onGround || p.batForm) && p.cx > (def.w - 2.5) * T && push >= 6; // die Fledermaus fliegt durch Seitenausgänge
       if (!use) continue;
       if (!gateOpen(d)) {
         if (!lockT) { lockT = 90; if (d.gate.seals) Game.note('castleSeals', seals(), sealRooms().length); else if (d.gate.crack) Game.note('castleCrackHard'); else if (d.gate.beat) Game.note('castleBarred'); else Game.note('castleLocked'); Audio8.sfx('select'); }
@@ -829,6 +840,7 @@ const Castle = (() => {
     bloodstone: { slot: 'acc', regen: 1, col: '#d81830' },
     luckcoin: { slot: 'acc', luck: 1, col: '#f8d878' },
     greedring: { slot: 'acc', greed: 1, col: '#f8b800' },
+    chicken: { slot: 'acc', luck: 1, greed: 1, col: '#f8f070' },        // Gummihuhn mit Seilrolle (Dachboden): mehr Beute und Gold
     potion: { heal: 0.5, price: 800, col: '#58f898' },
     elixir: { heal: 1, price: 4000, col: '#7cdcfc' },
     map: { key: 1, price: 3000, col: '#e8d8a8' },
@@ -846,6 +858,7 @@ const Castle = (() => {
   const FINDS = [ // Einzelstücke: [Raum, Gegenstand, Kachel-x, Standreihe]
     [['side', 'kolosseum'], 'leather', 12, 7], [['side', 'kanal'], 'bloodstone', 43, 7], [['side', 'schatz'], 'greedring', 25, 6],
     [['side', 'verlies'], 'dragonfang', 28, 6], [['side', 'wehrgang'], 'luckcoin', 37, 6], [['side', 'himmel'], 'mirror', 44, 5],
+    [['side', 'attic'], 'chicken', 12, 7],
   ];
   const DROPS = [['potion', 'potion', 'leather', 'silver'], ['potion', 'potion', 'chain', 'bloodrune', 'elixir'], ['potion', 'elixir', 'elixir', 'chain', 'bloodrune']];
   function gear(stat) { let n = 0; for (const s of SLOTS) { const g = eq[s] && GEAR[eq[s]]; if (g && g[stat]) n += g[stat]; } return n; }
@@ -1019,7 +1032,7 @@ const Castle = (() => {
   };
   const SPELL_IDS = ['spirit', 'hellfire', 'soulsteal'];
   const known = (id) => !!inv['book_' + id];
-  const mpMax = () => SPELL_IDS.some(known) ? 24 + 3 * (rpg.lv - 1) : 0;
+  const mpMax = () => SPELL_IDS.some(known) || relic.bat ? 24 + 3 * (rpg.lv - 1) : 0;
   let mp = 0, lastDir = '';
   const hist = [];
   const absDir = (s, face) => s.replace('F', face > 0 ? 'R' : 'L').replace('B', face > 0 ? 'L' : 'R');
@@ -1037,6 +1050,12 @@ const Castle = (() => {
     mp = Math.min(mp, max);
     const I = Input.held, c = (I.up ? 'U' : I.down ? 'D' : '') + (I.right ? 'R' : I.left ? 'L' : '');
     if (c !== lastDir) { if (c) { hist.push({ c, f: rpg.frames }); if (hist.length > 16) hist.shift(); } lastDir = c; }
+    if (p.batForm) return; // als Fledermaus keine Zauber (zurück mit Sprung/Angriff)
+    if (P.jump && relic.bat && p.state === 'normal' && cmdMatch(['D', 'U'], p.face)) { // ↓ ↑ + Sprung: Fledermausgestalt
+      hist.length = 0; P.jump = false;
+      if (mp < BAT_COST) { W.popup(p.cx, p.y - 10, 'MP!', '#7c84a8'); Audio8.sfx('wall'); return; }
+      toBat(p); return;
+    }
     if (!P.attack || p.state !== 'normal') return;
     for (const id of ['soulsteal', 'hellfire', 'spirit']) {
       if (!known(id) || !cmdMatch(SPELLS[id].cmd, p.face)) continue;
@@ -1097,6 +1116,66 @@ const Castle = (() => {
       }
     }
   }
+  // ---------------- Fledermausgestalt (Relikt „Seele der Fledermaus“, Lohn des Sonnenwächters) ----------------
+  // ↓ ↑ + Sprung verwandelt (4 MP, dann 1 MP alle 0,6 s); Sprung oder Angriff verwandelt zurück, wenn Platz ist, bei 0 MP von
+  // selbst. Die Fledermaus fliegt frei in alle Richtungen, ist nur 10×10 groß (passt durch enge Lücken) und greift nicht an.
+  // Ein Raumwechsel verwandelt zurück. Der Held bleibt derselbe (Player), nur Update und Zeichnen laufen hier.
+  const BAT_H = 10, BAT_COST = 4, HERO_H = 28;
+  function freeBox(x, y, w, h) {
+    for (let ty = Math.floor(y / T); ty <= Math.floor((y + h - 1) / T); ty++) for (let tx = Math.floor(x / T); tx <= Math.floor((x + w - 1) / T); tx++) if (SOLID.includes(Phys.tile(tx, ty))) return false;
+    return true;
+  }
+  function toBat(p) {
+    p.batForm = true; p.batT = 0; p.state = 'normal'; p.atkT = 0; p.dashT = 0; p.ledge = null; p.wallSlide = 0; p.crouch = false; p.crouchAtk = false;
+    p.y += 4; p.h = BAT_H; p.vx = 0; p.vy = -0.5; p.onGround = false;
+    mp -= BAT_COST; Audio8.sfx('bat'); Input.rumble(0.3, 0.2, 100);
+    for (let i = 0; i < 16; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.cy + rnd(-10, 10), rnd(-1, 1), rnd(-1, 1), i % 2 ? '#9c6cfc' : '#2c1c3c', 26, 1, 0));
+  }
+  function fromBat(p, force) { // Gestalt zurück: Füße knapp unter der Fledermaus, sonst etwas höher oder tiefer, wo Platz ist
+    const base = p.y + BAT_H + 14;
+    for (const dy of [0, -8, 8, -16, 16, -24]) {
+      const y = base + dy - HERO_H;
+      if (freeBox(p.x, y, p.w, HERO_H)) { p.batForm = false; p.h = HERO_H; p.y = y; p.vy = 0; Audio8.sfx('bat'); for (let i = 0; i < 12; i++) W.spawn(new Particle(p.cx + rnd(-6, 6), p.cy + rnd(-12, 12), rnd(-1, 1), rnd(-1, 1), '#9c6cfc', 22, 1, 0)); return true; }
+    }
+    if (force) { p.batForm = false; p.h = HERO_H; p.y = p.y + BAT_H - HERO_H; return true; }
+    W.popup(p.cx, p.y - 8, '!', '#fc7460'); Audio8.sfx('wall'); return false; // zu eng
+  }
+  function batUpdate(p) {
+    if (p.inv > 0) p.inv--;
+    p.state = 'normal'; // Treffer werfen die Fledermaus nur kurz zurück
+    const I = Input.held, P = Input.pressed;
+    if ((P.jump || P.attack) && p.batT > 10 && fromBat(p)) return;
+    p.batT++; p.walkT++;
+    if (p.batT % 36 === 0 && --mp <= 0) { mp = 0; fromBat(p, true); return; }
+    const tx = (I.right ? 1 : 0) - (I.left ? 1 : 0), ty = (I.down ? 1 : 0) - (I.up ? 1 : 0);
+    p.vx += (tx * 2.4 - p.vx) * 0.25; p.vy += (ty * 2.1 + (ty ? 0 : Math.sin(p.batT * 0.15) * 0.25) - p.vy) * 0.25;
+    if (tx) p.face = tx;
+    Phys.moveX(p, p.vx); Phys.moveY(p, p.vy);
+    const H = W.room.h * T;
+    if (p.y < 0) { p.y = 0; p.vy = 0; }
+    if (p.y + p.h > H) { p.y = H - p.h; p.vy = 0; }
+    if (!W.room.wrap) p.x = clamp(p.x, 0, W.room.w * T - p.w);
+    p.onGround = false;
+  }
+  function batDraw(p, ctx, cam) {
+    if (p.inv > 0 && (W.frame & 2)) return;
+    const x = Math.round(p.cx - cam.x), y = Math.round(p.cy - cam.y), f = p.face, up = (p.batT >> 2) & 1;
+    const R = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(f > 0 ? x + a : x - a - w, y + b, w, h); };
+    R(-3, -3, 7, 6, '#1c1028'); R(-2, -4, 2, 1, '#1c1028'); R(2, -4, 2, 1, '#1c1028'); // Körper, Ohren
+    R(1, -1, 1, 1, '#fc3c3c'); R(3, -1, 1, 1, '#fc3c3c'); R(-2, 2, 6, 1, '#3c2850'); // Augen, Bauch
+    const wy = up ? -6 : 1, wc = '#4c2c6c', wh = '#9c6cfc';
+    R(-11, wy, 8, 2, wc); R(-8, wy + 2, 5, 1, wc); R(4, wy, 8, 2, wc); R(4, wy + 2, 5, 1, wc); // Flügel
+    R(-11, wy, 8, 1, wh); R(4, wy, 8, 1, wh);
+    if (p.batT % 6 < 3) R(-1, 4, 1, 1, '#9c6cfc'); // Schimmer
+  }
+  if (on) {
+    const up = Player.prototype.update, dr = Player.prototype.draw;
+    Player.prototype.update = function (...a) {
+      if (this.batForm && this.state === 'dead') { this.batForm = false; this.h = HERO_H; this.y -= HERO_H - BAT_H; }
+      return this.batForm ? batUpdate(this) : up.apply(this, a);
+    };
+    Player.prototype.draw = function (ctx, cam) { return this.batForm ? batDraw(this, ctx, cam) : dr.call(this, ctx, cam); };
+  }
   // Statusbildschirm, Seite 2: gelernte Zauber mit Befehl (Blick nach rechts) und MP-Kosten
   function drawSpells(ctx) {
     const cx = View.cx, lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16);
@@ -1111,6 +1190,12 @@ const Castle = (() => {
         Font.draw(ctx, itemDesc('book_' + id), lx + 8, y + 21, '#b0a080');
       } else Font.draw(ctx, tr('spellUnknown'), lx + 8, y + 11, '#5c5c6c');
     });
+    if (relic.bat) { // Verwandlung
+      const y = 162;
+      Font.draw(ctx, tr('relic_bat'), lx, y, RELIC_COL.bat, { shadow: '#000' });
+      Font.draw(ctx, BAT_COST + '+ MP', rx, y, '#7cdcfc', { align: 'right', shadow: '#000' });
+      Font.draw(ctx, '↓ ↑  + ' + tr('spellJump') + '   (' + tr('spellJump') + '/' + tr('spellAttack') + ': ' + tr('batBack') + ')', lx + 8, y + 11, '#fcfcfc', { shadow: '#000' });
+    }
     Font.draw(ctx, tr('spellNote'), cx, 200, '#7c7c8c', { align: 'center' });
   }
   let famEnt = null;
@@ -1277,6 +1362,7 @@ const Castle = (() => {
     { done: () => bossDone([2, -1]), verb: 'castleGoalBeat', obj: () => bossName(2), where: 'whereGallery', at: [[2, -1], 'arena'] },
     { done: () => relic.breaker, verb: 'castleGoalFind', obj: () => tr('relic_breaker'), where: 'whereGallery', at: [[2, -1], 'arena'] },
     { done: () => bossDone(['sun', -1]), verb: 'castleGoalBeat', obj: () => bossName('sun'), where: 'whereRoof', at: [['sun', -1], 'arena'] },
+    { done: () => relic.bat, verb: 'castleGoalFind', obj: () => tr('relic_bat'), where: 'whereRoof', at: [['sun', -1], 'arena'] },
     { done: () => bossDone(['expo', -1]), verb: 'castleGoalBeat', obj: () => bossName('expo'), where: 'whereDome', at: [['expo', -1], 'arena'] },
     { done: () => S().some((st, s) => st.id === 3 && layout(s).some(r => seen[r.key] && seen[r.key].size)), verb: 'castleGoalGate', obj: () => '', where: 'whereSeal', at: [[0, 1], SEAL.x, SEAL.y] },
     { done: () => false, verb: 'castleGoalBeat', obj: () => bossName(3), where: 'whereThrone', at: [[3, -1], 'arena'] },
@@ -1330,6 +1416,7 @@ const Castle = (() => {
     { id: 'cloak', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.dash },
     { id: 'claw', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.wall },
     { id: 'stone', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.breaker },
+    { id: 'wings', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.bat },                         // Fledermausgestalt: Sims unter der Decke
     { id: 'seals', who: 'ally', at: [[0, 1], 32, 11], when: () => seals() >= sealRooms().length },  // auf der Galerie am Siegeltor
     { id: 'lib', who: 'lib', at: [[2, 1], 15, 47], when: () => true, heal: true },                    // Bibliothek: neben dem Lesepult
     { id: 'lib2', who: 'lib', at: [[2, 1], 15, 47], when: () => relic.breaker, heal: true, again: 'lib' },
@@ -1726,7 +1813,7 @@ const Castle = (() => {
     { at: [0, 1], lv: 4, gold: 3000, relics: ['jump2'], bosses: [], name: ['msRelic', () => tr('relic_jump2')] },
     { at: [0, -1], lv: 7, gold: 6000, relics: ['jump2', 'dash'], bosses: [0], name: ['msBeaten', () => bossName(0)] },
     { at: [1, -1], lv: 11, gold: 9000, relics: ['jump2', 'dash', 'ring', 'wall'], bosses: [0, 1], name: ['msBeaten', () => bossName(1)] },
-    { at: [2, -1], lv: 15, gold: 15000, relics: RELICS, bosses: [0, 1, 2], name: ['msBeaten', () => bossName(2)] },
+    { at: [2, -1], lv: 15, gold: 15000, relics: ['jump2', 'dash', 'ring', 'wall', 'breaker'], bosses: [0, 1, 2], name: ['msBeaten', () => bossName(2)] },
     { at: ['sun', -1], lv: 19, gold: 20000, relics: RELICS, bosses: [0, 1, 2, 'sun'], name: ['msBeaten', () => bossName('sun')] },
     { at: [0, 1], lv: 23, gold: 25000, relics: RELICS, bosses: [0, 1, 2, 'sun', 'expo'], name: ['msSeals'] },
     { at: [3, -1], lv: 28, gold: 30000, relics: RELICS, bosses: [0, 1, 2, 'sun', 'expo'], name: ['msBefore', () => bossName(3)] },
@@ -1849,6 +1936,7 @@ const Castle = (() => {
     for (const b of BEATS) { if (b.lines !== false) need.push('story_' + b.id); need.push('story_' + (b.again || b.id) + 'Again'); }
     for (const id of SPELL_IDS) need.push('spell_' + id);
     for (const id of TOOLS) need.push('tool_' + id);
+    for (const k of RELICS) need.push('relic_' + k, 'relicD_' + k);
     for (const k of need) if (tr(k) === k) out.push('Text fehlt: ' + k);
     return out;
   }
