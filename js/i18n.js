@@ -195,6 +195,10 @@ const I18N = (() => {
     warpTitle: { de: 'SCHNELLREISE', en: 'FAST TRAVEL', fr: 'VOYAGE RAPIDE', es: 'VIAJE RÁPIDO', ja: 'ワープ', zh: '快速传送' },
     warpCount: { de: 'WARPKAMMER {0}/{1}', en: 'WARP ROOM {0}/{1}', fr: 'TÉLÉPORTEUR {0}/{1}', es: 'TELETRANSPORTE {0}/{1}', ja: 'ワープの間 {0}/{1}', zh: '传送室 {0}/{1}' },
     mapHelpWarp: { de: 'PFEILE ZIEL   SPRUNG REISEN   START ZURÜCK', en: 'ARROWS PICK   JUMP TRAVEL   START BACK', fr: 'FLÈCHES CHOISIR   SAUT VOYAGER   START RETOUR', es: 'FLECHAS ELEGIR   SALTO VIAJAR   START VOLVER', ja: '矢印:選択 ジャンプ:移動 START:戻る', zh: '方向:选择 跳跃:传送 START:返回' },
+    // Schloss-Modus: RPG (Stufe, Status)
+    castleStatus: { de: 'STATUS', en: 'STATUS', fr: 'STATUT', es: 'ESTADO', ja: 'ステータス', zh: '状态' },
+    castleLvUp: { de: 'LEVEL UP!', en: 'LEVEL UP!', fr: 'NIVEAU SUP. !', es: '¡SUBES DE NIVEL!', ja: 'レベルアップ！', zh: '升级！' },
+    statusHelp: { de: 'SPRUNG/START ZURÜCK', en: 'JUMP/START BACK', fr: 'SAUT/START RETOUR', es: 'SALTO/START VOLVER', ja: 'ジャンプ/START 戻る', zh: '跳跃/START 返回' },
     hiTitle: { de: 'BESTENLISTE', en: 'HIGH SCORES', fr: 'MEILLEURS SCORES', es: 'RÉCORDS', ja: 'ハイスコア', zh: '高分榜' },
     newHi: { de: 'NEUER HIGHSCORE!', en: 'NEW HIGH SCORE!', fr: 'NOUVEAU RECORD !', es: '¡NUEVO RÉCORD!', ja: 'ハイスコア更新！', zh: '新高分！' },
     enterName: { de: 'GIB DEINE INITIALEN EIN', en: 'ENTER YOUR INITIALS', fr: 'ENTRE TES INITIALES', es: 'INTRODUCE TUS INICIALES', ja: 'イニシャルを入力', zh: '输入你的名字缩写' },

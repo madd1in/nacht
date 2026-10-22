@@ -142,6 +142,7 @@ const Game = {
 
   newGame(stage = 0, room = 0) {
     W.score = 0; W.lives = 3; W.nextLife = 20000; this.runBest = 0;
+    if (Castle.on) Castle.newRun(); // Schloss: neues Spiel beginnt auf Stufe 1
     W.player = new Player();
     this.startStage(stage, room);
   },
@@ -392,7 +393,7 @@ const Game = {
     if (this.revealed && this.revealT !== undefined) this.revealT++;
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
     const titleish = ['title', 'options', 'sections', 'secload', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
-    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'map' || this.state === 'warp' || this.state === 'demo') && W.room ? W.room.theme : null);
+    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'map' || this.state === 'warp' || this.state === 'status' || this.state === 'demo') && W.room ? W.room.theme : null);
     if (titleish && this.bootBg) this.bootBg.tick(); // Kulisse des Ladebildschirms unter den Menüs
     if (titleish) {
       FX.updateStorm(this.tStorm, View.w, () => { if (Audio8.ready()) setTimeout(() => Audio8.sfx('thunder'), 250 + Math.random() * 600); });
@@ -457,6 +458,7 @@ const Game = {
         const it = items[this.pauseSel || 0], ok = tap || P.jump || P.attack;
         if (ok && it === 'easy') this.toggleEasy();
         else if (ok && it === 'map') { this.go('map'); Castle.openMap(); Audio8.sfx('select'); } // Schloss-Modus: Karte
+        else if (ok && it === 'status') { this.go('status'); Audio8.sfx('select'); } // Schloss-Modus: Werte wie in SotN
         else if (ok && it === 'sec') { this.go('pausesec'); Audio8.sfx('select'); } // Abschnittswahl mitten im Spiel
         else if (ok && it === 'title' && this.t > 10) {
           this.unpause = false; Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('select'); this.finishRun(false); // Score zählt trotzdem
@@ -467,6 +469,9 @@ const Game = {
       case 'map': // Schlosskarte (nur ?castle): Angriff zoomt, Pfeile scrollen, Sprung/Start zurück zur Pause
         if ((P.start || P.jump) && this.t > 8) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('map'); Audio8.sfx('pause'); break; }
         Castle.mapInput(P);
+        break;
+      case 'status': // Statusbildschirm (nur ?castle): Sprung/Angriff/Start zurück zur Pause
+        if ((P.start || P.jump || P.attack) && this.t > 8) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('status'); Audio8.sfx('pause'); }
         break;
       case 'warp': { // Schnellreise (Warpkammer): Pfeile wählen das Ziel, Sprung/Angriff reist, Start zurück
         if (this.t < 8) break;
@@ -609,6 +614,7 @@ const Game = {
         if (this.state === 'pausesec') this.drawSections(ctx, true);
         if (this.state === 'map') Castle.draw(ctx, this.t);
         if (this.state === 'warp') Castle.draw(ctx, this.t, true);
+        if (this.state === 'status') Castle.drawStatus(ctx, this.t);
         if (this.state === 'fade') this.mosaicFade(ctx, this.t < 18 ? this.t / 16 : 1 - (this.t - 18) / 12);
         if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 30 ? this.t / 28 : 1 - (this.t - 30) / 14);
         if (this.hurryT > 0 && this.state === 'play') this.drawHurry(ctx);
@@ -748,7 +754,7 @@ const Game = {
     Audio8.sfx(Options.easy ? 'heart' : 'select');
   },
   // Touch im Pausenmenü: Tipp auf einen Menüpunkt wählt ihn (true), sonst geht es weiter
-  pauseItems() { return Castle.on ? ['resume', 'map', 'easy', 'sec', 'title'] : ['resume', 'easy', 'sec', 'title']; },
+  pauseItems() { return Castle.on ? ['resume', 'map', 'status', 'easy', 'sec', 'title'] : ['resume', 'easy', 'sec', 'title']; },
   pauseTouch(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect(), y = (clientY - r.top) / r.height * 240;
     for (let i = 0; i < this.pauseItems().length; i++) if (y >= 117 + i * 12 && y < 129 + i * 12) { this.pauseAct = i; return true; }
@@ -756,7 +762,7 @@ const Game = {
   },
   drawPause(ctx) {
     const ids = this.pauseItems(), extra = (ids.length - 4) * 12;
-    const LABEL = { resume: tr('resume'), map: tr('mapTitle'), easy: tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), sec: tr('secTitle'), title: tr('toTitle') };
+    const LABEL = { resume: tr('resume'), map: tr('mapTitle'), status: tr('castleStatus'), easy: tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), sec: tr('secTitle'), title: tr('toTitle') };
     const cx = View.cx, items = ids.map(id => LABEL[id]);
     const hint = tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey');
     const pw = Math.min(View.w - 8, Math.max(150, Font.width(hint) + 16, ...items.map(s => Font.width(s) + 96)));
@@ -941,10 +947,16 @@ const Game = {
     const p = W.player, pad = (n, l) => String(Math.max(0, n)).padStart(l, '0');
     const label = '#b0a080', val = '#fcfcfc';
     const right = Wd - 98, boxCx = Math.round((116 + right) / 2);
-    Font.draw(ctx, tr('hudScore'), 36, 3, label, { align: 'right' }); Font.draw(ctx, pad(this.dispScore || 0, 6), 40, 3, this.dispScore < W.score ? '#fce0a8' : val, { shadow: '#000' });
-    if (Options.easy) Font.draw(ctx, tr('tagEasy'), 82, 3, '#58f898');
-    Font.draw(ctx, tr('hudTime'), boxCx - 13, 3, label, { align: 'right' });
-    Font.draw(ctx, pad(W.time, 4), boxCx - 9, 3, W.time <= 30 && (W.frame & 16) ? '#fc7460' : val, { shadow: '#000' });
+    if (Castle.on) { // Schloss: Stufe mit EXP-Leiste statt Punkten, Gold in der Mitte statt der (stehenden) Zeit
+      Font.draw(ctx, 'LV', 18, 3, label, { align: 'right' }); Font.draw(ctx, pad(Castle.rpg.lv, 2), 22, 3, val, { shadow: '#000' });
+      const k = clamp(Castle.expProgress(), 0, 1); R('#000', 37, 4, 66, 5); R('#1c2c14', 38, 5, 64, 3); R('#58f898', 38, 5, Math.round(64 * k), 3); R('#b8fcd0', 38, 5, Math.round(64 * k), 1);
+      Font.draw(ctx, pad(this.dispScore || 0, 6), boxCx, 3, this.dispScore < W.score ? '#fce0a8' : '#f8b800', { align: 'center', shadow: '#000' });
+    } else {
+      Font.draw(ctx, tr('hudScore'), 36, 3, label, { align: 'right' }); Font.draw(ctx, pad(this.dispScore || 0, 6), 40, 3, this.dispScore < W.score ? '#fce0a8' : val, { shadow: '#000' });
+      if (Options.easy) Font.draw(ctx, tr('tagEasy'), 82, 3, '#58f898');
+      Font.draw(ctx, tr('hudTime'), boxCx - 13, 3, label, { align: 'right' });
+      Font.draw(ctx, pad(W.time, 4), boxCx - 9, 3, W.time <= 30 && (W.frame & 16) ? '#fc7460' : val, { shadow: '#000' });
+    }
     Font.draw(ctx, tr('hudStage'), Wd - 35, 3, label, { align: 'right' });
     Font.draw(ctx, pad(W.stage + 1, 1) + '-' + (W.roomIdx + 1), Wd - 30, 3, val, { shadow: '#000' });
     Font.draw(ctx, tr('hudPlayer'), 6, 13, label);

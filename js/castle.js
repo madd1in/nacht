@@ -8,6 +8,9 @@
 // Kammern wie in SotN: In der Speicherkammer (roter Sarg) wird der Spielstand gesichert und die Energie aufgefüllt – er
 // übersteht eine neue Browser-Sitzung (Titel: FORTSETZEN, ebenso nach Game Over). Die Warpkammer daneben wird beim
 // Betreten freigeschaltet; mit ↑ geht es per Karte in jede freigeschaltete Warpkammer (Schnellreise).
+// RPG wie in SotN: besiegte Gegner geben EXP, Stufenaufstieg („LEVEL UP!") erhöht max. HP, STR (Schaden) und CON (Abwehr);
+// Treffer zeigen Schadenszahlen, Gegner lassen Gold, Herzen und Braten fallen. Pause → STATUS. Stufe, EXP, Besiegte und
+// Spielzeit speichert die Speicherkammer (wie in SotN geht Ungespeichertes nach Game Over verloren).
 'use strict';
 
 const Castle = (() => {
@@ -57,7 +60,8 @@ const Castle = (() => {
     const p = W.player;
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, s: S()[c.s].id, r: c.r, place: { x: c.x, y: c.y, chamber: 'save' },
-        hero: Options.character, hearts: p.hearts, sub: p.sub, whip: p.whip, score: W.score, lives: W.lives, at: Date.now() }));
+        hero: Options.character, hearts: p.hearts, sub: p.sub, whip: p.whip, score: W.score, lives: W.lives, at: Date.now(),
+        lv: rpg.lv, exp: rpg.exp, kills: rpg.kills, frames: rpg.frames }));
       return true;
     } catch (e) { return false; }
   }
@@ -358,6 +362,7 @@ const Castle = (() => {
     W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber));
     for (const d of doorsOf(s, r)) W.spawn(new CastleDoor(d, def));
     for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
+    hpSeen.clear(); applyHp(W.player); // neuer Raum: Gegner des alten zählen nicht als besiegt
     inSave = arrive && arrive.place && arrive.place.chamber === 'save' ? roomKey(s, r) + ':save' : null; // beim Fortsetzen nicht gleich noch einmal speichern
     if (arrive && arrive.place !== 'start') {
       const p = W.player;
@@ -395,6 +400,7 @@ const Castle = (() => {
   function update(P) {
     const c = heroCell(), s = W.stage, r = W.roomIdx, key = roomKey(s, r);
     if (!c) return;
+    rpg.frames++; applyHp(W.player); trackHits(); // RPG: Spielzeit, max. HP der Stufe, Treffer und Besiegte
     let dirty = false;
     const set = seen[key] || (seen[key] = new Set()), i = c.y * c.cw + c.x;
     if (!set.has(i)) { set.add(i); dirty = true; }
@@ -439,6 +445,94 @@ const Castle = (() => {
     Game.bossName = 0; Audio8.tempo(1); Audio8.play('fanfare', W.songName()); Audio8.sfx('bigItem');
     Game.note('castleSeal', seals(), sealRooms().length);
     return true;
+  }
+
+  // ---------------- RPG: EXP, Stufe, Werte, Schadenszahlen, Beute ----------------
+  const rpg = { lv: 1, exp: 0, kills: 0, frames: 0 }, MAXLV = 99;
+  const expFor = (lv) => 15 * lv * (lv - 1); // Gesamt-EXP für Stufe lv: LV2 30, LV5 300, LV10 1350, LV20 5700
+  const values = () => { const b = rpg.lv - 1; return { str: 10 + b, con: 10 + b, hp: Options.maxHp + 2 * b }; };
+  const strMul = () => 1 + (values().str - 10) * 0.05, conDiv = () => 1 + (values().con - 10) * 0.04;
+  if (on) { // STR verstärkt Peitsche und Spezialwaffen, CON mindert erlittenen Schaden – nur im Schloss-Modus
+    Object.defineProperty(Options, 'dmgMul', { get: () => (Options.easy ? 2 : 1) * strMul(), configurable: true });
+    const hurt = Player.prototype.hurt;
+    Player.prototype.hurt = function (dmg, srcX) { return hurt.call(this, Math.max(1, Math.round(dmg / conDiv())), srcX); };
+  }
+  function applyHp(p) { // max. HP folgt der Stufe (Leicht-Modus verdoppelt die Grundleiste weiter)
+    const want = values().hp;
+    if (!p || p.maxHp === want) return;
+    const d = want - p.maxHp; p.maxHp = want; p.hp = clamp(p.hp + Math.max(0, d), 0, want);
+  }
+  function gainExp(n) {
+    rpg.exp += n;
+    let up = 0;
+    while (rpg.lv < MAXLV && rpg.exp >= expFor(rpg.lv + 1)) { rpg.lv++; up++; }
+    if (!up) return;
+    const p = W.player; applyHp(p);
+    Game.shout('castleLvUp'); Audio8.sfx('oneUp'); Input.rumble(0.4, 0.3, 200);
+    W.popup(p.cx, p.y - 12, 'LV ' + rpg.lv, '#58f898');
+    for (let i = 0; i < 20; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.y + rnd(0, 28), rnd(-0.6, 0.6), rnd(-2, -0.6), i % 2 ? '#58f898' : '#fce0a8', 44, 1, 0));
+  }
+  // Treffer: an der gesunkenen Lebensenergie erkennen (gilt für jede Gegnerart, ohne ihre Klassen anzufassen);
+  // verschwindet ein Gegner mit 0 Energie, war er besiegt – sonst nur aus dem Bild gelaufen oder vom Raumwechsel entfernt
+  const hpSeen = new Map();
+  function dmgNumber(e, d) { W.popup(e.cx + rnd(-4, 4), e.y - 2, String(Math.max(1, Math.round(d * 10))), e.kind === 'boss' ? '#f8b800' : '#fcfcfc'); }
+  function defeated(e) {
+    const big = e.kind === 'boss';
+    rpg.kills++;
+    gainExp(Math.max(1, Math.round((e.score || 100) / (big ? 20 : 15))));
+    const r = Math.random(), drop = big ? 'bagBig' : r < 0.05 ? 'roast' : r < 0.12 ? 'bag' : r < 0.17 ? 'heartB' : null; // Beute wie in SotN
+    if (drop) W.spawn(new Item(drop, e.cx, Math.min(e.cy, W.room.h * T - 24)));
+  }
+  function trackHits() {
+    const live = new Set();
+    for (const e of W.ents) {
+      if ((e.kind !== 'enemy' && e.kind !== 'boss') || typeof e.hp !== 'number') continue;
+      live.add(e);
+      const was = hpSeen.get(e);
+      if (was !== undefined && e.hp < was) dmgNumber(e, was - e.hp);
+      hpSeen.set(e, e.hp);
+    }
+    for (const [e, was] of hpSeen) {
+      if (live.has(e)) continue;
+      hpSeen.delete(e);
+      if (e.hp < was) dmgNumber(e, was - e.hp);
+      if (e.hp <= 0) defeated(e);
+    }
+  }
+  function newRun() { Object.assign(rpg, { lv: 1, exp: 0, kills: 0, frames: 0 }); hpSeen.clear(); }
+  const expProgress = () => rpg.lv >= MAXLV ? 1 : (rpg.exp - expFor(rpg.lv)) / (expFor(rpg.lv + 1) - expFor(rpg.lv));
+  const playTime = () => { const s = Math.floor(rpg.frames / 60), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h + ':' + String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+
+  // Statusbildschirm (Pause → STATUS): Werte wie in SotN in zwei Spalten, darunter EXP-Leiste, Karte, Siegel, Warpkammern
+  function drawStatus(ctx, t) {
+    const w = View.w, cx = View.cx, p = W.player, v = values();
+    ctx.fillStyle = 'rgba(2,4,18,0.97)'; ctx.fillRect(0, 0, w, 240);
+    ctx.fillStyle = '#c89020';
+    ctx.fillRect(6, 6, w - 12, 1); ctx.fillRect(6, 233, w - 12, 1); ctx.fillRect(6, 6, 1, 228); ctx.fillRect(w - 7, 6, 1, 228);
+    Game.big(ctx, tr('castleStatus'), cx, 12, 2, LOGO, null, '#000');
+    Font.draw(ctx, (p.def && p.def.name ? p.def.name : '') + '    LV ' + rpg.lv, cx, 34, '#f8b800', { align: 'center', shadow: '#000' });
+    const att = Math.round((p.whip >= 2 ? 2 : 1) * 10 * Options.dmgMul), next = rpg.lv >= MAXLV ? 0 : expFor(rpg.lv + 1) - rpg.exp;
+    const rows = [
+      [['HP', Math.ceil(Math.max(0, p.hp)) + '/' + p.maxHp], ['STR', v.str]],
+      [['EXP', rpg.exp], ['CON', v.con]],
+      [['NEXT', next], ['ATT', att]],
+      [['GOLD', W.score], ['DEF', Math.round(10 * conDiv())]],
+      [['KILLS', rpg.kills], ['TIME', playTime()]],
+    ];
+    const lx = cx - Math.min(118, w / 2 - 14), rx = cx + 8, colW = Math.min(110, w / 2 - 22);
+    rows.forEach((row, i) => row.forEach(([k, val], c) => {
+      const x = c ? rx : lx, y = 52 + i * 14;
+      Font.draw(ctx, k, x, y, '#b0a080');
+      Font.draw(ctx, String(val), x + colW, y, '#fcfcfc', { align: 'right', shadow: '#000' });
+    }));
+    const by = 124, bw = Math.min(220, w - 40), bx = Math.round(cx - bw / 2), k = expProgress(); // EXP bis zur nächsten Stufe
+    ctx.fillStyle = '#000'; ctx.fillRect(bx - 1, by - 1, bw + 2, 7); ctx.fillStyle = '#1c2c14'; ctx.fillRect(bx, by, bw, 5);
+    ctx.fillStyle = '#58f898'; ctx.fillRect(bx, by, Math.round(bw * clamp(k, 0, 1)), 5); ctx.fillStyle = '#b8fcd0'; ctx.fillRect(bx, by, Math.round(bw * clamp(k, 0, 1)), 1);
+    Font.draw(ctx, tr('mapCastle', percent()), cx, 142, '#fcfcfc', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('castleSealsShort', seals(), sealRooms().length), cx, 156, '#c8a0fc', { align: 'center', shadow: '#000' });
+    const wl = allChambers().filter(c => c.kind === 'warp');
+    Font.draw(ctx, tr('warpCount', wl.filter(c => warp[c.key]).length, wl.length), cx, 170, '#7cdcfc', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('statusHelp'), cx, 218, '#7c7c8c', { align: 'center' });
   }
 
   // ---------------- Erkundungsgrad ----------------
@@ -602,13 +696,16 @@ const Castle = (() => {
     if (typeof sv.hearts === 'number' && !Options.infHearts) p.hearts = sv.hearts;
     if (sv.sub) p.sub = sv.sub;
     if (typeof sv.whip === 'number' && !Options.maxWhip) p.whip = clamp(sv.whip, 1, 3);
-    p.hp = p.maxHp;
+    newRun();
+    if (sv.lv >= 1) Object.assign(rpg, { lv: Math.min(MAXLV, sv.lv | 0), exp: sv.exp | 0, kills: sv.kills | 0, frames: sv.frames | 0 });
+    applyHp(p); p.hp = p.maxHp;
   }
 
   return {
     on, update, settle, forward, bossBeaten, draw, openMap, mapInput, openWarp, warpInput, layout, castle, percent, roomPercent, firstVisit, seals,
     bossDone: (s, r) => !!boss[roomKey(s, r)],
     hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers,
+    newRun, drawStatus, expProgress, gainExp, get rpg() { return rpg; },
     get seen() { return seen; }, get warps() { return warp; },
     reset() { seen = {}; boss = {}; mini = {}; warp = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
   };

@@ -174,7 +174,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 | **1 (Prototyp erledigt)** | Kapitel werden Regionen eines Schlosses: Türen in beide Richtungen, Knoten Eingangshalle (Keller-, Turm-, Siegeltor), Wege hinter den Bossen, Einbahnen mit Rückweg, eine Karte für das ganze Schloss, Bosse geben Siegel und bleiben besiegt, kein Zeitlimit | alle Regionen frei begehbar, Thron hinter 5 Siegeln |
 | **1b (teilweise erledigt)** | erledigt: Speicherkammern mit Spielstand, „Fortsetzen" im Titel und nach Game Over, Warpkammern mit Schnellreise über die Karte. Offen: feste Raum-IDs, Regionsmusik ohne Neustart, Spielstand-Slots | Spielstand überlebt Umsortieren von `levels.js` |
 | 2 Relikte | `Player.has()`, Fluch-Szene, Reliktsockel, Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
-| 3 RPG | EXP/Level, HP/MP, Ausrüstungsmenü, Drops, Bibliothekar | Statusbildschirm, Shop |
+| **3 RPG (teilweise erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand. Offen: MP, Ausrüstungsmenü, Bibliothekar-Shop | Statusbildschirm, Shop |
 | 4 Bosse & Siegel | Arenen mit Hintertür, Siegeltor, Ende, neue Verbindungsräume | Abspann im Schloss-Modus |
 | 5 Kür | Warp-Spiegel, Schlosskarte, Geheimwände (`X`/`Y` gibt es schon), „Umgedrehtes Schloss" als Mode-7-Spiegelung | 200 % |
 
@@ -207,6 +207,14 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 - **Warpkammern** (blaue Nische mit Strudel) neben den Speicherkammern (Thron: am Torbogen vor der Brücke): betreten
   schaltet sie frei, ↑ öffnet die **SCHNELLREISE**-Karte, Pfeile wählen eine freigeschaltete Kammer, Sprung reist hin.
   Engelsstatuen sind auf der Karte jetzt blau, damit Rot für die Speicherkammern frei ist.
+- **RPG:** besiegte Gegner geben EXP (Punktwert ÷ 15, Bosse ÷ 20); Stufe n braucht insgesamt 15·n·(n−1) EXP
+  (LV2 30, LV5 300, LV10 1350). Jede Stufe: +2 max. HP, +1 STR (+5 % Schaden für Peitsche und Spezialwaffen),
+  +1 CON (erlittener Schaden ÷ (1 + 4 % je Punkt), mindestens 1). „LEVEL UP!" als Ausruf. Treffer zeigen Schadenszahlen
+  (Schaden × 10, Bosse gelb), Gegner lassen Gold, große Herzen und Braten fallen, Bosse einen großen Geldsack. Das HUD
+  zeigt LV mit EXP-Leiste und Gold statt Punkten und Zeit; Pause → **STATUS** (HP, EXP, NEXT, GOLD, KILLS, STR, CON, ATT,
+  DEF, Spielzeit, Erkundungsgrad, Siegel, Warpkammern). Stufe, EXP, Besiegte und Spielzeit sichert die Speicherkammer;
+  „SPIEL STARTEN" beginnt auf Stufe 1. Treffer werden an der gesunkenen Energie der Gegner erkannt (keine Gegnerklasse
+  geändert); STR/CON wirken über `Options.dmgMul` und `Player.hurt`, nur mit `?castle`.
 - Code: `js/castle.js` (Regionen `REGION_AT`, Verbindungen `LINKS`, Türen `CastleDoor`, Kammern `CHAMBERS`/`CastleChamber`,
   Spielstand, Karte), Einbindung in `js/game.js` (`castleGo`/`castleEnter`, `nextRoom`, `startStage`, `startClear`,
   Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map` und `warp`).
