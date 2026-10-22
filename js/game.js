@@ -147,20 +147,30 @@ const Game = {
   },
 
   startStage(s, room = 0) {
+    const say = !Castle.on || Castle.firstVisit(s); // Schloss: die Region nur beim ersten Betreten ansagen
     W.stage = s; W.time = Levels.STAGES[s].time; W.timeSub = 0; W.checkpoint = null; W.stageFrames = 0; W.miniDone = {};
     W.stats = { hits: 0, deaths: 0, combo: 0 };
     if (this.pendingView) this.applyView(this.pendingView);
     W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1)); this.shoutT = 0; this.noteT = 0;
+    if (Castle.on) Castle.settle(this.arrival);
     Audio8.stop();
     this.prewarmStage(s);
     this.go('card');
-    Voice.say(Levels.STAGES[s].voice || 'stage' + (s + 1));
+    if (say) Voice.say(Levels.STAGES[s].voice || 'stage' + (s + 1));
   },
 
   nextRoom() {
     if (this.state !== 'play') return;
     Audio8.sfx('door');
+    this.fadeTo = Castle.on ? Castle.forward() : null; // Schloss: wohin führt dieser Ausgang?
     this.go('fade');
+  },
+  // Schloss-Modus: durch eine Tür (Rand, ↑-Tür, Ausgang) – Mosaik-Überblendung, dann castleEnter
+  castleGo(tg) { Audio8.sfx('door'); this.fadeTo = tg; this.go('fade'); },
+  castleEnter(tg) { // andere Region: Regionskarte wie ein Kapitelstart, sonst nur den Raum wechseln
+    if (tg.s !== W.stage) { this.arrival = tg; this.startStage(tg.s, tg.r); this.arrival = null; return; }
+    if (this.pendingView) this.applyView(this.pendingView);
+    W.loadRoom(tg.s, tg.r); Castle.settle(tg); Audio8.play(W.songName(), null, 0.12);
   },
 
   onPlayerDeath() {
@@ -171,7 +181,9 @@ const Game = {
     this.go('respawn');
   },
 
-  startClear() { this.go('clear'); this.tallyPhase = 0; this.annT = 0; Audio8.play('clear'); Voice.say('clear'); this.recordTime(); this.rateStage(); },
+  startClear() {
+    if (Castle.on && Castle.bossBeaten()) return; // Schloss: Siegel statt Kapitelende, die Arena öffnet sich
+    this.go('clear'); this.tallyPhase = 0; this.annT = 0; Audio8.play('clear'); Voice.say('clear'); this.recordTime(); this.rateStage(); },
 
   // Arcade-Wertung S–D aus Restzeit, kassierten Treffern, bester Combo und Toden (vor der Zeitbonus-Zählung)
   rateStage() {
@@ -310,9 +322,9 @@ const Game = {
     ctx.globalAlpha = 1;
   },
   // kleine Nachricht oben im Bild (z. B. Gruß an Infernax)
-  note(key) { this.noteT = 240; this.noteKey = key; },
+  note(key, ...args) { this.noteT = 240; this.noteKey = key; this.noteArgs = args; },
   drawNote(ctx) {
-    const s = tr(this.noteKey), w = Font.width(s) + 12, x = Math.round(View.cx - w / 2), y = 48;
+    const s = tr(this.noteKey, ...(this.noteArgs || [])), w = Font.width(s) + 12, x = Math.round(View.cx - w / 2), y = 48;
     ctx.globalAlpha = this.noteT < 20 ? this.noteT / 20 : 1;
     ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.fillRect(x, y, w, 13);
     ctx.fillStyle = '#c89020'; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + 12, w, 1);
@@ -369,7 +381,7 @@ const Game = {
     if (this.revealed && this.revealT !== undefined) this.revealT++;
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
     const titleish = ['title', 'options', 'sections', 'secload', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
-    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'demo') && W.room ? W.room.theme : null);
+    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'map' || this.state === 'demo') && W.room ? W.room.theme : null);
     if (titleish && this.bootBg) this.bootBg.tick(); // Kulisse des Ladebildschirms unter den Menüs
     if (titleish) {
       FX.updateStorm(this.tStorm, View.w, () => { if (Audio8.ready()) setTimeout(() => Audio8.sfx('thunder'), 250 + Math.random() * 600); });
@@ -421,22 +433,29 @@ const Game = {
         if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
         break;
       case 'play': this.updatePlay(P); break;
-      case 'pause': // Pausenmenü: WEITER / LEICHT-MODUS / ABSCHNITT WÄHLEN / ZUM TITEL
-        if (P.up || P.down) { this.pauseSel = ((this.pauseSel || 0) + (P.down ? 1 : 3)) % 4; Audio8.sfx('select'); }
-        if (this.pauseAct !== undefined) {
-          this.pauseSel = this.pauseAct; this.pauseAct = undefined;
-          if (this.pauseSel === 1) this.toggleEasy(); else if (this.pauseSel === 0) this.unpause = true;
-          else if (this.pauseSel === 2) { this.go('pausesec'); Audio8.sfx('select'); break; }
-          else if (this.t > 10) { Audio8.setMusicVolume(0.5); Audio8.muffle(false); this.finishRun(false); break; }
-        }
-        if ((P.jump || P.attack) && this.pauseSel === 1) this.toggleEasy();
-        else if ((P.jump || P.attack) && this.pauseSel === 2) { this.go('pausesec'); Audio8.sfx('select'); } // Abschnittswahl mitten im Spiel
-        else if ((P.jump || P.attack) && this.pauseSel === 3 && this.t > 10) {
+      case 'pause': { // Pausenmenü: WEITER / (KARTE) / LEICHT-MODUS / ABSCHNITT WÄHLEN / ZUM TITEL
+        const items = this.pauseItems(), n = items.length;
+        if (P.up || P.down) { this.pauseSel = ((this.pauseSel || 0) + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
+        const tap = this.pauseAct !== undefined; // Touch: Menüpunkt angetippt
+        if (tap) { this.pauseSel = this.pauseAct; this.pauseAct = undefined; }
+        const it = items[this.pauseSel || 0], ok = tap || P.jump || P.attack;
+        if (ok && it === 'easy') this.toggleEasy();
+        else if (ok && it === 'map') { this.go('map'); Castle.openMap(); Audio8.sfx('select'); } // Schloss-Modus: Karte
+        else if (ok && it === 'sec') { this.go('pausesec'); Audio8.sfx('select'); } // Abschnittswahl mitten im Spiel
+        else if (ok && it === 'title' && this.t > 10) {
           this.unpause = false; Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('select'); this.finishRun(false); // Score zählt trotzdem
-        } else if (P.start || this.unpause || ((P.jump || P.attack) && !this.pauseSel)) {
+        } else if (P.start || this.unpause || (ok && it === 'resume')) {
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('pause'); }
         break;
+      }
+      case 'map': // Schlosskarte (nur ?castle): Angriff zoomt, Pfeile scrollen, Sprung/Start zurück zur Pause
+        if ((P.start || P.jump) && this.t > 8) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('map'); Audio8.sfx('pause'); break; }
+        Castle.mapInput(P);
+        break;
       case 'fade':
+        if (this.t === 18 && this.fadeTo) { // Schloss: Tür in einen anderen Raum (andere Region → Regionskarte)
+          const tg = this.fadeTo; this.fadeTo = null; this.castleEnter(tg); break;
+        }
         if (this.t === 18 && W.roomIdx + 1 >= W.stageDef.rooms.length) { // letzter Abschnitt ohne Bossarena (Ankunft am Burggraben): Kapitel geschafft –
           if (W.stage + 1 >= Levels.STAGES.length) { this.state = 'play'; W.stageClear(); break; } // ohne Abrechnungsbild (störte den Spielfluss), Bonus still gutgeschrieben
           this.recordTime(); this.rateStage(); W.addScore(W.time * 10 + W.player.hearts * 100 + (this.rankBonus || 0));
@@ -449,6 +468,7 @@ const Game = {
         if (this.t === 30) {
           if (this.pendingView) this.applyView(this.pendingView);
           W.loadRoom(W.stage, W.roomIdx); W.applyCheckpoint(); W.time = W.stageDef.time;
+          if (Castle.on) Castle.settle(null); // Türen und besiegte Bosse wiederherstellen
         }
         if (this.t > 44) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.hurryT = 0; this.readyT = 1; }
         break;
@@ -509,12 +529,13 @@ const Game = {
     if (this.noteT > 0) this.noteT--;
     if (W.slowmo > 0) { W.slowmo--; if (this.t % 3) return; } // Zeitlupe
     W.update(); this.updateBars();
+    if (Castle.on && this.state === 'play') Castle.update(P); // Schloss: Kartenzellen aufdecken, Türen benutzen
     if (!W.cleared) W.stageFrames++;
     if (this.hurryT > 0) this.hurryT--;
     if (W.boss && this.bossName < 150) { if (this.bossName === 0) Voice.say(W.boss.voice || 'boss' + (W.stage + 1)); this.bossName++; }
     const p = W.player;
     if (p.alive && p.hp <= p.maxHp / 4 && this.t % 50 === 0) Audio8.sfx('beat');
-    if (p.alive && !W.cleared && W.freeze === 0 && ++W.timeSub >= 40) {
+    if (!Castle.on && p.alive && !W.cleared && W.freeze === 0 && ++W.timeSub >= 40) { // Schloss: kein Zeitlimit
       W.timeSub = 0; W.time--;
       if (W.time <= 30 && W.time > 0) Audio8.sfx('tick');
       if (W.time === 60) { this.hurryT = 150; Audio8.tempo(1.12); Audio8.sfx('bell'); } // Zeit wird knapp: Musik zieht an
@@ -562,6 +583,7 @@ const Game = {
         this.drawHud(ctx);
         if (this.state === 'pause') this.drawPause(ctx);
         if (this.state === 'pausesec') this.drawSections(ctx, true);
+        if (this.state === 'map') Castle.draw(ctx, this.t);
         if (this.state === 'fade') this.mosaicFade(ctx, this.t < 18 ? this.t / 16 : 1 - (this.t - 18) / 12);
         if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 30 ? this.t / 28 : 1 - (this.t - 30) / 14);
         if (this.hurryT > 0 && this.state === 'play') this.drawHurry(ctx);
@@ -701,25 +723,28 @@ const Game = {
     Audio8.sfx(Options.easy ? 'heart' : 'select');
   },
   // Touch im Pausenmenü: Tipp auf einen Menüpunkt wählt ihn (true), sonst geht es weiter
+  pauseItems() { return Castle.on ? ['resume', 'map', 'easy', 'sec', 'title'] : ['resume', 'easy', 'sec', 'title']; },
   pauseTouch(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect(), y = (clientY - r.top) / r.height * 240;
-    for (let i = 0; i < 4; i++) if (y >= 117 + i * 12 && y < 129 + i * 12) { this.pauseAct = i; return true; }
+    for (let i = 0; i < this.pauseItems().length; i++) if (y >= 117 + i * 12 && y < 129 + i * 12) { this.pauseAct = i; return true; }
     return false;
   },
   drawPause(ctx) {
-    const cx = View.cx, items = [tr('resume'), tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), tr('secTitle'), tr('toTitle')];
+    const ids = this.pauseItems(), extra = (ids.length - 4) * 12;
+    const LABEL = { resume: tr('resume'), map: tr('mapTitle'), easy: tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), sec: tr('secTitle'), title: tr('toTitle') };
+    const cx = View.cx, items = ids.map(id => LABEL[id]);
     const hint = tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey');
     const pw = Math.min(View.w - 8, Math.max(150, Font.width(hint) + 16, ...items.map(s => Font.width(s) + 96)));
-    ctx.fillStyle = '#000'; ctx.fillRect(cx - pw / 2, 96, pw, 94);
-    ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - pw / 2 + 0.5, 96.5, pw - 1, 93);
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - pw / 2, 96, pw, 94 + extra);
+    ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - pw / 2 + 0.5, 96.5, pw - 1, 93 + extra);
     Font.draw(ctx, tr('pause'), cx, 104, '#fcfcfc', { align: 'center' });
     items.forEach((s, i) => {
       const on = (this.pauseSel || 0) === i;
-      Font.draw(ctx, s, cx - 46, 120 + i * 12, on ? (i === 1 && Options.easy ? '#58f898' : '#fcfcfc') : '#8c8c8c');
+      Font.draw(ctx, s, cx - 46, 120 + i * 12, on ? (ids[i] === 'easy' && Options.easy ? '#58f898' : '#fcfcfc') : '#8c8c8c');
       if (on && (this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - 60, 119 + i * 12);
     });
-    Font.draw(ctx, hint, cx, 176, '#7c7c7c', { align: 'center' });
-    if (!Audio8.ready()) Font.draw(ctx, tr('soundShort'), cx, 196, '#7c7c7c', { align: 'center' });
+    Font.draw(ctx, hint, cx, 176 + extra, '#7c7c7c', { align: 'center' });
+    if (!Audio8.ready()) Font.draw(ctx, tr('soundShort'), cx, 196 + extra, '#7c7c7c', { align: 'center' });
   },
 
   panel(ctx, title, sub) {
@@ -1109,7 +1134,7 @@ const Game = {
       const s = rooms[this.secSel].s, ns = (s + (P.right ? 1 : Levels.STAGES.length - 1)) % Levels.STAGES.length;
       this.secSel = rooms.findIndex(e => e.s === ns); Audio8.sfx('select');
     }
-    if (P.start && this.t > 8) { if (ingame) { this.go('pause'); this.pauseSel = 2; } else this.go('title'); Audio8.sfx('pause'); return; }
+    if (P.start && this.t > 8) { if (ingame) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('sec'); } else this.go('title'); Audio8.sfx('pause'); return; }
     if ((P.jump || P.attack) && this.t > 8) {
       const e = rooms[this.secSel];
       try { localStorage.setItem('nachtmahr.sec', String(this.secSel)); } catch (err) { /* privat */ }
@@ -1125,9 +1150,18 @@ const Game = {
     const idx = L.indexOf(sel), rows = 13, top = clamp(idx - 6, 0, Math.max(0, L.length - rows)), lx = Math.max(12, cx - 120);
     for (let k = 0; k < rows && top + k < L.length; k++) {
       const e = L[top + k], y = 58 + k * 11, on = e === sel;
-      if (e.head) { Font.draw(ctx, e.label, lx, y, '#f8b800', { shadow: '#000' }); ctx.fillStyle = 'rgba(200,144,32,0.4)'; ctx.fillRect(lx, y + 8, 240, 1); continue; }
+      if (e.head) {
+        Font.draw(ctx, e.label, lx, y, '#f8b800', { shadow: '#000' }); ctx.fillStyle = 'rgba(200,144,32,0.4)'; ctx.fillRect(lx, y + 8, 240, 1);
+        if (Castle.on) { // Schloss: Erkundungsgrad der Region, rotes Siegel, wenn ihr Boss besiegt ist
+          Font.draw(ctx, Math.floor(Castle.percent(e.s)) + '%', lx + 240, y, '#c8a0fc', { align: 'right', shadow: '#000' });
+          const ar = Levels.STAGES[e.s].rooms.findIndex(d => d.arena);
+          if (ar >= 0 && Castle.bossDone(e.s, ar)) { ctx.fillStyle = '#fc3c3c'; ctx.fillRect(lx + 200, y + 1, 5, 5); ctx.fillStyle = '#fce0a8'; ctx.fillRect(lx + 202, y + 3, 1, 1); }
+        }
+        continue;
+      }
       if (on) { ctx.fillStyle = 'rgba(200,40,40,0.35)'; ctx.fillRect(lx + 4, y - 2, 244, 11); if ((this.t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx + 6, y - 1); }
       Font.draw(ctx, e.label, lx + 18, y, on ? '#fcfcfc' : '#a0a0b0', { shadow: '#000', wave: on ? 1.2 : 0, t: this.t });
+      if (Castle.on) { const p = Castle.roomPercent(e.s, e.r); Font.draw(ctx, p + '%', lx + 240, y, p >= 100 ? '#f8b800' : p ? '#8c9cc8' : '#4c4c5c', { align: 'right', shadow: '#000' }); }
     }
     Font.draw(ctx, tr('secHelp'), cx, 212, '#7c7c8c', { align: 'center' });
   },
