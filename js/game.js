@@ -155,7 +155,7 @@ const Game = {
     W.loadRoom(s, Math.min(room, Levels.STAGES[s].rooms.length - 1)); this.shoutT = 0; this.noteT = 0;
     if (Castle.on) Castle.settle(this.arrival);
     Audio8.stop();
-    this.prewarmStage(s);
+    if (Castle.on && this.warmedStages && this.warmedStages.has(s)) this.warmJobs = []; else this.prewarmStage(s); // Schloss: Region schon vorgebaut
     this.go('card');
     if (say) Voice.say(Levels.STAGES[s].voice || 'stage' + (s + 1));
   },
@@ -177,11 +177,11 @@ const Game = {
     if (!Castle.on) return ['start', 'castle', 'options', 'lang', 'scores', 'sections'];
     return [...(Castle.hasSave() ? ['cont'] : []), 'start', 'arcade', 'options', 'lang', 'scores', 'sections'];
   },
-  switchMode(castle) {
+  switchMode(castle) { // Schloss-Modus ist Standard, ?arcade lädt das lineare Arcade-Spiel
     const u = new URL(location.href);
-    if (castle) u.searchParams.set('castle', ''); else u.searchParams.delete('castle');
-    u.searchParams.delete('stage'); u.searchParams.delete('room');
-    location.href = u.toString().replace(/=(?=&|$)/g, ''); // leere Schalter ohne „=“ (?castle&noboot)
+    ['castle', 'arcade', 'stage', 'room'].forEach(k => u.searchParams.delete(k));
+    if (!castle) u.searchParams.set('arcade', '');
+    location.href = u.toString().replace(/=(?=&|$)/g, ''); // leere Schalter ohne „=“ (?arcade&noboot)
   },
   // Schloss-Modus: am Spielstand der letzten Speicherkammer weiterspielen (Titel: FORTSETZEN, und nach Game Over)
   castleContinue() {
@@ -455,9 +455,9 @@ const Game = {
         if ((P.start || P.attack || P.jump) && this.t > 20) { Voice.stop(); this.newGame(0); }
         else if ((this.t > 60 * 9 && !Voice.busy()) || this.t > 60 * 24) this.newGame(0); // Erzähler ausreden lassen
         break;
-      case 'card':
+      case 'card': // Schloss-Modus: Regionsname nur kurz (30–90 Bilder statt 75–140)
         if (this.warming()) break; // erst wenn die Stage fertig vorgebaut ist (Ladebalken auf der Karte)
-        if ((this.t > 75 && !Voice.busy()) || this.t > 140 || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
+        if ((this.t > (Castle.on ? 30 : 75) && !Voice.busy()) || this.t > (Castle.on ? 90 : 140) || ((P.start || P.jump || P.attack) && this.t > 12)) { this.go('play'); Audio8.play(W.songName()); Audio8.tempo(1); this.bossName = 0; this.hurryT = 0; this.readyT = 1; }
         break;
       case 'play': this.updatePlay(P); break;
       case 'pause': { // Pausenmenü: WEITER / (KARTE) / LEICHT-MODUS / ABSCHNITT WÄHLEN / ZUM TITEL
@@ -469,6 +469,10 @@ const Game = {
         if (ok && it === 'easy') this.toggleEasy();
         else if (ok && it === 'map') { this.go('map'); Castle.openMap(); Audio8.sfx('select'); } // Schloss-Modus: Karte
         else if (ok && it === 'status') { this.go('status'); Audio8.sfx('select'); } // Schloss-Modus: Werte wie in SotN
+        else if (ok && it === 'skip') { // Schloss-Modus: Prolog (Schiff, Wald) überspringen – direkt ans Burgtor
+          this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false);
+          this.castleGo({ s: Levels.STAGES.findIndex(st => st.id === 0), r: 0, place: 'start' });
+        }
         else if (ok && it === 'sec') { this.go('pausesec'); Audio8.sfx('select'); } // Abschnittswahl mitten im Spiel
         else if (ok && it === 'title' && this.t > 10) {
           this.unpause = false; Audio8.setMusicVolume(0.5); Audio8.muffle(false); Audio8.sfx('select'); this.finishRun(false); // Score zählt trotzdem
@@ -635,6 +639,7 @@ const Game = {
         if (this.state === 'play' && this.shoutT > 0) this.drawShout(ctx);
         if (this.state === 'play') this.drawTut(ctx);
         if (this.state === 'play' && this.noteT > 0) this.drawNote(ctx);
+        if (this.state === 'play' && Castle.on) Castle.drawGoalToast(ctx); // Schloss: Wegweiser unten im Bild
         if (this.state === 'clear') this.drawClear(ctx);
         if (this.state === 'demo') this.drawDemo(ctx);
     }
@@ -764,7 +769,7 @@ const Game = {
     Audio8.sfx(Options.easy ? 'heart' : 'select');
   },
   // Touch im Pausenmenü: Tipp auf einen Menüpunkt wählt ihn (true), sonst geht es weiter
-  pauseItems() { return Castle.on ? ['resume', 'map', 'status', 'easy', 'sec', 'title'] : ['resume', 'easy', 'sec', 'title']; },
+  pauseItems() { return Castle.on ? ['resume', 'map', 'status', ...(Castle.inPrologue() ? ['skip'] : []), 'easy', 'sec', 'title'] : ['resume', 'easy', 'sec', 'title']; },
   pauseTouch(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect(), y = (clientY - r.top) / r.height * 240;
     for (let i = 0; i < this.pauseItems().length; i++) if (y >= 117 + i * 12 && y < 129 + i * 12) { this.pauseAct = i; return true; }
@@ -772,10 +777,11 @@ const Game = {
   },
   drawPause(ctx) {
     const ids = this.pauseItems(), extra = (ids.length - 4) * 12;
-    const LABEL = { resume: tr('resume'), map: tr('mapTitle'), status: tr('castleStatus'), easy: tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), sec: tr('secTitle'), title: tr('toTitle') };
+    const LABEL = { resume: tr('resume'), map: tr('mapTitle'), status: tr('castleStatus'), skip: tr('castleSkipPrologue'), easy: tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), sec: tr('secTitle'), title: tr('toTitle') };
     const cx = View.cx, items = ids.map(id => LABEL[id]);
     const hint = tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey');
     const pw = Math.min(View.w - 8, Math.max(150, Font.width(hint) + 16, ...items.map(s => Font.width(s) + 96)));
+    if (Castle.on) Castle.drawGoalBanner(ctx, 66); // Schloss: nächstes Ziel
     ctx.fillStyle = '#000'; ctx.fillRect(cx - pw / 2, 96, pw, 94 + extra);
     ctx.strokeStyle = '#c89020'; ctx.strokeRect(cx - pw / 2 + 0.5, 96.5, pw - 1, 93 + extra);
     Font.draw(ctx, tr('pause'), cx, 104, '#fcfcfc', { align: 'center' });
@@ -896,7 +902,7 @@ const Game = {
     if (!this.warming() || this.state === 'play' || (this.state === 'card' && this.t < 2)) return; // die Karte mit dem Ladebalken erst zeigen
     const t0 = performance.now();
     do { try { this.warmJobs.shift()(); } catch (e) { console.warn(e); } } while (this.warmJobs.length && performance.now() - t0 < 8);
-    if (!this.warmJobs.length) this.warmDoneT = this.t;
+    if (!this.warmJobs.length) { this.warmDoneT = this.t; (this.warmedStages || (this.warmedStages = new Set())).add(W.stage); }
   },
   // erster Raum einmal unsichtbar zeichnen: alles, was sonst beim ersten Bild gebaut würde (Wald, Torhaus, Lichter …), ist danach fertig
   warmCtx() { const c = this.warmC && this.warmC.width === View.w ? this.warmC : (this.warmC = Sprites.canvas(View.w, 240)); return c.getContext('2d'); },

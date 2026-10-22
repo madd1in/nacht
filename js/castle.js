@@ -1,11 +1,11 @@
-// Schloss-Modus (nur mit ?castle – Plan in docs/SOTN-PLAN.md): aus den Kapiteln wird ein zusammenhängendes Schloss im Stil
+// Schloss-Modus (Standard; ?arcade = lineares Arcade-Spiel – Plan in docs/SOTN-PLAN.md): aus den Kapiteln wird ein zusammenhängendes Schloss im Stil
 // von Symphony of the Night. Die Kapitel sind Regionen, jeder Raum hat Türen in beide Richtungen (zurück durch den linken
 // Rand, in Turmräumen mit ↑ an der Starttür), die Eingangshalle ist der Knoten: Kellertür in die Katakomben, Turmtür auf dem
 // Sims zum Bergfried, Siegeltor auf der Galerie zum Thron. Hinter besiegten Bossen öffnen sich neue Wege; Bosse bleiben
 // besiegt und geben je ein Siegel. Kein Zeitlimit.
 // Karte: jeder Raum zerfällt in Zellen zu 16×13 Kacheln (etwa ein Bildschirm); betretene Zellen werden aufgedeckt und mit
 // den Siegeln im localStorage gemerkt. Pause → KARTE zeigt das ganze Schloss (Angriff: Zoom, Pfeile: Scrollen).
-// Kammern wie in SotN: In der Speicherkammer (roter Sarg) wird der Spielstand gesichert und die Energie aufgefüllt – er
+// Kammern wie in SotN: In der Speicherkammer (Steinnische mit Sarg und Kerzen) wird der Spielstand gesichert und die Energie aufgefüllt – er
 // übersteht eine neue Browser-Sitzung (Titel: FORTSETZEN, ebenso nach Game Over). Die Warpkammer daneben wird beim
 // Betreten freigeschaltet; mit ↑ geht es per Karte in jede freigeschaltete Warpkammer (Schnellreise).
 // RPG wie in SotN: besiegte Gegner geben EXP, Stufenaufstieg („LEVEL UP!") erhöht max. HP, STR (Schaden) und CON (Abwehr);
@@ -14,7 +14,7 @@
 'use strict';
 
 const Castle = (() => {
-  const on = /[?&]castle\b/.test(location.search);
+  const on = /[?&]castle\b/.test(location.search) || !/[?&]arcade\b/.test(location.search); // Standard; ?arcade = lineares Arcade-Spiel
   const CW = 16, CH = 13, KEY = 'nachtmahr.map', SAVE_KEY = 'nachtmahr.castle';
   const SOLID = '#=XYB', STAND = ['candle', 'chest', 'statue', 'ring', 'crumble', 'elevator', 'platform'];
   // Lage der Regionen auf der Schlosskarte (Zellen; jede Region ordnet ihre Räume selbst an, erster Raum bei 0,0)
@@ -377,26 +377,33 @@ const Castle = (() => {
   }
   const allChambers = () => { const out = []; S().forEach((st, s) => st.rooms.forEach((d, r) => out.push(...chambersOf(s, r)))); return out; };
 
-  // Kammer in der Welt: Steinnische mit Rundbogen; Speichern: roter Sarg im roten Licht, Warp: kreisender Strudel
+  // Kammer in der Welt: Steinnische mit Rundbogen; Speichern: Sarg zwischen zwei Kerzen im warmen Licht, Warp: kreisender Strudel
   class CastleChamber extends Ent {
     constructor(c) { super((c.x + 1) * T - 20, (c.y + 1) * T - 52, 40, 52); this.kind = 'prop'; this.c = c; this.pulse = 0; }
     update() { this.t++; if (this.pulse > 0) this.pulse--; }
     lightUp(L, cx, cy) {
       const save = this.c.kind === 'save', on = save || warp[this.c.key];
-      L.push({ x: this.cx - cx, y: this.y - cy + 30, r: 40 + Math.sin(this.t * 0.05) * 4 + this.pulse, c: save ? [252, 60, 50] : on ? [110, 200, 255] : [90, 110, 160], a: save ? 0.7 : 0.55 });
+      L.push({ x: this.cx - cx, y: this.y - cy + 34, r: (save ? 32 : 40) + Math.sin(this.t * 0.05) * 3 + this.pulse, c: save ? [252, 196, 130] : on ? [110, 200, 255] : [90, 110, 160], a: save ? 0.45 : 0.55 });
     }
     draw(ctx) {
       const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), cx = x + 20, bot = y + 52, save = this.c.kind === 'save', t = this.t;
-      const fr = save ? '#a8282c' : '#2c6cb0', dk = save ? '#3c080c' : '#0c1c3c', hi = save ? '#fca0a0' : '#a8dcfc';
+      const fr = save ? '#5c5468' : '#2c6cb0', dk = save ? '#1c1824' : '#0c1c3c', hi = save ? '#a8a0b8' : '#a8dcfc';
       arch(ctx, cx, y, 20, bot, dk); arch(ctx, cx, y + 1, 19, bot, fr); arch(ctx, cx, y + 2, 18, bot, hi); arch(ctx, cx, y + 3, 17, bot, fr);
-      arch(ctx, cx, y + 5, 15, bot, '#05020a');
-      if (save) { // rotes Licht von oben, Sarg auf dem Sockel
-        for (let k = 0; k < 4; k++) { ctx.globalAlpha = (0.12 + 0.05 * Math.sin(t * 0.05)) * (k + 1) + this.pulse / 120; arch(ctx, cx, y + 6 + k * 3, 14 - k * 3, bot, '#e83020'); }
+      if (save) arch(ctx, cx, y + 4, 16, bot, '#9c7830'); // feine Goldkante
+      arch(ctx, cx, y + 5, 15, bot, '#07050c');
+      if (save) { // Ruhenische: dunkler Sarg aus poliertem Holz mit Messingbeschlag, zwei Kerzen, warmes Kerzenlicht
+        for (let k = 0; k < 3; k++) { ctx.globalAlpha = (0.05 + 0.02 * Math.sin(t * 0.06)) * (k + 1) + this.pulse / 160; arch(ctx, cx, y + 16 + k * 6, 12 - k * 3, bot, '#c88440'); }
         ctx.globalAlpha = 1;
-        ctx.fillStyle = '#2c1c14'; ctx.fillRect(cx - 9, bot - 6, 18, 6); ctx.fillStyle = '#5c3c24'; ctx.fillRect(cx - 9, bot - 6, 18, 1); // Sockel
-        ctx.fillStyle = '#3c140c'; ctx.beginPath(); ctx.moveTo(cx - 4, bot - 34); ctx.lineTo(cx + 4, bot - 34); ctx.lineTo(cx + 6, bot - 26); ctx.lineTo(cx + 4, bot - 6); ctx.lineTo(cx - 4, bot - 6); ctx.lineTo(cx - 6, bot - 26); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#8c2c1c'; ctx.fillRect(cx - 4, bot - 34, 8, 1); ctx.fillRect(cx - 6, bot - 26, 1, 4);
-        ctx.fillStyle = '#f8b800'; ctx.fillRect(cx - 1, bot - 30, 2, 12); ctx.fillRect(cx - 4, bot - 26, 8, 2); // Kreuz auf dem Deckel
+        ctx.fillStyle = '#2c2430'; ctx.fillRect(cx - 10, bot - 5, 20, 5); ctx.fillStyle = '#4c4458'; ctx.fillRect(cx - 10, bot - 5, 20, 1); // Steinsockel
+        ctx.fillStyle = '#24140e'; ctx.beginPath(); ctx.moveTo(cx - 4, bot - 36); ctx.lineTo(cx + 4, bot - 36); ctx.lineTo(cx + 6, bot - 28); ctx.lineTo(cx + 4, bot - 5); ctx.lineTo(cx - 4, bot - 5); ctx.lineTo(cx - 6, bot - 28); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#4c3020'; ctx.fillRect(cx - 4, bot - 36, 8, 1); ctx.fillRect(cx - 6, bot - 28, 1, 3); ctx.fillRect(cx - 4, bot - 34, 1, 26); // Glanzkante
+        ctx.fillStyle = '#a88850'; ctx.fillRect(cx - 4, bot - 29, 8, 1); ctx.fillRect(cx - 3, bot - 12, 6, 1); // Messingbänder
+        ctx.fillStyle = '#c8a860'; ctx.fillRect(cx - 1, bot - 23, 2, 2); ctx.fillRect(cx, bot - 24, 1, 4); ctx.fillRect(cx - 2, bot - 22, 4, 1); // kleine Raute
+        for (const s of [-1, 1]) { // Kerzen links und rechts, die Flammen flackern
+          const kx = cx + s * 9;
+          ctx.fillStyle = '#e8dcc8'; ctx.fillRect(kx - 1, bot - 11, 2, 6); ctx.fillStyle = '#6c5c4c'; ctx.fillRect(kx - 2, bot - 5, 4, 1);
+          const f = (t + (s > 0 ? 7 : 0)) >> 2 & 3; ctx.fillStyle = f === 3 ? '#fce0a8' : '#fcc860'; ctx.fillRect(kx - (f & 1), bot - 13 - (f === 2 ? 1 : 0), 1 + (f & 1), 2);
+        }
       } else { // Strudel: Ringe kreisen, freigeschaltet leuchtend
         const on = warp[this.c.key], a = t * 0.06;
         for (let i = 0; i < 5; i++) {
@@ -461,7 +468,7 @@ const Castle = (() => {
       const p = W.player;
       if (relic[this.k] || !p.alive || !Phys.overlap(this, p)) return;
       relic[this.k] = 1; save(); this.dead = true;
-      Game.note('castleRelic', tr('relic_' + this.k), tr('relicD_' + this.k));
+      Game.note('castleRelic', tr('relic_' + this.k), tr('relicD_' + this.k)); announceGoal(250);
       Audio8.sfx('bigItem'); Audio8.sfx('rosary'); Input.rumble(0.6, 0.5, 400); W.flash = 8;
       for (let i = 0; i < 30; i++) W.spawn(new Particle(this.cx + rnd(-8, 8), this.y + rnd(0, 20), rnd(-1.4, 1.4), rnd(-2.4, -0.4), i % 2 ? RELIC_COL[this.k] : '#fcfcfc', 56, 1, 0));
     }
@@ -516,7 +523,7 @@ const Castle = (() => {
     Game.note(ok ? 'castleSaved' : 'castleSaveFail'); Audio8.sfx('checkpoint'); Audio8.sfx('heart'); Input.rumble(0.3, 0.2, 150);
     const e = W.ents.find(o => o instanceof CastleChamber && o.c.key === c.key);
     if (e) e.pulse = 40;
-    for (let i = 0; i < 18; i++) W.spawn(new Particle((c.x + 1) * T + rnd(-10, 10), (c.y + 1) * T - rnd(4, 40), rnd(-0.4, 0.4), rnd(-1.4, -0.3), i % 2 ? '#fc5040' : '#fce0a8', 46, 1, 0));
+    for (let i = 0; i < 18; i++) W.spawn(new Particle((c.x + 1) * T + rnd(-10, 10), (c.y + 1) * T - rnd(4, 40), rnd(-0.4, 0.4), rnd(-1.4, -0.3), i % 2 ? '#c8a860' : '#fce0a8', 46, 1, 0));
   }
 
   // nach jedem Raumaufbau (Tür, Kapitelstart, Wiedereinstieg nach dem Tod): Türen setzen, besiegte Bosse fernhalten,
@@ -531,10 +538,11 @@ const Castle = (() => {
     for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
     for (const e of def.ents) if (e.type === 'vessel') { const k = key + ':v' + e.x; if (!vessel[k]) W.spawn(new LifeVessel(e, k)); } // Lebensgefäße
     if (arrive && def.side) Game.note('castleSideRoom', def.label, '*'.repeat(def.tier)); // Zusatzraum: Name und Gefahrenstufe
+    if (arrive && arrive.place && arrive.place.chamber === 'save') announceGoal(90); // Fortsetzen: woran war ich?
     spawnRelics(s, r, def, arrive);
     if (S()[s].id === 0 && !flag.curse) { // Burgtor: der Fluch des Grafen raubt die Kräfte (einmal)
       flag.curse = 1; save();
-      Game.note('castleCurse'); W.flash = 10; W.shake = Math.max(W.shake, 14); Audio8.sfx('roar'); Audio8.sfx('thunder'); Input.rumble(0.8, 0.6, 600);
+      Game.note('castleCurse'); announceGoal(260); W.flash = 10; W.shake = Math.max(W.shake, 14); Audio8.sfx('roar'); Audio8.sfx('thunder'); Input.rumble(0.8, 0.6, 600);
     }
     hpSeen.clear(); applyHp(W.player); // neuer Raum: Gegner des alten zählen nicht als besiegt
     inSave = arrive && arrive.place && arrive.place.chamber === 'save' ? roomKey(s, r) + ':save' : null; // beim Fortsetzen nicht gleich noch einmal speichern
@@ -576,6 +584,7 @@ const Castle = (() => {
     if (!c) return;
     rpg.frames++; applyHp(W.player); trackHits(); // RPG: Spielzeit, max. HP der Stufe, Treffer und Besiegte
     if (!has('jump2')) W.player.canDouble = false; // ohne Rabenfeder kein Doppelsprung
+    goalTick(); // Wegweiser-Einblendungen
     let dirty = false;
     const set = seen[key] || (seen[key] = new Set()), i = c.y * c.cw + c.x;
     if (!set.has(i)) { set.add(i); dirty = true; }
@@ -623,7 +632,7 @@ const Castle = (() => {
     const def = S()[s].rooms[W.roomIdx];
     for (const [R, k] of BOSS_RELIC) if (same(ref(R), s, W.roomIdx) && !relic[k]) W.spawn(new RelicStone(k, def.w - 10, def.start.y)); // Relikt des Bosses
     Game.bossName = 0; Audio8.tempo(1); Audio8.play('fanfare', W.songName()); Audio8.sfx('bigItem');
-    Game.note('castleSeal', seals(), sealRooms().length);
+    Game.note('castleSeal', seals(), sealRooms().length); announceGoal(260);
     return true;
   }
 
@@ -735,6 +744,59 @@ const Castle = (() => {
     Font.draw(ctx, tr('statusHelp'), cx, 222, '#7c7c8c', { align: 'center' });
   }
 
+  // ---------------- Wegweiser: was als Nächstes, und wo ----------------
+  // Ziele in der empfohlenen Reihenfolge; das erste unerledigte ist das nächste. at = Kartenziel ([Raum], 'arena' | x, y).
+  const bossDone = (R) => { const a = ref(R); return !!(a && boss[roomKey(a.s, a.r)]); };
+  const bossName = (id) => { const s = sIdx(id); return s < 0 ? '' : tr(S()[s].bossKey); };
+  const GOALS = [
+    { done: () => relic.jump2, verb: 'castleGoalFind', obj: () => tr('relic_jump2'), where: 'whereKolo', at: [['side', 'kolosseum'], 81, 10] },
+    { done: () => bossDone([0, -1]), verb: 'castleGoalBeat', obj: () => bossName(0), where: 'whereHall', at: [[0, -1], 'arena'] },
+    { done: () => relic.dash, verb: 'castleGoalFind', obj: () => tr('relic_dash'), where: 'whereHall', at: [[0, -1], 'arena'] },
+    { done: () => relic.ring, verb: 'castleGoalFind', obj: () => tr('relic_ring'), where: 'whereIce', at: [[1, 2], 12, 10] },
+    { done: () => bossDone([1, -1]), verb: 'castleGoalBeat', obj: () => bossName(1), where: 'whereCrypt', at: [[1, -1], 'arena'] },
+    { done: () => relic.wall, verb: 'castleGoalFind', obj: () => tr('relic_wall'), where: 'whereCrypt', at: [[1, -1], 'arena'] },
+    { done: () => bossDone([2, -1]), verb: 'castleGoalBeat', obj: () => bossName(2), where: 'whereGallery', at: [[2, -1], 'arena'] },
+    { done: () => relic.breaker, verb: 'castleGoalFind', obj: () => tr('relic_breaker'), where: 'whereGallery', at: [[2, -1], 'arena'] },
+    { done: () => bossDone(['sun', -1]), verb: 'castleGoalBeat', obj: () => bossName('sun'), where: 'whereRoof', at: [['sun', -1], 'arena'] },
+    { done: () => bossDone(['expo', -1]), verb: 'castleGoalBeat', obj: () => bossName('expo'), where: 'whereDome', at: [['expo', -1], 'arena'] },
+    { done: () => S().some((st, s) => st.id === 3 && layout(s).some(r => seen[r.key] && seen[r.key].size)), verb: 'castleGoalGate', obj: () => '', where: 'whereSeal', at: [[0, 1], SEAL.x, SEAL.y] },
+    { done: () => false, verb: 'castleGoalBeat', obj: () => bossName(3), where: 'whereThrone', at: [[3, -1], 'arena'] },
+  ];
+  const goal = () => GOALS.find(g => !g.done()) || null;
+  const goalText = (g) => tr(g.verb, g.obj());
+  function goalCell(g) { // Kartenzelle des Ziels (absolut)
+    const a = ref(g.at[0]), rm = a && roomAt(a.s, a.r);
+    if (!rm) return null;
+    const c = g.at[1] === 'arena' ? { x: rm.cw - 1, y: cellY(rm.def.start.y, rm.ch) } : placeCell(rm, { x: g.at[1], y: g.at[2] });
+    return { x: rm.ax + c.x, y: rm.ay + c.y };
+  }
+  // eigene Einblendung unten im Bild (unabhängig von den Raum-Hinweisen oben, die sie sonst überschreiben würden)
+  let toast = null, goalWait = 0;
+  function announceGoal(delay = 200) { goalWait = Math.max(1, delay); }
+  function goalTick() {
+    if (goalWait > 0 && --goalWait === 0) { const g = goal(); if (g) toast = { a: tr('castleGoalNote', goalText(g)), b: tr(g.where), t: 330 }; }
+    else if (toast && --toast.t <= 0) toast = null;
+  }
+  function drawGoalToast(ctx) {
+    if (!toast) return;
+    const k = toast.t, a = Math.min(1, (330 - k) / 20, k / 30), w = Math.min(View.w - 8, Math.max(Font.width(toast.a), Font.width(toast.b)) + 16), x = Math.round(View.cx - w / 2), y = 206;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(x, y, w, 24);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + 23, w, 1);
+    Font.draw(ctx, toast.a, View.cx, y + 4, '#f8b800', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, toast.b, View.cx, y + 14, '#d0c0a0', { align: 'center', shadow: '#000' });
+    ctx.globalAlpha = 1;
+  }
+  function drawGoalBanner(ctx, y) { // Pausenmenü: nächstes Ziel oben im Bild
+    const g = goal();
+    if (!g) return;
+    const w = View.w, cx = View.cx;
+    ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.fillRect(0, y - 3, w, 25);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(0, y - 3, w, 1); ctx.fillRect(0, y + 21, w, 1);
+    Font.draw(ctx, tr('castleGoalLabel') + ': ' + goalText(g), cx, y, '#f8b800', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr(g.where), cx, y + 11, '#d0c0a0', { align: 'center', shadow: '#000' });
+  }
+
   // ---------------- Erkundungsgrad ----------------
   function stats(s) { // [aufgedeckt, gesamt] der zählenden Zellen einer Region (oder eines Raums)
     let a = 0, n = 0;
@@ -797,7 +859,7 @@ const Castle = (() => {
 
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const r of L) { x0 = Math.min(x0, r.ax); y0 = Math.min(y0, r.ay); x1 = Math.max(x1, r.ax + r.cw); y1 = Math.max(y1, r.ay + r.ch); }
-    const top = 54, H = 142, left = 12, Wd = w - 24, gw = x1 - x0, gh = y1 - y0;
+    const top = 54, H = warpMode ? 136 : 126, left = 12, Wd = w - 24, gw = x1 - x0, gh = y1 - y0;
     const fit = clamp(Math.floor(Math.min(Wd / gw, H / gh)), 2, 12), cs = view.zoom ? Math.max(8, fit * 2) : fit;
     let ox, oy;
     if (view.zoom) { ox = Math.round(cx - (view.x + 0.5) * cs); oy = Math.round(top + H / 2 - (view.y + 0.5) * cs); }
@@ -858,7 +920,7 @@ const Castle = (() => {
       for (const c of chambersOf(r.s, r.i)) { // Kammern: Speichern rot (linke Hälfte), Warp hellblau (rechte Hälfte, grau vor dem Betreten)
         const cc = placeCell(r, c);
         if (!set.has(cc.y * r.cw + cc.x)) continue;
-        ctx.fillStyle = c.kind === 'save' ? '#fc2c2c' : warp[c.key] ? '#7cdcfc' : '#5c6c8c';
+        ctx.fillStyle = c.kind === 'save' ? '#d04858' : warp[c.key] ? '#7cdcfc' : '#5c6c8c';
         ctx.fillRect(ox + (r.ax + cc.x) * cs + (c.kind === 'warp' ? cs - half : 0), oy + (r.ay + cc.y) * cs + Math.floor((cs - half) / 2), half, half);
       }
     }
@@ -883,12 +945,24 @@ const Castle = (() => {
       ctx.strokeRect(px - g + 0.5, py - g + 0.5, cs + g * 2 - 1, cs + g * 2 - 1);
       if (on) ctx.strokeRect(px - g - 0.5, py - g - 0.5, cs + g * 2 + 1, cs + g * 2 + 1);
     });
+    const g = !warpMode && goal(), gc = g && goalCell(g);
+    if (gc && (t >> 4) % 2 === 0) { // Wegweiser: Zielraum golden umrahmt (auch wenn er noch nicht betreten ist)
+      const px = ox + gc.x * cs, py = oy + gc.y * cs, m = 2;
+      ctx.strokeStyle = '#f8b800'; ctx.lineWidth = 1; ctx.strokeRect(px - m + 0.5, py - m + 0.5, cs + m * 2 - 1, cs + m * 2 - 1);
+      ctx.strokeStyle = '#fce0a8'; ctx.strokeRect(px - m - 0.5, py - m - 0.5, cs + m * 2 + 1, cs + m * 2 + 1);
+    }
     ctx.restore();
     if (!any) Font.draw(ctx, tr('mapNone'), cx, top + H / 2 - 4, '#7c84a8', { align: 'center' });
 
-    Font.draw(ctx, tr('mapExplored', percent(W.stage)) + '    ' + tr('mapCastle', percent()), cx, 202, '#fcfcfc', { align: 'center', shadow: '#000' });
-    Font.draw(ctx, warpMode ? tr('warpCount', trip.sel + 1, trip.list.length) : tr('castleSealsShort', seals(), sealRooms().length), cx, 212, warpMode ? '#7cdcfc' : '#c8a0fc', { align: 'center', shadow: '#000' });
-    Font.draw(ctx, tr(warpMode ? 'mapHelpWarp' : view.zoom ? 'mapHelpZoom' : 'mapHelp'), cx, 222, '#7c7c8c', { align: 'center' });
+    let ly = top + H + 6;
+    if (g) { // nächstes Ziel und wo es liegt
+      Font.draw(ctx, tr('castleGoalLabel') + ': ' + goalText(g), cx, ly, '#f8b800', { align: 'center', shadow: '#000' });
+      Font.draw(ctx, tr(g.where), cx, ly + 10, '#d0c0a0', { align: 'center', shadow: '#000' });
+      ly += 21;
+    }
+    Font.draw(ctx, tr('mapExplored', percent(W.stage)) + '    ' + tr('mapCastle', percent()), cx, ly, '#fcfcfc', { align: 'center', shadow: '#000' });
+    if (!g) { Font.draw(ctx, warpMode ? tr('warpCount', trip.sel + 1, trip.list.length) : tr('castleSealsShort', seals(), sealRooms().length), cx, ly + 10, warpMode ? '#7cdcfc' : '#c8a0fc', { align: 'center', shadow: '#000' }); ly += 10; }
+    Font.draw(ctx, tr(warpMode ? 'mapHelpWarp' : view.zoom ? 'mapHelpZoom' : 'mapHelp'), cx, ly + 11, '#7c7c8c', { align: 'center' });
   }
 
   // Fortsetzen: Held, Herzen, Spezialwaffe und Peitsche aus dem Spielstand übernehmen
@@ -906,7 +980,7 @@ const Castle = (() => {
     bossDone: (s, r) => !!boss[roomKey(s, r)],
     hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers,
     newRun, drawStatus, expProgress, gainExp, get rpg() { return rpg; },
-    tier: (s) => TIER[S()[s].id] || 1, side: SIDE, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
+    tier: (s) => TIER[S()[s].id] || 1, side: SIDE, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
     reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
   };

@@ -180,9 +180,15 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 
 ### Prototyp (Phase 0 + 1) benutzen
 
-- `https://madouki.github.io/nacht/?castle` (lokal `index.html?castle`), optional mit `&stage=N&room=M` – oder im Titel
-  **SCHLOSS-MODUS (SOTN)** wählen (lädt mit `?castle` neu; zurück über **ARCADE-MODUS**). Ohne `?castle` bleibt alles wie im
-  Arcade-Modus.
+- Seit 2026-10-22 ist der Schloss-Modus der **Standard**: `https://madouki.github.io/nacht/` startet das Schloss. Das lineare
+  Arcade-Spiel gibt es unter `?arcade` oder im Titel über **ARCADE-MODUS** (zurück über **SCHLOSS-MODUS (SOTN)**); alte
+  `?castle`-Links funktionieren weiter. Testschalter wie gehabt: `&stage=N&room=M`, `&noboot`.
+- **Wegweiser:** das nächste Ziel in der empfohlenen Reihenfolge (Relikt finden, Boss besiegen, Siegeltor öffnen, Graf)
+  steht oben im Pausenmenü und unten auf der Karte, der Zielraum blinkt golden auf der Karte (auch unbetreten); nach Fluch,
+  Relikt, Boss und Fortsetzen blendet es sich unten im Bild ein.
+- **Prolog überspringen** (zum Testen): solange man auf dem Schiff oder im Wald ist, Pause → PROLOG ÜBERSPRINGEN.
+- **Laden:** Regionswechsel zeigen den Regionsnamen nur kurz (30–90 Bilder statt 75–140); eine schon vorgebaute Region wird
+  in derselben Sitzung nicht noch einmal vorgebaut.
 - **Relikte:** Beim ersten Betreten des Burghofs raubt der Fluch des Grafen Doppelsprung, Dash, Wandsprung und Ring-Greifen
   (Kante packen und Rutschen bleiben; im Prolog auf dem Schiff geht noch alles). Sie liegen als leuchtende Kugeln auf Sockeln:
   Rabenfeder (Doppelsprung) am Ende des Kolosseums, Enterhaken (Ringe) in der Eishöhle; Schattenmantel (Dash) bei der
@@ -216,7 +222,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   Bergfried oben, Sonnenkathedrale oben rechts, Wintergarten rechts, Thron ganz oben). Angriff zoomt, im Zoom scrollen
   die Pfeile, Sprung/Start schließt. Unten: Erkundungsgrad der Region und des Schlosses, Siegel n/5.
 - **Abschnittswahl:** im Schloss-Modus mit Erkundungsgrad je Raum und Region; ein rotes Siegel zeigt besiegte Regionsbosse.
-- **Speicherkammern** (rote Nische mit Sarg): hineingehen sichert den Spielstand und füllt Energie (und Herzen auf
+- **Speicherkammern** (Steinnische mit Sarg und Kerzen): hineingehen sichert den Spielstand und füllt Energie (und Herzen auf
   mindestens 10) auf. Je Region eine, dazu am Waldrand des Prologs; auf der Karte rot. Der Spielstand übersteht Neuladen
   und neue Browser-Sitzungen: im Titel steht dann **FORTSETZEN** ganz oben, und nach Game Over geht es zur letzten
   Speicherkammer. Gesichert werden Ort, Held, Herzen, Spezialwaffe, Peitsche, Punkte und Leben; Karte, Siegel und
