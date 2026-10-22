@@ -12,6 +12,7 @@
 // Treffer zeigen Schadenszahlen, Gegner lassen Gold, Herzen und Braten fallen. Pause → STATUS. Stufe, EXP, Besiegte und
 // Spielzeit speichert die Speicherkammer (wie in SotN geht Ungespeichertes nach Game Over verloren).
 // Geschichte: der zweite Held, der Bibliothekar und der lila Tentakel treiben sie in Gesprächen voran (Szenen an Relikten und Siegeln).
+// Ausrüstung wie in SotN: Waffe, Rüstung, Amulett, Tränke (Pause → AUSRÜSTUNG), Funde, Beute und der Laden des Bibliothekars.
 'use strict';
 
 const Castle = (() => {
@@ -34,21 +35,22 @@ const Castle = (() => {
   ];
 
   // ---------------- Spielstand: aufgedeckte Zellen, besiegte Bosse und Zwischengegner, freigeschaltete Warpkammern ----------------
-  // seen: Raumschlüssel "<kapitel-id>:<raum>" → Set der Zellnummern; boss/mini/warp/vessel/relic/crack/flag: Schlüssel → 1
-  let seen = {}, boss = {}, mini = {}, warp = {}, vessel = {}, relic = {}, crack = {}, flag = {};
+  // seen: Raumschlüssel "<kapitel-id>:<raum>" → Set der Zellnummern; boss/mini/warp/vessel/relic/crack/flag: Schlüssel → 1;
+  // inv: Gegenstand → Anzahl, eq: Platz (weapon/armor/acc) → Gegenstand
+  let seen = {}, boss = {}, mini = {}, warp = {}, vessel = {}, relic = {}, crack = {}, flag = {}, inv = {}, eq = {};
   try {
     const d = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (d && d.v === 1) {
       for (const k in d.rooms) seen[k] = new Set(d.rooms[k]);
       boss = d.boss || {}; mini = d.mini || {}; warp = d.warp || {}; vessel = d.vessel || {};
-      relic = d.relic || {}; crack = d.crack || {}; flag = d.flag || {};
+      relic = d.relic || {}; crack = d.crack || {}; flag = d.flag || {}; inv = d.inv || {}; eq = d.eq || {};
     }
-  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; }
+  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; }
   function save() {
     try {
       const rooms = {};
       for (const k in seen) rooms[k] = [...seen[k]];
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp, vessel, relic, crack, flag }));
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp, vessel, relic, crack, flag, inv, eq }));
     } catch (e) { /* privater Modus: gilt nur für diese Sitzung */ }
   }
   // Spielstand der Speicherkammer: Ort (Kapitel-id, Raum, Kammer), Held, Herzen, Spezialwaffe, Peitsche, Punkte, Leben
@@ -561,7 +563,7 @@ const Castle = (() => {
     const s = W.stage, r = W.roomIdx, def = S()[s].rooms[r], key = roomKey(s, r);
     if (boss[key] && s < S().length - 1) W.room.arena = null; // Bossarena: Boss besiegt, der Raum ist frei
     if (mini[key]) W.miniDone[s + ':' + r] = true;
-    W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber) && !(e instanceof CastleNPC));
+    W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber) && !(e instanceof CastleNPC) && !(e instanceof CastleLoot));
     for (const d of doorsOf(s, r)) W.spawn(new CastleDoor(d, def));
     for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
     for (const e of def.ents) if (e.type === 'vessel') { const k = key + ':v' + e.x; if (!vessel[k]) W.spawn(new LifeVessel(e, k)); } // Lebensgefäße
@@ -573,6 +575,7 @@ const Castle = (() => {
       Game.note('castleCurse'); announceGoal(260); W.flash = 10; W.shake = Math.max(W.shake, 14); Audio8.sfx('roar'); Audio8.sfx('thunder'); Input.rumble(0.8, 0.6, 600);
     }
     spawnNpcs(s, r); roomT = 0; // Figuren der Geschichte (nach dem Fluch: der zweite Held wartet schon im Burghof)
+    spawnFinds(s, r); // Einzelstücke der Ausrüstung
     hpSeen.clear(); applyHp(W.player); // neuer Raum: Gegner des alten zählen nicht als besiegt
     inSave = arrive && arrive.place && arrive.place.chamber === 'save' ? roomKey(s, r) + ':save' : null; // beim Fortsetzen nicht gleich noch einmal speichern
     if (arrive && arrive.place !== 'start') {
@@ -612,6 +615,8 @@ const Castle = (() => {
     const c = heroCell(), s = W.stage, r = W.roomIdx, key = roomKey(s, r);
     if (!c) return;
     rpg.frames++; applyHp(W.player); trackHits(); // RPG: Spielzeit, max. HP der Stufe, Treffer und Besiegte
+    const hero = W.player; // Blutstein: alle vier Sekunden 1 HP
+    if (gear('regen') && rpg.frames % 240 === 0 && hero.alive && hero.hp < hero.maxHp) { hero.hp = Math.min(hero.maxHp, hero.hp + 1); W.popup(hero.cx, hero.y - 6, '+10', '#d81830'); }
     if (!has('jump2')) W.player.canDouble = false; // ohne Rabenfeder kein Doppelsprung
     goalTick(); // Wegweiser-Einblendungen
     let dirty = false;
@@ -675,8 +680,8 @@ const Castle = (() => {
   const rpg = { lv: 1, exp: 0, kills: 0, frames: 0 }, MAXLV = 99;
   const expFor = (lv) => 15 * lv * (lv - 1); // Gesamt-EXP für Stufe lv: LV2 30, LV5 300, LV10 1350, LV20 5700
   const vessels = () => Object.keys(vessel).length;
-  const values = () => { const b = rpg.lv - 1; return { str: 10 + b, con: 10 + b, hp: Options.maxHp + 2 * b + 4 * vessels() }; };
-  const strMul = () => 1 + (values().str - 10) * 0.05, conDiv = () => 1 + (values().con - 10) * 0.04;
+  const values = () => { const b = rpg.lv - 1; return { str: 10 + b, con: 10 + b, hp: Options.maxHp + 2 * b + 4 * vessels() + gear('hp') }; };
+  const strMul = () => 1 + (values().str - 10 + gear('atk')) * 0.05, conDiv = () => 1 + (values().con - 10 + gear('def')) * 0.04; // Ausrüstung zählt wie STR/CON-Punkte
   if (on) { // STR verstärkt Peitsche und Spezialwaffen, CON mindert erlittenen Schaden – nur im Schloss-Modus
     Object.defineProperty(Options, 'dmgMul', { get: () => (Options.easy ? 2 : 1) * strMul(), configurable: true });
     const hurt = Player.prototype.hurt;
@@ -707,6 +712,7 @@ const Castle = (() => {
     gainExp(Math.max(1, Math.round(big ? Math.max((e.score || 0) / 20, (e.maxHp || 20) * 6) : (e.score || 100) / 15 * (e.expMul || 1))));
     const r = Math.random(), drop = big ? 'bagBig' : r < 0.05 ? 'roast' : r < 0.12 ? 'bag' : r < 0.17 ? 'heartB' : null; // Beute wie in SotN
     if (drop) W.spawn(new Item(drop, e.cx, Math.min(e.cy, W.room.h * T - 24)));
+    lootDrop(e, big); // selten Ausrüstung oder Tränke
   }
   // Gefahrenstufe: jeder Gegner (auch nachkommende und Geschosse) wird beim ersten Auftauchen einmal verstärkt
   const scaled = new WeakSet();
@@ -741,6 +747,180 @@ const Castle = (() => {
   function newRun() { Object.assign(rpg, { lv: 1, exp: 0, kills: 0, frames: 0 }); hpSeen.clear(); }
   const expProgress = () => rpg.lv >= MAXLV ? 1 : (rpg.exp - expFor(rpg.lv)) / (expFor(rpg.lv + 1) - expFor(rpg.lv));
   const playTime = () => { const s = Math.floor(rpg.frames / 60), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h + ':' + String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+
+  // ---------------- Ausrüstung, Tränke und der Laden des Bibliothekars (wie in SotN) ----------------
+  // Drei Plätze: Waffe (Beschläge und Runen für jede Heldenwaffe: ATT wie STR-Punkte), Rüstung (DEF wie CON-Punkte) und Amulett
+  // (max. HP, langsame Heilung, mehr Beute, mehr Gold). Tränke benutzt man in Pause → AUSRÜSTUNG, die Schlosskarte zeigt
+  // unbetretene Räume grau. Gegner lassen selten etwas fallen, Einzelstücke liegen in den Zusatzräumen, der Bibliothekar verkauft
+  // (Gold = Punkte). Besitz wird wie die Relikte sofort gemerkt; ein Kauf zieht das Gold auch vom Spielstand der Speicherkammer
+  // ab, sonst ließe sich nach Game Over mit demselben Gold noch einmal kaufen.
+  const GEAR = {
+    silver: { slot: 'weapon', atk: 2, price: 3000, col: '#d8dcf4' },
+    bloodrune: { slot: 'weapon', atk: 4, col: '#fc3c3c' },
+    dragonfang: { slot: 'weapon', atk: 7, col: '#f8b800' },
+    leather: { slot: 'armor', def: 2, price: 2000, col: '#c87c44' },
+    chain: { slot: 'armor', def: 4, price: 6000, col: '#a8a8bc' },
+    mirror: { slot: 'armor', def: 7, col: '#a4e4fc' },
+    heartamulet: { slot: 'acc', hp: 8, price: 5000, col: '#fc7460' },
+    bloodstone: { slot: 'acc', regen: 1, col: '#d81830' },
+    luckcoin: { slot: 'acc', luck: 1, col: '#f8d878' },
+    greedring: { slot: 'acc', greed: 1, col: '#f8b800' },
+    potion: { heal: 0.5, price: 800, col: '#58f898' },
+    elixir: { heal: 1, price: 4000, col: '#7cdcfc' },
+    map: { key: 1, price: 3000, col: '#e8d8a8' },
+  };
+  const SLOTS = ['weapon', 'armor', 'acc'], DRINKS = ['potion', 'elixir'];
+  const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'map'];
+  const FINDS = [ // Einzelstücke: [Raum, Gegenstand, Kachel-x, Standreihe]
+    [['side', 'kolosseum'], 'leather', 12, 7], [['side', 'kanal'], 'bloodstone', 43, 7], [['side', 'schatz'], 'greedring', 25, 6],
+    [['side', 'verlies'], 'dragonfang', 28, 6], [['side', 'wehrgang'], 'luckcoin', 37, 6], [['side', 'himmel'], 'mirror', 44, 5],
+  ];
+  const DROPS = [['potion', 'potion', 'leather', 'silver'], ['potion', 'potion', 'chain', 'bloodrune', 'elixir'], ['potion', 'elixir', 'elixir', 'chain', 'bloodrune']];
+  function gear(stat) { let n = 0; for (const s of SLOTS) { const g = eq[s] && GEAR[eq[s]]; if (g && g[stat]) n += g[stat]; } return n; }
+  const itemName = (id) => tr('item_' + id), itemDesc = (id) => tr('itemD_' + id);
+  if (on) { // Ring der Gier: jedes Gold zählt anderthalbfach
+    const add = W.addScore;
+    W.addScore = function (n, ...a) { return add.call(this, n > 0 && gear('greed') ? Math.round(n * 1.5) : n, ...a); };
+  }
+  function giveItem(id, found) { // found: Fund (Meldung, leeren Platz gleich belegen)
+    const g = GEAR[id];
+    inv[id] = (inv[id] || 0) + 1;
+    let worn = false;
+    if (found && g.slot && !eq[g.slot]) { eq[g.slot] = id; worn = true; applyHp(W.player); }
+    save();
+    if (found) { Game.note(worn ? 'castleFoundEq' : 'castleFound', itemName(id)); Audio8.sfx(g.slot || g.key ? 'bigItem' : 'item'); }
+  }
+  // Symbol 10×10: Klinge (Waffe), Brustpanzer (Rüstung), Ring (Amulett), Fläschchen (Trank), Rolle (Karte)
+  function itemIcon(ctx, id, x, y) {
+    const g = GEAR[id], c = g.col, R = (a, b, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x + a, y + b, w, h); };
+    if (g.slot === 'weapon') { for (let i = 0; i < 7; i++) R(2 + i, 7 - i, 2, 1, c); R(8, 0, 1, 1, '#fcfcfc'); R(1, 7, 3, 1, '#6c4410'); R(2, 6, 1, 3, '#6c4410'); R(0, 9, 2, 1, '#c89020'); }
+    else if (g.slot === 'armor') { R(1, 1, 3, 2, c); R(6, 1, 3, 2, c); R(2, 3, 6, 6, c); R(4, 1, 2, 1, '#000'); R(3, 4, 1, 4, '#fcfcfc'); R(2, 8, 6, 1, '#6c6c7c'); }
+    else if (g.slot === 'acc') { R(2, 3, 6, 1, '#c89020'); R(2, 8, 6, 1, '#c89020'); R(1, 4, 1, 4, '#c89020'); R(8, 4, 1, 4, '#c89020'); R(3, 0, 4, 3, c); R(4, 1, 1, 1, '#fcfcfc'); }
+    else if (g.heal) { R(4, 0, 2, 1, '#8c5c2c'); R(4, 1, 2, 2, '#c8d8e8'); R(2, 3, 6, 6, '#c8d8e8'); R(3, 5, 4, 4, c); R(3, 4, 1, 2, '#fcfcfc'); }
+    else { R(1, 2, 8, 6, c); R(0, 1, 2, 8, '#a89060'); R(8, 1, 2, 8, '#a89060'); R(3, 4, 4, 1, '#6c4410'); R(3, 6, 3, 1, '#6c4410'); }
+  }
+  class CastleLoot extends Ent { // Fund: schwebt (Einzelstück) oder fällt zu Boden (Beute), leuchtet in seiner Farbe
+    constructor(id, x, y, find) { super(x - 5, y - 5, 10, 10); this.kind = 'prop'; this.id = id; this.find = find; this.vy = find ? 0 : -2.2; this.landed = !!find; }
+    update() {
+      this.t++;
+      if (!this.landed) { this.vy = Math.min(this.vy + 0.15, 2.4); if (Phys.moveY(this, this.vy) === 1 || this.y > W.room.h * T) this.landed = true; }
+      const p = W.player;
+      if (!p.alive || this.t < 20 || !Phys.overlap(this, p)) return;
+      this.dead = true;
+      if (this.find) flag['find_' + this.find] = 1;
+      giveItem(this.id, true);
+      for (let i = 0; i < 16; i++) W.spawn(new Particle(this.cx + rnd(-5, 5), this.cy + rnd(-5, 5), rnd(-1, 1), rnd(-1.8, -0.4), i % 2 ? GEAR[this.id].col : '#fcfcfc', 40, 1, 0));
+    }
+    lightUp(L, cx, cy) { const v = parseInt(GEAR[this.id].col.slice(1), 16); L.push({ x: this.cx - cx, y: this.cy - cy, r: 22 + Math.sin(this.t * 0.08) * 3, c: [v >> 16, (v >> 8) & 255, v & 255], a: 0.55 }); }
+    draw(ctx) {
+      const bob = this.find || this.landed ? Math.round(Math.sin(this.t * 0.08) * 2) : 0;
+      itemIcon(ctx, this.id, Math.round(this.x - W.cam.x), Math.round(this.y - W.cam.y) + bob - (this.find ? 2 : 0));
+      if ((this.t >> 3) % 5 === 0) { ctx.fillStyle = '#fcfcfc'; ctx.fillRect(Math.round(this.x - W.cam.x) + 9, Math.round(this.y - W.cam.y) - 1 + bob, 1, 1); } // Funkeln
+    }
+  }
+  function spawnFinds(s, r) {
+    for (const [R, id, x, y] of FINDS) if (same(ref(R), s, r) && !flag['find_' + id]) W.spawn(new CastleLoot(id, x * T + 8, (y + 1) * T - 8, id));
+  }
+  function lootDrop(e, big) { // Beute nach Gefahrenstufe; Ausrüstung, die man schon hat, wird zum Heiltrank
+    const t = tierOf(W.stage, W.roomIdx), chance = big ? 1 : 0.03 * (gear('luck') ? 2.5 : 1);
+    if (Math.random() >= chance) return;
+    const pool = DROPS[t <= 2 ? 0 : t <= 4 ? 1 : 2];
+    let id = big ? 'elixir' : pool[Math.floor(Math.random() * pool.length)];
+    if (GEAR[id].slot && inv[id]) id = 'potion';
+    W.spawn(new CastleLoot(id, e.cx, Math.min(e.cy, W.room.h * T - 24), null));
+  }
+  function drink(id) { // Trank: heilt einen Anteil der max. HP
+    const p = W.player, g = GEAR[id];
+    if (!inv[id] || p.hp >= p.maxHp) return false;
+    inv[id]--; if (!inv[id]) delete inv[id]; save();
+    const before = p.hp; p.hp = Math.min(p.maxHp, p.hp + Math.ceil(p.maxHp * g.heal));
+    W.popup(p.cx, p.y - 8, 'HP +' + Math.round((p.hp - before) * 10), '#58f898'); Audio8.sfx('heart'); Audio8.sfx('glug');
+    return true;
+  }
+
+  // Ausrüstungsmenü (Pause → AUSRÜSTUNG): ↑↓ wählt, ←→ (oder Sprung) wechselt das Teil, auf den Tränken trinkt Sprung/Angriff
+  const menu = { sel: 0, msg: null };
+  function openEquip() { menu.sel = 0; menu.msg = null; }
+  const equipRows = () => [...SLOTS, ...DRINKS];
+  function equipInput(P) { // true = zurück zur Pause
+    if (P.start) return true;
+    const rows = equipRows(), n = rows.length;
+    if (P.up || P.down) { menu.sel = (menu.sel + (P.down ? 1 : n - 1)) % n; menu.msg = null; Audio8.sfx('select'); }
+    const row = rows[menu.sel];
+    if (SLOTS.includes(row) && (P.left || P.right || P.jump || P.attack)) {
+      const own = [null, ...Object.keys(GEAR).filter(id => GEAR[id].slot === row && inv[id])];
+      const i = own.indexOf(eq[row] || null), next = own[(i + (P.left ? own.length - 1 : 1)) % own.length];
+      if (next) eq[row] = next; else delete eq[row];
+      save(); applyHp(W.player); Audio8.sfx(own.length > 1 ? 'item' : 'select');
+    } else if (DRINKS.includes(row) && (P.jump || P.attack)) { if (!drink(row)) Audio8.sfx('wall'); }
+    return false;
+  }
+  function panel(ctx, title, col) { // Vollbild wie Status und Karte
+    const w = View.w, cx = View.cx;
+    ctx.fillStyle = 'rgba(2,4,18,0.97)'; ctx.fillRect(0, 0, w, 240);
+    ctx.fillStyle = col; ctx.fillRect(6, 6, w - 12, 1); ctx.fillRect(6, 233, w - 12, 1); ctx.fillRect(6, 6, 1, 228); ctx.fillRect(w - 7, 6, 1, 228);
+    Game.big(ctx, title, cx, 12, 2, LOGO, null, '#000');
+  }
+  function drawEquip(ctx, t) {
+    const cx = View.cx, p = W.player, rows = equipRows(), lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16);
+    panel(ctx, tr('equipTitle'), '#c89020');
+    rows.forEach((row, i) => {
+      const y = 40 + i * 18 + (i >= SLOTS.length ? 8 : 0), on = i === menu.sel, slot = SLOTS.includes(row), id = slot ? eq[row] : row;
+      if (on) { ctx.fillStyle = 'rgba(200,144,32,0.18)'; ctx.fillRect(lx - 6, y - 4, rx - lx + 12, 16); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y); }
+      Font.draw(ctx, slot ? tr('slot_' + row) : '', lx + 8, y, '#b0a080');
+      if (id && GEAR[id]) itemIcon(ctx, id, lx + 70, y - 2);
+      const name = id ? itemName(id) + (slot ? '' : '  ×' + (inv[id] || 0)) : tr('slotNone');
+      Font.draw(ctx, name, lx + 84, y, !id || (!slot && !inv[id]) ? '#5c5c6c' : on ? '#fcfcfc' : '#c8c8d8', { shadow: '#000' });
+      if (on && slot) Font.draw(ctx, '← →', rx, y, '#7c7c8c', { align: 'right' });
+    });
+    const row = rows[menu.sel], id = SLOTS.includes(row) ? eq[row] : row;
+    ctx.fillStyle = '#c89020'; ctx.fillRect(lx - 6, 156, rx - lx + 12, 1);
+    if (id && GEAR[id]) Font.draw(ctx, itemDesc(id), cx, 162, '#fce0a8', { align: 'center', shadow: '#000' });
+    const att = Math.round((p.whip >= 2 ? 2 : 1) * 10 * Options.dmgMul);
+    Font.draw(ctx, 'ATT ' + att + '    DEF ' + Math.round(10 * conDiv()) + '    HP ' + Math.ceil(Math.max(0, p.hp)) + '/' + p.maxHp, cx, 180, '#fcfcfc', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('item_map') + ': ' + (inv.map ? '✓' : '-') + '    GOLD ' + W.score, cx, 196, inv.map ? '#e8d8a8' : '#7c7c8c', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('equipHelp'), cx, 218, '#7c7c8c', { align: 'center' });
+  }
+
+  // Laden des Bibliothekars: öffnet nach jedem Gespräch mit ihm; Sprung/Angriff kauft, Start geht
+  const shop = { sel: 0, say: 'shopHi' };
+  function openShop() { shop.sel = 0; shop.say = 'shopHi'; }
+  function shopInput(P) { // true = Laden verlassen
+    if (P.start) return true;
+    const n = STOCK.length;
+    if (P.up || P.down) { shop.sel = (shop.sel + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
+    if (P.jump || P.attack) {
+      const id = STOCK[shop.sel], g = GEAR[id];
+      if ((g.slot || g.key) && inv[id]) { shop.say = 'shopOwned'; Audio8.sfx('wall'); }
+      else if (W.score < g.price) { shop.say = 'shopPoor'; Audio8.sfx('wall'); }
+      else {
+        W.score -= g.price; giveItem(id, false); Audio8.sfx('money');
+        try { // auch im Spielstand der Speicherkammer bezahlen
+          const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+          if (d && typeof d.score === 'number') { d.score = Math.max(0, d.score - g.price); localStorage.setItem(SAVE_KEY, JSON.stringify(d)); }
+        } catch (e) { /* privat */ }
+        shop.say = 'shopThanks' + (1 + Math.floor(Math.random() * 3));
+      }
+    }
+    return false;
+  }
+  function drawShop(ctx, t) {
+    const cx = View.cx, lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16);
+    panel(ctx, tr('shopTitle'), '#9c6cfc');
+    ctx.save(); ctx.translate(lx + 4, 72); ctx.scale(1, 1); drawLibrarian(ctx, 0, 0, t, false); ctx.restore();
+    const say = wrap(tr(shop.say), rx - lx - 24);
+    say.slice(0, 3).forEach((l, i) => Font.draw(ctx, l, lx + 20, 36 + i * 10, '#c8a0fc', { shadow: '#000' }));
+    STOCK.forEach((id, i) => {
+      const y = 82 + i * 15, on = i === shop.sel, g = GEAR[id], own = (g.slot || g.key) && inv[id], poor = W.score < g.price;
+      if (on) { ctx.fillStyle = 'rgba(156,108,252,0.2)'; ctx.fillRect(lx - 6, y - 4, rx - lx + 12, 14); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y - 1); }
+      itemIcon(ctx, id, lx + 8, y - 2);
+      Font.draw(ctx, itemName(id) + (DRINKS.includes(id) && inv[id] ? '  ×' + inv[id] : ''), lx + 22, y, own ? '#5c5c6c' : on ? '#fcfcfc' : '#c8c8d8', { shadow: '#000' });
+      Font.draw(ctx, own ? tr('equipOwned') : g.price + ' G', rx, y, own ? '#5c5c6c' : poor ? '#a84848' : '#f8b800', { align: 'right', shadow: '#000' });
+    });
+    Font.draw(ctx, itemDesc(STOCK[shop.sel]), cx, 192, '#fce0a8', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, 'GOLD ' + W.score, cx, 206, '#f8b800', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('shopHelp'), cx, 220, '#7c7c8c', { align: 'center' });
+  }
 
   // Statusbildschirm (Pause → STATUS): Werte wie in SotN in zwei Spalten, darunter EXP-Leiste, Karte, Siegel, Warpkammern
   function drawStatus(ctx, t) {
@@ -974,9 +1154,10 @@ const Castle = (() => {
       W.popup(p.cx, p.y - 8, 'HP MAX', '#58f898'); Audio8.sfx('heart');
       for (let i = 0; i < 14; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.y + rnd(0, 28), rnd(-0.4, 0.4), rnd(-1.4, -0.3), i % 2 ? '#58f898' : '#fce0a8', 40, 1, 0));
     }
+    if (b.who === 'lib') { openShop(); return 'shop'; } // danach sein Laden
     return true;
   }
-  function talkInput(P) { // true = Gespräch vorbei (Sprung/Angriff/↑: Seite fertig schreiben bzw. weiterblättern, Start: alles überspringen)
+  function talkInput(P) { // true = Gespräch vorbei, 'shop' = weiter in den Laden (Sprung/Angriff/↑: Seite fertig schreiben bzw. weiterblättern, Start: alles überspringen)
     if (!talk) return true;
     if (Game.t < 6) return false;
     const pg = page();
@@ -1095,6 +1276,17 @@ const Castle = (() => {
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) ctx.fillRect(ox + x * cs, oy + y * cs, 1, 1);
 
     const vis = (key, i) => !!(seen[key] && seen[key].has(i));
+    if (inv.map) for (const r of L) for (let y = 0; y < r.ch; y++) for (let x = 0; x < r.cw; x++) { // Schlosskarte: unbetretene Räume grau
+      if (vis(r.key, y * r.cw + x)) continue;
+      const px = ox + (r.ax + x) * cs, py = oy + (r.ay + y) * cs;
+      ctx.fillStyle = '#262a40'; ctx.fillRect(px, py, cs, cs);
+      if (cs < 4) continue;
+      ctx.fillStyle = '#4c5070';
+      if (x === 0) ctx.fillRect(px, py, 1, cs);
+      if (x === r.cw - 1) ctx.fillRect(px + cs - 1, py, 1, cs);
+      if (y === 0) ctx.fillRect(px, py, cs, 1);
+      if (y === r.ch - 1) ctx.fillRect(px, py + cs - 1, cs, 1);
+    }
     const byKey = {}; for (const r of L) byKey[r.key] = r;
     // Verbindungen: innerhalb der Regionen die Ausgänge, dazu die Türen zwischen den Regionen
     const links = [];
@@ -1213,8 +1405,9 @@ const Castle = (() => {
     bossDone: (s, r) => !!boss[roomKey(s, r)],
     hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers,
     newRun, drawStatus, expProgress, gainExp, get rpg() { return rpg; }, talkInput, drawTalk, get talk() { return talk; }, get flags() { return flag; },
+    openEquip, equipInput, drawEquip, openShop, shopInput, drawShop, get inv() { return inv; }, get eq() { return eq; }, giveItem,
     tier: (s) => TIER[S()[s].id] || 1, side: SIDE, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
-    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
+    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
   };
 })();

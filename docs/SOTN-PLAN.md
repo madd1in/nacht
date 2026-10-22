@@ -174,7 +174,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 | **1 (Prototyp erledigt)** | Kapitel werden Regionen eines Schlosses: Türen in beide Richtungen, Knoten Eingangshalle (Keller-, Turm-, Siegeltor), Wege hinter den Bossen, Einbahnen mit Rückweg, eine Karte für das ganze Schloss, Bosse geben Siegel und bleiben besiegt, kein Zeitlimit | alle Regionen frei begehbar, Thron hinter 5 Siegeln |
 | **1b (teilweise erledigt)** | erledigt: Speicherkammern mit Spielstand, „Fortsetzen" im Titel und nach Game Over, Warpkammern mit Schnellreise über die Karte. Offen: feste Raum-IDs, Regionsmusik ohne Neustart, Spielstand-Slots | Spielstand überlebt Umsortieren von `levels.js` |
 | **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 5 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher) auf Sockeln und bei Bossen, rissiges Gestein vor Zusatzräumen. Offen: automatischer Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
-| **3 RPG (teilweise erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand. Offen: MP, Ausrüstungsmenü, Bibliothekar-Shop | Statusbildschirm, Shop |
+| **3 RPG (fast erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand, Ausrüstung (Waffe/Rüstung/Amulett) mit Drops und Einzelstücken, Tränke, Laden des Bibliothekars, Schlosskarte. Offen: MP und Zauber, Verkaufen | Statusbildschirm, Shop |
 | 4 Bosse & Siegel | Arenen mit Hintertür, Siegeltor, Ende, neue Verbindungsräume | Abspann im Schloss-Modus |
 | **4b Geschichte & Verzahnung (erledigt)** | drei Figuren mit absurden Gesprächen im Maniac-Mansion-Ton (zweiter Held, Bibliothekar, lila Tentakel), elf Szenen entlang der Relikte und Siegel; drei Schleifen (Geheimgang Kolosseum ↔ Brunnenschacht, Wehrgang Bergfried ↔ Glockenturm, Himmelsbrücke Kathedralendach ↔ Kuppel). Offen: weitere Figuren, Szene nach dem Grafen | jede Region über mindestens zwei Wege erreichbar |
 | 5 Kür | Warp-Spiegel, Schlosskarte, Geheimwände (`X`/`Y` gibt es schon), „Umgedrehtes Schloss" als Mode-7-Spiegelung | 200 % |
@@ -260,8 +260,20 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   DEF, Spielzeit, Erkundungsgrad, Siegel, Warpkammern). Stufe, EXP, Besiegte und Spielzeit sichert die Speicherkammer;
   „SPIEL STARTEN" beginnt auf Stufe 1. Treffer werden an der gesunkenen Energie der Gegner erkannt (keine Gegnerklasse
   geändert); STR/CON wirken über `Options.dmgMul` und `Player.hurt`, nur mit `?castle`.
+- **Ausrüstung** (Pause → **AUSRÜSTUNG**): drei Plätze – Waffe (Beschläge und Runen für jede Heldenwaffe: Silberbeschlag
+  ATT +2, Blutrune +4, Drachenzahn +7), Rüstung (Lederwams DEF +2, Kettenhemd +4, Spiegelpanzer +7), Amulett (Herzamulett
+  max. HP +8, Blutstein heilt 1 HP alle 4 s, Glücksmünze 2,5× Beute, Ring der Gier 1,5× Gold). ATT/DEF zählen wie STR/CON-Punkte
+  (je +5 % Schaden bzw. +4 % Abwehr). ↑↓ wählt, ←→ oder Sprung wechselt, auf Heiltrank (50 %) und Elixier (100 %) trinkt Sprung.
+  Einzelstücke schweben in den Zusatzräumen (Kolosseum Lederwams, Kanal Blutstein, Schatzkammer Ring der Gier, Verlies
+  Drachenzahn, Wehrgang Glücksmünze, Himmelsbrücke Spiegelpanzer); ein Fund für einen leeren Platz wird gleich angelegt.
+  Gegner lassen mit 3 % etwas fallen (nach Gefahrenstufe; Doppeltes wird zum Heiltrank), Bosse ein Elixier.
+- **Laden des Bibliothekars:** nach jedem Gespräch mit ihm (↑) öffnet sein Laden – Heiltrank 800, Elixier 4000, Lederwams 2000,
+  Kettenhemd 6000, Silberbeschlag 3000, Herzamulett 5000, **Schlosskarte** 3000 (zeigt auf der Karte alle unbetretenen Räume
+  grau; der Erkundungsgrad zählt weiter nur Betretenes). Gold = Punkte; Ausrüstung gibt es nur einmal. Besitz wird wie die
+  Relikte sofort gemerkt (`inv`, `eq` im Karten-Spielstand), ein Kauf zieht das Gold auch im Speicherkammer-Spielstand ab.
 - Code: `js/castle.js` (Regionen `REGION_AT`, Verbindungen `LINKS`, Türen `CastleDoor`, Kammern `CHAMBERS`/`CastleChamber`,
   Szenen `BEATS`/`CastleNPC`, Spielstand, Karte), Einbindung in `js/game.js` (`castleGo`/`castleEnter`, `nextRoom`,
-  `startStage`, `startClear`, Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map`, `warp`, `status`, `talk`).
-- Daten: `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss, mini, warp, vessel, relic, crack, flag }`,
+  `startStage`, `startClear`, Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map`, `warp`, `status`, `talk`,
+  `equip`, `shop`); Ausrüstung `GEAR`/`FINDS`/`DROPS`/`STOCK`, `CastleLoot`.
+- Daten: `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss, mini, warp, vessel, relic, crack, flag, inv, eq }`,
   `localStorage['nachtmahr.castle']` = Spielstand der letzten Speicherkammer; `Castle.reset()` in der Konsole löscht alles.
