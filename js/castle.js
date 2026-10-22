@@ -209,7 +209,7 @@ const Castle = (() => {
   if (on && Levels.room) buildSide();
   // Gefahrenstufe je Region: tiefer im Schloss mehr Lebensenergie, Schaden und EXP der Gegner
   const TIER = { arrival: 1, 0: 1, 1: 2, 2: 3, sun: 4, expo: 5, 3: 6 };
-  const tierOf = (s, r) => { const d = S()[s].rooms[r]; return (d && d.tier) || TIER[S()[s].id] || 1; };
+  const tierOf = (s, r) => { const d = S()[s].rooms[r]; return ((d && d.tier) || TIER[S()[s].id] || 1) + 2 * (flag.ngp || 0); }; // Neues Spiel+: je Runde zwei Stufen mehr
 
   // Zellen, die für den Erkundungsgrad zählen: dort kann man stehen (Luft über Boden, Treppen) oder etwas finden –
   // reine Himmelszellen über Schiff und Abgründen zählen nicht, damit 100 % erreichbar bleiben
@@ -1514,7 +1514,7 @@ const Castle = (() => {
     return out;
   }
   const talkBox = () => { // unten im Bild – stehen die Sprecher dort, oben unter der Statusleiste
-    const w = Math.min(View.w - 12, 360), low = talk && talk.npc.y - W.cam.y > 96;
+    const w = Math.min(View.w - 12, 360), low = talk && talk.npc && talk.npc.y - W.cam.y > 96;
     return { x: Math.round(View.cx - w / 2), y: low ? 32 : 164, w, h: 72 };
   };
   function page() { // aktuelle Seite, umbrochen (beim ersten Zugriff)
@@ -1534,6 +1534,7 @@ const Castle = (() => {
     Game.go('talk');
   }
   function endTalk() {
+    if (talk.epi) { talk = null; return 'results'; } // Epilog vorbei: Ergebnis
     const { npc, b, again } = talk;
     talk = null;
     if (b.gold && !again && !beatDone(b)) { // Tentakel: klebriges Goldstück fürs Schweigen
@@ -1598,6 +1599,53 @@ const Castle = (() => {
     });
     if (talk.n >= pg.len && (t >> 4) % 2 === 0) Font.draw(ctx, talk.i + 1 < talk.pages.length ? '↓' : '·', hero ? x + w - 60 : x + w - 12, y + h - 12, '#f8b800', { shadow: '#000' });
   }
+
+  // ---------------- Ende im Schloss-Modus: Epilog, Ergebnis, Neues Spiel+ ----------------
+  // Nach dem Grafen: die drei Figuren verabschieden sich über der Morgendämmerung (Gesprächsfenster wie im Spiel), dann das
+  // Ergebnis wie in SotN (Erkundungsgrad, Zeit, Stufe, Relikte, Gefäße, Rang nach Erkundungsgrad) mit der Wahl zwischen
+  // NEUES SPIEL+ (Stufe, Gold, Ausrüstung, Begleiter und Zauber bleiben; Karte, Relikte, Bosse, Gefäße und Warpkammern auf
+  // Anfang; jede Runde zwei Gefahrenstufen mehr; Start am Burgtor) und dem Abspann.
+  function startEpilogue() {
+    flag.cleared = (flag.cleared || 0) + 1; save();
+    const ally = HEROES.def(allyId()).name, hero = HEROES.def(Options.character).name, raw = tr('story_epilogue');
+    talk = { npc: null, b: null, again: false, epi: true, i: 0, n: 0,
+      pages: (Array.isArray(raw) ? raw : [raw]).map(s => ({ who: s[0], text: s.slice(2).replace(/\{0\}/g, ally).replace(/\{1\}/g, hero) })) };
+  }
+  const ngp = () => flag.ngp || 0;
+  const RANKS = [[95, 'S'], [80, 'A'], [60, 'B'], [0, 'C']];
+  const rankOf = () => { const p = +percent(); return RANKS.find(([min]) => p >= min)[1]; };
+  const results = { sel: 0 };
+  function resultsInput(P) { // 'ngplus', 'credits' oder null
+    if (P.up || P.down) { results.sel = 1 - results.sel; Audio8.sfx('select'); }
+    if (P.jump || P.attack || P.start) return results.sel === 0 ? 'ngplus' : 'credits';
+    return null;
+  }
+  function drawResults(ctx, t) {
+    const cx = View.cx, lx = cx - Math.min(110, View.w / 2 - 20), rx = cx + Math.min(110, View.w / 2 - 20), rank = rankOf();
+    panel(ctx, tr('endTitle'), '#f8b800');
+    const vAll = S().reduce((n, st) => n + st.rooms.reduce((m, d) => m + d.ents.filter(e => e.type === 'vessel').length, 0), 0);
+    const rows = [[tr('mapCastle', percent()), ''], ['TIME', playTime()], ['LV', rpg.lv], ['KILLS', rpg.kills], [tr('castleRelicCount', RELICS.filter(k => relic[k]).length, RELICS.length), ''],
+      [tr('castleVesselCount', vessels(), vAll), ''], ['GOLD', W.score]];
+    if (ngp()) rows.push(['NG+', ngp()]);
+    rows.forEach(([k, v], i) => { Font.draw(ctx, k, lx, 40 + i * 12, '#d0c0a0', { shadow: '#000' }); if (v !== '') Font.draw(ctx, String(v), rx, 40 + i * 12, '#fcfcfc', { align: 'right', shadow: '#000' }); });
+    const ry = 40 + rows.length * 12 + 8; // Rang mit Kommentar
+    Game.big(ctx, rank, cx, ry, 3, rank === 'S' ? LOGO : ['#fcfcfc', '#fce0a8', '#f8b800', '#c89020', '#9c6400', '#6c4410', '#2c1408'], null, '#000');
+    wrap(tr('endRank' + rank), rx - lx).slice(0, 2).forEach((l, i) => Font.draw(ctx, l, cx, ry + 26 + i * 10, '#c8a0fc', { align: 'center', shadow: '#000' }));
+    ['endNgPlus', 'endCredits'].forEach((k, i) => {
+      const y = 200 + i * 12, on = results.sel === i;
+      Font.draw(ctx, tr(k), cx, y, on ? '#fcfcfc' : '#7c7c8c', { align: 'center', shadow: '#000' });
+      if (on && (t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, cx - Font.width(tr(k)) / 2 - 12, y - 1);
+    });
+  }
+  function ngPlus() { // Fortschritt zurück, Held behalten; Rückgabe: was Game nach newGame wieder einsetzt
+    const keep = { lv: rpg.lv, exp: rpg.exp, kills: rpg.kills, frames: rpg.frames, gold: W.score };
+    const next = ngp() + 1;
+    seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {};
+    delete flag.curse; flag.ngp = next; // Szenen und Funde bleiben gesehen, der Fluch schlägt wieder zu
+    save(); dropResume(); try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ }
+    return keep;
+  }
+  function ngRestore(keep) { Object.assign(rpg, { lv: keep.lv, exp: keep.exp, kills: keep.kills, frames: keep.frames }); W.score = keep.gold; const p = W.player; applyHp(p); p.hp = p.maxHp; mp = mpMax(); }
 
   // ---------------- Erkundungsgrad ----------------
   function stats(s) { // [aufgedeckt, gesamt] der zählenden Zellen einer Region (oder eines Raums)
@@ -1874,7 +1922,7 @@ const Castle = (() => {
   }
 
   // Test-Werkzeugkasten (Pause → TEST-WERKZEUGE, nur im Testmodus): ↑↓ wählt, Sprung führt aus, Start zurück
-  const TOOLS = ['god', 'relics', 'lv', 'gold', 'warps', 'reveal', 'boss', 'milestones', 'check'];
+  const TOOLS = ['god', 'relics', 'lv', 'gold', 'warps', 'reveal', 'boss', 'milestones', 'ending', 'check'];
   const tools = { sel: 0, msg: '' };
   let god = false;
   if (on) { const hurt = Player.prototype.hurt; Player.prototype.hurt = function (...a) { return god ? false : hurt.apply(this, a); }; } // unverwundbar (Stürze zählen weiter)
@@ -1898,6 +1946,7 @@ const Castle = (() => {
       if (!bossBeaten()) { tools.msg = tr('toolNoBoss'); return null; }
     }
     else if (id === 'milestones') return 'milestones';
+    else if (id === 'ending') return 'ending'; // Ende im Schloss-Modus ansehen (Epilog, Ergebnis, Neues Spiel+)
     else if (id === 'check') { const r = selfCheckLog(); tools.msg = r.length ? tr('checkBad', r.length) : tr('checkOk'); return null; }
     tools.msg = tr('toolDone', tr('tool_' + id));
     return null;
@@ -1906,7 +1955,7 @@ const Castle = (() => {
     const cx = View.cx, lx = cx - Math.min(120, View.w / 2 - 16), rx = cx + Math.min(120, View.w / 2 - 16);
     panel(ctx, tr('testTools'), '#58f898');
     TOOLS.forEach((id, i) => {
-      const y = 38 + i * 15, on = i === tools.sel;
+      const y = 36 + i * 14, on = i === tools.sel;
       if (on) { ctx.fillStyle = 'rgba(88,248,152,0.14)'; ctx.fillRect(lx - 4, y - 3, rx - lx + 8, 13); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 2, y - 1); }
       Font.draw(ctx, tr('tool_' + id), lx + 10, y, on ? '#fcfcfc' : '#a8a8b8', { shadow: '#000' });
       if (id === 'god') Font.draw(ctx, tr(god ? 'on' : 'off'), rx, y, god ? '#58f898' : '#7c7c8c', { align: 'right', shadow: '#000' });
@@ -1937,6 +1986,7 @@ const Castle = (() => {
     for (const id of SPELL_IDS) need.push('spell_' + id);
     for (const id of TOOLS) need.push('tool_' + id);
     for (const k of RELICS) need.push('relic_' + k, 'relicD_' + k);
+    need.push('story_epilogue', 'endTitle', 'endNgPlus', 'endCredits', ...RANKS.map(([, r]) => 'endRank' + r));
     for (const k of need) if (tr(k) === k) out.push('Text fehlt: ' + k);
     return out;
   }
@@ -1966,7 +2016,7 @@ const Castle = (() => {
     startTest, finishTest, drawMilestones, milestones: MILESTONES.length, get testing() { return testing; },
     toolsInput, drawTools, selfCheck, get god() { return god; },
     toggleOverlay, get overlay() { return overlayOn; },
-    tier: (s) => TIER[S()[s].id] || 1, side: SIDE, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
+    tier: (s) => (TIER[S()[s].id] || 1) + 2 * (flag.ngp || 0), side: SIDE, startEpilogue, resultsInput, drawResults, ngPlus, ngRestore, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
     reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); localStorage.removeItem(RESUME_KEY); } catch (e) { /* privat */ } },
   };

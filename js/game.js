@@ -146,6 +146,14 @@ const Game = {
   saveResume() {
     if (Castle.on && W.player && ['play', 'pause', 'pausesec', 'map', 'warp', 'status', 'talk', 'shop', 'equip', 'tools'].includes(this.state)) Castle.writeResume();
   },
+  startCastleEnding() { // Schloss: Graf besiegt – Epilog über der Morgendämmerung, dann Ergebnis
+    this.saveHi(); Castle.dropResume(); this.rubble = [];
+    this.go('epilogue'); Audio8.play('ending'); Castle.startEpilogue();
+  },
+  startNGPlus() { // Neues Spiel+: Held behalten, Schloss auf Anfang (eine Runde härter), Start am Burgtor
+    const keep = Castle.ngPlus();
+    this.newGame(Levels.STAGES.findIndex(st => st.id === 0), 0); Castle.ngRestore(keep);
+  },
   startMilestone(i) { // Testmodus: Meilenstein laden und dort beginnen
     Audio8.setMusicVolume(0.5); Audio8.muffle(false);
     const tg = Castle.startTest(i);
@@ -519,6 +527,19 @@ const Game = {
         const r = Castle.toolsInput(P);
         if (r === 'back') { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('tools'); Audio8.sfx('pause'); }
         else if (r === 'milestones') { this.go('milestones'); this.msSel = 0; this.msFrom = 'tools'; }
+        else if (r === 'ending') { Audio8.setMusicVolume(0.5); Audio8.muffle(false); this.startCastleEnding(); }
+        break;
+      }
+      case 'epilogue': { // Schloss-Ende: Abschied der Figuren, dann das Ergebnis
+        const r = Castle.talkInput(P);
+        if (r) { this.go('results'); Audio8.sfx('bigItem'); }
+        break;
+      }
+      case 'results': { // Ergebnis: NEUES SPIEL+ oder Abspann
+        if (this.t < 30) break;
+        const r = Castle.resultsInput(P);
+        if (r === 'ngplus') this.startNGPlus();
+        else if (r === 'credits') { this.go('ending'); this.rubble = []; }
         break;
       }
       case 'milestones': { // Testmodus: Meilenstein wählen (vom Titel oder aus dem Werkzeugkasten)
@@ -645,6 +666,7 @@ const Game = {
     if (this.tallyPhase === 2 && ++this.rankT === 25) { Audio8.sfx('stamp'); W.shake = 10; Input.rumble(0.5, 0.5, 250); } // Rang-Stempel
     if (this.tallyPhase === 2 && this.t - this.t2 > 150) {
       if (W.stage + 1 < Levels.STAGES.length) { W.player.hp = W.player.maxHp; this.startStage(W.stage + 1); }
+      else if (Castle.on) this.startCastleEnding(); // Schloss: Epilog und Ergebnis vor dem Abspann
       else { this.saveHi(); this.go('ending'); Audio8.play('ending'); this.rubble = []; }
     }
   },
@@ -658,6 +680,12 @@ const Game = {
       case 'options': this.drawOptions(ctx); break;
       case 'sections': this.drawSections(ctx); break;
       case 'milestones': Castle.drawMilestones(ctx, this.t, this.msSel || 0); break;
+      case 'epilogue': { // Schloss-Ende: Morgendämmerung über der Burg, darüber das Gesprächsfenster
+        this.drawSkyScene(ctx, false, 150);
+        ctx.fillStyle = 'rgba(252,160,68,0.4)'; ctx.fillRect(0, 140, View.w, 68); ctx.fillStyle = 'rgba(248,120,88,0.25)'; ctx.fillRect(0, 100, View.w, 40);
+        Castle.drawTalk(ctx, this.t); break;
+      }
+      case 'results': Castle.drawResults(ctx, this.t); break;
       case 'secload': this.drawSecLoad(ctx); break;
       case 'charsel': this.drawCharSel(ctx); break;
       case 'intro': this.drawIntro(ctx); break;
