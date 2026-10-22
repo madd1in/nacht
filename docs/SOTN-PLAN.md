@@ -188,6 +188,25 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   steht oben im Pausenmenü und unten auf der Karte, der Zielraum blinkt golden auf der Karte (auch unbetreten); nach Fluch,
   Relikt, Boss und Fortsetzen blendet es sich unten im Bild ein.
 - **Prolog überspringen** (zum Testen): solange man auf dem Schiff oder im Wald ist, Pause → PROLOG ÜBERSPRINGEN.
+- **Testmodus** (Titel → TESTMODUS): Sprung zu acht Meilensteinen (Burgtor nach dem Fluch, Rabenfeder, Riesenfledermaus,
+  Knochenriese, Medusa, Sonnenwächter, fünf Siegel, vor dem Grafen) mit passender Stufe, Gold, Relikten, Siegeln, Ausrüstung,
+  Begleitern, Zaubern und freien Warpkammern; ältere Szenen gelten als gesehen. Der Testmodus speichert in eigene Plätze
+  (`nachtmahr.test.*`, die Adresse bekommt `?test`), der echte Spielstand bleibt unberührt; Titel → TESTMODUS BEENDEN.
+  HUD zeigt „TEST“ (mit * = unverwundbar). Pause → **TEST-WERKZEUGE**: unverwundbar, alle Relikte, Stufe +5, Gold +10000,
+  alle Warpkammern, Karte aufdecken, Boss hier besiegen, zu einem Meilenstein, Selbsttest.
+- **Selbsttest** (`Castle.selfCheck()`, im Testmodus bei jedem Meilenstein und in den Werkzeugen, Ergebnis in der Konsole):
+  Karte ohne Überlappung, ↑-Türen und Figuren auf Boden mit Platz darüber, Funde nicht in der Wand, alle Verbindungen finden
+  ihre Räume, alle Texte (Gegenstände, Szenen, Zauber, Werkzeuge) vorhanden.
+- **Fortsetzungspunkt:** beim Pausieren, bei jedem Raumwechsel und wenn der Tab versteckt oder der Browser geschlossen wird,
+  merkt sich das Spiel Raum, Stelle (auf festem Boden die aktuelle, sonst der letzte sichere Punkt), Energie, MP, Stufe und
+  Gold. Titel → FORTSETZEN nimmt den neueren von Fortsetzungspunkt und Speicherkammer; nach Game Over zählt wie in SotN nur
+  die Speicherkammer (der Fortsetzungspunkt verfällt). Im Prolog gibt es keinen Fortsetzungspunkt.
+- **Karte auf Select:** Select/Ansicht-Taste (Tastatur: Tab) blendet die Karte durchscheinend über dem laufenden Spiel ein,
+  um den Helden zentriert (noch einmal drücken: weg); in der Pause öffnet Select die große Karte. Im Arcade-Modus bleibt die
+  Ansicht-Taste der Tonschalter.
+- **Türen:** ↑-Türen sind Steinbögen wie die Speicherkammer (Quaderring, Schlussstein, Fackelschein, zwei Wandfackeln),
+  verschlossen mit eisernem Fallgitter; das Siegeltor hat violette Runen. Seitenausgänge zeigen schon aus zwölf Kacheln
+  Entfernung einen Lichtschein und drei große Winkelpfeile, die zum Rand laufen.
 - **Laden:** Regionswechsel zeigen den Regionsnamen nur kurz (30–90 Bilder statt 75–140); eine schon vorgebaute Region wird
   in derselben Sitzung nicht noch einmal vorgebaut.
 - **Relikte:** Beim ersten Betreten des Burghofs raubt der Fluch des Grafen Doppelsprung, Dash, Wandsprung und Ring-Greifen
@@ -289,5 +308,6 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   Szenen `BEATS`/`CastleNPC`, Spielstand, Karte), Einbindung in `js/game.js` (`castleGo`/`castleEnter`, `nextRoom`,
   `startStage`, `startClear`, Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map`, `warp`, `status`, `talk`,
   `equip`, `shop`); Ausrüstung `GEAR`/`FINDS`/`DROPS`/`STOCK`/`BOSS_LOOT`, `CastleLoot`, Begleiter `CastleFamiliar`/`famTick`, Zauber `SPELLS`/`preUpdate`/`CastleSpell`.
-- Daten: `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss, mini, warp, vessel, relic, crack, flag, inv, eq, famx }`,
+- Daten: `localStorage['nachtmahr.resume']` = Fortsetzungspunkt (Testmodus: `nachtmahr.test.map` / `.castle` / `.resume`);
+  `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss, mini, warp, vessel, relic, crack, flag, inv, eq, famx }`,
   `localStorage['nachtmahr.castle']` = Spielstand der letzten Speicherkammer; `Castle.reset()` in der Konsole löscht alles.

@@ -41,8 +41,10 @@ const Game = {
     });
     // Touch in der Pause: input.js wertet den Tipp aus (Menüpunkt wählen oder weiterspielen)
     document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.saveResume(); // Schloss: Tab weg oder Browser zu → Fortsetzungspunkt
       if (document.hidden && this.state === 'play' && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.3); Audio8.muffle(true); }
     });
+    window.addEventListener('pagehide', () => this.saveResume());
     this.resize();
     const q = new URLSearchParams(location.search);
     this.debugStage = q.has('stage') ? clamp(parseInt(q.get('stage'), 10) - 1, 0, Levels.STAGES.length - 1) : null;
@@ -140,9 +142,18 @@ const Game = {
   go(state) { this.state = state; this.t = 0; },
   toTitle() { this.saveHi(); this.go('title'); Audio8.muffle(false); this.bars = null; Audio8.play('title'); Audio8.ambience(true); this.revealed = false; this.idleT = 0; Voice.stop(); },
 
+  // Schloss: Fortsetzungspunkt schreiben, solange man in einem Raum ist (Pause, Menüs, Spiel – nicht auf Titel oder im Übergang)
+  saveResume() {
+    if (Castle.on && W.player && ['play', 'pause', 'pausesec', 'map', 'warp', 'status', 'talk', 'shop', 'equip', 'tools'].includes(this.state)) Castle.writeResume();
+  },
+  startMilestone(i) { // Testmodus: Meilenstein laden und dort beginnen
+    Audio8.setMusicVolume(0.5); Audio8.muffle(false);
+    const tg = Castle.startTest(i);
+    this.newGame(tg.s, tg.r); Castle.finishTest(i);
+  },
   newGame(stage = 0, room = 0) {
     W.score = 0; W.lives = 3; W.nextLife = 20000; this.runBest = 0;
-    if (Castle.on) Castle.newRun(); // Schloss: neues Spiel beginnt auf Stufe 1
+    if (Castle.on) { Castle.newRun(); Castle.dropResume(); } // Schloss: neues Spiel beginnt auf Stufe 1, alter Fortsetzungspunkt verfällt
     W.player = new Player();
     this.startStage(stage, room);
   },
@@ -175,8 +186,10 @@ const Game = {
   },
   titleItems() { // Titelmenü; der Moduswechsel lädt die Seite mit bzw. ohne ?castle neu
     if (!Castle.on) return ['start', 'castle', 'options', 'lang', 'scores', 'sections'];
-    return [...(Castle.hasSave() ? ['cont'] : []), 'start', 'arcade', 'options', 'lang', 'scores', 'sections'];
+    if (Castle.testing) return [...(Castle.hasSave() ? ['cont'] : []), 'test', 'testEnd', 'options', 'lang']; // Testmodus: eigene Spielstände
+    return [...(Castle.hasSave() ? ['cont'] : []), 'start', 'arcade', 'options', 'lang', 'scores', 'sections', 'test'];
   },
+  endTest() { const u = new URL(location.href); u.searchParams.delete('test'); location.href = u.toString().replace(/=(?=&|$)/g, ''); },
   switchMode(castle) { // Schloss-Modus ist Standard, ?arcade lädt das lineare Arcade-Spiel
     const u = new URL(location.href);
     ['castle', 'arcade', 'stage', 'room'].forEach(k => u.searchParams.delete(k));
@@ -184,8 +197,8 @@ const Game = {
     location.href = u.toString().replace(/=(?=&|$)/g, ''); // leere Schalter ohne „=“ (?arcade&noboot)
   },
   // Schloss-Modus: am Spielstand der letzten Speicherkammer weiterspielen (Titel: FORTSETZEN, und nach Game Over)
-  castleContinue() {
-    const sv = Castle.loadSave();
+  castleContinue(chamberOnly = false) { // chamberOnly: nach Game Over nur die Speicherkammer (wie in SotN)
+    const sv = Castle.loadSave(chamberOnly);
     if (!sv) { this.go('charsel'); return; }
     if (sv.hero && HEROES.list.some(d => d.id === sv.hero)) Options.set('character', sv.hero);
     W.score = sv.score || 0; W.lives = sv.lives >= 0 ? sv.lives : 3; W.nextLife = (Math.floor(W.score / 20000) + 1) * 20000; this.runBest = 0;
@@ -196,7 +209,7 @@ const Game = {
 
   onPlayerDeath() {
     W.lives--; W.stats.deaths++;
-    if (W.lives < 0) { this.saveHi(); this.sel = 0; this.go('gameover'); Audio8.play('over'); Voice.say('gameover'); return; }
+    if (W.lives < 0) { if (Castle.on) Castle.dropResume(); this.saveHi(); this.sel = 0; this.go('gameover'); Audio8.play('over'); Voice.say('gameover'); return; } // Schloss: nach Game Over zählt nur die Speicherkammer
     const p = W.player;
     p.hp = p.maxHp; p.hearts = Options.infHearts ? 99 : Math.max(5, p.hearts); p.whip = Options.maxWhip ? 3 : Math.max(1, p.whip - 1);
     this.go('respawn');
@@ -402,7 +415,7 @@ const Game = {
     if (this.revealed && this.revealT !== undefined) this.revealT++;
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
     const titleish = ['title', 'options', 'sections', 'secload', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
-    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'map' || this.state === 'warp' || this.state === 'status' || this.state === 'talk' || this.state === 'shop' || this.state === 'equip' || this.state === 'demo') && W.room ? W.room.theme : null);
+    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'map' || this.state === 'warp' || this.state === 'status' || this.state === 'talk' || this.state === 'shop' || this.state === 'equip' || this.state === 'tools' || this.state === 'demo') && W.room ? W.room.theme : null);
     if (titleish && this.bootBg) this.bootBg.tick(); // Kulisse des Ladebildschirms unter den Menüs
     if (titleish) {
       FX.updateStorm(this.tStorm, View.w, () => { if (Audio8.ready()) setTimeout(() => Audio8.sfx('thunder'), 250 + Math.random() * 600); });
@@ -423,6 +436,8 @@ const Game = {
           if (it === 'lang') { this.cycleLang(false); break; }
           if (it === 'scores') { this.startScores(false); break; }
           if (it === 'sections') { this.go('sections'); break; } // Abschnittswahl fürs Testspielen
+          if (it === 'test') { this.go('milestones'); this.msSel = 0; this.msFrom = 'title'; break; } // Testmodus: Meilensteine
+          if (it === 'testEnd') { this.endTest(); break; }
           this.go('charsel');
         }
         break;
@@ -466,10 +481,12 @@ const Game = {
         const tap = this.pauseAct !== undefined; // Touch: Menüpunkt angetippt
         if (tap) { this.pauseSel = this.pauseAct; this.pauseAct = undefined; }
         const it = items[this.pauseSel || 0], ok = tap || P.jump || P.attack;
-        if (ok && it === 'easy') this.toggleEasy();
+        if (Castle.on && P.map) { this.go('map'); Castle.openMap(); Audio8.sfx('select'); } // Select in der Pause: große Karte
+        else if (ok && it === 'easy') this.toggleEasy();
         else if (ok && it === 'map') { this.go('map'); Castle.openMap(); Audio8.sfx('select'); } // Schloss-Modus: Karte
         else if (ok && it === 'status') { this.go('status'); Audio8.sfx('select'); } // Schloss-Modus: Werte wie in SotN
         else if (ok && it === 'equip') { this.go('equip'); Castle.openEquip(); Audio8.sfx('select'); } // Schloss-Modus: Ausrüstung und Tränke
+        else if (ok && it === 'tools') { this.go('tools'); Audio8.sfx('select'); } // Testmodus: Werkzeugkasten
         else if (ok && it === 'skip') { // Schloss-Modus: Prolog (Schiff, Wald) überspringen – direkt ans Burgtor
           this.unpause = false; this.go('play'); Audio8.setMusicVolume(0.5); Audio8.muffle(false);
           this.castleGo({ s: Levels.STAGES.findIndex(st => st.id === 0), r: 0, place: 'start' });
@@ -482,7 +499,7 @@ const Game = {
         break;
       }
       case 'map': // Schlosskarte (nur ?castle): Angriff zoomt, Pfeile scrollen, Sprung/Start zurück zur Pause
-        if ((P.start || P.jump) && this.t > 8) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('map'); Audio8.sfx('pause'); break; }
+        if ((P.start || P.jump || P.map) && this.t > 8) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('map'); Audio8.sfx('pause'); break; }
         Castle.mapInput(P);
         break;
       case 'status': // Statusbildschirm (nur ?castle): ←→ Werte/Zauber, Sprung/Angriff/Start zurück zur Pause
@@ -497,6 +514,21 @@ const Game = {
       case 'shop': // Laden des Bibliothekars: ↑↓ wählt, Sprung/Angriff kauft, Start geht
         if (this.t > 8 && Castle.shopInput(P)) { this.go('play'); Audio8.sfx('pause'); }
         break;
+      case 'tools': { // Testmodus: Werkzeugkasten aus der Pause
+        if (this.t < 8) break;
+        const r = Castle.toolsInput(P);
+        if (r === 'back') { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('tools'); Audio8.sfx('pause'); }
+        else if (r === 'milestones') { this.go('milestones'); this.msSel = 0; this.msFrom = 'tools'; }
+        break;
+      }
+      case 'milestones': { // Testmodus: Meilenstein wählen (vom Titel oder aus dem Werkzeugkasten)
+        if (this.t < 8) break;
+        const n = Castle.milestones;
+        if (P.up || P.down) { this.msSel = (this.msSel + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
+        if (P.jump || P.attack) { Audio8.sfx('bigItem'); this.startMilestone(this.msSel); }
+        else if (P.start) { if (this.msFrom === 'tools') this.go('tools'); else this.go('title'); Audio8.sfx('pause'); }
+        break;
+      }
       case 'equip': // Ausrüstung (Pause): ↑↓ wählt, ←→ wechselt, Sprung trinkt, Start zurück zur Pause
         if (this.t > 8 && Castle.equipInput(P)) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('equip'); Audio8.sfx('pause'); }
         break;
@@ -533,7 +565,7 @@ const Game = {
         if (left >= 0 && (P.start || P.jump || P.attack) && this.t > 30) {
           this.runBest = Math.max(this.runBest || 0, W.score); // Score vor dem Continue zählt für die Bestenliste
           Audio8.sfx('bigItem');
-          if (Castle.on && Castle.hasSave()) { this.castleContinue(); break; } // Schloss: zurück in die letzte Speicherkammer
+          if (Castle.on && Castle.loadSave(true)) { this.castleContinue(true); break; } // Schloss: zurück in die letzte Speicherkammer
           W.score = 0; W.lives = 3; W.nextLife = 20000; W.player = new Player(); this.startStage(W.stage);
         } else if (left < 0 && (this.t > 60 * 10 + 120 || ((P.start || P.jump) && this.t > 60 * 10 + 20))) this.finishRun(false);
         break;
@@ -572,7 +604,8 @@ const Game = {
   },
 
   updatePlay(P) {
-    if (P.start && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.3); Audio8.muffle(true); Audio8.sfx('pause'); return; }
+    if (P.start && W.player.alive) { this.go('pause'); this.pauseSel = 0; Audio8.setMusicVolume(0.3); Audio8.muffle(true); Audio8.sfx('pause'); this.saveResume(); return; } // Schloss: Pause = Fortsetzungspunkt
+    if (Castle.on && P.map) Castle.toggleOverlay(); // Schloss: Select/Tab – Karte durchscheinend über dem Spiel
     if (this.readyT > 0) { // READY? … GO! (das Spiel läuft dabei schon)
       this.readyT++;
       if (this.readyT === 3) Audio8.sfx('ready');
@@ -624,6 +657,7 @@ const Game = {
       case 'title': this.drawTitle(ctx); break;
       case 'options': this.drawOptions(ctx); break;
       case 'sections': this.drawSections(ctx); break;
+      case 'milestones': Castle.drawMilestones(ctx, this.t, this.msSel || 0); break;
       case 'secload': this.drawSecLoad(ctx); break;
       case 'charsel': this.drawCharSel(ctx); break;
       case 'intro': this.drawIntro(ctx); break;
@@ -638,6 +672,7 @@ const Game = {
         if (W.cinema > 0) this.drawCinema(ctx);
         this.drawCombo(ctx);
         this.drawHud(ctx);
+        if (this.state === 'play' && Castle.on && Castle.overlay) Castle.draw(ctx, this.t, false, true); // Karten-Overlay (Select/Tab)
         if (this.state === 'pause') this.drawPause(ctx);
         if (this.state === 'pausesec') this.drawSections(ctx, true);
         if (this.state === 'map') Castle.draw(ctx, this.t);
@@ -646,6 +681,7 @@ const Game = {
         if (this.state === 'talk') Castle.drawTalk(ctx, this.t);
         if (this.state === 'shop') Castle.drawShop(ctx, this.t);
         if (this.state === 'equip') Castle.drawEquip(ctx, this.t);
+        if (this.state === 'tools') Castle.drawTools(ctx, this.t);
         if (this.state === 'fade') this.mosaicFade(ctx, this.t < 18 ? this.t / 16 : 1 - (this.t - 18) / 12);
         if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 30 ? this.t / 28 : 1 - (this.t - 30) / 14);
         if (this.hurryT > 0 && this.state === 'play') this.drawHurry(ctx);
@@ -786,7 +822,7 @@ const Game = {
     Audio8.sfx(Options.easy ? 'heart' : 'select');
   },
   // Touch im Pausenmenü: Tipp auf einen Menüpunkt wählt ihn (true), sonst geht es weiter
-  pauseItems() { return Castle.on ? ['resume', 'map', 'status', 'equip', ...(Castle.inPrologue() ? ['skip'] : []), 'easy', 'sec', 'title'] : ['resume', 'easy', 'sec', 'title']; },
+  pauseItems() { return Castle.on ? ['resume', 'map', 'status', 'equip', ...(Castle.inPrologue() ? ['skip'] : []), Castle.testing ? 'tools' : 'easy', 'sec', 'title'] : ['resume', 'easy', 'sec', 'title']; },
   pauseTouch(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect(), y = (clientY - r.top) / r.height * 240;
     for (let i = 0; i < this.pauseItems().length; i++) if (y >= 117 + i * 12 && y < 129 + i * 12) { this.pauseAct = i; return true; }
@@ -794,7 +830,7 @@ const Game = {
   },
   drawPause(ctx) {
     const ids = this.pauseItems(), extra = (ids.length - 4) * 12;
-    const LABEL = { resume: tr('resume'), map: tr('mapTitle'), status: tr('castleStatus'), equip: tr('equipTitle'), skip: tr('castleSkipPrologue'), easy: tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), sec: tr('secTitle'), title: tr('toTitle') };
+    const LABEL = { resume: tr('resume'), map: tr('mapTitle'), status: tr('castleStatus'), equip: tr('equipTitle'), tools: tr('testTools'), skip: tr('castleSkipPrologue'), easy: tr('optEasy') + ': ' + tr(Options.easy ? 'on' : 'off'), sec: tr('secTitle'), title: tr('toTitle') };
     const cx = View.cx, items = ids.map(id => LABEL[id]);
     const hint = tr(Input.device === 'pad' ? 'pausePad' : Input.device === 'touch' ? 'pauseTouch' : 'pauseKey');
     const pw = Math.min(View.w - 8, Math.max(150, Font.width(hint) + 16, ...items.map(s => Font.width(s) + 96)));
@@ -983,6 +1019,7 @@ const Game = {
     if (Castle.on) { // Schloss: Stufe mit EXP-Leiste statt Punkten, Gold in der Mitte statt der (stehenden) Zeit
       Font.draw(ctx, 'LV', 18, 3, label, { align: 'right' }); Font.draw(ctx, pad(Castle.rpg.lv, 2), 22, 3, val, { shadow: '#000' });
       const k = clamp(Castle.expProgress(), 0, 1); R('#000', 37, 4, 66, 5); R('#1c2c14', 38, 5, 64, 3); R('#58f898', 38, 5, Math.round(64 * k), 3); R('#b8fcd0', 38, 5, Math.round(64 * k), 1);
+      if (Castle.testing) Font.draw(ctx, Castle.god ? 'TEST *' : 'TEST', 4, 34, '#58f898', { shadow: '#000' }); // Testmodus sichtbar (* = unverwundbar)
       const mm = Castle.mpMax(); // MP, sobald ein Zauber gelernt ist
       if (mm) { const m = clamp(Castle.mp / mm, 0, 1); Font.draw(ctx, 'MP', 108, 3, label); R('#000', 120, 4, 28, 5); R('#0c1c34', 121, 5, 26, 3); R('#3cbcfc', 121, 5, Math.round(26 * m), 3); R('#a4e4fc', 121, 5, Math.round(26 * m), 1); }
       Font.draw(ctx, pad(this.dispScore || 0, 6), boxCx, 3, this.dispScore < W.score ? '#fce0a8' : '#f8b800', { align: 'center', shadow: '#000' });
@@ -1159,10 +1196,10 @@ const Game = {
     const ids = this.titleItems(), ni = ids.length;
     const by = 228 - bh, my0 = Math.min(L.sub + 13, by - ni * msp - (tags.length ? 11 : 3));
     const fx = (this.langFx = Math.max(0, (this.langFx || 0) - 1)) > 0;
-    const LABEL = { cont: tr('castleCont'), start: tr('start'), castle: tr('castleMode'), arcade: tr('arcadeMode'), options: tr('options'), lang: langTxt, scores: tr('hiTitle'), sections: tr('sections') };
+    const LABEL = { cont: tr('castleCont'), start: tr('start'), castle: tr('castleMode'), arcade: tr('arcadeMode'), options: tr('options'), lang: langTxt, scores: tr('hiTitle'), sections: tr('sections'), test: tr('testMode'), testEnd: tr('testEnd') };
     ids.map(id => LABEL[id]).forEach((m, i) => {
       const on = this.menu === i, y = my0 + i * msp, lang = ids[i] === 'lang';
-      const col = on ? (lang && fx ? '#ffffff' : '#fce0a8') : lang ? '#d0b8e0' : ids[i] === 'sections' ? '#5c4a6c' : ids[i] === 'cont' ? '#fca070' : ids[i] === 'castle' || ids[i] === 'arcade' ? '#a4b4fc' : '#8c7a9c';
+      const col = on ? (lang && fx ? '#ffffff' : '#fce0a8') : lang ? '#d0b8e0' : ids[i] === 'sections' ? '#5c4a6c' : ids[i] === 'test' || ids[i] === 'testEnd' ? '#4c8c6c' : ids[i] === 'cont' ? '#fca070' : ids[i] === 'castle' || ids[i] === 'arcade' ? '#a4b4fc' : '#8c7a9c';
       if (on) { // Glut hinter dem gewählten Punkt
         const w = (I18N.cjk ? Font.width(m) : m.length * 6) + 24, gr = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
         gr.addColorStop(0, 'rgba(120,10,30,0)'); gr.addColorStop(0.5, `rgba(150,20,40,${0.42 + 0.12 * Math.sin(t * 0.1)})`); gr.addColorStop(1, 'rgba(120,10,30,0)');

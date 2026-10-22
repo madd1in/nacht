@@ -18,7 +18,12 @@
 
 const Castle = (() => {
   const on = /[?&]castle\b/.test(location.search) || !/[?&]arcade\b/.test(location.search); // Standard; ?arcade = lineares Arcade-Spiel
-  const CW = 16, CH = 13, KEY = 'nachtmahr.map', SAVE_KEY = 'nachtmahr.castle';
+  const CW = 16, CH = 13;
+  // Spielstände: Karte/Besitz (map), Speicherkammer (castle) und Fortsetzungspunkt (resume: beim Pausieren und beim Schließen des
+  // Tabs). Der Testmodus (?test, Titel → TESTMODUS) hat eigene Plätze nachtmahr.test.*, der echte Spielstand bleibt unberührt.
+  let testing = on && /[?&]test\b/.test(location.search), KEY, SAVE_KEY, RESUME_KEY;
+  const setKeys = () => { const p = testing ? 'nachtmahr.test.' : 'nachtmahr.'; KEY = p + 'map'; SAVE_KEY = p + 'castle'; RESUME_KEY = p + 'resume'; };
+  setKeys();
   const SOLID = '#=XYB', STAND = ['candle', 'chest', 'statue', 'ring', 'crumble', 'elevator', 'platform'];
   // Lage der Regionen auf der Schlosskarte (Zellen; jede Region ordnet ihre Räume selbst an, erster Raum bei 0,0)
   const REGION_AT = { arrival: [-18, 0], 0: [0, 0], 1: [2, 4], 2: [5, -4], sun: [18, -12], expo: [20, -4], 3: [2, -20] };
@@ -55,13 +60,31 @@ const Castle = (() => {
     } catch (e) { /* privater Modus: gilt nur für diese Sitzung */ }
   }
   // Spielstand der Speicherkammer: Ort (Kapitel-id, Raum, Kammer), Held, Herzen, Spezialwaffe, Peitsche, Punkte, Leben
-  function readSave() {
+  function readKey(k) {
     try {
-      const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'), s = d && d.v === 1 ? sIdx(d.s) : -1;
+      const d = JSON.parse(localStorage.getItem(k) || 'null'), s = d && d.v === 1 ? sIdx(d.s) : -1;
       if (s < 0 || !(d.r >= 0 && d.r < S()[s].rooms.length) || !d.place) return null;
       return { ...d, s };
     } catch (e) { return null; }
   }
+  // Fortsetzen: der neuere von Speicherkammer und Fortsetzungspunkt; nach Game Over nur die Speicherkammer (wie in SotN)
+  function readSave(chamberOnly) {
+    const a = readKey(SAVE_KEY), b = chamberOnly ? null : readKey(RESUME_KEY);
+    return a && b ? ((b.at || 0) > (a.at || 0) ? b : a) : a || b;
+  }
+  // Fortsetzungspunkt: Raum, Stelle (auf festem Boden die aktuelle, sonst der letzte sichere Punkt im Raum), Held, Werte
+  function writeResume() {
+    const p = W.player, s = W.stage, r = W.roomIdx;
+    if (!on || !p || !p.alive || !S()[s] || inPrologue()) return;
+    const cp = W.checkpoint && W.checkpoint.stage === s && W.checkpoint.room === r ? W.checkpoint : null;
+    const here = p.onGround && p.state === 'normal' && !W.arenaOn;
+    const place = here ? { px: Math.round(p.cx), feet: Math.round(p.feet), face: p.face, resume: 1 } : cp ? { px: cp.cx, feet: cp.feet, face: 1, resume: 1 } : 'start';
+    try {
+      localStorage.setItem(RESUME_KEY, JSON.stringify({ v: 1, s: S()[s].id, r, place, hero: Options.character, hearts: p.hearts, sub: p.sub, whip: p.whip,
+        hp: p.hp, score: W.score, lives: W.lives, at: Date.now(), lv: rpg.lv, exp: rpg.exp, kills: rpg.kills, frames: rpg.frames, mp }));
+    } catch (e) { /* privat */ }
+  }
+  const dropResume = () => { try { localStorage.removeItem(RESUME_KEY); } catch (e) { /* privat */ } };
   function writeSave(c) {
     const p = W.player;
     try {
@@ -312,6 +335,14 @@ const Castle = (() => {
     for (let y = 0; y < r; y++) { const h = Math.round(Math.sqrt(r * r - (r - y - 0.5) * (r - y - 0.5))); ctx.fillRect(cx - h, top + y, h * 2, 1); }
     ctx.fillRect(cx - r, top + r, r * 2, bottom - top - r);
   }
+  // Winkelpfeil (7×13, drei Pixel stark, mit dunkler Kante) für Seitenausgänge; dir = 1 nach rechts, -1 nach links
+  function chevron(ctx, x, y, dir) {
+    for (const [col, o] of [['#1c1008', 1], ['#f8b800', 0]]) {
+      ctx.fillStyle = col;
+      for (let k = 0; k < 13; k++) { const d = 6 - Math.abs(k - 6); ctx.fillRect(x + dir * d + o - (dir < 0 ? 2 : 0), y + k + o, 3, 1); }
+    }
+    ctx.fillStyle = '#fce0a8'; for (let k = 3; k < 10; k++) { const d = 6 - Math.abs(k - 6); ctx.fillRect(x + dir * d + (dir < 0 ? -2 : 2), y + k, 1, 1); } // Lichtkante
+  }
   class CastleDoor extends Ent {
     constructor(d, def) {
       const seal = !!(d.place && d.place.door === 'seal');
@@ -321,28 +352,55 @@ const Castle = (() => {
       else { this.x = 0; this.y = (def.start.y + 1) * T - this.h; this.noWrap = true; }
     }
     update() { this.t++; }
-    lightUp(L, cx, cy) { if (this.k === 'up' && gateOpen(this.d)) L.push({ x: this.cx - cx, y: this.y - cy + this.h / 2, r: 34 + Math.sin(this.t * 0.07) * 3, c: this.seal ? [190, 120, 252] : [252, 210, 140], a: 0.55 }); }
+    lightUp(L, cx, cy) {
+      if (!gateOpen(this.d)) return;
+      if (this.k === 'up') { L.push({ x: this.cx - cx, y: this.y - cy + this.h / 2, r: 30 + Math.sin(this.t * 0.07) * 3, c: this.seal ? [190, 120, 252] : [252, 180, 110], a: 0.45 }); return; }
+      const p = W.player; // Seitenausgang: warmer Schein am Rand, sobald der Held in der Nähe ist
+      if (Math.abs(p.cx - this.cx) < 12 * T) L.push({ x: (this.k === 'edgeL' ? this.x : this.x + this.w) - cx, y: this.y - cy + this.h / 2, r: 30, c: [252, 210, 140], a: 0.4 });
+    }
     draw(ctx) {
       const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), p = W.player, open = gateOpen(this.d);
-      const near = Math.abs(p.cx - this.cx) < (this.k === 'up' ? 14 : 4 * T) && Math.abs(p.feet - (this.y + this.h)) < (this.k === 'up' ? 8 : 3 * T);
-      if (this.k !== 'up') { // Randtür: pulsierender Pfeil, sobald der Held in der Nähe ist (hinter dem Boss erst nach dem Sieg)
-        if (!open || !near) return;
-        ctx.globalAlpha = 0.55 + 0.45 * Math.sin(this.t * 0.15);
-        Font.draw(ctx, this.k === 'edgeL' ? '←' : '→', this.k === 'edgeL' ? x + 4 : x + this.w - 10, y + this.h - 30, '#f8b800', { shadow: '#000' });
+      const near = Math.abs(p.cx - this.cx) < 14 && Math.abs(p.feet - (this.y + this.h)) < 8;
+      if (this.k !== 'up') { // Seitenausgang: Lichtschein am Rand und drei Winkelpfeile, die hinauslaufen (hinter dem Boss erst nach dem Sieg)
+        const dist = Math.abs(p.cx - this.cx);
+        if (!open || dist > 12 * T || Math.abs(p.feet - (this.y + this.h)) > 4 * T) return;
+        const dir = this.k === 'edgeL' ? -1 : 1, ex = this.k === 'edgeL' ? x : x + this.w, a = clamp(1.5 - dist / (8 * T), 0.45, 1);
+        ctx.globalAlpha = a * (0.2 + 0.08 * Math.sin(this.t * 0.1)); ctx.fillStyle = '#fce0a8';
+        for (let k = 0; k < 4; k++) ctx.fillRect(dir > 0 ? ex - 3 - k * 3 : ex + k * 3, y + 6 + k * 2, 3, this.h - 6 - k * 2); // Licht fällt herein
+        for (let i = 0; i < 3; i++) {
+          const ph = ((this.t * 0.5 + i * 9) % 27) / 27;
+          ctx.globalAlpha = a * Math.sin(ph * Math.PI);
+          chevron(ctx, Math.round(ex - dir * (36 - ph * 24)), y + this.h - 30, dir);
+        }
         ctx.globalAlpha = 1;
         return;
       }
-      const cx = x + this.w / 2, bot = y + this.h, r = this.w / 2 - 4;
-      const fr = this.seal ? '#7c3cc8' : '#c89020', dk = this.seal ? '#3c1c64' : '#6c4410', hi = this.seal ? '#e0c8fc' : '#fce0a8';
-      arch(ctx, cx, y + 3, r + 4, bot, dk); arch(ctx, cx, y + 4, r + 3, bot, fr); arch(ctx, cx, y + 5, r + 2, bot, hi); arch(ctx, cx, y + 6, r + 1, bot, fr);
-      arch(ctx, cx, y + 8, r, bot, '#05020a');
-      if (open) { // Glut im Torbogen, unten am stärksten
-        const a = 0.22 + 0.1 * Math.sin(this.t * 0.06);
-        for (let k = 0; k < 4; k++) { ctx.globalAlpha = a * (k + 1) / 4; arch(ctx, cx, y + 14 + k * 6, r - 2, bot, this.seal ? '#9c4cfc' : '#c86c10'); }
+      // Torbogen aus Stein wie die Speicherkammer: Quaderring, Schlussstein, dunkler Gang mit Fackelschein; verschlossen: Fallgitter
+      const cx = x + this.w / 2, bot = y + this.h, r = this.w / 2 - 4, t = this.t;
+      arch(ctx, cx, y + 2, r + 5, bot, '#1c1824'); arch(ctx, cx, y + 3, r + 4, bot, '#5c5468'); arch(ctx, cx, y + 4, r + 3, bot, '#4c4458');
+      ctx.fillStyle = '#2c2634'; // Fugen im Quaderring
+      for (const a of [0.2, 0.55, 0.9, 1.25, 1.6, 1.95, 2.3, 2.65, 3.0]) { const ax = Math.round(cx - Math.cos(a) * (r + 3.5)), ay = Math.round(y + 4 + r + 3 - Math.sin(a) * (r + 3)); ctx.fillRect(ax, ay, 1, 2); }
+      for (let yy = y + r + 8; yy < bot - 2; yy += 7) { ctx.fillRect(cx - r - 4, yy, 3, 1); ctx.fillRect(cx + r + 1, yy, 3, 1); }
+      ctx.fillStyle = '#8c84a0'; ctx.fillRect(cx - r - 4, y + r + 6, 1, bot - y - r - 8); // Lichtkante links
+      if (this.seal) { arch(ctx, cx, y + 5, r + 2, bot, '#3c1c64'); ctx.fillStyle = '#b070fc'; for (let i = 0; i < 5; i++) { const a = 0.3 + i * 0.62; ctx.fillRect(Math.round(cx - Math.cos(a) * (r + 3)), Math.round(y + 4 + r + 3 - Math.sin(a) * (r + 3)), 2, 2); } } // Runen
+      arch(ctx, cx, y + 6, r + 1, bot, '#07050c');
+      if (open) { // Fackelschein aus dem Gang, unten am stärksten
+        const a = 0.16 + 0.06 * Math.sin(t * 0.06);
+        for (let k = 0; k < 4; k++) { ctx.globalAlpha = a * (k + 1) / 4; arch(ctx, cx, y + 16 + k * 6, r - 2, bot, this.seal ? '#9c4cfc' : '#c87830'); }
         ctx.globalAlpha = 1;
-      } else { ctx.fillStyle = '#6c6c7c'; for (let i = -r + 3; i < r; i += 5) ctx.fillRect(cx + i, y + 10, 1, bot - y - 10); ctx.fillRect(cx - r, y + 20, r * 2, 1); } // Gitter
-      ctx.fillStyle = dk; ctx.fillRect(cx - r - 4, bot - 2, (r + 4) * 2, 2); // Schwelle
-      ctx.fillStyle = hi; ctx.fillRect(cx - 2, y + 2, 4, 3); ctx.fillStyle = fr; ctx.fillRect(cx - 1, y + 3, 2, 1); // Schlussstein
+      } else { // Fallgitter mit Nieten
+        ctx.fillStyle = '#3c3c4c'; for (let i = -r + 2; i < r; i += 5) ctx.fillRect(cx + i, y + 9, 2, bot - y - 9);
+        ctx.fillRect(cx - r, y + 18, r * 2, 2); ctx.fillRect(cx - r, y + 30, r * 2, 2);
+        ctx.fillStyle = '#7c7c8c'; for (let i = -r + 2; i < r; i += 5) { ctx.fillRect(cx + i, y + 18, 1, 1); ctx.fillRect(cx + i, y + 30, 1, 1); }
+      }
+      ctx.fillStyle = '#2c2634'; ctx.fillRect(cx - r - 5, bot - 2, (r + 5) * 2, 2); ctx.fillStyle = '#6c6480'; ctx.fillRect(cx - r - 5, bot - 2, (r + 5) * 2, 1); // Schwelle
+      ctx.fillStyle = '#8c84a0'; ctx.fillRect(cx - 3, y + 1, 6, 4); ctx.fillStyle = '#5c5468'; ctx.fillRect(cx - 2, y + 2, 4, 3); // Schlussstein
+      if (open && !this.seal) for (const s of [-1, 1]) { // Wandfackeln links und rechts
+        const fx = cx + s * (r + 8), fy = y + 14;
+        ctx.fillStyle = '#3c2c1c'; ctx.fillRect(fx - 1, fy, 2, 6); ctx.fillStyle = '#6c6c7c'; ctx.fillRect(fx - 2, fy, 4, 1);
+        const f = ((t >> 2) + (s > 0 ? 2 : 0)) & 3;
+        ctx.fillStyle = '#c84810'; ctx.fillRect(fx - 1, fy - 4 + (f & 1), 3, 4 - (f & 1)); ctx.fillStyle = '#fcc860'; ctx.fillRect(fx, fy - 3 + (f === 2 ? 1 : 0), 1, 2);
+      }
       if (this.seal) { // fünf Siegelsockel über dem Tor, besiegte Bosse leuchten rot
         const n = sealRooms().length, h = seals();
         for (let i = 0; i < n; i++) { const sx = cx - n * 3 + i * 6 + 1; ctx.fillStyle = '#1c0c2c'; ctx.fillRect(sx - 1, y - 7, 6, 6); ctx.fillStyle = i < h ? '#fc3c3c' : '#4c3c5c'; ctx.fillRect(sx, y - 6, 4, 4); }
@@ -569,7 +627,7 @@ const Castle = (() => {
     for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
     for (const e of def.ents) if (e.type === 'vessel') { const k = key + ':v' + e.x; if (!vessel[k]) W.spawn(new LifeVessel(e, k)); } // Lebensgefäße
     if (arrive && def.side) Game.note('castleSideRoom', def.label, '*'.repeat(def.tier)); // Zusatzraum: Name und Gefahrenstufe
-    if (arrive && arrive.place && arrive.place.chamber === 'save') announceGoal(90); // Fortsetzen: woran war ich?
+    if (arrive && arrive.place && (arrive.place.chamber === 'save' || arrive.place.resume)) announceGoal(90); // Fortsetzen: woran war ich?
     spawnRelics(s, r, def, arrive);
     if (S()[s].id === 0 && !flag.curse) { // Burgtor: der Fluch des Grafen raubt die Kräfte (einmal)
       flag.curse = 1; save();
@@ -588,13 +646,15 @@ const Castle = (() => {
         cx = col * T + 8; feet = floorRow(def, col, ex.y0) * T; face = ex.x1 >= def.w - 1 || cx > def.w * T / 2 ? -1 : 1;
       } else if (arrive.place === 'right') {
         cx = (def.w - 2) * T + 8; feet = floorRow(def, def.w - 2, def.start.y - 2) * T; face = -1;
-      } else { const u = upSpot(def, arrive.place); cx = u.cx; feet = u.feet; }
+      } else if (arrive.place.px !== undefined) { cx = arrive.place.px; feet = arrive.place.feet; face = arrive.place.face || 1; } // Fortsetzungspunkt
+      else { const u = upSpot(def, arrive.place); cx = u.cx; feet = u.feet; }
       p.reset(cx, feet); p.face = face;
       W.checkpoint = { stage: s, room: r, cx, feet }; // nach dem Tod hier wieder einsteigen
       W.snapCam();
     }
     guard = true; push = 0; lastX = W.player.x;
     if (inExit()) W.exiting = true; // in der Ausgangszone angekommen: erst hinaus, dann gilt sie wieder
+    if (arrive) writeResume(); // jeder Raumwechsel ist ein Fortsetzungspunkt
   }
   function inExit() {
     const ex = W.room && W.room.exit, p = W.player;
@@ -1502,26 +1562,36 @@ const Castle = (() => {
     return null;
   }
 
-  function draw(ctx, t, warpMode = false) {
+  // Overlay (Select/Tab im Spiel): dieselbe Karte durchscheinend über dem laufenden Spiel, um den Helden zentriert
+  let overlayOn = false;
+  function toggleOverlay() { overlayOn = !overlayOn; Audio8.sfx('select'); }
+  function draw(ctx, t, warpMode = false, overlay = false) {
     const w = View.w, cx = View.cx, L = castle(), sw = warpMode && trip.list[trip.sel], st = S()[sw ? sw.s : W.stage];
-    ctx.fillStyle = 'rgba(2,4,18,0.97)'; ctx.fillRect(0, 0, w, 240);
-    ctx.fillStyle = warpMode ? '#2c6cb0' : '#c89020';
-    ctx.fillRect(6, 6, w - 12, 1); ctx.fillRect(6, 233, w - 12, 1); ctx.fillRect(6, 6, 1, 228); ctx.fillRect(w - 7, 6, 1, 228);
-    Game.big(ctx, tr(warpMode ? 'warpTitle' : 'mapTitle'), cx, 12, 2, warpMode ? ['#fcfcfc', '#d8f0fc', '#a4e4fc', '#3cbcfc', '#0078f8', '#0040a8', '#001038'] : LOGO, null, '#000');
-    Font.draw(ctx, tr(st.nameKey), cx, 32, '#f8b800', { align: 'center', shadow: '#000' });
-    const sec = Game.sectionList().find(e => !e.head && e.s === (sw ? sw.s : W.stage) && e.r === (sw ? sw.r : W.roomIdx));
-    if (sec) Font.draw(ctx, sec.label, cx, 42, '#8c9cc8', { align: 'center', shadow: '#000' });
+    if (!overlay) {
+      ctx.fillStyle = 'rgba(2,4,18,0.97)'; ctx.fillRect(0, 0, w, 240);
+      ctx.fillStyle = warpMode ? '#2c6cb0' : '#c89020';
+      ctx.fillRect(6, 6, w - 12, 1); ctx.fillRect(6, 233, w - 12, 1); ctx.fillRect(6, 6, 1, 228); ctx.fillRect(w - 7, 6, 1, 228);
+      Game.big(ctx, tr(warpMode ? 'warpTitle' : 'mapTitle'), cx, 12, 2, warpMode ? ['#fcfcfc', '#d8f0fc', '#a4e4fc', '#3cbcfc', '#0078f8', '#0040a8', '#001038'] : LOGO, null, '#000');
+      Font.draw(ctx, tr(st.nameKey), cx, 32, '#f8b800', { align: 'center', shadow: '#000' });
+      const sec = Game.sectionList().find(e => !e.head && e.s === (sw ? sw.s : W.stage) && e.r === (sw ? sw.r : W.roomIdx));
+      if (sec) Font.draw(ctx, sec.label, cx, 42, '#8c9cc8', { align: 'center', shadow: '#000' });
+    }
 
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const r of L) { x0 = Math.min(x0, r.ax); y0 = Math.min(y0, r.ay); x1 = Math.max(x1, r.ax + r.cw); y1 = Math.max(y1, r.ay + r.ch); }
-    const top = 54, H = warpMode ? 136 : 126, left = 12, Wd = w - 24, gw = x1 - x0, gh = y1 - y0;
-    const fit = clamp(Math.floor(Math.min(Wd / gw, H / gh)), 2, 12), cs = view.zoom ? Math.max(8, fit * 2) : fit;
+    const top = overlay ? 36 : 54, H = overlay ? 190 : warpMode ? 136 : 126, left = overlay ? 4 : 12, Wd = w - left * 2, gw = x1 - x0, gh = y1 - y0;
+    const fit = clamp(Math.floor(Math.min(Wd / gw, H / gh)), 2, 12), cs = overlay ? 7 : view.zoom ? Math.max(8, fit * 2) : fit;
     let ox, oy;
-    if (view.zoom) { ox = Math.round(cx - (view.x + 0.5) * cs); oy = Math.round(top + H / 2 - (view.y + 0.5) * cs); }
+    const hc = overlay && heroCell(), hr = overlay && roomAt(W.stage, W.roomIdx);
+    if (hc && hr) { ox = Math.round(cx - (hr.ax + hc.x + 0.5) * cs); oy = Math.round(top + H / 2 - (hr.ay + hc.y + 0.5) * cs); } // Overlay: Held in der Mitte
+    else if (view.zoom) { ox = Math.round(cx - (view.x + 0.5) * cs); oy = Math.round(top + H / 2 - (view.y + 0.5) * cs); }
     else { ox = Math.round(cx - (gw * cs) / 2) - x0 * cs; oy = Math.round(top + (H - gh * cs) / 2) - y0 * cs; }
     ctx.save(); ctx.beginPath(); ctx.rect(left, top - 2, Wd, H + 4); ctx.clip();
-    ctx.fillStyle = 'rgba(70,90,170,0.35)';
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) ctx.fillRect(ox + x * cs, oy + y * cs, 1, 1);
+    if (overlay) { ctx.fillStyle = 'rgba(2,4,18,0.35)'; ctx.fillRect(left, top - 2, Wd, H + 4); ctx.globalAlpha = 0.78; } // Spiel scheint durch
+    else {
+      ctx.fillStyle = 'rgba(70,90,170,0.35)';
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) ctx.fillRect(ox + x * cs, oy + y * cs, 1, 1);
+    }
 
     const vis = (key, i) => !!(seen[key] && seen[key].has(i));
     if (inv.map) for (const r of L) for (let y = 0; y < r.ch; y++) for (let x = 0; x < r.cw; x++) { // Schlosskarte: unbetretene Räume grau
@@ -1625,6 +1695,12 @@ const Castle = (() => {
       ctx.strokeStyle = '#fce0a8'; ctx.strokeRect(px - m - 0.5, py - m - 0.5, cs + m * 2 + 1, cs + m * 2 + 1);
     }
     ctx.restore();
+    if (overlay) { // Overlay: nur Erkundungsgrad und Hinweis am unteren Rand
+      ctx.globalAlpha = 0.85;
+      Font.draw(ctx, tr('mapExplored', percent(W.stage)) + '   ' + tr('mapCastle', percent()) + '   ' + tr('mapOverlayHelp'), cx, top + H - 6, '#d8dcf4', { align: 'center', shadow: '#000' });
+      ctx.globalAlpha = 1;
+      return;
+    }
     if (!any) Font.draw(ctx, tr('mapNone'), cx, top + H / 2 - 4, '#7c84a8', { align: 'center' });
 
     let ly = top + H + 6;
@@ -1638,6 +1714,150 @@ const Castle = (() => {
     Font.draw(ctx, tr(warpMode ? 'mapHelpWarp' : view.zoom ? 'mapHelpZoom' : 'mapHelp'), cx, ly + 11, '#7c7c8c', { align: 'center' });
   }
 
+  // ---------------- Testmodus: direkt zu Meilensteinen springen (Titel → TESTMODUS) ----------------
+  // Jeder Meilenstein setzt Relikte, besiegte Bosse, Stufe, Gold und Ausrüstung so, wie man sie dort ungefähr hätte, und startet
+  // im passenden Raum. Ältere Szenen gelten als gesehen (die aktuelle Szene je Figur spielt noch), Einzelstücke als gefunden,
+  // Warpkammern der erreichten Regionen sind frei. Gespeichert wird in eigene Plätze (nachtmahr.test.*, die Adresse bekommt ?test,
+  // damit auch ein wieder geöffneter Browser im Test weiterspielt); TESTMODUS BEENDEN lädt ohne ?test mit dem echten Spielstand.
+  const MS_ITEMS = [[], ['tentling', 'potion'], ['batcard', 'leather', 'potion', 'potion'], ['silver', 'potion'],
+    ['chain', 'heartamulet', 'book_spirit', 'map'], ['bloodrune', 'book_hellfire', 'elixir'], ['mirror', 'fairy', 'book_soulsteal', 'elixir', 'elixir'], ['dragonfang']];
+  const MILESTONES = [ // at: Zielraum, lv, gold, relics, bosses (Regions-ids), name: [i18n-Schlüssel, Argument]
+    { at: [0, 0], lv: 1, gold: 0, relics: [], bosses: [], name: ['msGate'] },
+    { at: [0, 1], lv: 4, gold: 3000, relics: ['jump2'], bosses: [], name: ['msRelic', () => tr('relic_jump2')] },
+    { at: [0, -1], lv: 7, gold: 6000, relics: ['jump2', 'dash'], bosses: [0], name: ['msBeaten', () => bossName(0)] },
+    { at: [1, -1], lv: 11, gold: 9000, relics: ['jump2', 'dash', 'ring', 'wall'], bosses: [0, 1], name: ['msBeaten', () => bossName(1)] },
+    { at: [2, -1], lv: 15, gold: 15000, relics: RELICS, bosses: [0, 1, 2], name: ['msBeaten', () => bossName(2)] },
+    { at: ['sun', -1], lv: 19, gold: 20000, relics: RELICS, bosses: [0, 1, 2, 'sun'], name: ['msBeaten', () => bossName('sun')] },
+    { at: [0, 1], lv: 23, gold: 25000, relics: RELICS, bosses: [0, 1, 2, 'sun', 'expo'], name: ['msSeals'] },
+    { at: [3, -1], lv: 28, gold: 30000, relics: RELICS, bosses: [0, 1, 2, 'sun', 'expo'], name: ['msBefore', () => bossName(3)] },
+  ];
+  const msName = (m) => tr(m.name[0], m.name[1] ? m.name[1]() : '');
+  const msItems = (n) => MS_ITEMS.slice(0, n + 1).flat();
+  function startTest(n) { // Zustand im Speicher setzen; Rückgabe: Zielraum für Game.newGame
+    const m = MILESTONES[n];
+    if (!testing) { // in die Test-Spielstände wechseln, ?test in die Adresse
+      testing = true; setKeys();
+      try { const u = new URL(location.href); u.searchParams.set('test', ''); history.replaceState(null, '', u.toString().replace(/=(?=&|$)/g, '')); } catch (e) { /* ohne History */ }
+    }
+    try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(RESUME_KEY); } catch (e) { /* privat */ }
+    seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = { curse: 1 }; inv = {}; eq = {}; famx = {};
+    for (const k of m.relics) relic[k] = 1;
+    const reached = new Set(['arrival', 0, ...m.bosses, ref(m.at) && S()[ref(m.at).s].id]);
+    for (const id of m.bosses) { const s = sIdx(id); if (s >= 0) boss[roomKey(s, mainCount(s) - 1)] = 1; }
+    if (m.relics.includes('breaker')) for (const k of ['kanal', 'schatz', 'verlies']) crack[k] = 1;
+    for (const id of msItems(n)) {
+      inv[id] = (inv[id] || 0) + 1;
+      const g = GEAR[id];
+      if (g.slot) eq[g.slot] = id; // jeweils das zuletzt erreichte Teil anlegen
+      if (FINDS.some(f => f[1] === id) || BOSS_LOOT.some(f => f[1] === id)) flag['find_' + id] = 1;
+    }
+    for (const c of allChambers()) if (c.kind === 'warp' && reached.has(S()[c.s].id)) warp[c.key] = 1;
+    for (const who of WHO) { // ältere Szenen gesehen, die aktuelle bleibt
+      const list = BEATS.filter(b => b.who === who && b.when());
+      list.slice(0, -1).forEach(b => { flag['story_' + b.id] = 1; });
+    }
+    if (inv.tentling) flag.story_tent3 = 1; // der Neffe ist schon dabei
+    save();
+    const a = ref(m.at);
+    return { s: a.s, r: a.r };
+  }
+  function finishTest(n) { // nach Game.newGame: Stufe, Gold, volle Energie
+    const m = MILESTONES[n], p = W.player;
+    Object.assign(rpg, { lv: m.lv, exp: expFor(m.lv), kills: 0, frames: 0 });
+    W.score = m.gold; W.nextLife = (Math.floor(m.gold / 20000) + 1) * 20000;
+    applyHp(p); p.hp = p.maxHp; mp = mpMax(); p.hearts = Math.max(p.hearts, 20);
+    selfCheckLog(); // Testmodus: Selbsttest in die Konsole
+  }
+  function drawMilestones(ctx, t, sel) {
+    const cx = View.cx, lx = cx - Math.min(140, View.w / 2 - 12), rx = cx + Math.min(140, View.w / 2 - 12);
+    panel(ctx, tr('testMode'), '#58f898');
+    MILESTONES.forEach((m, i) => {
+      const y = 36 + i * 17, on = i === sel;
+      if (on) { ctx.fillStyle = 'rgba(88,248,152,0.14)'; ctx.fillRect(lx - 4, y - 3, rx - lx + 8, 15); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 2, y); }
+      Font.draw(ctx, msName(m), lx + 10, y, on ? '#fcfcfc' : '#a8a8b8', { shadow: '#000' });
+      Font.draw(ctx, 'LV ' + m.lv, rx, y, on ? '#58f898' : '#5c7c6c', { align: 'right', shadow: '#000' });
+      RELICS.forEach((k, j) => { ctx.fillStyle = m.relics.includes(k) ? RELIC_COL[k] : '#2c2838'; ctx.fillRect(lx + 10 + j * 7, y + 9, 5, 3); }); // Relikte
+      ctx.fillStyle = '#c89020'; for (let j = 0; j < m.bosses.length; j++) ctx.fillRect(lx + 50 + j * 6, y + 9, 4, 3); // Siegel
+    });
+    const m = MILESTONES[sel], items = [...new Set(msItems(sel))].map(itemName).join(', ');
+    wrap(items || '-', rx - lx).slice(0, 2).forEach((l, i) => Font.draw(ctx, l, cx, 176 + i * 10, '#fce0a8', { align: 'center', shadow: '#000' }));
+    Font.draw(ctx, m.gold + ' G', cx, 198, '#f8b800', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('testNoSave'), cx, 210, '#fc7460', { align: 'center' });
+    Font.draw(ctx, tr('testHelp'), cx, 222, '#7c7c8c', { align: 'center' });
+  }
+
+  // Test-Werkzeugkasten (Pause → TEST-WERKZEUGE, nur im Testmodus): ↑↓ wählt, Sprung führt aus, Start zurück
+  const TOOLS = ['god', 'relics', 'lv', 'gold', 'warps', 'reveal', 'boss', 'milestones', 'check'];
+  const tools = { sel: 0, msg: '' };
+  let god = false;
+  if (on) { const hurt = Player.prototype.hurt; Player.prototype.hurt = function (...a) { return god ? false : hurt.apply(this, a); }; } // unverwundbar (Stürze zählen weiter)
+  function toolsInput(P) { // 'back', 'milestones' oder null
+    if (P.start) return 'back';
+    const n = TOOLS.length;
+    if (P.up || P.down) { tools.sel = (tools.sel + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
+    if (!(P.jump || P.attack)) return null;
+    const id = TOOLS[tools.sel], p = W.player;
+    Audio8.sfx('item');
+    if (id === 'god') god = !god;
+    else if (id === 'relics') { for (const k of RELICS) relic[k] = 1; save(); }
+    else if (id === 'lv') { rpg.lv = Math.min(MAXLV, rpg.lv + 5); rpg.exp = expFor(rpg.lv); applyHp(p); p.hp = p.maxHp; mp = mpMax(); }
+    else if (id === 'gold') W.score += 10000;
+    else if (id === 'warps') { for (const c of allChambers()) if (c.kind === 'warp') warp[c.key] = 1; save(); }
+    else if (id === 'reveal') { for (const r of castle()) { const set = seen[r.key] || (seen[r.key] = new Set()); for (let i = 0; i < r.cw * r.ch; i++) set.add(i); } save(); }
+    else if (id === 'boss') {
+      const b = W.ents.find(e => e.kind === 'boss');
+      if (!b && !W.room.arena) { tools.msg = tr('toolNoBoss'); Audio8.sfx('wall'); return null; }
+      W.ents = W.ents.filter(e => e.kind !== 'boss'); W.boss = null;
+      if (!bossBeaten()) { tools.msg = tr('toolNoBoss'); return null; }
+    }
+    else if (id === 'milestones') return 'milestones';
+    else if (id === 'check') { const r = selfCheckLog(); tools.msg = r.length ? tr('checkBad', r.length) : tr('checkOk'); return null; }
+    tools.msg = tr('toolDone', tr('tool_' + id));
+    return null;
+  }
+  function drawTools(ctx, t) {
+    const cx = View.cx, lx = cx - Math.min(120, View.w / 2 - 16), rx = cx + Math.min(120, View.w / 2 - 16);
+    panel(ctx, tr('testTools'), '#58f898');
+    TOOLS.forEach((id, i) => {
+      const y = 38 + i * 15, on = i === tools.sel;
+      if (on) { ctx.fillStyle = 'rgba(88,248,152,0.14)'; ctx.fillRect(lx - 4, y - 3, rx - lx + 8, 13); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 2, y - 1); }
+      Font.draw(ctx, tr('tool_' + id), lx + 10, y, on ? '#fcfcfc' : '#a8a8b8', { shadow: '#000' });
+      if (id === 'god') Font.draw(ctx, tr(god ? 'on' : 'off'), rx, y, god ? '#58f898' : '#7c7c8c', { align: 'right', shadow: '#000' });
+    });
+    Font.draw(ctx, 'LV ' + rpg.lv + '   GOLD ' + W.score + '   ' + tr('castleRelicCount', RELICS.filter(k => relic[k]).length, RELICS.length), cx, 180, '#c8c8d8', { align: 'center', shadow: '#000' });
+    if (tools.msg) Font.draw(ctx, tools.msg, cx, 196, '#58f898', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('testHelp'), cx, 222, '#7c7c8c', { align: 'center' });
+  }
+  // Selbsttest: Karte ohne Überlappung, Türen und Figuren auf Boden mit Platz darüber, Funde nicht in der Wand, alle Verbindungen
+  // finden ihre Räume, alle Texte vorhanden. Im Testmodus beim Start eines Meilensteins und im Werkzeugkasten (Ergebnis in der Konsole)
+  function selfCheck() {
+    const out = [], used = new Map();
+    for (const r of castle()) for (let y = 0; y < r.ch; y++) for (let x = 0; x < r.cw; x++) {
+      const k = (r.ax + x) + ',' + (r.ay + y);
+      if (used.has(k) && used.get(k) !== r.key) out.push('Karte: ' + r.key + ' überlappt ' + used.get(k));
+      used.set(k, r.key);
+    }
+    const ground = (def, x, y) => x >= 0 && x < def.w && y >= 1 && y + 1 < def.h && SOLID.includes(def.grid[y + 1][x]) && !SOLID.includes(def.grid[y][x]) && !SOLID.includes(def.grid[y - 1][x]);
+    S().forEach((st, s) => st.rooms.forEach((def, r) => {
+      for (const d of doorsOf(s, r)) if (d.place && typeof d.place === 'object' && !(ground(def, d.place.x, d.place.y) && ground(def, d.place.x + 1, d.place.y))) out.push('Tür ohne Boden/Platz: ' + roomKey(s, r) + ' ' + d.place.x + ',' + d.place.y);
+    }));
+    for (const [A, , B] of LINKS) if (!ref(A) || !ref(B)) out.push('Verbindung ohne Raum: ' + JSON.stringify([A, B]));
+    for (const b of BEATS) { const a = ref(b.at[0]); if (!a) out.push('Szene ohne Raum: ' + b.id); else if (!ground(S()[a.s].rooms[a.r], b.at[1], b.at[2])) out.push('Figur ohne Boden: ' + b.id); }
+    for (const [R, id, x, y] of FINDS) { const a = ref(R); if (!a) out.push('Fund ohne Raum: ' + id); else if (SOLID.includes(S()[a.s].rooms[a.r].grid[y][x])) out.push('Fund in der Wand: ' + id); }
+    const need = ['famSay_bat', 'famSay_fairy', 'famSay_tent', 'npcLib', 'equipTitle', 'shopTitle', 'spellTitle', 'testMode', 'mapOverlayHelp'];
+    for (const id in GEAR) need.push('item_' + id, 'itemD_' + id);
+    for (const b of BEATS) { if (b.lines !== false) need.push('story_' + b.id); need.push('story_' + (b.again || b.id) + 'Again'); }
+    for (const id of SPELL_IDS) need.push('spell_' + id);
+    for (const id of TOOLS) need.push('tool_' + id);
+    for (const k of need) if (tr(k) === k) out.push('Text fehlt: ' + k);
+    return out;
+  }
+  function selfCheckLog() {
+    const r = selfCheck();
+    if (r.length) console.warn('[NACHTMAHR] Selbsttest: ' + r.length + ' Probleme', r); else console.info('[NACHTMAHR] Selbsttest OK');
+    return r;
+  }
+
   // Fortsetzen: Held, Herzen, Spezialwaffe und Peitsche aus dem Spielstand übernehmen
   function applySave(p, sv) {
     if (typeof sv.hearts === 'number' && !Options.infHearts) p.hearts = sv.hearts;
@@ -1645,18 +1865,21 @@ const Castle = (() => {
     if (typeof sv.whip === 'number' && !Options.maxWhip) p.whip = clamp(sv.whip, 1, 3);
     newRun();
     if (sv.lv >= 1) Object.assign(rpg, { lv: Math.min(MAXLV, sv.lv | 0), exp: sv.exp | 0, kills: sv.kills | 0, frames: sv.frames | 0 });
-    applyHp(p); p.hp = p.maxHp; mp = mpMax();
+    applyHp(p); p.hp = sv.hp > 0 ? Math.min(p.maxHp, sv.hp) : p.maxHp; mp = typeof sv.mp === 'number' ? Math.min(mpMax(), sv.mp) : mpMax(); // Fortsetzungspunkt: Energie wie beim Verlassen
   }
 
   return {
     on, update, settle, forward, bossBeaten, draw, openMap, mapInput, openWarp, warpInput, layout, castle, percent, roomPercent, firstVisit, seals,
     bossDone: (s, r) => !!boss[roomKey(s, r)],
-    hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers,
+    hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers, writeResume, dropResume,
     newRun, drawStatus, expProgress, gainExp, get rpg() { return rpg; }, talkInput, drawTalk, get talk() { return talk; }, get flags() { return flag; },
     openEquip, equipInput, drawEquip, openShop, shopInput, drawShop, get inv() { return inv; }, get eq() { return eq; }, giveItem,
     preUpdate, statusInput, mpMax, get mp() { return mp; }, set mp(v) { mp = v; },
+    startTest, finishTest, drawMilestones, milestones: MILESTONES.length, get testing() { return testing; },
+    toolsInput, drawTools, selfCheck, get god() { return god; },
+    toggleOverlay, get overlay() { return overlayOn; },
     tier: (s) => TIER[S()[s].id] || 1, side: SIDE, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
-    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
+    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); localStorage.removeItem(RESUME_KEY); } catch (e) { /* privat */ } },
   };
 })();

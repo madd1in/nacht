@@ -502,10 +502,11 @@ const Audio8 = (() => {
       tri: EX_C.map(c => { const [lo, hi] = EX_B[c]; return rep(`${lo}:2 ${lo}:1 ${hi}:1`, 3); }).join(' ') + ' ' + // Galopp
         EX_C.map(c => { const [lo, hi] = EX_B[c]; return rep(`${lo}:1 ${lo}:1 ${hi}:1 ${lo}:1`, 3); }).join(' '), // pumpend
       pad: rep(EX_C.map(c => EX[c].join('+') + ':12').join(' '), 2),
-      // gerader Walzer-Groove: Kick auf 1, Snare auf 2 und 3, Hi-Hat in Achteln; Fill nur alle acht Takte.
-      // B-Teil: durchgehender Doppel-Kick in 16teln (ohne Pumpen), Snare weiter auf 2 und 3
-      dr: EX_C.map((c, i) => i % 8 === 7 ? 'k:1 h:1 o:1 h:1 q:1 h:1 q:1 h:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1' : 'k:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1 q:1 h:1 o:1 h:1').join(' ') + ' ' +
-        EX_C.map((c, i) => i === 31 ? 'k:1 d:1 q:1 d:1 t:1 u:1 w:6' : i % 8 === 7 ? 'k:1 d:1 d:1 d:1 q:1 d:1 q:1 d:1 t:1 t:1 u:1 u:1' : i % 8 === 0 ? 'x:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1' : 'k:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1 q:1 d:1 d:1 d:1').join(' '),
+      // Walzer „Bumm-tss-tss“: Bassdrum nur auf der Eins (nur sie duckt die Melodie), auf 2 und 3 ein offenes Becken, dazwischen
+      // leise Hi-Hat; Fill alle acht Takte. Vorher lagen Kick+Snare auch auf 2 und 3 (Melodie pumpte dreimal je Takt) und im
+      // B-Teil ein Doppel-Kick in Dauer-16teln – das nervte. B-Teil jetzt: Snare auf 2 und 3, Hi-Hat in 16teln, keine Kick-Flut
+      dr: EX_C.map((c, i) => i % 8 === 7 ? 'k:2 h:2 s:2 t:1 t:1 u:1 u:1 s:2' : i % 8 === 0 ? 'x:2 h:2 o:2 h:2 o:2 h:2' : 'k:2 h:2 o:2 h:2 o:2 h:2').join(' ') + ' ' +
+        EX_C.map((c, i) => i === 31 ? 'k:2 h:2 s:2 w:6' : i % 8 === 7 ? 'k:2 s:1 s:1 s:2 t:1 t:1 u:1 u:1 s:2' : i % 8 === 0 ? 'x:2 h:1 h:1 s:2 h:2 s:2 h:1 h:1' : 'k:2 h:1 h:1 s:2 h:2 s:2 h:1 h:1').join(' '),
     },
     clear: {
       bpm: 150, loop: false,

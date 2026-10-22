@@ -10,8 +10,9 @@ const Input = (() => {
     KeyC: 'sub', KeyL: 'sub',
     ShiftLeft: 'dash', ShiftRight: 'dash', KeyE: 'dash', KeyI: 'dash',
     Enter: 'start', Escape: 'start', KeyP: 'start',
+    Tab: 'map', // Schloss-Modus: Karte als Overlay
   };
-  const ACTIONS = ['left', 'right', 'up', 'down', 'jump', 'attack', 'sub', 'start', 'dash'];
+  const ACTIONS = ['left', 'right', 'up', 'down', 'jump', 'attack', 'sub', 'start', 'dash', 'map'];
   const kb = {}, touch = {}, held = {}, prev = {}, pressed = {}, latch = {}, prevReal = {};
   let demoFn = null, realHit = false, tapHit = false; // Demo-Modus: Eingaben kommen aus einer Funktion, echte Tasten beenden ihn
   let anyListener = null, lastDevice = 'keys', padName = null, padIndex = -1, prevPadBack = false;
@@ -73,9 +74,11 @@ const Input = (() => {
     out.sub = b(3) || b(7);                // Y oder RT
     out.dash = b(5) || b(4) || b(6);       // RB, LB oder LT: Dash
     out.start = b(9);                      // Menü-Taste
-    const back = b(8);                     // Ansicht-Taste = Ton
-    if (back && !prevPadBack) Audio8.toggleMute();
+    const back = b(8);                     // Ansicht-/Select-Taste: im Schloss-Modus die Karte, im Arcade-Modus der Ton
+    const castle = typeof Castle !== 'undefined' && Castle.on;
+    if (back && !prevPadBack && !castle) Audio8.toggleMute();
     prevPadBack = back;
+    out.map = castle && back;
     if (p.buttons.some(x => x.pressed) || Math.abs(ax) > 0.5 || Math.abs(ay) > 0.5) {
       lastDevice = 'pad';
       if (anyListener) anyListener();
