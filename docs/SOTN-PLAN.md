@@ -174,7 +174,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 | **1 (Prototyp erledigt)** | Kapitel werden Regionen eines Schlosses: Türen in beide Richtungen, Knoten Eingangshalle (Keller-, Turm-, Siegeltor), Wege hinter den Bossen, Einbahnen mit Rückweg, eine Karte für das ganze Schloss, Bosse geben Siegel und bleiben besiegt, kein Zeitlimit | alle Regionen frei begehbar, Thron hinter 5 Siegeln |
 | **1b (teilweise erledigt)** | erledigt: Speicherkammern mit Spielstand, „Fortsetzen" im Titel und nach Game Over, Warpkammern mit Schnellreise über die Karte. Offen: feste Raum-IDs, Regionsmusik ohne Neustart, Spielstand-Slots | Spielstand überlebt Umsortieren von `levels.js` |
 | **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 6 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher, Fledermausgestalt) auf Sockeln und bei Bossen, rissiges Gestein vor Zusatzräumen, Dachboden nur fliegend. Selbsttest prüft Türen/Figuren/Texte. Offen: Nebel- und Wolfsgestalt, automatischer Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
-| **3 RPG (fast erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand, Ausrüstung (Waffe/Rüstung/Amulett) mit Drops und Einzelstücken, Tränke, Laden des Bibliothekars, Schlosskarte, drei Begleiter mit Stufen, MP und drei Zauber per Befehlseingabe. Offen: Verkaufen, weitere Zauber | Statusbildschirm, Shop |
+| **3 RPG (fast erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand, Ausrüstung (Waffe/Rüstung/Amulett) mit Drops und Einzelstücken, Tränke, Laden des Bibliothekars, Schlosskarte, drei Begleiter mit Stufen, MP und drei Zauber per Befehlseingabe, Bestiarium, Verkaufen. Offen: weitere Zauber und Gestalten | Statusbildschirm, Shop |
 | **4 Bosse & Siegel (erledigt)** | Arenen mit Hintertür, Siegeltor, eigenes Ende (Epilog der drei Figuren, Ergebnis mit Rang nach Erkundungsgrad, Neues Spiel+), neue Verbindungsräume | Abspann im Schloss-Modus |
 | **4b Geschichte & Verzahnung (erledigt)** | drei Figuren mit absurden Gesprächen im Maniac-Mansion-Ton (zweiter Held, Bibliothekar, lila Tentakel), elf Szenen entlang der Relikte und Siegel; drei Schleifen (Geheimgang Kolosseum ↔ Brunnenschacht, Wehrgang Bergfried ↔ Glockenturm, Himmelsbrücke Kathedralendach ↔ Kuppel). Offen: weitere Figuren, Szene nach dem Grafen | jede Region über mindestens zwei Wege erreichbar |
 | 5 Kür | Warp-Spiegel, Schlosskarte, Geheimwände (`X`/`Y` gibt es schon), „Umgedrehtes Schloss" als Mode-7-Spiegelung | 200 % |
@@ -293,6 +293,12 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   was nah kommt, und redet zu viel). Jeder Treffer bzw. jede Heilung gibt Erfahrung, alle 12 Punkte eine Stufe (bis LV 9:
   mehr Schaden, kürzere Pausen). Begleiter treffen nur Gegner und Bosse (deren Trefferzonen), nie Kerzen, Geschosse oder
   Geheimwände; Sprechblasen mit absurden Sprüchen. Stufen liegen in `famx` im Karten-Spielstand.
+- **Bestiarium** (Pause → STATUS, ←→ bis zur dritten Seite, ↑↓ wählt): 21 Gegnerarten und 8 Bosse wie die Gegnerliste in
+  SotN, mit Siegen je Art und absurdem Eintrag (unbesiegte Arten bleiben „???“). Die erste besiegte Art meldet „NEU IM
+  BESTIARIUM“. Gezählt wird über den Klassennamen des Gegners (`best` im Karten-Spielstand; bleibt bei Neues Spiel+).
+- **Verkaufen:** im Laden des Bibliothekars wechselt ←→ zwischen KAUFEN und VERKAUFEN. Verkaufen lässt sich alles außer
+  Zauberbüchern, Schlosskarte, Begleitern und dem einzigen angelegten Stück; halber Ladenpreis, Einzelstücke zu festen
+  Preisen (z. B. Drachenzahn 6000). Der Erlös wird auch im Speicherkammer-Spielstand gutgeschrieben.
 - **Ende im Schloss-Modus:** nach dem Grafen verabschieden sich zweiter Held, Bibliothekar und lila Tentakel über dem
   Morgenhimmel (Gesprächsfenster, absurd wie gewohnt), dann **SCHLOSS BEFREIT**: Erkundungsgrad, Spielzeit, Stufe, Besiegte,
   Relikte, Lebensgefäße, Gold und ein Rang nach Erkundungsgrad (S ab 95 %, A ab 80 %, B ab 60 %, sonst C) mit Kommentar.
@@ -322,5 +328,5 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   `startStage`, `startClear`, Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map`, `warp`, `status`, `talk`,
   `equip`, `shop`); Ausrüstung `GEAR`/`FINDS`/`DROPS`/`STOCK`/`BOSS_LOOT`, `CastleLoot`, Begleiter `CastleFamiliar`/`famTick`, Zauber `SPELLS`/`preUpdate`/`CastleSpell`.
 - Daten: `localStorage['nachtmahr.resume']` = Fortsetzungspunkt (Testmodus: `nachtmahr.test.map` / `.castle` / `.resume`);
-  `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss, mini, warp, vessel, relic, crack, flag, inv, eq, famx }`,
+  `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss, mini, warp, vessel, relic, crack, flag, inv, eq, famx, best }`,
   `localStorage['nachtmahr.castle']` = Spielstand der letzten Speicherkammer; `Castle.reset()` in der Konsole löscht alles.

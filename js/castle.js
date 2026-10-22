@@ -42,21 +42,21 @@ const Castle = (() => {
 
   // ---------------- Spielstand: aufgedeckte Zellen, besiegte Bosse und Zwischengegner, freigeschaltete Warpkammern ----------------
   // seen: Raumschlüssel "<kapitel-id>:<raum>" → Set der Zellnummern; boss/mini/warp/vessel/relic/crack/flag: Schlüssel → 1;
-  // inv: Gegenstand → Anzahl, eq: Platz (weapon/armor/acc/fam) → Gegenstand, famx: Begleiter → Erfahrung
-  let seen = {}, boss = {}, mini = {}, warp = {}, vessel = {}, relic = {}, crack = {}, flag = {}, inv = {}, eq = {}, famx = {};
+  // inv: Gegenstand → Anzahl, eq: Platz (weapon/armor/acc/fam) → Gegenstand, famx: Begleiter → Erfahrung, best: Gegnerart → Siege
+  let seen = {}, boss = {}, mini = {}, warp = {}, vessel = {}, relic = {}, crack = {}, flag = {}, inv = {}, eq = {}, famx = {}, best = {};
   try {
     const d = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (d && d.v === 1) {
       for (const k in d.rooms) seen[k] = new Set(d.rooms[k]);
       boss = d.boss || {}; mini = d.mini || {}; warp = d.warp || {}; vessel = d.vessel || {};
-      relic = d.relic || {}; crack = d.crack || {}; flag = d.flag || {}; inv = d.inv || {}; eq = d.eq || {}; famx = d.famx || {};
+      relic = d.relic || {}; crack = d.crack || {}; flag = d.flag || {}; inv = d.inv || {}; eq = d.eq || {}; famx = d.famx || {}; best = d.best || {};
     }
-  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; }
+  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; best = {}; }
   function save() {
     try {
       const rooms = {};
       for (const k in seen) rooms[k] = [...seen[k]];
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp, vessel, relic, crack, flag, inv, eq, famx }));
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp, vessel, relic, crack, flag, inv, eq, famx, best }));
     } catch (e) { /* privater Modus: gilt nur für diese Sitzung */ }
   }
   // Spielstand der Speicherkammer: Ort (Kapitel-id, Raum, Kammer), Held, Herzen, Spezialwaffe, Peitsche, Punkte, Leben
@@ -782,8 +782,9 @@ const Castle = (() => {
   const hpSeen = new Map();
   function dmgNumber(e, d) { W.popup(e.cx + rnd(-4, 4), e.y - 2, String(Math.max(1, Math.round(d * 10))), e.kind === 'boss' ? '#f8b800' : '#fcfcfc'); }
   function defeated(e) {
-    const big = e.kind === 'boss';
+    const big = e.kind === 'boss', kind = e.constructor && e.constructor.name;
     rpg.kills++;
+    if (BEAST_SET.has(kind)) { const first = !best[kind]; best[kind] = (best[kind] || 0) + 1; if (first) { save(); W.popup(e.cx, e.y - 14, tr('beastNew'), '#c8a0fc'); } } // Bestiarium
     gainExp(Math.max(1, Math.round(big ? Math.max((e.score || 0) / 20, (e.maxHp || 20) * 6) : (e.score || 100) / 15 * (e.expMul || 1))));
     const r = Math.random(), drop = big ? 'bagBig' : r < 0.05 ? 'roast' : r < 0.12 ? 'bag' : r < 0.17 ? 'heartB' : null; // Beute wie in SotN
     if (drop) W.spawn(new Item(drop, e.cx, Math.min(e.cy, W.room.h * T - 24)));
@@ -1266,22 +1267,36 @@ const Castle = (() => {
   }
 
   // Laden des Bibliothekars: öffnet nach jedem Gespräch mit ihm; Sprung/Angriff kauft, Start geht
-  const shop = { sel: 0, say: 'shopHi' };
-  function openShop() { shop.sel = 0; shop.say = 'shopHi'; }
+  // ←→ wechselt zwischen KAUFEN und VERKAUFEN. Verkaufen: alles außer Zauberbüchern, Schlosskarte, Begleitern und dem einzigen
+  // angelegten Stück; Preis = halber Ladenpreis bzw. ein fester Wert für Einzelstücke. Der Erlös landet auch im Spielstand der
+  // Speicherkammer (der Gegenstand ist ja sofort weg).
+  const SELL = { bloodrune: 2000, dragonfang: 6000, mirror: 6000, bloodstone: 4000, luckcoin: 3000, greedring: 5000, chicken: 2500 };
+  const sellPrice = (id) => SELL[id] || Math.floor((GEAR[id].price || 1000) / 2);
+  const sellable = () => Object.keys(GEAR).filter(id => { const g = GEAR[id]; if (!inv[id] || g.spell || g.key || g.slot === 'fam') return false; return !(g.slot && eq[g.slot] === id && inv[id] <= 1); });
+  const shop = { sel: 0, say: 'shopHi', mode: 'buy' };
+  function openShop() { shop.sel = 0; shop.say = 'shopHi'; shop.mode = 'buy'; }
+  function saveGold(d) { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && typeof s.score === 'number') { s.score = Math.max(0, s.score + d); localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } } catch (e) { /* privat */ } }
   function shopInput(P) { // true = Laden verlassen
     if (P.start) return true;
-    const n = STOCK.length;
-    if (P.up || P.down) { shop.sel = (shop.sel + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
+    if (P.left || P.right) { shop.mode = shop.mode === 'buy' ? 'sell' : 'buy'; shop.sel = 0; Audio8.sfx('select'); }
+    const list = shop.mode === 'buy' ? STOCK : sellable(), n = list.length;
+    if (n && (P.up || P.down)) { shop.sel = (shop.sel + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
+    shop.sel = Math.min(shop.sel, Math.max(0, n - 1));
+    if ((P.jump || P.attack) && shop.mode === 'sell') {
+      const id = list[shop.sel];
+      if (!id) { Audio8.sfx('wall'); return false; }
+      const v = sellPrice(id);
+      inv[id]--; if (!inv[id]) delete inv[id]; save();
+      W.score += v; saveGold(v); Audio8.sfx('money'); shop.say = 'shopSold';
+      return false;
+    }
     if (P.jump || P.attack) {
       const id = STOCK[shop.sel], g = GEAR[id];
       if (once(g) && inv[id]) { shop.say = 'shopOwned'; Audio8.sfx('wall'); }
       else if (W.score < g.price) { shop.say = 'shopPoor'; Audio8.sfx('wall'); }
       else {
         W.score -= g.price; giveItem(id, false); Audio8.sfx('money');
-        try { // auch im Spielstand der Speicherkammer bezahlen
-          const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-          if (d && typeof d.score === 'number') { d.score = Math.max(0, d.score - g.price); localStorage.setItem(SAVE_KEY, JSON.stringify(d)); }
-        } catch (e) { /* privat */ }
+        saveGold(-g.price); // auch im Spielstand der Speicherkammer bezahlen
         shop.say = 'shopThanks' + (1 + Math.floor(Math.random() * 3));
       }
     }
@@ -1293,27 +1308,60 @@ const Castle = (() => {
     ctx.save(); ctx.translate(lx + 4, 72); ctx.scale(1, 1); drawLibrarian(ctx, 0, 0, t, false); ctx.restore();
     const say = wrap(tr(shop.say), rx - lx - 24);
     say.slice(0, 3).forEach((l, i) => Font.draw(ctx, l, lx + 20, 36 + i * 10, '#c8a0fc', { shadow: '#000' }));
-    const top = clamp(shop.sel - 3, 0, Math.max(0, STOCK.length - 8)); // acht Zeilen sichtbar, die Liste rollt mit
-    if (top > 0) Font.draw(ctx, '↑', cx, 69, '#9c6cfc');
-    if (top + 8 < STOCK.length) Font.draw(ctx, '↓', cx, 178, '#9c6cfc');
-    STOCK.slice(top, top + 8).forEach((id, n) => {
-      const i = top + n, y = 78 + n * 13, on = i === shop.sel, g = GEAR[id], own = once(g) && inv[id], poor = W.score < g.price;
-      if (on) { ctx.fillStyle = 'rgba(156,108,252,0.2)'; ctx.fillRect(lx - 6, y - 3, rx - lx + 12, 13); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y - 1); }
+    const sell = shop.mode === 'sell', list = sell ? sellable() : STOCK;
+    ['shopBuy', 'shopSell'].forEach((k, i) => { const on = (i === 1) === sell, x = cx + (i ? 40 : -40); Font.draw(ctx, tr(k), x, 66, on ? '#fcfcfc' : '#5c5c6c', { align: 'center', shadow: '#000' }); if (on) { ctx.fillStyle = '#9c6cfc'; ctx.fillRect(x - Font.width(tr(k)) / 2, 74, Font.width(tr(k)), 1); } });
+    Font.draw(ctx, '←', cx - 84, 66, '#7c7c8c'); Font.draw(ctx, '→', cx + 80, 66, '#7c7c8c');
+    const top = clamp(shop.sel - 3, 0, Math.max(0, list.length - 8)); // acht Zeilen sichtbar, die Liste rollt mit
+    if (top > 0) Font.draw(ctx, '↑', rx - 4, 66, '#9c6cfc');
+    if (top + 8 < list.length) Font.draw(ctx, '↓', rx - 4, 178, '#9c6cfc');
+    if (!list.length) Font.draw(ctx, tr('shopNothing'), cx, 110, '#7c7c8c', { align: 'center' });
+    list.slice(top, top + 8).forEach((id, n) => {
+      const i = top + n, y = 80 + n * 12, on = i === shop.sel, g = GEAR[id], own = !sell && once(g) && inv[id], poor = !sell && W.score < g.price;
+      if (on) { ctx.fillStyle = 'rgba(156,108,252,0.2)'; ctx.fillRect(lx - 6, y - 3, rx - lx + 12, 12); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y - 1); }
       itemIcon(ctx, id, lx + 8, y - 2);
-      Font.draw(ctx, itemName(id) + (DRINKS.includes(id) && inv[id] ? '  ×' + inv[id] : ''), lx + 22, y, own ? '#5c5c6c' : on ? '#fcfcfc' : '#c8c8d8', { shadow: '#000' });
-      Font.draw(ctx, own ? tr('equipOwned') : g.price + ' G', rx, y, own ? '#5c5c6c' : poor ? '#a84848' : '#f8b800', { align: 'right', shadow: '#000' });
+      Font.draw(ctx, itemName(id) + ((sell || DRINKS.includes(id)) && inv[id] ? '  ×' + inv[id] : ''), lx + 22, y, own ? '#5c5c6c' : on ? '#fcfcfc' : '#c8c8d8', { shadow: '#000' });
+      Font.draw(ctx, sell ? '+' + sellPrice(id) + ' G' : own ? tr('equipOwned') : g.price + ' G', rx, y, own ? '#5c5c6c' : poor ? '#a84848' : sell ? '#58f898' : '#f8b800', { align: 'right', shadow: '#000' });
     });
-    Font.draw(ctx, itemDesc(STOCK[shop.sel]), cx, 186, '#fce0a8', { align: 'center', shadow: '#000' });
+    if (list[shop.sel]) Font.draw(ctx, itemDesc(list[shop.sel]), cx, 186, '#fce0a8', { align: 'center', shadow: '#000' });
     Font.draw(ctx, 'GOLD ' + W.score, cx, 202, '#f8b800', { align: 'center', shadow: '#000' });
     Font.draw(ctx, tr('shopHelp'), cx, 218, '#7c7c8c', { align: 'center' });
   }
 
+  // ---------------- Bestiarium wie die Gegnerliste in SotN (Status, dritte Seite): Siege je Gegnerart, absurde Einträge ----------------
+  const BEASTS = ['Bat', 'Skeleton', 'Ghoul', 'Raven', 'Knight', 'LivingArmor', 'Panther', 'Skull', 'Fishman', 'Ghost', 'Snake', 'FlyBook', 'Tome',
+    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon',
+    'TentacleBoss', 'GiantBat', 'IceWitch', 'GiantSkeleton', 'Medusa', 'SunWarden', 'ManTrap', 'Count'];
+  const BEAST_BOSS = { TentacleBoss: 'bossTentacle', GiantBat: 'boss1', IceWitch: 'bossWitch', GiantSkeleton: 'boss2', Medusa: 'boss3', SunWarden: 'bossKnight', ManTrap: 'bossTrap', Count: 'boss4' };
+  const BEAST_SET = new Set(BEASTS);
+  const beastName = (k) => tr(BEAST_BOSS[k] || 'beast_' + k);
+  const beasts = { sel: 0 };
+  function drawBeasts(ctx, t) {
+    const cx = View.cx, lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16), rows = 10;
+    const known = BEASTS.filter(k => best[k]).length, top = clamp(beasts.sel - 4, 0, BEASTS.length - rows);
+    Font.draw(ctx, tr('beastCount', known, BEASTS.length), cx, 36, '#c8a0fc', { align: 'center', shadow: '#000' });
+    if (top > 0) Font.draw(ctx, '↑', rx, 36, '#9c6cfc');
+    if (top + rows < BEASTS.length) Font.draw(ctx, '↓', rx, 48 + rows * 12, '#9c6cfc');
+    BEASTS.slice(top, top + rows).forEach((k, n) => {
+      const i = top + n, y = 50 + n * 12, on = i === beasts.sel, got = best[k], bossy = !!BEAST_BOSS[k];
+      if (on) { ctx.fillStyle = 'rgba(156,108,252,0.2)'; ctx.fillRect(lx - 4, y - 2, rx - lx + 8, 11); }
+      Font.draw(ctx, String(i + 1).padStart(2, '0'), lx, y, '#5c5c6c');
+      Font.draw(ctx, got ? beastName(k) : '???', lx + 18, y, got ? (bossy ? '#f8b800' : on ? '#fcfcfc' : '#c8c8d8') : '#5c5c6c', { shadow: '#000' });
+      if (got) Font.draw(ctx, '×' + got, rx, y, '#7cdcfc', { align: 'right', shadow: '#000' });
+    });
+    const k = BEASTS[beasts.sel];
+    wrap(best[k] ? tr('beastD_' + k) : tr('beastUnknown'), rx - lx).slice(0, 2).forEach((l, i) => Font.draw(ctx, l, cx, 180 + i * 10, best[k] ? '#fce0a8' : '#5c5c6c', { align: 'center', shadow: '#000' }));
+  }
+
   // Statusbildschirm (Pause → STATUS): Werte wie in SotN in zwei Spalten, darunter EXP-Leiste, Karte, Siegel, Warpkammern
-  let statusPage = 0; // 0 = Werte, 1 = Zauber (←→ blättert)
-  function statusInput(P) { if (P.left || P.right) { statusPage = 1 - statusPage; Audio8.sfx('select'); } }
+  let statusPage = 0; // 0 = Werte, 1 = Zauber, 2 = Bestiarium (←→ blättert, im Bestiarium ↑↓ wählen)
+  function statusInput(P) {
+    if (P.left || P.right) { statusPage = (statusPage + (P.right ? 1 : 2)) % 3; Audio8.sfx('select'); }
+    if (statusPage === 2 && (P.up || P.down)) { beasts.sel = clamp(beasts.sel + (P.down ? 1 : -1), 0, BEASTS.length - 1); Audio8.sfx('select'); }
+  }
   function drawStatus(ctx, t) {
     const w = View.w, cx = View.cx, p = W.player, v = values();
     if (statusPage === 1) { panel(ctx, tr('spellTitle'), '#7cdcfc'); drawSpells(ctx); Font.draw(ctx, tr('statusHelp'), cx, 222, '#7c7c8c', { align: 'center' }); return; }
+    if (statusPage === 2) { panel(ctx, tr('beastTitle'), '#9c6cfc'); drawBeasts(ctx, t); Font.draw(ctx, tr('statusHelp'), cx, 222, '#7c7c8c', { align: 'center' }); return; }
     ctx.fillStyle = 'rgba(2,4,18,0.97)'; ctx.fillRect(0, 0, w, 240);
     ctx.fillStyle = '#c89020';
     ctx.fillRect(6, 6, w - 12, 1); ctx.fillRect(6, 233, w - 12, 1); ctx.fillRect(6, 6, 1, 228); ctx.fillRect(w - 7, 6, 1, 228);
@@ -1875,7 +1923,7 @@ const Castle = (() => {
       try { const u = new URL(location.href); u.searchParams.set('test', ''); history.replaceState(null, '', u.toString().replace(/=(?=&|$)/g, '')); } catch (e) { /* ohne History */ }
     }
     try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(RESUME_KEY); } catch (e) { /* privat */ }
-    seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = { curse: 1 }; inv = {}; eq = {}; famx = {};
+    seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = { curse: 1 }; inv = {}; eq = {}; famx = {}; best = {};
     for (const k of m.relics) relic[k] = 1;
     const reached = new Set(['arrival', 0, ...m.bosses, ref(m.at) && S()[ref(m.at).s].id]);
     for (const id of m.bosses) { const s = sIdx(id); if (s >= 0) boss[roomKey(s, mainCount(s) - 1)] = 1; }
@@ -1987,6 +2035,8 @@ const Castle = (() => {
     for (const id of TOOLS) need.push('tool_' + id);
     for (const k of RELICS) need.push('relic_' + k, 'relicD_' + k);
     need.push('story_epilogue', 'endTitle', 'endNgPlus', 'endCredits', ...RANKS.map(([, r]) => 'endRank' + r));
+    need.push('beastTitle', 'beastCount', 'beastUnknown', 'beastNew', 'shopBuy', 'shopSell', 'shopSold', 'shopNothing');
+    for (const k of BEASTS) { need.push('beastD_' + k); if (!BEAST_BOSS[k]) need.push('beast_' + k); }
     for (const k of need) if (tr(k) === k) out.push('Text fehlt: ' + k);
     return out;
   }
@@ -2014,10 +2064,10 @@ const Castle = (() => {
     openEquip, equipInput, drawEquip, openShop, shopInput, drawShop, get inv() { return inv; }, get eq() { return eq; }, giveItem,
     preUpdate, statusInput, mpMax, get mp() { return mp; }, set mp(v) { mp = v; },
     startTest, finishTest, drawMilestones, milestones: MILESTONES.length, get testing() { return testing; },
-    toolsInput, drawTools, selfCheck, get god() { return god; },
+    toolsInput, drawTools, selfCheck, get god() { return god; }, get best() { return best; },
     toggleOverlay, get overlay() { return overlayOn; },
     tier: (s) => (TIER[S()[s].id] || 1) + 2 * (flag.ngp || 0), side: SIDE, startEpilogue, resultsInput, drawResults, ngPlus, ngRestore, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
-    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); localStorage.removeItem(RESUME_KEY); } catch (e) { /* privat */ } },
+    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; best = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); localStorage.removeItem(RESUME_KEY); } catch (e) { /* privat */ } },
   };
 })();
