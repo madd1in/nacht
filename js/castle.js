@@ -5,11 +5,14 @@
 // besiegt und geben je ein Siegel. Kein Zeitlimit.
 // Karte: jeder Raum zerfällt in Zellen zu 16×13 Kacheln (etwa ein Bildschirm); betretene Zellen werden aufgedeckt und mit
 // den Siegeln im localStorage gemerkt. Pause → KARTE zeigt das ganze Schloss (Angriff: Zoom, Pfeile: Scrollen).
+// Kammern wie in SotN: In der Speicherkammer (roter Sarg) wird der Spielstand gesichert und die Energie aufgefüllt – er
+// übersteht eine neue Browser-Sitzung (Titel: FORTSETZEN, ebenso nach Game Over). Die Warpkammer daneben wird beim
+// Betreten freigeschaltet; mit ↑ geht es per Karte in jede freigeschaltete Warpkammer (Schnellreise).
 'use strict';
 
 const Castle = (() => {
   const on = /[?&]castle\b/.test(location.search);
-  const CW = 16, CH = 13, KEY = 'nachtmahr.map';
+  const CW = 16, CH = 13, KEY = 'nachtmahr.map', SAVE_KEY = 'nachtmahr.castle';
   const SOLID = '#=XYB', STAND = ['candle', 'chest', 'statue', 'ring', 'crumble', 'elevator', 'platform'];
   // Lage der Regionen auf der Schlosskarte (Zellen; jede Region ordnet ihre Räume selbst an, erster Raum bei 0,0)
   const REGION_AT = { arrival: [-18, 0], 0: [0, 0], 1: [2, 4], 2: [5, -4], sun: [18, -12], expo: [20, -4], 3: [2, -20] };
@@ -26,21 +29,37 @@ const Castle = (() => {
     [[1, -1], 'right', [0, 1], CELLAR, { boss: true, oneway: true }], // Gruft hinter dem Knochenriesen → Aufzug zur Kellertür
   ];
 
-  // ---------------- Spielstand: aufgedeckte Zellen, besiegte Bosse und Zwischengegner ----------------
-  let seen = {}, boss = {}, mini = {}; // Raumschlüssel "<kapitel-id>:<raum>" → Set der Zellnummern / 1
+  // ---------------- Spielstand: aufgedeckte Zellen, besiegte Bosse und Zwischengegner, freigeschaltete Warpkammern ----------------
+  let seen = {}, boss = {}, mini = {}, warp = {}; // Raumschlüssel "<kapitel-id>:<raum>" → Set der Zellnummern / 1
   try {
     const d = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (d && d.v === 1) {
       for (const k in d.rooms) seen[k] = new Set(d.rooms[k]);
-      boss = d.boss || {}; mini = d.mini || {};
+      boss = d.boss || {}; mini = d.mini || {}; warp = d.warp || {};
     }
-  } catch (e) { seen = {}; boss = {}; mini = {}; }
+  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; }
   function save() {
     try {
       const rooms = {};
       for (const k in seen) rooms[k] = [...seen[k]];
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini }));
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp }));
     } catch (e) { /* privater Modus: gilt nur für diese Sitzung */ }
+  }
+  // Spielstand der Speicherkammer: Ort (Kapitel-id, Raum, Kammer), Held, Herzen, Spezialwaffe, Peitsche, Punkte, Leben
+  function readSave() {
+    try {
+      const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'), s = d && d.v === 1 ? sIdx(d.s) : -1;
+      if (s < 0 || !(d.r >= 0 && d.r < S()[s].rooms.length) || !d.place) return null;
+      return { ...d, s };
+    } catch (e) { return null; }
+  }
+  function writeSave(c) {
+    const p = W.player;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, s: S()[c.s].id, r: c.r, place: { x: c.x, y: c.y, chamber: 'save' },
+        hero: Options.character, hearts: p.hearts, sub: p.sub, whip: p.whip, score: W.score, lives: W.lives, at: Date.now() }));
+      return true;
+    } catch (e) { return false; }
   }
 
   const S = () => Levels.STAGES;
@@ -97,7 +116,7 @@ const Castle = (() => {
       }
       for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) used.add((gx + x) + ',' + (gy + y));
       const marks = [];
-      def.ents.forEach(e => { if (e.type === 'statue') marks.push({ x: cellX(e.x, cw), y: cellY(e.y, ch), c: '#e83820' }); });
+      def.ents.forEach(e => { if (e.type === 'statue') marks.push({ x: cellX(e.x, cw), y: cellY(e.y, ch), c: '#5cb8f8' }); }); // Engel: blau wie ihr Schein (rot = Speicherkammer)
       if (def.arena) marks.push({ x: cw - 1, y: cellY(def.start.y, ch), boss: true });
       if (def.mini) marks.push({ x: cellX((def.mini.x0 + def.mini.x1) / 2, cw), y: cellY(def.mini.minRow, ch), boss: true });
       out.push({ def, s, i, key: roomKey(s, i), gx, gy, cw, ch, start: sc, exit: exitCell(def), link, count: countable(def), marks });
@@ -225,6 +244,110 @@ const Castle = (() => {
     }
   }
 
+  // ---------------- Kammern: Speichern und Schnellreise ----------------
+  // je Region eine Speicher- und eine Warpkammer, dazu Speichern am Waldrand des Prologs. Plätze von Hand gewählt (ebener Boden,
+  // 2 Kacheln breit, 3 hoch frei, nicht vor Kerzen oder neben Gegnern, nicht auf den Randtüren): [Raum, Art, Kachel-x, Standreihe].
+  // Passt ein Platz nach einem Umbau nicht mehr, sucht findSpot die nächste freie Bodenstelle rechts vom Start.
+  const CHAMBERS = [
+    [['arrival', -1], 'save', 7, 10],                              // Wald: gleich nach der Landung
+    [[0, 1], 'save', 63, 17], [[0, 1], 'warp', 67, 17],            // Eingangshalle: unter dem rechten Sims
+    [[1, 0], 'save', 8, 10], [[1, 0], 'warp', 15, 10],             // Katakomben: Ufer des Höhlensees
+    [[2, 0], 'save', 6, 10], [[2, 0], 'warp', 10, 10],             // Bergfried: vor der Stachelgrube
+    [['sun', 0], 'save', 6, 15], [['sun', 0], 'warp', 11, 15],     // Sonnenkathedrale: Vorplatz
+    [['expo', 0], 'save', 5, 27], [['expo', 0], 'warp', 63, 27],   // Wintergarten: Eingang und jenseits des Beckens
+    [[3, 0], 'save', 57, 10], [[3, 2], 'warp', 3, 8],              // Thron: Ende des Strudels, Torbogen vor der Brücke
+  ];
+  function spotOk(def, x, y) { // ebener Boden unter beiden Kacheln, darüber drei Reihen frei
+    if (y < 3 || y + 1 >= def.h || x < 1 || x + 1 >= def.w) return false;
+    for (let dx = 0; dx < 2; dx++) {
+      if (!'#='.includes(def.grid[y + 1][x + dx])) return false;
+      for (let dy = 0; dy < 3; dy++) if (def.grid[y - dy][x + dx] !== '.') return false;
+    }
+    return true;
+  }
+  function findSpot(def, from, taken) {
+    const y = def.start.y, g = def.grid, ex = def.exit, last = def.arena ? def.w - 22 : def.w - 3;
+    if (y < 3 || y + 1 >= def.h) return null;
+    for (let x = Math.max(1, from); x < last; x++) {
+      let ok = true;
+      for (let dx = 0; dx < 2 && ok; dx++) {
+        if (!'#='.includes(g[y + 1][x + dx])) ok = false;
+        for (let dy = 0; dy < 3 && ok; dy++) if (g[y - dy][x + dx] !== '.') ok = false;
+      }
+      if (!ok || taken.some(t => Math.abs(t - x) < 4)) continue;
+      if (ex && x + 1 >= ex.x0 - 1 && x <= ex.x1 + 1 && y >= ex.y0 - 2 && y <= ex.y1 + 2) continue;
+      if (def.mini && x + 1 >= def.mini.x0 && x <= def.mini.x1) continue;
+      if (def.ents.some(e => (typeof e.x === 'number' && typeof e.y === 'number' && Math.abs(e.x - (x + 0.5)) < 3 && Math.abs(e.y - y) < 4)
+        || (typeof e.x0 === 'number' && typeof e.x1 === 'number' && x + 2 >= e.x0 && x - 1 <= e.x1 && (e.row === undefined || Math.abs(e.row - y) < 4)))) continue;
+      return { x, y };
+    }
+    return null;
+  }
+  const chamberCache = {};
+  function chambersOf(s, r) {
+    const k = s + ':' + r;
+    if (chamberCache[k]) return chamberCache[k];
+    const def = S()[s].rooms[r], out = [], taken = [];
+    for (const d of doorsOf(s, r)) if (d.place && typeof d.place === 'object') taken.push(d.place.x);
+    let from = def.start.x + 3;
+    for (const [R, kind, hx, hy] of CHAMBERS) {
+      if (!same(ref(R), s, r)) continue;
+      const spot = spotOk(def, hx, hy) ? { x: hx, y: hy } : findSpot(def, from, taken);
+      if (!spot) { console.warn('[NACHTMAHR] Schloss: kein Platz für die ' + kind + '-Kammer in ' + roomKey(s, r)); continue; }
+      out.push({ kind, s, r, x: spot.x, y: spot.y, key: roomKey(s, r) + ':' + kind });
+      taken.push(spot.x); from = spot.x + 4;
+    }
+    return (chamberCache[k] = out);
+  }
+  const allChambers = () => { const out = []; S().forEach((st, s) => st.rooms.forEach((d, r) => out.push(...chambersOf(s, r)))); return out; };
+
+  // Kammer in der Welt: Steinnische mit Rundbogen; Speichern: roter Sarg im roten Licht, Warp: kreisender Strudel
+  class CastleChamber extends Ent {
+    constructor(c) { super((c.x + 1) * T - 20, (c.y + 1) * T - 52, 40, 52); this.kind = 'prop'; this.c = c; this.pulse = 0; }
+    update() { this.t++; if (this.pulse > 0) this.pulse--; }
+    lightUp(L, cx, cy) {
+      const save = this.c.kind === 'save', on = save || warp[this.c.key];
+      L.push({ x: this.cx - cx, y: this.y - cy + 30, r: 40 + Math.sin(this.t * 0.05) * 4 + this.pulse, c: save ? [252, 60, 50] : on ? [110, 200, 255] : [90, 110, 160], a: save ? 0.7 : 0.55 });
+    }
+    draw(ctx) {
+      const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), cx = x + 20, bot = y + 52, save = this.c.kind === 'save', t = this.t;
+      const fr = save ? '#a8282c' : '#2c6cb0', dk = save ? '#3c080c' : '#0c1c3c', hi = save ? '#fca0a0' : '#a8dcfc';
+      arch(ctx, cx, y, 20, bot, dk); arch(ctx, cx, y + 1, 19, bot, fr); arch(ctx, cx, y + 2, 18, bot, hi); arch(ctx, cx, y + 3, 17, bot, fr);
+      arch(ctx, cx, y + 5, 15, bot, '#05020a');
+      if (save) { // rotes Licht von oben, Sarg auf dem Sockel
+        for (let k = 0; k < 4; k++) { ctx.globalAlpha = (0.12 + 0.05 * Math.sin(t * 0.05)) * (k + 1) + this.pulse / 120; arch(ctx, cx, y + 6 + k * 3, 14 - k * 3, bot, '#e83020'); }
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#2c1c14'; ctx.fillRect(cx - 9, bot - 6, 18, 6); ctx.fillStyle = '#5c3c24'; ctx.fillRect(cx - 9, bot - 6, 18, 1); // Sockel
+        ctx.fillStyle = '#3c140c'; ctx.beginPath(); ctx.moveTo(cx - 4, bot - 34); ctx.lineTo(cx + 4, bot - 34); ctx.lineTo(cx + 6, bot - 26); ctx.lineTo(cx + 4, bot - 6); ctx.lineTo(cx - 4, bot - 6); ctx.lineTo(cx - 6, bot - 26); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#8c2c1c'; ctx.fillRect(cx - 4, bot - 34, 8, 1); ctx.fillRect(cx - 6, bot - 26, 1, 4);
+        ctx.fillStyle = '#f8b800'; ctx.fillRect(cx - 1, bot - 30, 2, 12); ctx.fillRect(cx - 4, bot - 26, 8, 2); // Kreuz auf dem Deckel
+      } else { // Strudel: Ringe kreisen, freigeschaltet leuchtend
+        const on = warp[this.c.key], a = t * 0.06;
+        for (let i = 0; i < 5; i++) {
+          const rr = 13 - i * 2.4, ph = a * (i % 2 ? -1 : 1) + i;
+          ctx.strokeStyle = on ? (i % 2 ? '#7cd8fc' : '#f0fcff') : '#3c4c6c'; ctx.globalAlpha = on ? 0.9 - i * 0.12 : 0.6;
+          ctx.beginPath(); ctx.ellipse(cx, bot - 22, rr, rr * 1.25, 0, ph, ph + Math.PI * 1.4); ctx.stroke();
+        }
+        ctx.globalAlpha = 1; ctx.fillStyle = on ? '#ffffff' : '#5c6c8c'; ctx.fillRect(cx - 1, bot - 23, 2, 2);
+        ctx.fillStyle = '#1c2c4c'; ctx.fillRect(cx - 12, bot - 3, 24, 3); ctx.fillStyle = on ? '#58b8f8' : '#3c4c6c'; ctx.fillRect(cx - 12, bot - 3, 24, 1); // Sockelplatte
+      }
+      const p = W.player;
+      if (!save && Math.abs(p.cx - this.cx) < 14 && Math.abs(p.feet - bot - W.cam.y) < 8 && warp[this.c.key]) Font.draw(ctx, '↑', cx - 2, y - 12 + Math.round(Math.sin(t * 0.12) * 2), '#fcfcfc', { shadow: '#000' });
+    }
+  }
+  const atChamber = (c, p) => p.onGround && Math.abs(p.cx - (c.x + 1) * T) < 14 && Math.abs(p.feet - (c.y + 1) * T) < 8;
+  let inSave = null; // Schlüssel der Speicherkammer, in der der Held gerade steht (erst nach dem Verlassen wieder speichern)
+  function saveAt(c) {
+    const p = W.player;
+    p.hp = p.maxHp; if (!Options.infHearts) p.hearts = Math.max(p.hearts, 10);
+    const ok = writeSave(c);
+    W.checkpoint = { stage: c.s, room: c.r, cx: (c.x + 1) * T, feet: (c.y + 1) * T };
+    Game.note(ok ? 'castleSaved' : 'castleSaveFail'); Audio8.sfx('checkpoint'); Audio8.sfx('heart'); Input.rumble(0.3, 0.2, 150);
+    const e = W.ents.find(o => o instanceof CastleChamber && o.c.key === c.key);
+    if (e) e.pulse = 40;
+    for (let i = 0; i < 18; i++) W.spawn(new Particle((c.x + 1) * T + rnd(-10, 10), (c.y + 1) * T - rnd(4, 40), rnd(-0.4, 0.4), rnd(-1.4, -0.3), i % 2 ? '#fc5040' : '#fce0a8', 46, 1, 0));
+  }
+
   // nach jedem Raumaufbau (Tür, Kapitelstart, Wiedereinstieg nach dem Tod): Türen setzen, besiegte Bosse fernhalten,
   // bei Ankunft den Helden an die Tür stellen
   let guard = false, push = 0, lastX = 0, lockT = 0;
@@ -232,8 +355,10 @@ const Castle = (() => {
     const s = W.stage, r = W.roomIdx, def = S()[s].rooms[r], key = roomKey(s, r);
     if (boss[key] && s < S().length - 1) W.room.arena = null; // Bossarena: Boss besiegt, der Raum ist frei
     if (mini[key]) W.miniDone[s + ':' + r] = true;
-    W.ents = W.ents.filter(e => !(e instanceof CastleDoor));
+    W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber));
     for (const d of doorsOf(s, r)) W.spawn(new CastleDoor(d, def));
+    for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
+    inSave = arrive && arrive.place && arrive.place.chamber === 'save' ? roomKey(s, r) + ':save' : null; // beim Fortsetzen nicht gleich noch einmal speichern
     if (arrive && arrive.place !== 'start') {
       const p = W.player;
       let cx, feet, face = 1;
@@ -279,6 +404,15 @@ const Castle = (() => {
     if (lockT > 0) lockT--;
     const p = W.player, def = S()[s].rooms[r];
     if (!p.alive || p.state !== 'normal' || W.arenaOn) { push = 0; lastX = p.x; return; }
+    for (const c of chambersOf(s, r)) { // Speicherkammer: hineingehen = speichern; Warpkammer: betreten schaltet frei, ↑ reist
+      const at = atChamber(c, p);
+      if (c.kind === 'save') {
+        if (at && inSave !== c.key) { inSave = c.key; saveAt(c); } else if (!at && inSave === c.key) inSave = null;
+      } else if (at) {
+        if (!warp[c.key]) { warp[c.key] = 1; save(); Game.note('castleWarpOn'); Audio8.sfx('bigItem'); }
+        if (P.up) { push = 0; Game.openWarp(c); return; }
+      }
+    }
     const I = Input.held;
     for (const d of doorsOf(s, r)) {
       const k = kindOf(def, d.place);
@@ -338,15 +472,33 @@ const Castle = (() => {
     if (P.attack) { view.zoom = !view.zoom; Audio8.sfx('select'); }
     if (view.zoom) { if (P.left) view.x--; if (P.right) view.x++; if (P.up) view.y--; if (P.down) view.y++; }
   }
+  // Schnellreise: Auswahl unter allen freigeschalteten Warpkammern auf der Schlosskarte
+  const trip = { list: [], sel: 0, from: null };
+  function openWarp(c) {
+    trip.list = allChambers().filter(w => w.kind === 'warp' && warp[w.key]); trip.from = c.key;
+    trip.sel = Math.max(0, trip.list.findIndex(w => w.key === c.key)); view.zoom = false;
+  }
+  function warpInput(P) { // 'cancel', ein Ziel { s, r, place } oder null
+    const n = trip.list.length;
+    if (P.start || !n) return 'cancel';
+    if (P.left || P.up) { trip.sel = (trip.sel + n - 1) % n; Audio8.sfx('select'); }
+    if (P.right || P.down) { trip.sel = (trip.sel + 1) % n; Audio8.sfx('select'); }
+    if (P.jump || P.attack) {
+      const w = trip.list[trip.sel];
+      if (w.key === trip.from) return 'cancel';
+      return { s: w.s, r: w.r, place: { x: w.x, y: w.y, chamber: 'warp' } };
+    }
+    return null;
+  }
 
-  function draw(ctx, t) {
-    const w = View.w, cx = View.cx, L = castle(), st = S()[W.stage];
+  function draw(ctx, t, warpMode = false) {
+    const w = View.w, cx = View.cx, L = castle(), sw = warpMode && trip.list[trip.sel], st = S()[sw ? sw.s : W.stage];
     ctx.fillStyle = 'rgba(2,4,18,0.97)'; ctx.fillRect(0, 0, w, 240);
-    ctx.fillStyle = '#c89020';
+    ctx.fillStyle = warpMode ? '#2c6cb0' : '#c89020';
     ctx.fillRect(6, 6, w - 12, 1); ctx.fillRect(6, 233, w - 12, 1); ctx.fillRect(6, 6, 1, 228); ctx.fillRect(w - 7, 6, 1, 228);
-    Game.big(ctx, tr('mapTitle'), cx, 12, 2, LOGO, null, '#000');
+    Game.big(ctx, tr(warpMode ? 'warpTitle' : 'mapTitle'), cx, 12, 2, warpMode ? ['#fcfcfc', '#d8f0fc', '#a4e4fc', '#3cbcfc', '#0078f8', '#0040a8', '#001038'] : LOGO, null, '#000');
     Font.draw(ctx, tr(st.nameKey), cx, 32, '#f8b800', { align: 'center', shadow: '#000' });
-    const sec = Game.sectionList().find(e => !e.head && e.s === W.stage && e.r === W.roomIdx);
+    const sec = Game.sectionList().find(e => !e.head && e.s === (sw ? sw.s : W.stage) && e.r === (sw ? sw.r : W.roomIdx));
     if (sec) Font.draw(ctx, sec.label, cx, 42, '#8c9cc8', { align: 'center', shadow: '#000' });
 
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
@@ -408,6 +560,13 @@ const Castle = (() => {
         ctx.fillStyle = d.place.door === 'seal' ? '#b070fc' : '#f8b800';
         ctx.fillRect(ox + (r.ax + c.x) * cs + Math.floor(cs / 2) - 1, oy + (r.ay + c.y) * cs + cs - Math.max(2, m) - 1, 2, Math.max(2, m));
       }
+      const half = Math.max(1, Math.floor(cs / 2));
+      for (const c of chambersOf(r.s, r.i)) { // Kammern: Speichern rot (linke Hälfte), Warp hellblau (rechte Hälfte, grau vor dem Betreten)
+        const cc = placeCell(r, c);
+        if (!set.has(cc.y * r.cw + cc.x)) continue;
+        ctx.fillStyle = c.kind === 'save' ? '#fc2c2c' : warp[c.key] ? '#7cdcfc' : '#5c6c8c';
+        ctx.fillRect(ox + (r.ax + cc.x) * cs + (c.kind === 'warp' ? cs - half : 0), oy + (r.ay + cc.y) * cs + Math.floor((cs - half) / 2), half, half);
+      }
     }
     ctx.fillStyle = '#f8b800'; // Türen zwischen benachbarten Zellen: goldene Lücke in der Wand
     for (const k of known) {
@@ -421,18 +580,36 @@ const Castle = (() => {
       const i = cs >= 4 ? Math.max(1, Math.floor(cs / 4)) : 0;
       ctx.fillStyle = '#fcfcfc'; ctx.fillRect(ox + (rm.ax + c.x) * cs + i - (cs < 4 ? 1 : 0), oy + (rm.ay + c.y) * cs + i - (cs < 4 ? 1 : 0), cs - i * 2 + (cs < 4 ? 2 : 0), cs - i * 2 + (cs < 4 ? 2 : 0));
     }
+    if (warpMode) trip.list.forEach((wc, i) => { // Schnellreise: Ziele gerahmt, das gewählte blinkt
+      const rr = roomAt(wc.s, wc.r), cc = rr && placeCell(rr, wc);
+      if (!cc) return;
+      const px = ox + (rr.ax + cc.x) * cs, py = oy + (rr.ay + cc.y) * cs, on = i === trip.sel, g = on ? 3 : 1;
+      if (on && (t >> 3) % 2) return;
+      ctx.strokeStyle = on ? '#ffffff' : '#3cbcfc'; ctx.lineWidth = 1;
+      ctx.strokeRect(px - g + 0.5, py - g + 0.5, cs + g * 2 - 1, cs + g * 2 - 1);
+      if (on) ctx.strokeRect(px - g - 0.5, py - g - 0.5, cs + g * 2 + 1, cs + g * 2 + 1);
+    });
     ctx.restore();
     if (!any) Font.draw(ctx, tr('mapNone'), cx, top + H / 2 - 4, '#7c84a8', { align: 'center' });
 
     Font.draw(ctx, tr('mapExplored', percent(W.stage)) + '    ' + tr('mapCastle', percent()), cx, 202, '#fcfcfc', { align: 'center', shadow: '#000' });
-    Font.draw(ctx, tr('castleSealsShort', seals(), sealRooms().length), cx, 212, '#c8a0fc', { align: 'center', shadow: '#000' });
-    Font.draw(ctx, tr(view.zoom ? 'mapHelpZoom' : 'mapHelp'), cx, 222, '#7c7c8c', { align: 'center' });
+    Font.draw(ctx, warpMode ? tr('warpCount', trip.sel + 1, trip.list.length) : tr('castleSealsShort', seals(), sealRooms().length), cx, 212, warpMode ? '#7cdcfc' : '#c8a0fc', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr(warpMode ? 'mapHelpWarp' : view.zoom ? 'mapHelpZoom' : 'mapHelp'), cx, 222, '#7c7c8c', { align: 'center' });
+  }
+
+  // Fortsetzen: Held, Herzen, Spezialwaffe und Peitsche aus dem Spielstand übernehmen
+  function applySave(p, sv) {
+    if (typeof sv.hearts === 'number' && !Options.infHearts) p.hearts = sv.hearts;
+    if (sv.sub) p.sub = sv.sub;
+    if (typeof sv.whip === 'number' && !Options.maxWhip) p.whip = clamp(sv.whip, 1, 3);
+    p.hp = p.maxHp;
   }
 
   return {
-    on, update, settle, forward, bossBeaten, draw, openMap, mapInput, layout, castle, percent, roomPercent, firstVisit, seals,
+    on, update, settle, forward, bossBeaten, draw, openMap, mapInput, openWarp, warpInput, layout, castle, percent, roomPercent, firstVisit, seals,
     bossDone: (s, r) => !!boss[roomKey(s, r)],
-    get seen() { return seen; },
-    reset() { seen = {}; boss = {}; mini = {}; try { localStorage.removeItem(KEY); } catch (e) { /* privat */ } },
+    hasSave: () => !!readSave(), loadSave: readSave, applySave, chambers: allChambers,
+    get seen() { return seen; }, get warps() { return warp; },
+    reset() { seen = {}; boss = {}; mini = {}; warp = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
   };
 })();

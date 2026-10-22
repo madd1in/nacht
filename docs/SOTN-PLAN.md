@@ -172,7 +172,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 |---|---|---|
 | **0 (erledigt)** | `?castle`: Pause → KARTE, betretene Zellen aufdecken, Heldenposition, Erkundungsgrad, Speicherung in `localStorage` | Karte im Browser getestet, Arcade unverändert |
 | **1 (Prototyp erledigt)** | Kapitel werden Regionen eines Schlosses: Türen in beide Richtungen, Knoten Eingangshalle (Keller-, Turm-, Siegeltor), Wege hinter den Bossen, Einbahnen mit Rückweg, eine Karte für das ganze Schloss, Bosse geben Siegel und bleiben besiegt, kein Zeitlimit | alle Regionen frei begehbar, Thron hinter 5 Siegeln |
-| 1b offen | feste Raum-IDs, eigene Speicherräume mit Spielstand und „Fortsetzen" im Titel, Regionsmusik ohne Neustart | Spielstand überlebt Umsortieren von `levels.js` |
+| **1b (teilweise erledigt)** | erledigt: Speicherkammern mit Spielstand, „Fortsetzen" im Titel und nach Game Over, Warpkammern mit Schnellreise über die Karte. Offen: feste Raum-IDs, Regionsmusik ohne Neustart, Spielstand-Slots | Spielstand überlebt Umsortieren von `levels.js` |
 | 2 Relikte | `Player.has()`, Fluch-Szene, Reliktsockel, Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
 | 3 RPG | EXP/Level, HP/MP, Ausrüstungsmenü, Drops, Bibliothekar | Statusbildschirm, Shop |
 | 4 Bosse & Siegel | Arenen mit Hintertür, Siegeltor, Ende, neue Verbindungsräume | Abspann im Schloss-Modus |
@@ -199,7 +199,16 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   Bergfried oben, Sonnenkathedrale oben rechts, Wintergarten rechts, Thron ganz oben). Angriff zoomt, im Zoom scrollen
   die Pfeile, Sprung/Start schließt. Unten: Erkundungsgrad der Region und des Schlosses, Siegel n/5.
 - **Abschnittswahl:** im Schloss-Modus mit Erkundungsgrad je Raum und Region; ein rotes Siegel zeigt besiegte Regionsbosse.
-- Code: `js/castle.js` (Regionen `REGION_AT`, Verbindungen `LINKS`, Türen `CastleDoor`, Spielstand, Karte), Einbindung
-  in `js/game.js` (`castleGo`/`castleEnter`, `nextRoom`, `startStage`, `startClear`, Pausenmenü, Zustand `map`).
-- Daten: `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss: {…}, mini: {…} }`;
-  `Castle.reset()` in der Konsole löscht alles.
+- **Speicherkammern** (rote Nische mit Sarg): hineingehen sichert den Spielstand und füllt Energie (und Herzen auf
+  mindestens 10) auf. Je Region eine, dazu am Waldrand des Prologs; auf der Karte rot. Der Spielstand übersteht Neuladen
+  und neue Browser-Sitzungen: im Titel steht dann **FORTSETZEN** ganz oben, und nach Game Over geht es zur letzten
+  Speicherkammer. Gesichert werden Ort, Held, Herzen, Spezialwaffe, Peitsche, Punkte und Leben; Karte, Siegel und
+  Warpkammern werden ohnehin laufend gemerkt. „SPIEL STARTEN" beginnt auf dem Schiff, Karte und Siegel bleiben.
+- **Warpkammern** (blaue Nische mit Strudel) neben den Speicherkammern (Thron: am Torbogen vor der Brücke): betreten
+  schaltet sie frei, ↑ öffnet die **SCHNELLREISE**-Karte, Pfeile wählen eine freigeschaltete Kammer, Sprung reist hin.
+  Engelsstatuen sind auf der Karte jetzt blau, damit Rot für die Speicherkammern frei ist.
+- Code: `js/castle.js` (Regionen `REGION_AT`, Verbindungen `LINKS`, Türen `CastleDoor`, Kammern `CHAMBERS`/`CastleChamber`,
+  Spielstand, Karte), Einbindung in `js/game.js` (`castleGo`/`castleEnter`, `nextRoom`, `startStage`, `startClear`,
+  Pausenmenü, Titelmenü `titleItems`/`castleContinue`, Zustände `map` und `warp`).
+- Daten: `localStorage['nachtmahr.map']` = `{ v: 1, rooms: { "<stage-id>:<raum>": [Zellnummern] }, boss: {…}, mini: {…}, warp: {…} }`,
+  `localStorage['nachtmahr.castle']` = Spielstand der letzten Speicherkammer; `Castle.reset()` in der Konsole löscht alles.

@@ -172,6 +172,17 @@ const Game = {
     if (this.pendingView) this.applyView(this.pendingView);
     W.loadRoom(tg.s, tg.r); Castle.settle(tg); Audio8.play(W.songName(), null, 0.12);
   },
+  titleItems() { return Castle.on && Castle.hasSave() ? ['cont', 'start', 'options', 'lang', 'scores', 'sections'] : ['start', 'options', 'lang', 'scores', 'sections']; },
+  // Schloss-Modus: am Spielstand der letzten Speicherkammer weiterspielen (Titel: FORTSETZEN, und nach Game Over)
+  castleContinue() {
+    const sv = Castle.loadSave();
+    if (!sv) { this.go('charsel'); return; }
+    if (sv.hero && HEROES.list.some(d => d.id === sv.hero)) Options.set('character', sv.hero);
+    W.score = sv.score || 0; W.lives = sv.lives >= 0 ? sv.lives : 3; W.nextLife = (Math.floor(W.score / 20000) + 1) * 20000; this.runBest = 0;
+    W.player = new Player(); Castle.applySave(W.player, sv);
+    this.arrival = { s: sv.s, r: sv.r, place: sv.place }; this.startStage(sv.s, sv.r); this.arrival = null;
+  },
+  openWarp(c) { this.go('warp'); Castle.openWarp(c); Audio8.sfx('select'); }, // Warpkammer: ↑ öffnet die Schnellreise-Karte
 
   onPlayerDeath() {
     W.lives--; W.stats.deaths++;
@@ -381,25 +392,30 @@ const Game = {
     if (this.revealed && this.revealT !== undefined) this.revealT++;
     if (this.state === 'title' && this.revealed && this.t % 520 === 0) Audio8.sfx('bell');
     const titleish = ['title', 'options', 'sections', 'secload', 'charsel', 'intro', 'scores', 'entry'].includes(this.state);
-    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'map' || this.state === 'demo') && W.room ? W.room.theme : null);
+    Audio8.ambience(titleish ? 'courtyard' : (this.state === 'play' || this.state === 'pause' || this.state === 'pausesec' || this.state === 'map' || this.state === 'warp' || this.state === 'demo') && W.room ? W.room.theme : null);
     if (titleish && this.bootBg) this.bootBg.tick(); // Kulisse des Ladebildschirms unter den Menüs
     if (titleish) {
       FX.updateStorm(this.tStorm, View.w, () => { if (Audio8.ready()) setTimeout(() => Audio8.sfx('thunder'), 250 + Math.random() * 600); });
     }
     switch (this.state) {
-      case 'title':
+      case 'title': { // Titelmenü (Schloss-Modus mit Spielstand: FORTSETZEN zuoberst)
         if (this.revealed && this.idleT > 60 * 20) { this.startScores(true); break; } // Attract-Modus
-        if (P.up || P.down) { this.menu = (this.menu + (P.down ? 1 : 4)) % 5; Audio8.sfx('select'); }
-        if (P.left || P.right) { Audio8.init(); this.menu = 2; this.cycleLang(P.left); Audio8.sfx('select'); break; } // Sprache: auf dem Titel jederzeit mit ◀ ▶
+        const items = this.titleItems(), n = items.length;
+        this.menu = Math.min(this.menu, n - 1);
+        if (P.up || P.down) { this.menu = (this.menu + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
+        if (P.left || P.right) { Audio8.init(); this.menu = items.indexOf('lang'); this.cycleLang(P.left); Audio8.sfx('select'); break; } // Sprache: auf dem Titel jederzeit mit ◀ ▶
         if (P.start || P.jump || P.attack) {
           Audio8.init(); Audio8.sfx('select');
-          if (this.menu === 1) { this.go('options'); this.optSel = 0; break; }
-          if (this.menu === 2) { this.cycleLang(false); break; }
-          if (this.menu === 3) { this.startScores(false); break; }
-          if (this.menu === 4) { this.go('sections'); break; } // Abschnittswahl fürs Testspielen
+          const it = items[this.menu];
+          if (it === 'cont') { this.castleContinue(); break; }
+          if (it === 'options') { this.go('options'); this.optSel = 0; break; }
+          if (it === 'lang') { this.cycleLang(false); break; }
+          if (it === 'scores') { this.startScores(false); break; }
+          if (it === 'sections') { this.go('sections'); break; } // Abschnittswahl fürs Testspielen
           this.go('charsel');
         }
         break;
+      }
       case 'entry': this.updateEntry(P); break;
       case 'scores': this.updateScores(); break;
       case 'demo': this.updateDemo(); break;
@@ -452,6 +468,12 @@ const Game = {
         if ((P.start || P.jump) && this.t > 8) { this.go('pause'); this.pauseSel = this.pauseItems().indexOf('map'); Audio8.sfx('pause'); break; }
         Castle.mapInput(P);
         break;
+      case 'warp': { // Schnellreise (Warpkammer): Pfeile wählen das Ziel, Sprung/Angriff reist, Start zurück
+        if (this.t < 8) break;
+        const tg = Castle.warpInput(P);
+        if (tg === 'cancel') { this.go('play'); Audio8.sfx('pause'); } else if (tg) { this.state = 'play'; Audio8.sfx('bigItem'); this.castleGo(tg); }
+        break;
+      }
       case 'fade':
         if (this.t === 18 && this.fadeTo) { // Schloss: Tür in einen anderen Raum (andere Region → Regionskarte)
           const tg = this.fadeTo; this.fadeTo = null; this.castleEnter(tg); break;
@@ -478,7 +500,9 @@ const Game = {
         if (left >= 0 && this.t % 60 === 0) Audio8.sfx('tick');
         if (left >= 0 && (P.start || P.jump || P.attack) && this.t > 30) {
           this.runBest = Math.max(this.runBest || 0, W.score); // Score vor dem Continue zählt für die Bestenliste
-          Audio8.sfx('bigItem'); W.score = 0; W.lives = 3; W.nextLife = 20000; W.player = new Player(); this.startStage(W.stage);
+          Audio8.sfx('bigItem');
+          if (Castle.on && Castle.hasSave()) { this.castleContinue(); break; } // Schloss: zurück in die letzte Speicherkammer
+          W.score = 0; W.lives = 3; W.nextLife = 20000; W.player = new Player(); this.startStage(W.stage);
         } else if (left < 0 && (this.t > 60 * 10 + 120 || ((P.start || P.jump) && this.t > 60 * 10 + 20))) this.finishRun(false);
         break;
       }
@@ -584,6 +608,7 @@ const Game = {
         if (this.state === 'pause') this.drawPause(ctx);
         if (this.state === 'pausesec') this.drawSections(ctx, true);
         if (this.state === 'map') Castle.draw(ctx, this.t);
+        if (this.state === 'warp') Castle.draw(ctx, this.t, true);
         if (this.state === 'fade') this.mosaicFade(ctx, this.t < 18 ? this.t / 16 : 1 - (this.t - 18) / 12);
         if (this.state === 'respawn') this.mosaicFade(ctx, this.t < 30 ? this.t / 28 : 1 - (this.t - 30) / 14);
         if (this.hurryT > 0 && this.state === 'play') this.drawHurry(ctx);
@@ -1081,11 +1106,13 @@ const Game = {
     const langTxt = tr('optLang') + '  < ' + I18N.NAMES[Options.lang] + ' >', msp = I18N.cjk ? 11 : 10;
     const tags = [Options.easy && tr('tagEasy'), Options.maxWhip && tr('tagWhip'), Options.infHearts && tr('tagHearts')].filter(Boolean);
     const lines = this.controlLines(), lh = I18N.cjk ? 11 : 9, bw = Math.min(View.w - 8, 240), bh = lines.length * lh + 7;
-    const by = 228 - bh, my0 = Math.min(L.sub + 13, by - 5 * msp - (tags.length ? 11 : 3));
+    const ids = this.titleItems(), ni = ids.length;
+    const by = 228 - bh, my0 = Math.min(L.sub + 13, by - ni * msp - (tags.length ? 11 : 3));
     const fx = (this.langFx = Math.max(0, (this.langFx || 0) - 1)) > 0;
-    [tr('start'), tr('options'), langTxt, tr('hiTitle'), tr('sections')].forEach((m, i) => {
-      const on = this.menu === i, y = my0 + i * msp, lang = i === 2;
-      const col = on ? (lang && fx ? '#ffffff' : '#fce0a8') : lang ? '#d0b8e0' : i === 4 ? '#5c4a6c' : '#8c7a9c';
+    const LABEL = { cont: tr('castleCont'), start: tr('start'), options: tr('options'), lang: langTxt, scores: tr('hiTitle'), sections: tr('sections') };
+    ids.map(id => LABEL[id]).forEach((m, i) => {
+      const on = this.menu === i, y = my0 + i * msp, lang = ids[i] === 'lang';
+      const col = on ? (lang && fx ? '#ffffff' : '#fce0a8') : lang ? '#d0b8e0' : ids[i] === 'sections' ? '#5c4a6c' : ids[i] === 'cont' ? '#fca070' : '#8c7a9c';
       if (on) { // Glut hinter dem gewählten Punkt
         const w = (I18N.cjk ? Font.width(m) : m.length * 6) + 24, gr = ctx.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
         gr.addColorStop(0, 'rgba(120,10,30,0)'); gr.addColorStop(0.5, `rgba(150,20,40,${0.42 + 0.12 * Math.sin(t * 0.1)})`); gr.addColorStop(1, 'rgba(120,10,30,0)');
@@ -1094,7 +1121,7 @@ const Game = {
       this.bootText(ctx, m, cx, y, col, on ? '#400008' : '#000');
       if (on && (t >> 4) % 2 === 0) { const w = I18N.cjk ? Font.width(m) : m.length * 6 - 1; Sprites.draw(ctx, Sprites.S.heartS, Math.round(cx - w / 2 - 12), y - 1); }
     });
-    if (tags.length) this.bootText(ctx, tags.join(' + '), cx, my0 + 5 * msp + 1, '#58f898', '#000');
+    if (tags.length) this.bootText(ctx, tags.join(' + '), cx, my0 + ni * msp + 1, '#58f898', '#000');
     // Steuerung im Kasten wie der Ladebalken
     const bx = Math.round(cx - bw / 2);
     ctx.fillStyle = 'rgba(6,2,10,0.74)'; ctx.fillRect(bx, by, bw, bh);
