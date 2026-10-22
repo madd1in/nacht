@@ -12,7 +12,7 @@
 // Treffer zeigen Schadenszahlen, Gegner lassen Gold, Herzen und Braten fallen. Pause → STATUS. Stufe, EXP, Besiegte und
 // Spielzeit speichert die Speicherkammer (wie in SotN geht Ungespeichertes nach Game Over verloren).
 // Geschichte: der zweite Held, der Bibliothekar und der lila Tentakel treiben sie in Gesprächen voran (Szenen an Relikten und Siegeln).
-// Ausrüstung wie in SotN: Waffe, Rüstung, Amulett, Tränke (Pause → AUSRÜSTUNG), Funde, Beute und der Laden des Bibliothekars.
+// Ausrüstung wie in SotN: Waffe, Rüstung, Amulett, Begleiter, Tränke (Pause → AUSRÜSTUNG), Funde, Beute und der Laden des Bibliothekars.
 'use strict';
 
 const Castle = (() => {
@@ -36,21 +36,21 @@ const Castle = (() => {
 
   // ---------------- Spielstand: aufgedeckte Zellen, besiegte Bosse und Zwischengegner, freigeschaltete Warpkammern ----------------
   // seen: Raumschlüssel "<kapitel-id>:<raum>" → Set der Zellnummern; boss/mini/warp/vessel/relic/crack/flag: Schlüssel → 1;
-  // inv: Gegenstand → Anzahl, eq: Platz (weapon/armor/acc) → Gegenstand
-  let seen = {}, boss = {}, mini = {}, warp = {}, vessel = {}, relic = {}, crack = {}, flag = {}, inv = {}, eq = {};
+  // inv: Gegenstand → Anzahl, eq: Platz (weapon/armor/acc/fam) → Gegenstand, famx: Begleiter → Erfahrung
+  let seen = {}, boss = {}, mini = {}, warp = {}, vessel = {}, relic = {}, crack = {}, flag = {}, inv = {}, eq = {}, famx = {};
   try {
     const d = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (d && d.v === 1) {
       for (const k in d.rooms) seen[k] = new Set(d.rooms[k]);
       boss = d.boss || {}; mini = d.mini || {}; warp = d.warp || {}; vessel = d.vessel || {};
-      relic = d.relic || {}; crack = d.crack || {}; flag = d.flag || {}; inv = d.inv || {}; eq = d.eq || {};
+      relic = d.relic || {}; crack = d.crack || {}; flag = d.flag || {}; inv = d.inv || {}; eq = d.eq || {}; famx = d.famx || {};
     }
-  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; }
+  } catch (e) { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; }
   function save() {
     try {
       const rooms = {};
       for (const k in seen) rooms[k] = [...seen[k]];
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp, vessel, relic, crack, flag, inv, eq }));
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, rooms, boss, mini, warp, vessel, relic, crack, flag, inv, eq, famx }));
     } catch (e) { /* privater Modus: gilt nur für diese Sitzung */ }
   }
   // Spielstand der Speicherkammer: Ort (Kapitel-id, Raum, Kammer), Held, Herzen, Spezialwaffe, Peitsche, Punkte, Leben
@@ -615,6 +615,7 @@ const Castle = (() => {
     const c = heroCell(), s = W.stage, r = W.roomIdx, key = roomKey(s, r);
     if (!c) return;
     rpg.frames++; applyHp(W.player); trackHits(); // RPG: Spielzeit, max. HP der Stufe, Treffer und Besiegte
+    famTick(); // Begleiter
     const hero = W.player; // Blutstein: alle vier Sekunden 1 HP
     if (gear('regen') && rpg.frames % 240 === 0 && hero.alive && hero.hp < hero.maxHp) { hero.hp = Math.min(hero.maxHp, hero.hp + 1); W.popup(hero.cx, hero.y - 6, '+10', '#d81830'); }
     if (!has('jump2')) W.player.canDouble = false; // ohne Rabenfeder kein Doppelsprung
@@ -671,6 +672,7 @@ const Castle = (() => {
     for (const d of doorsOf(s, W.roomIdx)) W.spawn(new CastleDoor(d, S()[s].rooms[W.roomIdx]));
     const def = S()[s].rooms[W.roomIdx];
     for (const [R, k] of BOSS_RELIC) if (same(ref(R), s, W.roomIdx) && !relic[k]) W.spawn(new RelicStone(k, def.w - 10, def.start.y)); // Relikt des Bosses
+    for (const [R, id] of BOSS_LOOT) if (same(ref(R), s, W.roomIdx) && !flag['find_' + id] && !inv[id]) W.spawn(new CastleLoot(id, (def.w - 14) * T + 8, (def.start.y + 1) * T - 10, id)); // sein Junges
     Game.bossName = 0; Audio8.tempo(1); Audio8.play('fanfare', W.songName()); Audio8.sfx('bigItem');
     Game.note('castleSeal', seals(), sealRooms().length); announceGoal(260);
     return true;
@@ -768,9 +770,13 @@ const Castle = (() => {
     potion: { heal: 0.5, price: 800, col: '#58f898' },
     elixir: { heal: 1, price: 4000, col: '#7cdcfc' },
     map: { key: 1, price: 3000, col: '#e8d8a8' },
+    batcard: { slot: 'fam', fam: 'bat', col: '#9c6cfc' },              // Junges der Riesenfledermaus (liegt nach dem Sieg in ihrer Arena)
+    fairy: { slot: 'fam', fam: 'fairy', price: 7000, col: '#58f898' },  // Fee im Glas (Laden des Bibliothekars)
+    tentling: { slot: 'fam', fam: 'tent', col: '#d880fc' },            // Neffe des Tentakels (Kolosseum, nach der Rabenfeder)
   };
-  const SLOTS = ['weapon', 'armor', 'acc'], DRINKS = ['potion', 'elixir'];
-  const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'map'];
+  const SLOTS = ['weapon', 'armor', 'acc', 'fam'], DRINKS = ['potion', 'elixir'];
+  const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'fairy', 'map'];
+  const BOSS_LOOT = [[[0, -1], 'batcard']];
   const FINDS = [ // Einzelstücke: [Raum, Gegenstand, Kachel-x, Standreihe]
     [['side', 'kolosseum'], 'leather', 12, 7], [['side', 'kanal'], 'bloodstone', 43, 7], [['side', 'schatz'], 'greedring', 25, 6],
     [['side', 'verlies'], 'dragonfang', 28, 6], [['side', 'wehrgang'], 'luckcoin', 37, 6], [['side', 'himmel'], 'mirror', 44, 5],
@@ -796,6 +802,7 @@ const Castle = (() => {
     if (g.slot === 'weapon') { for (let i = 0; i < 7; i++) R(2 + i, 7 - i, 2, 1, c); R(8, 0, 1, 1, '#fcfcfc'); R(1, 7, 3, 1, '#6c4410'); R(2, 6, 1, 3, '#6c4410'); R(0, 9, 2, 1, '#c89020'); }
     else if (g.slot === 'armor') { R(1, 1, 3, 2, c); R(6, 1, 3, 2, c); R(2, 3, 6, 6, c); R(4, 1, 2, 1, '#000'); R(3, 4, 1, 4, '#fcfcfc'); R(2, 8, 6, 1, '#6c6c7c'); }
     else if (g.slot === 'acc') { R(2, 3, 6, 1, '#c89020'); R(2, 8, 6, 1, '#c89020'); R(1, 4, 1, 4, '#c89020'); R(8, 4, 1, 4, '#c89020'); R(3, 0, 4, 3, c); R(4, 1, 1, 1, '#fcfcfc'); }
+    else if (g.slot === 'fam') { R(1, 0, 8, 10, c); R(2, 1, 6, 8, '#1c1028'); R(3, 3, 4, 3, c); R(4, 2, 2, 1, c); R(3, 7, 4, 1, '#c89020'); } // Begleiterkarte wie in SotN
     else if (g.heal) { R(4, 0, 2, 1, '#8c5c2c'); R(4, 1, 2, 2, '#c8d8e8'); R(2, 3, 6, 6, '#c8d8e8'); R(3, 5, 4, 4, c); R(3, 4, 1, 2, '#fcfcfc'); }
     else { R(1, 2, 8, 6, c); R(0, 1, 2, 8, '#a89060'); R(8, 1, 2, 8, '#a89060'); R(3, 4, 4, 1, '#6c4410'); R(3, 6, 3, 1, '#6c4410'); }
   }
@@ -820,6 +827,123 @@ const Castle = (() => {
   }
   function spawnFinds(s, r) {
     for (const [R, id, x, y] of FINDS) if (same(ref(R), s, r) && !flag['find_' + id]) W.spawn(new CastleLoot(id, x * T + 8, (y + 1) * T - 8, id));
+    const def = S()[s].rooms[r];
+    for (const [R, id] of BOSS_LOOT) if (same(ref(R), s, r) && boss[roomKey(s, r)] && !flag['find_' + id] && !inv[id]) W.spawn(new CastleLoot(id, (def.w - 14) * T + 8, (def.start.y + 1) * T - 10, id));
+  }
+
+  // ---------------- Begleiter (Familiars wie in SotN): folgen dem Helden, steigen mit jedem Einsatz auf (bis LV 9) ----------------
+  // Fledermausjunges: stürzt sich auf Gegner in der Nähe. Fee: heilt, wenn die Energie unter die Hälfte fällt (und will dafür
+  // Komplimente). Tentakelchen: haut zu, was nah kommt, und redet zu viel. Treffer gehen wie bei der Peitsche über die
+  // Trefferzonen der Gegner, aber nie auf Kerzen, Geschosse oder Geheimwände.
+  const famLv = (id) => Math.min(9, 1 + Math.floor((famx[id] || 0) / 12));
+  let famHits = 0;
+  function famStrike(box, dmg) {
+    const id = 'fam' + (++famHits);
+    let hit = false;
+    for (const e of W.ents) {
+      if (e.dead || (e.kind !== 'enemy' && e.kind !== 'boss')) continue;
+      if (e.kind === 'enemy' && e.rise !== undefined && e.rise < 12) continue;
+      const vul = e.hurtBoxes ? e.hurtBoxes().some(b => Phys.overlap(box, b)) : Phys.overlap(box, e.hurtBox ? e.hurtBox() : e);
+      if (vul && e.hit(dmg, id)) hit = true;
+    }
+    return hit;
+  }
+  function famTarget(f, rx, ry) { // nächster lebender Gegner im Bild innerhalb rx/ry um den Begleiter
+    let best = null, bd = 1e9;
+    for (const e of W.ents) {
+      if (e.dead || (e.kind !== 'enemy' && e.kind !== 'boss') || !(e.hp > 0) || e.dying || !e.onScreen(0)) continue;
+      const dx = Math.abs(e.cx - f.cx), dy = Math.abs(e.cy - f.cy);
+      if (dx > rx || dy > ry) continue;
+      if (dx + dy < bd) { bd = dx + dy; best = e; }
+    }
+    return best;
+  }
+  class CastleFamiliar extends Ent {
+    constructor(id) {
+      const p = W.player;
+      super(p.cx - 6, p.y - 10, 12, 10); this.kind = 'fx'; this.id = id; this.type = GEAR[id].fam; this.room = W.room;
+      this.cd = 60; this.target = null; this.dive = 0; this.slap = 0; this.say = null; this.sayT = 0; this.quip = 600 + Math.floor(Math.random() * 900); this.face = p.face;
+    }
+    gain(n) { // Erfahrung: alle 12 Punkte eine Stufe
+      const before = famLv(this.id);
+      famx[this.id] = (famx[this.id] || 0) + n;
+      if (famLv(this.id) > before) { save(); W.popup(this.cx, this.y - 8, 'LV ' + famLv(this.id), '#58f898'); Audio8.sfx('oneUp'); }
+    }
+    talk() { const l = tr('famSay_' + this.type); this.say = Array.isArray(l) ? l[Math.floor(Math.random() * l.length)] : l; this.sayT = 150; }
+    update() {
+      this.t++;
+      const p = W.player, lv = famLv(this.id);
+      if (this.cd > 0) this.cd--;
+      if (this.sayT > 0) this.sayT--;
+      if (--this.quip <= 0) { this.quip = 1200 + Math.floor(Math.random() * 1200); if (this.type !== 'fairy') this.talk(); }
+      let tx = p.cx - p.face * (this.type === 'tent' ? 13 : 18), ty = p.feet - (this.type === 'tent' ? 12 : this.type === 'fairy' ? 42 : 34) + Math.sin(this.t * 0.07) * 3, k = 0.12;
+      if (this.type === 'bat') {
+        if (!this.target && !this.cd) { this.target = famTarget(this, 110, 70); this.dive = 0; }
+        if (this.target) {
+          const e = this.target;
+          if (e.dead || !(e.hp > 0) || ++this.dive > 70) { this.target = null; this.cd = 30; }
+          else {
+            tx = e.cx; ty = e.cy; k = 0.2;
+            if (Math.abs(e.cx - this.cx) < 9 && Math.abs(e.cy - this.cy) < 10) {
+              if (famStrike({ x: this.x - 2, y: this.y - 2, w: this.w + 4, h: this.h + 4 }, 0.5 + 0.1 * (lv - 1))) { this.gain(1); Audio8.sfx('bat', this.cx); }
+              this.target = null; this.cd = 70 - lv * 3;
+            }
+          }
+        }
+      } else if (this.type === 'tent') {
+        if (this.slap > 0 && --this.slap === 6) {
+          if (famStrike({ x: this.face > 0 ? this.cx : this.cx - 30, y: this.y - 6, w: 30, h: 20 }, 0.8 + 0.15 * (lv - 1))) this.gain(1);
+        }
+        if (!this.slap && !this.cd) { const e = famTarget(this, 34, 26); if (e) { this.face = e.cx > this.cx ? 1 : -1; this.slap = 12; this.cd = 48 - lv * 2; Audio8.sfx('slime', this.cx); } }
+      } else if (this.type === 'fairy' && !this.cd && p.alive && p.hp < p.maxHp * 0.5) { // Fee: heilen
+        const before = p.hp; p.hp = Math.min(p.maxHp, p.hp + Math.ceil(p.maxHp * (0.12 + 0.02 * lv)));
+        W.popup(p.cx, p.y - 10, '+' + Math.round((p.hp - before) * 10), '#58f898'); Audio8.sfx('holy');
+        for (let i = 0; i < 12; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.y + rnd(0, 28), rnd(-0.4, 0.4), rnd(-1.2, -0.2), i % 2 ? '#58f898' : '#fcfcfc', 36, 1, 0));
+        this.cd = 900 - lv * 60; this.gain(2); this.talk();
+      }
+      this.x += (tx - this.cx) * k; this.y += (ty - this.cy) * k;
+      if (Math.abs(p.cx - this.cx) > 220 || Math.abs(p.cy - this.cy) > 160) { this.x = p.cx - 6; this.y = p.y - 10; } // zu weit weg: zurück zum Helden
+      if (!this.slap) this.face = this.target ? (this.target.cx > this.cx ? 1 : -1) : p.face;
+    }
+    lightUp(L, cx, cy) { if (this.type === 'fairy') L.push({ x: this.cx - cx, y: this.cy - cy, r: 40 + Math.sin(this.t * 0.1) * 4, c: [160, 252, 190], a: 0.5 }); }
+    draw(ctx) {
+      const x = Math.round(this.cx - W.cam.x), y = Math.round(this.cy - W.cam.y), t = this.t, f = this.face;
+      const R = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(f > 0 ? x + a : x - a - w, y + b, w, h); };
+      if (this.type === 'bat') { // Fledermausjunges: zwei Flügelschläge, rote Augen
+        const up = (t >> 2) & 1;
+        R(-2, -2, 5, 4, '#2c1c3c'); R(-1, -3, 1, 1, '#2c1c3c'); R(2, -3, 1, 1, '#2c1c3c'); R(0, -1, 1, 1, '#fc3c3c'); R(2, -1, 1, 1, '#fc3c3c');
+        if (up) { R(-7, -5, 5, 2, '#4c2c6c'); R(3, -5, 5, 2, '#4c2c6c'); R(-5, -3, 3, 1, '#4c2c6c'); R(3, -3, 3, 1, '#4c2c6c'); }
+        else { R(-7, 0, 5, 2, '#4c2c6c'); R(3, 0, 5, 2, '#4c2c6c'); R(-5, -1, 3, 1, '#4c2c6c'); R(3, -1, 3, 1, '#4c2c6c'); }
+      } else if (this.type === 'fairy') { // Fee: flirrende Flügel, grünes Haar, Funkenschweif
+        const flap = (t >> 1) & 1;
+        ctx.globalAlpha = 0.55 + 0.25 * Math.sin(t * 0.6);
+        R(-7, -8 + flap, 5, 4, '#a4e4fc'); R(3, -8 + flap, 5, 4, '#a4e4fc'); R(-6, -4, 4, 3, '#d8f4fc'); R(3, -4, 4, 3, '#d8f4fc'); // Flügel
+        ctx.globalAlpha = 1;
+        R(-1, -7, 3, 3, '#fce0a8'); R(-2, -8, 5, 1, '#f8d878'); R(-2, -7, 1, 3, '#f8d878'); R(1, -6, 1, 1, '#000'); // Kopf, goldenes Haar
+        R(-1, -4, 3, 3, '#fc9cdc'); R(-2, -1, 5, 2, '#fc7cc8'); R(-1, 1, 1, 2, '#fce0a8'); R(1, 1, 1, 2, '#fce0a8'); // rosa Kleid, Beine
+        R(3, -3, 1, 4, '#c89020'); R(3, -4, 1, 1, '#fcfcfc'); // Zauberstab
+        if ((t >> 2) % 3 === 0) R(-4 - (t % 5), 3 + (t % 3), 1, 1, '#fcfcfc');
+      } else { // Tentakelchen: kleiner lila Arm mit einem Auge, haut mit der Spitze zu
+        const sw = Math.round(Math.sin(t * 0.12) * 1.5);
+        for (let k = 0; k < 12; k++) { const hw = k < 7 ? 2 : 1; R(-hw + (k > 6 ? sw : 0), 6 - k, hw * 2, 1, '#7c2c98'); }
+        R(-2, 6, 1, 1, '#4e1666'); R(1, 0, 1, 1, '#f0bcd8'); R(1, 3, 1, 1, '#f0bcd8');
+        R(-1, -2 + 0, 3, 2, '#fcfcfc'); R(0, -2, 1, 1, '#1c0418'); R(-2, -3, 2, 1, '#16041e'); // Auge, Braue
+        if (this.slap) { const e = this.slap > 6 ? 12 - this.slap : this.slap; R(2, 1, 4 + e * 3, 2, '#7c2c98'); R(4 + e * 3, 0, 2, 4, '#ac58c8'); } // Schlag
+      }
+      if (this.sayT > 0 && this.say) { // Sprechblase
+        ctx.globalAlpha = Math.min(1, this.sayT / 20);
+        const w = Font.width(this.say) + 6, bx = clamp(x - w / 2, 2, View.w - w - 2), by = y - 22;
+        ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx, by, w, 11);
+        Font.draw(ctx, this.say, bx + 3, by + 2, this.type === 'fairy' ? '#b8fcd0' : this.type === 'bat' ? '#c8a0fc' : '#e8b0fc');
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+  let famEnt = null;
+  function famTick() { // genau ein Begleiter, passend zum belegten Platz; nach Raumwechsel neu beim Helden
+    const id = eq.fam || null;
+    if (famEnt && (famEnt.dead || famEnt.room !== W.room || famEnt.id !== id)) { famEnt.dead = true; famEnt = null; }
+    if (id && !famEnt && W.player && W.player.alive) famEnt = W.spawn(new CastleFamiliar(id));
   }
   function lootDrop(e, big) { // Beute nach Gefahrenstufe; Ausrüstung, die man schon hat, wird zum Heiltrank
     const t = tierOf(W.stage, W.roomIdx), chance = big ? 1 : 0.03 * (gear('luck') ? 2.5 : 1);
@@ -869,7 +993,7 @@ const Castle = (() => {
       if (on) { ctx.fillStyle = 'rgba(200,144,32,0.18)'; ctx.fillRect(lx - 6, y - 4, rx - lx + 12, 16); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y); }
       Font.draw(ctx, slot ? tr('slot_' + row) : '', lx + 8, y, '#b0a080');
       if (id && GEAR[id]) itemIcon(ctx, id, lx + 70, y - 2);
-      const name = id ? itemName(id) + (slot ? '' : '  ×' + (inv[id] || 0)) : tr('slotNone');
+      const name = id ? itemName(id) + (slot ? (GEAR[id].fam ? '  LV ' + famLv(id) : '') : '  ×' + (inv[id] || 0)) : tr('slotNone');
       Font.draw(ctx, name, lx + 84, y, !id || (!slot && !inv[id]) ? '#5c5c6c' : on ? '#fcfcfc' : '#c8c8d8', { shadow: '#000' });
       if (on && slot) Font.draw(ctx, '← →', rx, y, '#7c7c8c', { align: 'right' });
     });
@@ -911,15 +1035,15 @@ const Castle = (() => {
     const say = wrap(tr(shop.say), rx - lx - 24);
     say.slice(0, 3).forEach((l, i) => Font.draw(ctx, l, lx + 20, 36 + i * 10, '#c8a0fc', { shadow: '#000' }));
     STOCK.forEach((id, i) => {
-      const y = 82 + i * 15, on = i === shop.sel, g = GEAR[id], own = (g.slot || g.key) && inv[id], poor = W.score < g.price;
-      if (on) { ctx.fillStyle = 'rgba(156,108,252,0.2)'; ctx.fillRect(lx - 6, y - 4, rx - lx + 12, 14); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y - 1); }
+      const y = 78 + i * 13, on = i === shop.sel, g = GEAR[id], own = (g.slot || g.key) && inv[id], poor = W.score < g.price;
+      if (on) { ctx.fillStyle = 'rgba(156,108,252,0.2)'; ctx.fillRect(lx - 6, y - 3, rx - lx + 12, 13); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y - 1); }
       itemIcon(ctx, id, lx + 8, y - 2);
       Font.draw(ctx, itemName(id) + (DRINKS.includes(id) && inv[id] ? '  ×' + inv[id] : ''), lx + 22, y, own ? '#5c5c6c' : on ? '#fcfcfc' : '#c8c8d8', { shadow: '#000' });
       Font.draw(ctx, own ? tr('equipOwned') : g.price + ' G', rx, y, own ? '#5c5c6c' : poor ? '#a84848' : '#f8b800', { align: 'right', shadow: '#000' });
     });
-    Font.draw(ctx, itemDesc(STOCK[shop.sel]), cx, 192, '#fce0a8', { align: 'center', shadow: '#000' });
-    Font.draw(ctx, 'GOLD ' + W.score, cx, 206, '#f8b800', { align: 'center', shadow: '#000' });
-    Font.draw(ctx, tr('shopHelp'), cx, 220, '#7c7c8c', { align: 'center' });
+    Font.draw(ctx, itemDesc(STOCK[shop.sel]), cx, 186, '#fce0a8', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, 'GOLD ' + W.score, cx, 202, '#f8b800', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('shopHelp'), cx, 218, '#7c7c8c', { align: 'center' });
   }
 
   // Statusbildschirm (Pause → STATUS): Werte wie in SotN in zwei Spalten, darunter EXP-Leiste, Karte, Siegel, Warpkammern
@@ -1030,7 +1154,8 @@ const Castle = (() => {
     { id: 'lib', who: 'lib', at: [[2, 1], 15, 47], when: () => true, heal: true },                    // Bibliothek: neben dem Lesepult
     { id: 'lib2', who: 'lib', at: [[2, 1], 15, 47], when: () => relic.breaker, heal: true, again: 'lib' },
     { id: 'tent', who: 'tent', at: [['side', 'kolosseum'], 8, 10], when: () => flag.curse },          // Kolosseum: der gefeuerte Tentakel im Eimer
-    { id: 'tent2', who: 'tent', at: [['side', 'himmel'], 14, 8], when: () => relic.breaker, gold: 1000 }, // Himmelsbrücke: erobert die Wolken
+    { id: 'tent3', who: 'tent', at: [['side', 'kolosseum'], 8, 10], when: () => relic.jump2, give: 'tentling' }, // gibt seinen Neffen mit
+    { id: 'tent2', who: 'tent', at: [['side', 'himmel'], 14, 8], when: () => relic.breaker && (flag.story_tent3 || inv.tentling), gold: 1000 }, // Himmelsbrücke: erobert die Wolken
   ];
   const WHO = ['ally', 'lib', 'tent'], VOICE = { ally: 'A', lib: 'L', tent: 'T' };
   const allyId = () => { const ids = HEROES.list.map(d => d.id), i = Math.max(0, ids.indexOf(Options.character)); return ids[(i + 1) % ids.length]; };
@@ -1081,6 +1206,8 @@ const Castle = (() => {
       this.t++;
       if (this.go) { this.x += 1.6 * this.go; this.walk++; if (this.t > 36) this.dead = true; return; } // geht davon und verschwindet in den Schatten
       const p = W.player; if (p) this.face = p.cx < this.cx ? -1 : 1;
+      const b = beatNow(this.b.who); // neue Szene am selben Platz (z. B. Relikt im selben Raum gefunden): gleich übernehmen
+      if (b && b !== this.b && same(ref(b.at[0]), W.stage, W.roomIdx) && b.at[1] === this.b.at[1] && b.at[2] === this.b.at[2]) this.b = b;
     }
     lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: this.y - cy + 10, r: 30 + Math.sin(this.t * 0.05) * 2, c: this.b.who === 'lib' ? [252, 200, 130] : this.b.who === 'tent' ? [200, 110, 250] : [190, 200, 255], a: 0.4 }); }
     draw(ctx) {
@@ -1146,6 +1273,7 @@ const Castle = (() => {
       const p = W.player;
       W.addScore(b.gold); W.popup(p.cx, p.y - 8, '+' + b.gold + ' G', '#f8b800'); Audio8.sfx('money');
     }
+    if (b.give && !inv[b.give]) giveItem(b.give, true); // Geschenk (Begleiter)
     if (!again && !beatDone(b)) { flag['story_' + b.id] = 1; save(); announceGoal(50); }
     if (b.leave && !again) { npc.go = 1; npc.t = 0; } // macht sich auf den Weg
     if (b.heal) { // Bibliothekar: Kerzenschein heilt
@@ -1408,6 +1536,6 @@ const Castle = (() => {
     openEquip, equipInput, drawEquip, openShop, shopInput, drawShop, get inv() { return inv; }, get eq() { return eq; }, giveItem,
     tier: (s) => TIER[S()[s].id] || 1, side: SIDE, drawGoalBanner, drawGoalToast, announceGoal, inPrologue, goal: () => { const g = goal(); return g && { text: goalText(g), where: tr(g.where) }; }, get vessels() { return vessel; }, get relics() { return relic; }, get cracks() { return crack; }, has,
     get seen() { return seen; }, get warps() { return warp; },
-    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
+    reset() { seen = {}; boss = {}; mini = {}; warp = {}; vessel = {}; relic = {}; crack = {}; flag = {}; inv = {}; eq = {}; famx = {}; try { localStorage.removeItem(KEY); localStorage.removeItem(SAVE_KEY); } catch (e) { /* privat */ } },
   };
 })();
