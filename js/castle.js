@@ -291,6 +291,23 @@ const Castle = (() => {
       .chest(41, 2).prop('vessel', { x: 46, y: 2 })
       .wrap().music('stage3').label('SPIEGELSCHACHT').start(2, 37).done();
     add('spiegelschacht', 2, 5, [19, -10], shaft);
+    // Versunkene Kapelle (unter dem Kanal, Tür am Kanalanfang): oben eine Luftblase mit Steg, darunter alles unter Wasser – nur
+    // mit dem Taucherhelm zu erkunden. Säulenstümpfe, Simse, eine versunkene Glocke (Blender), Quallen, Altar mit Lebensgefäß.
+    const chapel = R(64, 'crypt', 26)
+      .ground(0, 63, 24)
+      .fill(0, 8, 7, 9, '#')                                                            // Steg in der Luftblase
+      .fill(14, 14, 15, 23, '#').fill(30, 12, 31, 23, '#').fill(46, 14, 47, 23, '#')    // Säulenstümpfe
+      .fill(8, 18, 12, 18, '=').fill(20, 15, 26, 15, '=').fill(36, 19, 42, 19, '=').fill(52, 16, 58, 16, '=')
+      .fill(56, 21, 61, 23, '#')                                                        // Altar
+      .candle(2, 5, 'H').candle(6, 5)
+      .enemy('bat', 4, 3)
+      .chest(24, 14, 'big').prop('vessel', { x: 58, y: 20 })
+      .music('stage2').label('VERSUNKENE KAPELLE').start(2, 7).done();
+    chapel.waterLine = 9;
+    chapel.jellies = [[18, 11], [27, 18], [35, 13], [44, 20], [54, 12]];
+    chapel.decor = [D('sbell', 33.5, 23)];
+    add('kapelle', 1, 4, [14, 12], chapel);
+    LINKS.push([['side', 'kanal'], { x: 6, y: 10, door: 'side' }, ['side', 'kapelle'], { x: 3, y: 7, door: 'side' }, {}]); // Kanal → versunkene Kapelle
     LINKS.push(
       [['side', 'spiegel'], { x: 37, y: 10, door: 'side' }, ['side', 'spiegeltunnel'], 'start', {}],   // Kabinett (hinter der Wand) → Tunnel
       [['side', 'spiegeltunnel'], 'right', ['side', 'spiegelschacht'], 'start', {}],                  // Tunnel → Schacht
@@ -672,9 +689,9 @@ const Castle = (() => {
   // bleiben); im Prolog auf dem Schiff kann er noch alles. Die Relikte liegen im Schloss: Doppelsprung am Ende des Kolosseums,
   // Dash bei der Riesenfledermaus, Ring-Greifen in der Eishöhle, Wandsprung beim Knochenriesen, Steinbrecher bei Medusa
   // (zerschlägt rissiges Gestein vor Kanal, Schatzkammer und Verlies). So führt ein Relikt zum nächsten.
-  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker', 'bat', 'mist', 'wolf', 'boots'];
-  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460', bat: '#c8a0fc', mist: '#a4b4d8', wolf: '#8ca4c8', boots: '#e8e8f4' };
-  const RELIC_AT = [[['side', 'kolosseum'], 'jump2', 81, 10], [[1, 2], 'ring', 12, 10]];        // fest liegende Relikte
+  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker', 'bat', 'mist', 'wolf', 'boots', 'diver'];
+  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460', bat: '#c8a0fc', mist: '#a4b4d8', wolf: '#8ca4c8', boots: '#e8e8f4', diver: '#d88c4c' };
+  const RELIC_AT = [[['side', 'kolosseum'], 'jump2', 81, 10], [[1, 2], 'ring', 12, 10], [['side', 'kanal'], 'diver', 104, 10]];        // fest liegende Relikte
   // Belohnung der Regionsbosse (Sonnenwächter: Fledermausgestalt, Menschenfalle: Nebelgestalt)
   const BOSS_RELIC = [[[0, -1], 'dash'], [[1, -1], 'wall'], [[2, -1], 'breaker'], [['sun', -1], 'bat'], [['expo', -1], 'mist']];
   // Lohn eines Zwischengegners: [Raum, Relikt, x, Standreihe, Ersatzplatz]. Eishexe: Seele des Wolfs neben dem Eistor. Aus dem
@@ -706,6 +723,7 @@ const Castle = (() => {
     draw(ctx) {
       const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), t = this.t, bob = Math.round(Math.sin(t * 0.07) * 2), c = RELIC_COL[this.k];
       ctx.fillStyle = '#3c3448'; ctx.fillRect(x, y + 20, 16, 8); ctx.fillStyle = '#6c6480'; ctx.fillRect(x, y + 20, 16, 1); ctx.fillRect(x + 2, y + 18, 12, 2); // Sockel
+      if (this.k === 'diver' && k3at(ctx, 'helmet', x + 8, y + 17 + bob)) return; // Taucherhelm als Blender-Modell auf dem Sockel
       ctx.globalAlpha = 0.35 + 0.15 * Math.sin(t * 0.1); ctx.fillStyle = c; ctx.fillRect(x + 2, y + 1 + bob, 12, 12); ctx.globalAlpha = 1; // Schein
       ctx.fillStyle = c; ctx.fillRect(x + 5, y + 3 + bob, 6, 8); ctx.fillRect(x + 4, y + 4 + bob, 8, 6);
       ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 6, y + 4 + bob, 2, 2);
@@ -734,7 +752,7 @@ const Castle = (() => {
   // img/krat3d.png, je Bild: [x, y, w, h, Anker x, Anker y, Zusatzpunkte x/y …]. Anker = Standpunkt (Boden, Gleis) bzw. Aufhängung.
   // Zusatzpunkte: Lok – Schornstein, Zylinderhahn, Dampfdom, Führerhaus; Laterne – Licht; Tresen – Klingel, Lampe;
   // Grammophon – Trichter; Sternlampe – Stern; Aufzug – Stockwerkanzeige. Fehlt das Bild, zeichnet der Raum einfach ohne.
-  const K3 = {"loco":[129,0,237,71,155,68,218,4,203,56,158,13,118,24],"wagon":[0,78,226,70,113,67],"canopy":[0,0,128,77,64,74],"bench":[170,149,31,19,16,18],"lamppost":[269,78,12,57,6,56,6,8],"clock":[154,149,15,23,8,1],"sign":[202,149,46,19,23,1],"desk":[0,149,92,29,46,28,60,8,21,4],"keys":[412,78,44,31,22,30],"gramo":[390,78,21,34,8,32,3,6],"starlamp":[346,78,16,49,8,47,8,10],"chair":[132,149,21,24,10,23],"lift":[282,78,36,52,18,51,18,8],"cart":[363,78,26,35,13,34],"bed":[93,149,38,27,19,26],"crane":[227,78,41,58,7,56],"mirror":[319,78,26,50,13,49,5,12,21,42]};
+  const K3 = {"loco":[129,0,237,71,155,68,218,4,203,56,158,13,118,24],"wagon":[0,78,226,70,113,67],"canopy":[0,0,128,77,64,74],"bench":[197,149,31,19,16,18],"lamppost":[269,78,12,57,6,56,6,8],"clock":[181,149,15,23,8,1],"sign":[229,149,46,19,23,1],"desk":[27,149,92,29,46,28,60,8,21,4],"keys":[448,78,44,31,22,30],"gramo":[426,78,21,34,8,32,3,6],"starlamp":[346,78,16,49,8,47,8,10],"chair":[159,149,21,24,10,23],"lift":[282,78,36,52,18,51,18,8],"cart":[399,78,26,35,13,34],"bed":[120,149,38,27,19,26],"crane":[227,78,41,58,7,56],"mirror":[319,78,26,50,13,49,5,12,21,42],"helmet":[0,149,26,30,13,25],"sbell":[363,78,35,38,28,36]};
   let k3 = null;
   if (on) {
     const img = new Image();
@@ -1128,6 +1146,62 @@ const Castle = (() => {
     ctx.fillStyle = 'rgba(220,235,255,0.22)'; for (let k = 0; k < h; k++) ctx.fillRect(x0 + Math.round(k * 0.6) - 4 + ((W.frame >> 3) % 40) - 10, y0 + k, 2, 1); // Glanzstreifen
     ctx.restore();
   }
+  // ---------------- Unterwasser (Relikt „Taucherhelm“) ----------------
+  // Mit dem Helm ertrinkt der Held nicht mehr: im Wasser (Kachel ~ oder unter der Wasserlinie eines Raums, def.waterLine) sinkt
+  // er langsam, jeder Sprung ist ein Schwimmzug, er bewegt sich gebremst; am Boden des Beckens bleibt er stehen. Ohne Helm
+  // ist Wasser wie bisher gefährlich, unter einer Wasserlinie ertrinkt er (zurück an den letzten sicheren Platz).
+  const inWater = (p) => { const r = W.room; return (r.waterLine !== undefined && p.feet - 10 > r.waterLine * T) || Phys.tile(Math.floor(p.cx / T), Math.floor((p.feet - 6) / T)) === '~'; };
+  function swimUpdate(p, up, a) {
+    const x0 = p.x;
+    p.canDouble = true; // jeder Sprung im Wasser ist ein Schwimmzug
+    if (p.vy > 1.3) p.vy = 1.3;
+    up.apply(p, a);
+    p.x = x0 + (p.x - x0) * 0.75; // Wasser bremst
+    if (p.vy < -2.8) p.vy = -2.8; if (p.vy > 1.3) p.vy = 1.3;
+    if (p.feet > W.room.h * T - 1) { p.y = W.room.h * T - 1 - p.h; p.vy = Math.min(0, p.vy); } // Grund des Beckens
+    if ((W.frame % 18) === 0) W.spawn(new Particle(p.cx + p.face * 3, p.y + 6, rnd(-0.2, 0.2), -0.6, '#a4e4fc', 40, 1, -0.01)); // Luftblasen
+  }
+  class Jelly extends Enemy { // Qualle: pulst nach oben, sinkt langsam, treibt auf den Helden zu, leuchtet
+    constructor(tx, ty) { super(tx * T + 2, ty * T, 12, 12, 2, 2, 300); this.vx = 0; this.vy = 0.3; this.ph = Math.floor(rnd(0, 60)); }
+    update() {
+      super.update();
+      const p = W.player, top = (W.room.waterLine || 0) * T + 4;
+      if ((this.t + this.ph) % 70 === 0) this.vy = -1.4; // Pulsschlag
+      this.vy = Math.min(0.35, this.vy + 0.03);
+      this.vx += (Math.sign(p.cx - this.cx) * 0.25 - this.vx) * 0.02;
+      this.x += this.vx; this.y += this.vy;
+      if (this.y < top) { this.y = top; this.vy = 0.2; }
+      if (this.y + this.h > (W.room.h - 2) * T) { this.y = (W.room.h - 2) * T - this.h; this.vy = -0.6; }
+      this.touch();
+    }
+    lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: this.cy - cy, r: 18, c: [216, 128, 252], a: 0.45 }); }
+    draw(ctx) {
+      const x = Math.round(this.cx - W.cam.x), y = Math.round(this.y - W.cam.y), t = this.t + this.ph, sq = (t % 70) < 10 ? 1 : 0, fl = this.flash;
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = fl ? '#fcfcfc' : '#c870e8'; ctx.fillRect(x - 6 + sq, y + sq, 12 - sq * 2, 6); ctx.fillRect(x - 4, y - 2 + sq, 8, 2);
+      ctx.fillStyle = fl ? '#fcfcfc' : '#f0b8fc'; ctx.fillRect(x - 3, y - 1 + sq, 4, 2);
+      ctx.fillStyle = '#e8a0fc'; for (let k = 0; k < 4; k++) { const tx = x - 5 + k * 3 + Math.round(Math.sin(t * 0.15 + k) * 1.5); ctx.fillRect(tx, y + 6, 1, 4 + (k % 2) * 3); }
+      ctx.globalAlpha = 1;
+    }
+  }
+  class CastleWater extends Ent { // Wasser über der Wasserlinie: Tönung, Wellenkante, Lichtstrahlen, Tang, Blasen (zeichnet über allem)
+    constructor(line) { super(0, 0, 1, 1); this.kind = 'fx'; this.line = line; this.noWrap = true; }
+    update() { this.t++; if (this.t % 9 === 0) W.spawn(new Particle(W.cam.x + rnd(0, View.w), W.cam.y + 208, rnd(-0.1, 0.1), -rnd(0.4, 0.9), '#a4e4fc', 260, 1, 0)); }
+    draw(ctx) {
+      const y0 = Math.round(this.line * T - W.cam.y), t = this.t, w = View.w, kelp = [3, 9, 18, 27, 38, 44, 51, 60];
+      for (const kx of kelp) { // Tang vom Grund
+        const bx = Math.round(kx * T + 8 - W.cam.x), by = Math.round((W.room.h - 2) * T - W.cam.y);
+        if (bx < -20 || bx > w + 20) continue;
+        for (let k = 0; k < 22; k++) { ctx.fillStyle = k % 4 ? '#1c5c3c' : '#2c7c4c'; ctx.fillRect(bx + Math.round(Math.sin(t * 0.04 + k * 0.35 + kx) * k * 0.25), by - k * 3, 2, 3); }
+      }
+      if (y0 >= 208) return;
+      const top = Math.max(0, y0);
+      ctx.fillStyle = 'rgba(20,70,150,0.32)'; ctx.fillRect(0, top, w, 208 - top);
+      ctx.fillStyle = 'rgba(120,200,255,0.06)'; // Lichtstrahlen von der Oberfläche
+      for (let k = 0; k < 5; k++) { const sx = ((k * 83 + t * 0.3) % (w + 60)) - 30; ctx.beginPath(); ctx.moveTo(sx, top); ctx.lineTo(sx + 14, top); ctx.lineTo(sx + 44, 208); ctx.lineTo(sx + 24, 208); ctx.closePath(); ctx.fill(); }
+      if (y0 > -4) { ctx.fillStyle = '#7cd0fc'; for (let X = 0; X < w; X += 2) ctx.fillRect(X, y0 + Math.round(Math.sin((X + W.cam.x) * 0.08 + t * 0.06) * 1.5), 2, 1); ctx.fillStyle = 'rgba(200,240,255,0.35)'; ctx.fillRect(0, y0 + 2, w, 1); }
+    }
+  }
   function spawnRelics(s, r, def, arrive) {
     const here = ([R]) => same(ref(R), s, r);
     for (const e of RELIC_AT) if (here(e) && !relic[e[1]]) W.spawn(new RelicStone(e[1], e[2], e[3]));
@@ -1171,6 +1245,9 @@ const Castle = (() => {
     W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber) && !(e instanceof CastleNPC) && !(e instanceof CastleLoot) && !(e instanceof CastleGrate) && !(e instanceof CastleDecor) && !(e instanceof Puppet));
     if (def.decor) W.ents.unshift(new CastleDecor(def.decor)); // Blender-Modelle ganz hinten (vor Türen und Figuren)
     for (const [x, y] of def.puppets || []) W.spawn(new Puppet(x, y)); // Puppen im Bahnhof
+    W.ents = W.ents.filter(e => !(e instanceof CastleWater) && !(e instanceof Jelly));
+    if (def.waterLine !== undefined) W.spawn(new CastleWater(def.waterLine)); // Wasser-Ebene über allem
+    for (const [x, y] of def.jellies || []) W.spawn(new Jelly(x, y)); // Quallen
     for (const d of doorsOf(s, r)) W.spawn(new CastleDoor(d, def));
     for (const g of def.grates || []) W.spawn(new CastleGrate(g)); // Gitter (nur Nebel kommt durch)
     for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
@@ -1249,6 +1326,7 @@ const Castle = (() => {
       W.roll += (want - W.roll) * 0.12;
     }
     if (def.grates) grateBlock(p); // Gitter: nur Nebel kommt durch
+    if (def.waterLine !== undefined && !relic.diver && p.alive && p.feet > def.waterLine * T + 22 && p.state !== 'dead') { Game.note('castleDrown'); p.fallPenalty(3); } // ohne Helm: ertrinken
     if (!p.alive || p.state !== 'normal' || W.arenaOn) { push = 0; lastX = p.x; return; }
     for (const e of W.ents) { // Figuren: neue Szene beim Herantreten, danach ↑ für den Rat
       if (!(e instanceof CastleNPC) || e.go || !p.onGround || Math.abs(p.feet - (e.y + e.h)) > 16) continue;
@@ -1409,14 +1487,16 @@ const Castle = (() => {
     saucer: { quest: 'saucer', col: '#f0f0f8' },
     book_tetra: { spell: 'tetra', col: '#58f8f8' },                          // Lohn des Bibliothekars: Tetra-Seelen
     porter: { slot: 'acc', mp: 12, def: 1, col: '#c83040' },                  // Portiersmütze (Lohn für die Koffer)
-    ironball: { slot: 'acc', atk: 4, col: '#8c8c9c' },                        // Eisenkugel des Gefangenen (Lohn für die Untertasse)     // Hotelbademantel (Portier): weich, heilt langsam
+    ironball: { slot: 'acc', atk: 4, col: '#8c8c9c' },                        // Eisenkugel des Gefangenen (Lohn für die Untertasse)
+    trident: { slot: 'weapon', atk: 5, col: '#58c8d8' },                     // Dreizack des Wassermanns (versunkene Kapelle)
+    rec_kraken: { rec: 'kraken', col: '#7c4cc8' },     // Hotelbademantel (Portier): weich, heilt langsam
     // Schallplatten fürs Grammophon im Hotel (spielen ein Stück des Schlosses): gefunden, gekauft, eine liegt schon auf dem Teller
     rec_hotel: { rec: 'hotel', col: '#c89020' }, rec_title: { rec: 'title', col: '#9c6cfc' }, rec_stage1: { rec: 'stage1', price: 1500, col: '#fc7460' },
     rec_sea: { rec: 'sea', price: 1500, col: '#3cbcfc' }, rec_boss: { rec: 'boss', price: 3000, col: '#fc3c3c' }, rec_stage2: { rec: 'stage2', col: '#58f898' },
     rec_library: { rec: 'library', col: '#e8b070' }, rec_expo: { rec: 'expo', col: '#88d8a0' }, rec_chapel: { rec: 'chapel', col: '#d880fc' }, rec_sun: { rec: 'sun', col: '#f8b800' },
     rec_ending: { rec: 'ending', col: '#fce0a8' },
   };
-  const RECORDS = ['hotel', 'title', 'stage1', 'sea', 'boss', 'stage2', 'library', 'expo', 'chapel', 'sun', 'ending'];
+  const RECORDS = ['hotel', 'title', 'stage1', 'sea', 'boss', 'stage2', 'library', 'expo', 'chapel', 'sun', 'kraken', 'ending'];
   const hasRec = (id) => id === 'hotel' || !!inv['rec_' + id];
   const SLOTS = ['weapon', 'armor', 'acc', 'fam'], DRINKS = ['potion', 'elixir'];
   const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'fairy', 'map', 'book_spirit', 'book_hellfire', 'book_soulsteal'];
@@ -1433,6 +1513,7 @@ const Castle = (() => {
     [['side', 'hotel'], 'qbook_cook', 54, 10], [['side', 'wehrgang'], 'qbook_love', 38, 6], [['side', 'bahnhof'], 'qbook_phone', 5, 8],
     [['side', 'kolosseum'], 'qcase1', 57, 6], [['side', 'attic'], 'qcase2', 30, 10], [['side', 'kanal'], 'qcase3', 100, 10],
     [['side', 'zimmer13'], 'saucer', 7, 10],
+    [['side', 'kapelle'], 'trident', 10, 17], [['side', 'kapelle'], 'rec_kraken', 39, 18],
   ];
   // Nebenaufträge (Status, vierte Seite): Auftraggeber, Stücke, Szene zum Annehmen und zum Abgeben
   const QUESTS = [
@@ -1952,10 +2033,16 @@ const Castle = (() => {
     Player.prototype.update = function (...a) {
       if ((this.batForm || this.mistForm || this.wolfForm) && this.state === 'dead') { this.y -= HERO_H - this.h; this.batForm = false; this.mistForm = false; this.wolfForm = false; this.h = HERO_H; }
       if (this.superT > 0) { if (this.state === 'normal' && this.alive && !this.batForm && !this.mistForm && !this.wolfForm) return superUpdate(this); this.superT = 0; } // Supersprung
+      if (relic.diver && this.alive && (this.state === 'normal' || this.state === 'hurt') && !this.batForm && !this.mistForm && !this.wolfForm && inWater(this)) return swimUpdate(this, up, a); // Taucherhelm
       return this.batForm ? batUpdate(this) : this.mistForm ? mistUpdate(this) : this.wolfForm ? wolfUpdate(this) : up.apply(this, a);
     };
     Player.prototype.draw = function (ctx, cam) { return this.batForm ? batDraw(this, ctx, cam) : this.mistForm ? mistDraw(this, ctx, cam) : this.wolfForm ? wolfDraw(this, ctx, cam) : dr.call(this, ctx, cam); };
     Player.prototype.setCrouch = function (on) { if (!this.batForm && !this.mistForm && !this.wolfForm) return sc.call(this, on); }; // Treffer und Stürze ändern die Tiergestalt nicht
+    const hz = Player.prototype.hazards;
+    Player.prototype.hazards = function () { // mit Taucherhelm ist Wasser kein Abgrund mehr
+      if (relic.diver && Phys.tile(Math.floor(this.cx / T), Math.floor((this.feet - 6) / T)) === '~') { if (this.y > W.room.h * T + 8) this.fallPenalty(4); return; }
+      return hz.call(this);
+    };
   }
   // Statusbildschirm, Seite 2: gelernte Zauber mit Befehl (Blick nach rechts) und MP-Kosten
   function drawSpells(ctx) {
@@ -2144,7 +2231,7 @@ const Castle = (() => {
 
   // ---------------- Bestiarium wie die Gegnerliste in SotN (Status, dritte Seite): Siege je Gegnerart, absurde Einträge ----------------
   const BEASTS = ['Bat', 'Skeleton', 'Ghoul', 'Raven', 'Knight', 'LivingArmor', 'Panther', 'Skull', 'Fishman', 'Ghost', 'Snake', 'FlyBook', 'Tome',
-    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon', 'Puppet', 'Conductor', 'Doppel',
+    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon', 'Puppet', 'Jelly', 'Conductor', 'Doppel',
     'TentacleBoss', 'GiantBat', 'IceWitch', 'GiantSkeleton', 'Medusa', 'SunWarden', 'ManTrap', 'Count'];
   const BEAST_BOSS = { TentacleBoss: 'bossTentacle', GiantBat: 'boss1', IceWitch: 'bossWitch', GiantSkeleton: 'boss2', Medusa: 'boss3', SunWarden: 'bossKnight', ManTrap: 'bossTrap', Count: 'boss4', Conductor: 'bossConductor', Doppel: 'bossDoppel' };
   const BEAST_SET = new Set(BEASTS);
@@ -2298,6 +2385,7 @@ const Castle = (() => {
     { id: 'steam', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.boots },                       // Dampfstiefel: Signalbrücke im Bahnhof
     { id: 'claw', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.wall },
     { id: 'stone', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.breaker },
+    { id: 'dive', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.diver },                         // Taucherhelm: versunkene Kapelle
     { id: 'wings', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.bat },                         // Fledermausgestalt: Sims unter der Decke
     { id: 'fog', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.mist },                          // Nebelgestalt: Gitter im Kerker
     { id: 'seals', who: 'ally', at: [[0, 1], 32, 11], when: () => seals() >= sealRooms().length },  // auf der Galerie am Siegeltor
@@ -2967,7 +3055,7 @@ const Castle = (() => {
     need.push('npcPrisoner', 'npcConcierge', 'concTitle', 'concHi', 'concSold', 'concOwned', 'concPoor', 'concThanks1', 'concThanks2', 'concThanks3', 'gramoTitle', 'gramoHi',
       'gramoPlay', 'gramoMissing', 'gramoNow', 'gramoHelp', 'hotelSign', 'boardTitle', 'formBack', 'whereWitch',
       'bossConductor', 'bossConductorNote', 'bossConductorShout', 'bossConductorRage', 'castleLocked13', 'dashKey',
-      'bossDoppel', 'bossDoppelNote', 'bossDoppelShout', 'bossDoppelRage', 'famSay_shadow', 'questTitle', 'questDone', 'questNone', 'questFrom');
+      'bossDoppel', 'bossDoppelNote', 'bossDoppelShout', 'bossDoppelRage', 'famSay_shadow', 'questTitle', 'questDone', 'questNone', 'questFrom', 'castleDrown');
     for (const q of QUESTS) need.push('quest_' + q.id, 'questHint_' + q.id);
     { // Erreichbarkeit: vom Wald aus über Türen und Ausgänge (alles geöffnet) – kein Raum darf abgeschnitten sein
       const key = (s, r) => s + ':' + r, seenR = new Set(), queue = [], s0 = sIdx('arrival');
