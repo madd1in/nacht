@@ -173,7 +173,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 | **0 (erledigt)** | `?castle`: Pause → KARTE, betretene Zellen aufdecken, Heldenposition, Erkundungsgrad, Speicherung in `localStorage` | Karte im Browser getestet, Arcade unverändert |
 | **1 (Prototyp erledigt)** | Kapitel werden Regionen eines Schlosses: Türen in beide Richtungen, Knoten Eingangshalle (Keller-, Turm-, Siegeltor), Wege hinter den Bossen, Einbahnen mit Rückweg, eine Karte für das ganze Schloss, Bosse geben Siegel und bleiben besiegt, kein Zeitlimit | alle Regionen frei begehbar, Thron hinter 5 Siegeln |
 | **1b (teilweise erledigt)** | erledigt: Speicherkammern mit Spielstand, „Fortsetzen" im Titel und nach Game Over, Warpkammern mit Schnellreise über die Karte. Offen: feste Raum-IDs, Regionsmusik ohne Neustart, Spielstand-Slots | Spielstand überlebt Umsortieren von `levels.js` |
-| **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 9 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher, Fledermaus-, Nebel-, Wolfsgestalt, Dampfstiefel) auf Sockeln, bei Bossen und bei den Zwischengegnern Eishexe und Zugführer, rissiges Gestein vor Zusatzräumen, Dachboden nur fliegend, Kerkerzelle nur als Nebel, Gepäckraum im Hotel nur als Wolf. Selbsttest prüft Türen/Figuren/Gitter/Texte/Modelle/Puppen. Offen: automatischer Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
+| **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 9 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher, Fledermaus-, Nebel-, Wolfsgestalt, Dampfstiefel) auf Sockeln, bei Bossen und bei den Zwischengegnern Eishexe und Zugführer, rissiges Gestein vor Zusatzräumen, Dachboden nur fliegend, Kerkerzelle nur als Nebel, Gepäckraum im Hotel nur als Wolf. Selbsttest prüft Türen/Figuren/Gitter/Texte/Modelle/Puppen und die Erreichbarkeit aller Räume über Türen. Offen: Erreichbarkeit innerhalb der Räume (Sprunghöhen) | ganzes Schloss ohne Softlock durchspielbar |
 | **3 RPG (fast erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand, Ausrüstung (Waffe/Rüstung/Amulett) mit Drops und Einzelstücken, Tränke, Laden des Bibliothekars, Schlosskarte, drei Begleiter mit Stufen, MP und drei Zauber per Befehlseingabe, Bestiarium, Verkaufen. Offen: weitere Zauber und Gestalten | Statusbildschirm, Shop |
 | **4 Bosse & Siegel (erledigt)** | Arenen mit Hintertür, Siegeltor, eigenes Ende (Epilog der drei Figuren, Ergebnis mit Rang nach Erkundungsgrad, Neues Spiel+), neue Verbindungsräume | Abspann im Schloss-Modus |
 | **4b Geschichte & Verzahnung (erledigt)** | drei Figuren mit absurden Gesprächen im Maniac-Mansion-Ton (zweiter Held, Bibliothekar, lila Tentakel), elf Szenen entlang der Relikte und Siegel; drei Schleifen (Geheimgang Kolosseum ↔ Brunnenschacht, Wehrgang Bergfried ↔ Glockenturm, Himmelsbrücke Kathedralendach ↔ Kuppel). Offen: weitere Figuren, Szene nach dem Grafen | jede Region über mindestens zwei Wege erreichbar |
@@ -305,6 +305,19 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   Wahl: **NEUES SPIEL+** (Stufe, EXP, Gold, Ausrüstung, Begleiter, Zauber und gesehene Szenen bleiben; Karte, Relikte, Bosse,
   Gefäße, Warpkammern und rissige Wände auf Anfang; der Fluch schlägt wieder zu; je Runde +2 Gefahrenstufen; Start am Burgtor)
   oder der bekannte **Abspann**. Test: Pause → TEST-WERKZEUGE → ZUM ENDE.
+- **Spiegelkabinett und der Doppelgänger** (Tür in der Marmorgalerie, x 34, Stufe 4): Marmorsaal mit Standspiegeln aus
+  Blender, die den Helden spiegeln – solange der Doppelgänger lebt, mit Verzögerung. Er tritt aus dem rechten Spiegel: dein
+  eigenes Bild in Dunkelviolett mit roten Augen, deine Waffe und Reichweite, hält Abstand, springt, weicht deinen Hieben mit
+  einem Rückwärts-Dash aus; ab halber Energie Nachbilder und Schattendolche. Lohn (`MINI_LOOT`): **Schattenzwilling** –
+  Begleiter, der 18 Bilder hinter dir herläuft und jeden Hieb wiederholt. Hinten eine brüchige Wand (Mauerbraten, Goldsack),
+  dahinter eine Nische mit der Tür zum Spiegeltunnel.
+- **Spiegeltunnel** (Thema `mirror`): das ganze Spielfeld rollt mit dem Fortschritt einmal um die Bildmitte (`def.roll`,
+  `W.roll`, world.js `applyCamFx` mit Kulisse `W.rollBack`: Kaleidoskop aus Spiegelringen in den Ecken) – in der Mitte steht
+  alles kopfüber, die Steuerung bleibt. Boden spiegelt, Standspiegel spiegeln verzögert. **Spiegelschacht:** Zylinder
+  (`wrap`, Turmmantel aus Spiegelfeldern in ps2.js) zum Hochklettern, dreht sich um die senkrechte Achse; oben eine Tür auf
+  die Empore der Marmorgalerie (Schleife).
+- **Selbsttest – Erreichbarkeit:** Breitensuche vom Wald über Türen und Ausgänge; jeder Raum, der so nicht erreichbar ist,
+  wird gemeldet („Raum unerreichbar“).
 - **Lokschuppen und der Zugführer:** Tür am linken Bahnsteig (x 14) in den Lokschuppen über dem Bahnhof (Stufe 3). Links
   stehen Lok und Wasserkran, oben ein Kransims mit Lebensgefäß; rechts die Arena des **Zugführers** – einer riesigen
   Schaffnerpuppe (Blender, zwölf Posen in `img/cond3d.png`, Bildkarte `K3C`): ruckt heran, holt mit der Fahrkartenzange aus

@@ -169,6 +169,11 @@ const W = {
       hx = -Math.sin(this.roll) * clamp(this.room.h * T - this.cam.y - 104, 0, 380) * 0.3;
       cover = 1 + (this.rollAmp * 1.2 + Math.abs(this.sway.a)) * (vw / 208 + 0.3) + (this.rollAmp * 380 * 0.3 * 2) / vw + Math.abs(heave) * 2 / 208;
     }
+    if (this.room.roll) { // Spiegeltunnel (Schloss-Modus): das Bild dreht sich ganz herum, in den Ecken erscheint die Kulisse aus castle.js
+      if (this.rollBack) this.rollBack(ctx, vw);
+      const c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
+      cover = Math.min(1.25, Math.max((vw * c + 208 * s) / vw, (vw * s + 208 * c) / 208));
+    }
     ctx.translate(px + hx, py + heave); ctx.rotate(rot); ctx.scale(z * cover, z * cover); ctx.translate(-px, -py);
   },
 
@@ -540,7 +545,7 @@ const W = {
     else order.forEach(k => { for (const e of this.ents) if (e.kind === k) e.draw(ctx); if (k === 'boss') this.player.draw(ctx, this.cam); });
     for (const e of this.ents) if (e.drawFront && !e.dead) e.drawFront(ctx); // Bauwerke, die vor dem Helden liegen (Torhaus beim Durchgehen)
     this.drawReflections(ctx, sx, sy);
-    if ((theme === 'throne' || theme === 'gallery') && !View.lite) this.drawFloorMirror(ctx, sx, sy);
+    if ((theme === 'throne' || theme === 'gallery' || (theme === 'mirror' && !this.room.wrap)) && !View.lite) this.drawFloorMirror(ctx, sx, sy);
     FX.drawAmbient(ctx, this.cam);
     Tiles.drawFront(ctx, this.room, this.cam);
     FX.drawFog(ctx, theme, this.cam, this.frame, this.room.h * T - this.cam.y);

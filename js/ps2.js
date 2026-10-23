@@ -344,8 +344,22 @@ const PS2 = (() => {
       }
       return c;
     }
+    function buildMirrorTex(room) { // Spiegelschacht: Mantel aus Spiegelfeldern in Silberrahmen, schräge Glanzstreifen, Sterne im Glas
+      const Wd = room.w * T, Hd = room.h * T, c = Sprites.canvas(Wd, Hd), x = c.getContext('2d');
+      let s = 911; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+      x.fillStyle = '#4c5470'; x.fillRect(0, 0, Wd, Hd);
+      for (let y = 0; y < Hd; y += 64) for (let X = (y / 64) % 2 * 24; X < Wd + 48; X += 48) {
+        const bx = X % Wd, g = x.createLinearGradient(bx, y, bx + 44, y + 60); g.addColorStop(0, '#2c3c6c'); g.addColorStop(0.5, '#141c3c'); g.addColorStop(1, '#0c1028');
+        x.fillStyle = g; x.fillRect(bx + 2, y + 2, 44, 60); if (bx + 46 > Wd) x.fillRect(bx + 2 - Wd, y + 2, 44, 60);
+        x.fillStyle = 'rgba(160,190,240,0.35)'; for (let k = 0; k < 60; k++) x.fillRect(bx + 8 + k * 0.45, y + 2 + k, 3, 1);
+        for (let k = 0; k < 3; k++) { x.fillStyle = rnd() < 0.5 ? '#fcfcfc' : '#a8b8f0'; x.fillRect(bx + 4 + rnd() * 40, y + 4 + rnd() * 56, 1, 1); }
+        x.fillStyle = '#d8e0f4'; x.fillRect(bx, y, 48, 1); x.fillRect(bx, y, 1, 64);
+      }
+      return c;
+    }
     function buildTex(room) {
       if (room.theme === 'ice') return buildIceTex(room);
+      if (room.theme === 'mirror') return buildMirrorTex(room);
       const Wd = room.w * T, Hd = room.h * T, c = Sprites.canvas(Wd, Hd), x = c.getContext('2d');
       let s = 77; const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
       x.fillStyle = '#c8a874'; x.fillRect(0, 0, Wd, Hd);

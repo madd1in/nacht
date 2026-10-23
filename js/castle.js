@@ -254,6 +254,48 @@ const Castle = (() => {
       .music('hotel').label('ZIMMER 13').start(2, 10).done();
     room13.decor = [D('bed', 15.5, 10), D('chair', 10, 10), D('cart', 25, 10, true)];
     add('zimmer13', 0, 1, [2, -3], room13);
+    // Spiegelkabinett (unter der Marmorgalerie, Tür x 34): Marmorsaal mit Standspiegeln (Blender). Aus dem rechten Spiegel tritt
+    // der Doppelgänger. Danach liegt sein Schatten als Begleiterkarte im Saal; hinten eine brüchige Wand mit Mauerbraten.
+    const mirrors = R(40, 'gallery')
+      .ground(0, 39)
+      .fill(33, 7, 36, 7, '=')                                    // Empore mit dem Lebensgefäß
+      .fill(36, 5, 39, 10, '#').fill(37, 8, 39, 10, '.').set(36, 10, 'X').set(36, 9, 'Y') // brüchige Wand: Braten, Goldsack – dahinter die Tür zum Spiegeltunnel
+      .candle(4, 6, 'H').candle(31, 6).candle(36, 4, '$')
+      .prop('vessel', { x: 34, y: 6 })
+      .mini('doppel', 9, 29, 11, 0)
+      .music('stage3').label('SPIEGELKABINETT').start(2, 10).done();
+    mirrors.decor = [6, 11, 16, 21, 26, 31].map(x => D('mirror', x, 10));
+    add('spiegel', 2, 4, [14, -11], mirrors);
+    LINKS.push([[2, -1], { x: 34, y: 10, door: 'side' }, ['side', 'spiegel'], 'start', {}]); // Marmorgalerie → Spiegelkabinett
+    // Spiegeltunnel: das ganze Bild rollt einmal herum (roll: von Kachel x0 bis x1, in der Mitte kopfüber), Spiegel spiegeln
+    // verzögert, der Boden spiegelt. Danach der Spiegelschacht: ein Zylinder (wrap) aus Spiegelfeldern, der sich beim Klettern um
+    // die senkrechte Achse dreht; oben führt eine Tür auf die Empore der Marmorgalerie zurück (Schleife).
+    const tunnel = R(96, 'mirror')
+      .ground(0, 95)
+      .fill(20, 9, 21, 10, '#').fill(44, 8, 45, 10, '#').fill(70, 9, 71, 10, '#')     // Spiegelsäulen zum Überspringen
+      .fill(30, 7, 35, 7, '=').fill(56, 7, 61, 7, '=').fill(80, 8, 84, 8, '=')         // Glasborde
+      .candle(10, 8, 'H').candle(32, 5).candle(50, 8, '$').candle(58, 5, 'H').candle(76, 8).candle(90, 8, 'H')
+      .enemy('ghost', 26, 4).enemy('bat', 40, 3).enemy('ghost', 64, 4).enemy('knight', 52, 10).enemy('bat', 86, 3)
+      .prop('vessel', { x: 58, y: 6 })
+      .music('stage3').label('SPIEGELTUNNEL').start(2, 10).done();
+    tunnel.roll = [8, 88];
+    tunnel.decor = [12, 28, 40, 52, 66, 78].map(x => D('mirror', x, 10));
+    add('spiegeltunnel', 2, 5, [13, -10], tunnel);
+    const shaft = R(48, 'mirror', 40)
+      .ground(0, 47, 38)
+      .fill(4, 34, 9, 34, '=').fill(9, 30, 14, 30, '=').fill(14, 26, 19, 26, '=').fill(19, 22, 24, 22, '=')
+      .fill(24, 18, 29, 18, '=').fill(29, 14, 34, 14, '=').fill(34, 10, 39, 10, '=').fill(39, 6, 44, 6, '=')
+      .fill(40, 3, 47, 3, '=')                                                            // oben: Ausstieg zur Galerie
+      .candle(6, 31, 'H').candle(16, 23).candle(26, 15, '$').candle(36, 7, 'H').candle(45, 0)
+      .enemy('bat', 10, 27).enemy('ghost', 20, 19).enemy('bat', 30, 11).enemy('ghost', 40, 4)
+      .chest(41, 2).prop('vessel', { x: 46, y: 2 })
+      .wrap().music('stage3').label('SPIEGELSCHACHT').start(2, 37).done();
+    add('spiegelschacht', 2, 5, [19, -10], shaft);
+    LINKS.push(
+      [['side', 'spiegel'], { x: 37, y: 10, door: 'side' }, ['side', 'spiegeltunnel'], 'start', {}],   // Kabinett (hinter der Wand) → Tunnel
+      [['side', 'spiegeltunnel'], 'right', ['side', 'spiegelschacht'], 'start', {}],                  // Tunnel → Schacht
+      [['side', 'spiegelschacht'], { x: 43, y: 2, door: 'side' }, [2, -1], { x: 34, y: 6, door: 'side' }, {}], // Schacht oben → Empore der Galerie
+    );
     LINKS.push(
       [['side', 'bahnhof'], { x: 14, y: 17, door: 'side' }, ['side', 'schuppen'], 'start', {}],                                 // Bahnsteig → Lokschuppen
       [['side', 'hotel'], { x: 46, y: 10, door: 'room13' }, ['side', 'zimmer13'], { x: 3, y: 10, door: 'room13' }, { item: 'keyring' }], // Galerie → Zimmer 13
@@ -692,7 +734,7 @@ const Castle = (() => {
   // img/krat3d.png, je Bild: [x, y, w, h, Anker x, Anker y, Zusatzpunkte x/y …]. Anker = Standpunkt (Boden, Gleis) bzw. Aufhängung.
   // Zusatzpunkte: Lok – Schornstein, Zylinderhahn, Dampfdom, Führerhaus; Laterne – Licht; Tresen – Klingel, Lampe;
   // Grammophon – Trichter; Sternlampe – Stern; Aufzug – Stockwerkanzeige. Fehlt das Bild, zeichnet der Raum einfach ohne.
-  const K3 = {"loco":[129,0,237,71,155,68,218,4,203,56,158,13,118,24],"wagon":[0,78,226,70,113,67],"canopy":[0,0,128,77,64,74],"bench":[170,149,31,19,16,18],"lamppost":[269,78,12,57,6,56,6,8],"clock":[154,149,15,23,8,1],"sign":[202,149,46,19,23,1],"desk":[0,149,92,29,46,28,60,8,21,4],"keys":[385,78,44,31,22,30],"gramo":[363,78,21,34,8,32,3,6],"starlamp":[319,78,16,49,8,47,8,10],"chair":[132,149,21,24,10,23],"lift":[282,78,36,52,18,51,18,8],"cart":[336,78,26,35,13,34],"bed":[93,149,38,27,19,26],"crane":[227,78,41,58,7,56]};
+  const K3 = {"loco":[129,0,237,71,155,68,218,4,203,56,158,13,118,24],"wagon":[0,78,226,70,113,67],"canopy":[0,0,128,77,64,74],"bench":[170,149,31,19,16,18],"lamppost":[269,78,12,57,6,56,6,8],"clock":[154,149,15,23,8,1],"sign":[202,149,46,19,23,1],"desk":[0,149,92,29,46,28,60,8,21,4],"keys":[412,78,44,31,22,30],"gramo":[390,78,21,34,8,32,3,6],"starlamp":[346,78,16,49,8,47,8,10],"chair":[132,149,21,24,10,23],"lift":[282,78,36,52,18,51,18,8],"cart":[363,78,26,35,13,34],"bed":[93,149,38,27,19,26],"crane":[227,78,41,58,7,56],"mirror":[319,78,26,50,13,49,5,12,21,42]};
   let k3 = null;
   if (on) {
     const img = new Image();
@@ -742,6 +784,11 @@ const Castle = (() => {
     constructor(list) { super(0, 0, 1, 1); this.kind = 'prop'; this.list = list; this.noWrap = true; }
     update() {
       this.t++;
+      const p = W.player;
+      if (p && this.list.some(d => d[0] === 'mirror')) { // Verlauf für die Spiegel (verzögertes Spiegelbild)
+        mirrorHist.push({ x: p.cx, feet: p.feet, spr: p.batForm || p.mistForm || p.wolfForm ? null : p.sprite(), face: p.face });
+        if (mirrorHist.length > 15) mirrorHist.shift();
+      }
       for (const d of this.list) {
         if (d[0] !== 'loco') continue;
         if (this.t % 6 === 0) { // Dampf aus dem Schornstein: steigt, wird heller, verweht
@@ -766,7 +813,7 @@ const Castle = (() => {
     draw(ctx) {
       for (const d of this.list) {
         if (d[0] === 'board') drawBoard(ctx, d[1], d[2], this.t);
-        else k3draw(ctx, d[0], d[1], d[2], d[3], d[4]);
+        else { k3draw(ctx, d[0], d[1], d[2], d[3], d[4]); if (d[0] === 'mirror') drawMirror(ctx, d); }
       }
     }
   }
@@ -941,6 +988,146 @@ const Castle = (() => {
     const p = W.player;
     if (Math.abs(p.cx - d.cx) < 14 && Math.abs(p.feet - (d.y + d.h)) < 8) Font.draw(ctx, '↑', cx - 2, y - 12 + Math.round(Math.sin(t * 0.12) * 2), open ? '#fcfcfc' : '#8c8c9c', { shadow: '#000' });
   }
+  // ---------------- Spiegelkabinett: der Doppelgänger und der Schattenzwilling ----------------
+  // Schattenbild eines Heldenbilds: dunkelviolett eingefärbt, die Zeichnung schimmert durch (je Bild und Richtung einmal erzeugt)
+  const tintCache = new WeakMap();
+  function shadowOf(spr, flip) {
+    let e = tintCache.get(spr);
+    if (!e) { e = {}; tintCache.set(spr, e); }
+    const k = flip ? 'f' : 'c';
+    if (!e[k]) {
+      const src = spr[k], c = Sprites.canvas(src.width, src.height), x = c.getContext('2d');
+      x.drawImage(src, 0, 0); x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(34,8,58,0.8)'; x.fillRect(0, 0, c.width, c.height);
+      e[k] = c;
+    }
+    return e[k];
+  }
+  function drawShadow(ctx, spr, cx, feet, flip, alpha = 1) { // wie Player.draw: Bild am Mittelpunkt, Füße unten
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(shadowOf(spr, flip), Math.round(cx - 8 - (spr.mx || 0) - W.cam.x) - spr.pad, Math.round(feet - spr.h - W.cam.y) - spr.pad);
+    ctx.globalAlpha = 1;
+  }
+  const heroLen = () => { const p = W.player; return Math.max(26, p.wlen || 26); }; // Reichweite der Heldenwaffe
+  class ShadowShard extends Ent { // Schattendolch (Doppelgänger, Phase 2): fliegt gerade, dreht sich
+    constructor(x, y, vx) { super(x - 4, y - 2, 8, 4); this.kind = 'eproj'; this.vx = vx; this.dmg = 2; }
+    update() { this.t++; this.x += this.vx; if (!this.onScreen(16) || this.t > 160) this.dead = true; const p = W.player; if (p.alive && Phys.overlap(this, p)) { p.hurt(this.dmg, this.cx); this.dead = true; } }
+    draw(ctx) { const x = Math.round(this.cx - W.cam.x), y = Math.round(this.cy - W.cam.y), d = Math.sign(this.vx); ctx.fillStyle = '#5c2c8c'; ctx.fillRect(x - 4, y - 1, 8, 2); ctx.fillStyle = '#d8b0fc'; ctx.fillRect(x + d * 3, y - 1, 2, 2); ctx.fillStyle = 'rgba(160,100,220,0.4)'; ctx.fillRect(x - d * 8, y, 6, 1); }
+  }
+  class Doppel extends Boss {
+    constructor(ax, aw) {
+      const gy = (W.room.h - 2) * T;
+      super(ax + aw - 58, gy - 28, 10, 28, 30, 3); // tritt aus dem Spiegel rechts in der Arena
+      this.ax = ax; this.aw = aw; this.gy = gy; this.mini = true; this.score = 7000; this.nameKey = 'bossDoppel'; this.music = 'boss2';
+      this.face = -1; this.state = 'appear'; this.timer = 0; this.ph2 = false; this.lootY = gy - 40; this.vx = 0; this.vy = 0; this.onGround = true;
+      this.cd = 40; this.jumps = 0; this.walkT = 0; this.trail = []; this.atkT = 0; this.atkId = 0; this.lastPlayerAtk = 0;
+    }
+    get H() { return HEROES.get(Options.character); }
+    vulnerable() { return this.state !== 'appear' && this.state !== 'dodge'; }
+    say(k, col) { W.popup(clamp(this.cx, W.cam.x + 90, W.cam.x + View.w - 90), this.y - 14, tr(k), col); }
+    go(s) { this.state = s; this.timer = 0; }
+    hit(dmg, id) { const r = super.hit(dmg, id); if (r && !this.dying) { this.vx = -this.face * 1.6; this.vy = Math.min(this.vy, -1.2); } return r; }
+    spr() {
+      const H = this.H;
+      if (this.dying || this.state === 'hurt') return H.hurt;
+      if (this.atkT) return H.atk[this.atkT < 7 ? 0 : this.atkT < 12 ? 1 : 2];
+      if (this.state === 'dodge') return H.dash;
+      if (!this.onGround) return this.vy < -1.2 ? H.jumpUp : this.vy < 1.3 ? H.jumpApex : H.jumpFall;
+      if (Math.abs(this.vx) > 0.2) return H.walk[Math.floor(this.walkT / 5) % 8];
+      return H.idle[Math.floor(this.t / 40) % 2];
+    }
+    update() {
+      this.tick();
+      if (this.dying) { this.vx = 0; return this.updateDeath(110); }
+      const p = W.player, dx = p.cx - this.cx, dist = Math.abs(dx), reach = heroLen();
+      if (!this.ph2 && this.hp <= this.maxHp / 2) { this.ph2 = true; W.flash = 10; W.shake = Math.max(W.shake, 12); Audio8.sfx('shatter'); Input.rumble(0.6, 0.5, 400); this.say('bossDoppelRage', '#d8b0fc'); }
+      if (this.cd > 0) this.cd--;
+      this.trail.push({ x: this.cx, feet: this.y + this.h, spr: this.spr(), face: this.face }); if (this.trail.length > 10) this.trail.shift();
+      if (this.state === 'appear') { // steigt aus dem Spiegel
+        if (this.timer === 20) this.say('bossDoppelShout', '#d8b0fc');
+        if (this.timer > 70) this.go('stalk');
+        return;
+      }
+      if (this.atkT) { // Hieb wie der Held: Ausholen, Treffer in Bild 12–17
+        this.atkT++;
+        if (this.atkT >= 12 && this.atkT <= 17) {
+          const box = { x: this.face > 0 ? this.cx + 4 : this.cx - 4 - reach, y: this.y + 4, w: reach, h: 12 };
+          if (p.alive && Phys.overlap(box, p)) p.hurt(this.dmg, this.cx);
+        }
+        if (this.atkT === 13) Audio8.sfx(W.player.sword ? 'whip' : 'crack', this.cx);
+        if (this.atkT > 19) { this.atkT = 0; this.cd = this.ph2 ? 16 : 30; }
+      } else if (this.state === 'dodge') { if (this.timer > 14) { this.go('stalk'); this.vx = 0; } }
+      else {
+        this.face = Math.sign(dx) || this.face;
+        const want = dist > reach * 0.85 ? this.face : dist < reach * 0.5 ? -this.face : 0; // Abstand halten wie ein Fechter
+        if (this.onGround) this.vx = want * (this.ph2 ? 1.7 : 1.45);
+        if (want) this.walkT++;
+        const pAtk = p.atkT > 0 && p.atkT < 5 && this.lastPlayerAtk !== p.atkId;
+        if (pAtk) this.lastPlayerAtk = p.atkId;
+        if (pAtk && dist < reach + 30 && this.onGround && Math.random() < (this.ph2 ? 0.5 : 0.35)) { // weicht aus: Rückwärts-Dash
+          this.go('dodge'); this.vx = -this.face * 3.4; Audio8.sfx('whoosh', this.cx); W.dust(this.cx, this.y + this.h, 3);
+        } else if (!this.cd && dist <= reach + 6 && Math.abs(p.feet - (this.y + this.h)) < 26) { this.atkT = 1; this.vx = 0; }
+        else if (this.onGround && ((p.feet < this.y + this.h - 24 && dist < 90) || (this.timer % 140 === 139 && Math.random() < 0.5))) { this.vy = -4.3; this.onGround = false; this.jumps = 1; Audio8.sfx('djump', this.cx); }
+        else if (!this.onGround && this.jumps === 1 && this.vy > 0.5 && p.feet < this.y && Math.random() < 0.04) { this.vy = -3.9; this.jumps = 2; W.puff(this.cx, this.y + this.h); }
+        if (this.ph2 && this.timer % 210 === 200 && this.onGround) { // Schattendolche
+          for (const dy of [-6, 0, 6]) W.spawn(new ShadowShard(this.cx, this.y + 12 + dy, this.face * (3 + Math.abs(dy) * 0.08)));
+          Audio8.sfx('throw', this.cx);
+        }
+      }
+      this.vy = Math.min(this.vy + 0.21, 4.2);
+      if (Phys.moveX(this, this.vx) && this.state === 'dodge') this.vx = 0;
+      const r = Phys.moveY(this, this.vy);
+      if (r === 1) { this.onGround = true; this.vy = 0; this.jumps = 0; } else if (r === -1) this.vy = 0; else this.onGround = false;
+      if (!this.atkT && this.state !== 'dodge' && this.onGround && Math.abs(this.vx) > 2) this.vx *= 0.7;
+      this.x = clamp(this.x, this.ax + 2, this.ax + this.aw - this.w - 2);
+      this.touch();
+    }
+    lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: this.cy - cy, r: 26, c: [150, 80, 220], a: 0.35 }); }
+    draw(ctx) {
+      const feet = this.y + this.h, fl = this.face < 0, s = this.spr(), a = this.state === 'appear' ? Math.min(1, this.timer / 50) : 1;
+      if (this.ph2) this.trail.forEach((t, i) => { if (i % 3 === 0) drawShadow(ctx, t.spr, t.x, t.feet, t.face < 0, 0.12 + i * 0.02); }); // Nachbilder
+      if (this.flash) { Sprites.draw(ctx, s, Math.round(this.cx - 8 - (s.mx || 0) - W.cam.x), Math.round(feet - s.h - W.cam.y), fl, true); }
+      else drawShadow(ctx, s, this.cx, feet + (this.dying ? 0 : 0), fl, this.dying ? Math.max(0, 1 - this.dying / 110) : a);
+      if (!this.dying && a >= 1) { const ex = Math.round(this.cx + this.face * 2 - W.cam.x), ey = Math.round(feet - 25 - W.cam.y); ctx.fillStyle = '#fc3c3c'; ctx.fillRect(ex, ey, 1, 1); ctx.fillRect(ex + this.face * 2, ey, 1, 1); } // rote Augen
+      if (this.atkT >= 9 && this.atkT <= 18) { // dunkle Waffe: Strich mit Glanz, ganz ausgestreckt ab Bild 12
+        const len = this.atkT >= 12 ? heroLen() : heroLen() * 0.4, hx = Math.round(this.cx + this.face * 4 - W.cam.x), hy = Math.round(feet - 20 - W.cam.y);
+        ctx.fillStyle = '#3c1c5c'; ctx.fillRect(this.face > 0 ? hx : hx - len, hy, len, 2); ctx.fillStyle = '#b080e8'; ctx.fillRect(this.face > 0 ? hx + len - 3 : hx - len, hy, 3, 1);
+      }
+      if (this.dying && this.dying % 9 === 1) for (let i = 0; i < 6; i++) W.spawn(new Particle(this.cx + rnd(-6, 6), this.y + rnd(0, 28), rnd(-1.4, 1.4), rnd(-2, -0.3), i % 2 ? '#d8e8fc' : '#8c6cbc', 30, 1, 0.12)); // Spiegelsplitter
+    }
+  }
+  if (on && typeof BOSSES !== 'undefined') BOSSES.doppel = Doppel;
+  // Spiegeltunnel: hinter dem gedrehten Bild (world.js applyCamFx) ein Kaleidoskop – achteckige Spiegelringe fliegen auf den
+  // Betrachter zu, Facettenspeichen drehen sich, Glitzern
+  function rollBack(ctx, vw) {
+    const t = W.frame, cx = vw / 2, cy = 104;
+    ctx.fillStyle = '#04030c'; ctx.fillRect(-2, -2, vw + 4, 212);
+    for (let i = 0; i < 10; i++) {
+      const z = (i + (t * 0.01) % 1) / 10, r = 12 + z * z * 300, rot = t * 0.003 * (i % 2 ? 1 : -1) + i * 0.4;
+      ctx.strokeStyle = `rgba(${120 + i * 12},${150 + i * 9},255,${(0.12 + z * 0.45).toFixed(2)})`; ctx.lineWidth = 1 + z * 3;
+      ctx.beginPath();
+      for (let k = 0; k <= 8; k++) { const a = rot + k / 8 * Math.PI * 2, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.8; if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(180,200,255,0.12)'; ctx.lineWidth = 1;
+    for (let k = 0; k < 8; k++) { const a = t * 0.002 + k / 8 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 400, cy + Math.sin(a) * 320); ctx.stroke(); }
+    for (let k = 0; k < 14; k++) { const a = k * 2.39 + t * 0.004, rr = 30 + ((k * 37 + t * 0.6) % 260); ctx.fillStyle = k % 3 ? '#a8b8f0' : '#fcfcfc'; ctx.fillRect(Math.round(cx + Math.cos(a) * rr), Math.round(cy + Math.sin(a) * rr * 0.8), 1, 1); }
+  }
+  if (on) W.rollBack = rollBack;
+  // Spiegel im Kabinett: zeigen den Helden – solange der Doppelgänger lebt, mit Verzögerung (das Spiegelbild ist nicht ganz
+  // bei der Sache), danach wieder brav. Der Doppelgänger selbst hat kein Spiegelbild.
+  const mirrorHist = [];
+  function drawMirror(ctx, d) {
+    const p = W.player, g0 = k3pt('mirror', 0, d[1], d[2]), g1 = k3pt('mirror', 1, d[1], d[2]);
+    const x0 = Math.round(g0.x - W.cam.x), y0 = Math.round(g0.y - W.cam.y), w = Math.round(g1.x - g0.x), h = Math.round(g1.y - g0.y);
+    if (x0 > View.w || x0 + w < 0 || !p) return;
+    const late = !mini[roomKey(W.stage, W.roomIdx)], h0 = late && mirrorHist.length > 14 ? mirrorHist[0] : null;
+    const src = h0 || { x: p.cx, feet: p.feet, spr: p.batForm || p.mistForm || p.wolfForm ? null : p.sprite(), face: p.face };
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+    if (src.spr && Math.abs(src.x - (g0.x + g1.x) / 2) < 30) { ctx.globalAlpha = 0.55; Sprites.draw(ctx, src.spr, Math.round(src.x - 8 - (src.spr.mx || 0) - W.cam.x), Math.round(src.feet - 2 - src.spr.h - W.cam.y), src.face > 0); ctx.globalAlpha = 1; }
+    ctx.fillStyle = 'rgba(90,120,170,0.18)'; ctx.fillRect(x0, y0, w, h);
+    ctx.fillStyle = 'rgba(220,235,255,0.22)'; for (let k = 0; k < h; k++) ctx.fillRect(x0 + Math.round(k * 0.6) - 4 + ((W.frame >> 3) % 40) - 10, y0 + k, 2, 1); // Glanzstreifen
+    ctx.restore();
+  }
   function spawnRelics(s, r, def, arrive) {
     const here = ([R]) => same(ref(R), s, r);
     for (const e of RELIC_AT) if (here(e) && !relic[e[1]]) W.spawn(new RelicStone(e[1], e[2], e[3]));
@@ -1050,12 +1237,17 @@ const Castle = (() => {
     if (W.miniDone[s + ':' + r] && !mini[key]) { // Zwischengegner besiegt: gemerkt, sein Relikt erscheint
       mini[key] = 1; dirty = true;
       for (const [R, k, x, y] of MINI_RELIC) if (same(ref(R), s, r) && !relic[k]) W.spawn(new RelicStone(k, x, y));
+      for (const [R, id, x, y] of MINI_LOOT) if (same(ref(R), s, r) && !inv[id]) W.spawn(new CastleLoot(id, x * T + 8, (y + 1) * T - 8, id));
     }
     if (dirty) save();
     if (guard && !inExit()) { guard = false; W.exiting = false; }
     if (lockT > 0) lockT--;
     roomT++;
     const p = W.player, def = S()[s].rooms[r];
+    if (def.roll) { // Spiegeltunnel: das Bild rollt einmal ganz herum, je nachdem, wie weit der Held ist (Mitte: kopfüber)
+      const u = clamp((p.cx - def.roll[0] * T) / ((def.roll[1] - def.roll[0]) * T), 0, 1), want = Math.PI * 2 * (u - Math.sin(Math.PI * 2 * u) / (Math.PI * 2));
+      W.roll += (want - W.roll) * 0.12;
+    }
     if (def.grates) grateBlock(p); // Gitter: nur Nebel kommt durch
     if (!p.alive || p.state !== 'normal' || W.arenaOn) { push = 0; lastX = p.x; return; }
     for (const e of W.ents) { // Figuren: neue Szene beim Herantreten, danach ↑ für den Rat
@@ -1205,6 +1397,7 @@ const Castle = (() => {
     batcard: { slot: 'fam', fam: 'bat', col: '#9c6cfc' },              // Junges der Riesenfledermaus (liegt nach dem Sieg in ihrer Arena)
     fairy: { slot: 'fam', fam: 'fairy', price: 7000, col: '#58f898' },  // Fee im Glas (Laden des Bibliothekars)
     tentling: { slot: 'fam', fam: 'tent', col: '#d880fc' },            // Neffe des Tentakels (Kolosseum, nach der Rabenfeder)
+    shadowcard: { slot: 'fam', fam: 'shadow', col: '#8c5cc8' },        // Schatten des Doppelgängers: wiederholt jeden Hieb
     book_spirit: { spell: 'spirit', price: 2500, col: '#a4e4fc' },      // Zauberbücher (Laden): lehren je einen Zauber
     book_hellfire: { spell: 'hellfire', price: 6000, col: '#fc7c1c' },
     book_soulsteal: { spell: 'soulsteal', price: 12000, col: '#d880fc' },
@@ -1222,6 +1415,7 @@ const Castle = (() => {
   const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'fairy', 'map', 'book_spirit', 'book_hellfire', 'book_soulsteal'];
   const once = (g) => !!(g.slot || g.key || g.spell || g.rec); // gibt es nur einmal
   const BOSS_LOOT = [[[0, -1], 'batcard']];
+  const MINI_LOOT = [[['side', 'spiegel'], 'shadowcard', 20, 10]]; // nach dem Doppelgänger: sein Schatten als Begleiter
   const FINDS = [ // Einzelstücke: [Raum, Gegenstand, Kachel-x, Standreihe]
     [['side', 'kolosseum'], 'leather', 12, 7], [['side', 'kanal'], 'bloodstone', 43, 7], [['side', 'schatz'], 'greedring', 25, 6],
     [['side', 'verlies'], 'dragonfang', 28, 6], [['side', 'wehrgang'], 'luckcoin', 37, 6], [['side', 'himmel'], 'mirror', 44, 5],
@@ -1281,6 +1475,7 @@ const Castle = (() => {
     for (const [R, id, x, y] of FINDS) if (same(ref(R), s, r) && !flag['find_' + id]) W.spawn(new CastleLoot(id, x * T + 8, (y + 1) * T - 8, id));
     const def = S()[s].rooms[r];
     for (const [R, id] of BOSS_LOOT) if (same(ref(R), s, r) && boss[roomKey(s, r)] && !flag['find_' + id] && !inv[id]) W.spawn(new CastleLoot(id, (def.w - 14) * T + 8, (def.start.y + 1) * T - 10, id));
+    for (const [R, id, x, y] of MINI_LOOT) if (same(ref(R), s, r) && mini[roomKey(s, r)] && !flag['find_' + id] && !inv[id]) W.spawn(new CastleLoot(id, x * T + 8, (y + 1) * T - 8, id));
   }
 
   // ---------------- Begleiter (Familiars wie in SotN): folgen dem Helden, steigen mit jedem Einsatz auf (bis LV 9) ----------------
@@ -1312,7 +1507,7 @@ const Castle = (() => {
   class CastleFamiliar extends Ent {
     constructor(id) {
       const p = W.player;
-      super(p.cx - 6, p.y - 10, 12, 10); this.kind = 'fx'; this.id = id; this.type = GEAR[id].fam; this.room = W.room;
+      super(p.cx - 6, p.y - 10, 12, 10); this.kind = 'fx'; this.id = id; this.type = GEAR[id].fam; this.room = W.room; this.hist = []; this.ghost = null; this.swing = 0;
       this.cd = 60; this.target = null; this.dive = 0; this.slap = 0; this.say = null; this.sayT = 0; this.quip = 600 + Math.floor(Math.random() * 900); this.face = p.face;
     }
     gain(n) { // Erfahrung: alle 12 Punkte eine Stufe
@@ -1346,6 +1541,20 @@ const Castle = (() => {
           if (famStrike({ x: this.face > 0 ? this.cx : this.cx - 30, y: this.y - 6, w: 30, h: 20 }, 0.8 + 0.15 * (lv - 1))) this.gain(1);
         }
         if (!this.slap && !this.cd) { const e = famTarget(this, 34, 26); if (e) { this.face = e.cx > this.cx ? 1 : -1; this.slap = 12; this.cd = 48 - lv * 2; Audio8.sfx('slime', this.cx); } }
+      } else if (this.type === 'shadow') { // Schattenzwilling: läuft 18 Bilder hinter dem Helden her und wiederholt jeden Hieb
+        const form = p.batForm || p.mistForm || p.wolfForm;
+        this.hist.push(form || !p.alive ? null : { x: p.cx, feet: p.feet, face: p.face, spr: p.sprite(), box: !p.atkSub && p.atkT >= 12 && p.atkT <= 17 ? p.whipBox() : null, id: p.atkId });
+        if (this.hist.length > 18) this.hist.shift();
+        const h = this.ghost = this.hist[0];
+        if (h) {
+          const off = -h.face * 14;
+          tx = h.x + off; ty = h.feet - 14; k = 1; this.face = h.face;
+          if (h.box) {
+            let hit = false;
+            for (const b of h.box) if (famStrike({ x: b.x + off, y: b.y, w: b.w, h: b.h }, 0.7 + 0.1 * (lv - 1), 'sh' + h.id)) hit = true;
+            if (hit && this.swing !== h.id) { this.swing = h.id; this.gain(1); }
+          }
+        }
       } else if (this.type === 'fairy' && !this.cd && p.alive && p.hp < p.maxHp * 0.5) { // Fee: heilen
         const before = p.hp; p.hp = Math.min(p.maxHp, p.hp + Math.ceil(p.maxHp * (0.12 + 0.02 * lv)));
         W.popup(p.cx, p.y - 10, '+' + Math.round((p.hp - before) * 10), '#58f898'); Audio8.sfx('holy');
@@ -1354,13 +1563,20 @@ const Castle = (() => {
       }
       this.x += (tx - this.cx) * k; this.y += (ty - this.cy) * k;
       if (Math.abs(p.cx - this.cx) > 220 || Math.abs(p.cy - this.cy) > 160) { this.x = p.cx - 6; this.y = p.y - 10; } // zu weit weg: zurück zum Helden
-      if (!this.slap) this.face = this.target ? (this.target.cx > this.cx ? 1 : -1) : p.face;
+      if (!this.slap && this.type !== 'shadow') this.face = this.target ? (this.target.cx > this.cx ? 1 : -1) : p.face;
     }
     lightUp(L, cx, cy) { if (this.type === 'fairy') L.push({ x: this.cx - cx, y: this.cy - cy, r: 40 + Math.sin(this.t * 0.1) * 4, c: [160, 252, 190], a: 0.5 }); }
     draw(ctx) {
       const x = Math.round(this.cx - W.cam.x), y = Math.round(this.cy - W.cam.y), t = this.t, f = this.face;
       const R = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(f > 0 ? x + a : x - a - w, y + b, w, h); };
-      if (this.type === 'bat') { // Fledermausjunges: zwei Flügelschläge, rote Augen
+      if (this.type === 'shadow') { // Schattenzwilling: das Heldenbild von vor 18 Bildern, durchscheinend, mit Waffenstrich
+        const h = this.ghost;
+        if (h && h.spr) {
+          const off = -h.face * 14;
+          drawShadow(ctx, h.spr, h.x + off, h.feet, h.face < 0, 0.55);
+          if (h.box) { ctx.fillStyle = 'rgba(160,110,230,0.5)'; for (const b of h.box) ctx.fillRect(Math.round(b.x + off + b.w / 2 - W.cam.x) - 1, Math.round(b.y + b.h / 2 - W.cam.y) - 1, 2, 2); }
+        }
+      } else if (this.type === 'bat') { // Fledermausjunges: zwei Flügelschläge, rote Augen
         const up = (t >> 2) & 1;
         R(-2, -2, 5, 4, '#2c1c3c'); R(-1, -3, 1, 1, '#2c1c3c'); R(2, -3, 1, 1, '#2c1c3c'); R(0, -1, 1, 1, '#fc3c3c'); R(2, -1, 1, 1, '#fc3c3c');
         if (up) { R(-7, -5, 5, 2, '#4c2c6c'); R(3, -5, 5, 2, '#4c2c6c'); R(-5, -3, 3, 1, '#4c2c6c'); R(3, -3, 3, 1, '#4c2c6c'); }
@@ -1385,7 +1601,7 @@ const Castle = (() => {
         ctx.globalAlpha = Math.min(1, this.sayT / 20);
         const w = Font.width(this.say) + 6, bx = clamp(x - w / 2, 2, View.w - w - 2), by = y - 22;
         ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx, by, w, 11);
-        Font.draw(ctx, this.say, bx + 3, by + 2, this.type === 'fairy' ? '#b8fcd0' : this.type === 'bat' ? '#c8a0fc' : '#e8b0fc');
+        Font.draw(ctx, this.say, bx + 3, by + 2, this.type === 'fairy' ? '#b8fcd0' : this.type === 'bat' ? '#c8a0fc' : this.type === 'shadow' ? '#b890f0' : '#e8b0fc');
         ctx.globalAlpha = 1;
       }
     }
@@ -1902,9 +2118,9 @@ const Castle = (() => {
 
   // ---------------- Bestiarium wie die Gegnerliste in SotN (Status, dritte Seite): Siege je Gegnerart, absurde Einträge ----------------
   const BEASTS = ['Bat', 'Skeleton', 'Ghoul', 'Raven', 'Knight', 'LivingArmor', 'Panther', 'Skull', 'Fishman', 'Ghost', 'Snake', 'FlyBook', 'Tome',
-    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon', 'Puppet', 'Conductor',
+    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon', 'Puppet', 'Conductor', 'Doppel',
     'TentacleBoss', 'GiantBat', 'IceWitch', 'GiantSkeleton', 'Medusa', 'SunWarden', 'ManTrap', 'Count'];
-  const BEAST_BOSS = { TentacleBoss: 'bossTentacle', GiantBat: 'boss1', IceWitch: 'bossWitch', GiantSkeleton: 'boss2', Medusa: 'boss3', SunWarden: 'bossKnight', ManTrap: 'bossTrap', Count: 'boss4', Conductor: 'bossConductor' };
+  const BEAST_BOSS = { TentacleBoss: 'bossTentacle', GiantBat: 'boss1', IceWitch: 'bossWitch', GiantSkeleton: 'boss2', Medusa: 'boss3', SunWarden: 'bossKnight', ManTrap: 'bossTrap', Count: 'boss4', Conductor: 'bossConductor', Doppel: 'bossDoppel' };
   const BEAST_SET = new Set(BEASTS);
   const beastName = (k) => tr(BEAST_BOSS[k] || 'beast_' + k);
   const beasts = { sel: 0 };
@@ -2696,7 +2912,20 @@ const Castle = (() => {
     for (const k of BEASTS) { need.push('beastD_' + k); if (!BEAST_BOSS[k]) need.push('beast_' + k); }
     need.push('npcPrisoner', 'npcConcierge', 'concTitle', 'concHi', 'concSold', 'concOwned', 'concPoor', 'concThanks1', 'concThanks2', 'concThanks3', 'gramoTitle', 'gramoHi',
       'gramoPlay', 'gramoMissing', 'gramoNow', 'gramoHelp', 'hotelSign', 'boardTitle', 'formBack', 'whereWitch',
-      'bossConductor', 'bossConductorNote', 'bossConductorShout', 'bossConductorRage', 'castleLocked13', 'dashKey');
+      'bossConductor', 'bossConductorNote', 'bossConductorShout', 'bossConductorRage', 'castleLocked13', 'dashKey',
+      'bossDoppel', 'bossDoppelNote', 'bossDoppelShout', 'bossDoppelRage', 'famSay_shadow');
+    { // Erreichbarkeit: vom Wald aus über Türen und Ausgänge (alles geöffnet) – kein Raum darf abgeschnitten sein
+      const key = (s, r) => s + ':' + r, seenR = new Set(), queue = [], s0 = sIdx('arrival');
+      const push = (s, r) => { if (s >= 0 && !seenR.has(key(s, r))) { seenR.add(key(s, r)); queue.push([s, r]); } };
+      push(s0 >= 0 ? s0 : 0, 0);
+      while (queue.length) {
+        const [s, r] = queue.shift(), rooms = S()[s].rooms;
+        if (r + 1 < rooms.length && !rooms[r + 1].side) push(s, r + 1); // Ausgang in den nächsten Raum
+        for (const d of doorsOf(s, r)) push(d.to.s, d.to.r);
+        for (const [A, pa, B] of LINKS) { const a = ref(A), b = ref(B); if (a && b && same(a, s, r) && pa === 'exit') push(b.s, b.r); }
+      }
+      S().forEach((st, s) => st.rooms.forEach((def, r) => { if (!seenR.has(key(s, r))) out.push('Raum unerreichbar: ' + roomKey(s, r) + (def.label ? ' (' + def.label + ')' : '')); }));
+    }
     if (!Array.isArray(tr('boardRows'))) out.push('Text fehlt: boardRows');
     for (const k of RECORDS) if (!GEAR['rec_' + k]) out.push('Schallplatte ohne Gegenstand: ' + k);
     S().forEach((st, s) => st.rooms.forEach((def, r) => {
