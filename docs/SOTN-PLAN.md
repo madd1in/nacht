@@ -173,7 +173,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 | **0 (erledigt)** | `?castle`: Pause → KARTE, betretene Zellen aufdecken, Heldenposition, Erkundungsgrad, Speicherung in `localStorage` | Karte im Browser getestet, Arcade unverändert |
 | **1 (Prototyp erledigt)** | Kapitel werden Regionen eines Schlosses: Türen in beide Richtungen, Knoten Eingangshalle (Keller-, Turm-, Siegeltor), Wege hinter den Bossen, Einbahnen mit Rückweg, eine Karte für das ganze Schloss, Bosse geben Siegel und bleiben besiegt, kein Zeitlimit | alle Regionen frei begehbar, Thron hinter 5 Siegeln |
 | **1b (teilweise erledigt)** | erledigt: Speicherkammern mit Spielstand, „Fortsetzen" im Titel und nach Game Over, Warpkammern mit Schnellreise über die Karte. Offen: feste Raum-IDs, Regionsmusik ohne Neustart, Spielstand-Slots | Spielstand überlebt Umsortieren von `levels.js` |
-| **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 6 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher, Fledermausgestalt) auf Sockeln und bei Bossen, rissiges Gestein vor Zusatzräumen, Dachboden nur fliegend. Selbsttest prüft Türen/Figuren/Texte. Offen: Nebel- und Wolfsgestalt, automatischer Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
+| **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 7 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher, Fledermaus-, Nebelgestalt) auf Sockeln und bei Bossen, rissiges Gestein vor Zusatzräumen, Dachboden nur fliegend, Kerkerzelle nur als Nebel. Selbsttest prüft Türen/Figuren/Gitter/Texte. Offen: Wolfsgestalt, automatischer Erreichbarkeits-Prüfer | ganzes Schloss ohne Softlock durchspielbar |
 | **3 RPG (fast erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand, Ausrüstung (Waffe/Rüstung/Amulett) mit Drops und Einzelstücken, Tränke, Laden des Bibliothekars, Schlosskarte, drei Begleiter mit Stufen, MP und drei Zauber per Befehlseingabe, Bestiarium, Verkaufen. Offen: weitere Zauber und Gestalten | Statusbildschirm, Shop |
 | **4 Bosse & Siegel (erledigt)** | Arenen mit Hintertür, Siegeltor, eigenes Ende (Epilog der drei Figuren, Ergebnis mit Rang nach Erkundungsgrad, Neues Spiel+), neue Verbindungsräume | Abspann im Schloss-Modus |
 | **4b Geschichte & Verzahnung (erledigt)** | drei Figuren mit absurden Gesprächen im Maniac-Mansion-Ton (zweiter Held, Bibliothekar, lila Tentakel), elf Szenen entlang der Relikte und Siegel; drei Schleifen (Geheimgang Kolosseum ↔ Brunnenschacht, Wehrgang Bergfried ↔ Glockenturm, Himmelsbrücke Kathedralendach ↔ Kuppel). Offen: weitere Figuren, Szene nach dem Grafen | jede Region über mindestens zwei Wege erreichbar |
@@ -305,6 +305,14 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   Wahl: **NEUES SPIEL+** (Stufe, EXP, Gold, Ausrüstung, Begleiter, Zauber und gesehene Szenen bleiben; Karte, Relikte, Bosse,
   Gefäße, Warpkammern und rissige Wände auf Anfang; der Fluch schlägt wieder zu; je Runde +2 Gefahrenstufen; Start am Burgtor)
   oder der bekannte **Abspann**. Test: Pause → TEST-WERKZEUGE → ZUM ENDE.
+- **Nebelgestalt** (Relikt „Asche des Nebels“, liegt nach dem Sieg über die Menschenfalle in ihrer Arena): ↑ ↓ + Sprung
+  verwandelt (6 MP, dann 1 MP alle 0,5 s), langsam schwebender Nebel, unverwundbar, schwebt durch **Gitter** (`def.grates`,
+  `CastleGrate`: schieben jeden zurück, der kein Nebel ist). Sprung oder Angriff verwandelt zurück, wenn Platz ist (nicht
+  mitten im Gitter). Der **Kerker** (Tür mitten im Kolosseum, x 50) ist früh betretbar: hinter einem bis zur Decke vermauerten
+  Gitter sitzt **der Gefangene** (seit 1391, wegen Falschparkens mit einer Kutsche, hat Tee). Er spricht schon durchs Gitter
+  (größere Reichweite `reach`), als Nebel in seiner Zelle schenkt er den **Schlüsselbund** (Amulett, ATT +2, DEF +2); dort
+  liegen auch ein Lebensgefäß und eine Truhe. Der zweite Held erklärt den Weg (Szene „fog“). Relikte jetzt 7. Die
+  Verwandlungen rechnen ab den Füßen (die Befehle enden oft geduckt).
 - **Fledermausgestalt** (Relikt „Seele der Fledermaus“, liegt nach dem Sieg über den Sonnenwächter in seiner Arena):
   ↓ ↑ + Sprung verwandelt (4 MP, dann 1 MP alle 0,6 s, bei 0 MP von selbst zurück), Sprung oder Angriff verwandelt zurück,
   wenn Platz ist. Die Fledermaus fliegt frei, ist 10×10 groß und fliegt auch durch Seitenausgänge; ein Raumwechsel
