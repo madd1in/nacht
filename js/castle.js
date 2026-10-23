@@ -200,6 +200,45 @@ const Castle = (() => {
     kerker.grates = [{ x: 34, y0: 7, y1: 10 }];
     add('kerker', 0, 2, [1, 2], kerker);
     LINKS.push([['side', 'kolosseum'], { x: 50, y: 10, door: 'side' }, ['side', 'kerker'], 'start', {}]); // Kolosseum → Kerker
+    // Hotel Krat (Hommage an „Lies of P“): Lobby über dem Burghof – ein sicherer Ort mit Sternlampe (Speichern), Aufzug (Warp),
+    // Grammophon (Schallplatten), dem Portier (eine Puppe, die nicht lügen kann) und seinem Laden. Unter der Galerie hinter einer
+    // Haustierklappe der Gepäckraum: nur die Wolfsgestalt kommt hinein. Links geht es in den Bahnhof. Möbel und Tresen sind
+    // Blender-Modelle (img/krat3d.png); decor: [Bild, Anker x, Anker y (px), gespiegelt, unten abschneiden bei y]
+    const D = (k, tx, row, flip) => [k, Math.round(tx * T + 8), (row + 1) * T, !!flip];
+    const hotel = R(64, 'hotel', 20)
+      .ground(0, 63, 18)
+      .stair(31, 17, 7, 1).fill(38, 11, 63, 11, '=')            // Treppe mit rotem Läufer zur Galerie
+      .fill(56, 12, 56, 16, '#')                                 // Wand des Gepäckraums, unten die Haustierklappe
+      .candle(6, 14, 'H').candle(19, 14).candle(41, 8, '$').candle(52, 8, 'H').candle(60, 8)
+      .chest(61, 10).chest(62, 17, 'big').prop('vessel', { x: 60, y: 17 })
+      .music('hotel').label('HOTEL KRAT').start(2, 17).done();
+    hotel.grates = [{ x: 56, y0: 17, y1: 17, pet: true }];
+    hotel.decor = [D('keys', 24, 14.6), D('chair', 6.6, 17), D('chair', 11.4, 17, true), D('cart', 17.5, 17), D('chair', 48, 17), D('cart', 52.5, 17, true)];
+    add('hotel', 0, 1, [0, -2], hotel);
+    // Bahnhof Krat: Bahnsteighalle mit Glasdach. Die Dampflok „KRAT“ steht mit zwei Wagen unter Dampf, davor Bahnsteigdächer,
+    // Bänke und Gaslaternen, oben eine Fußgängerbrücke und die Abfahrtstafel. Hier sind die Puppen los: Gepäckträger ohne Fäden.
+    const station = R(112, 'station', 20)
+      .ground(0, 111, 18)
+      .stair(36, 17, 7, 1).fill(43, 11, 69, 11, '=').stair(76, 17, 7, -1)   // Fußgängerbrücke über die Halle
+      .fill(0, 9, 7, 9, '=')                                                  // Sims am Stellwerk
+      .candle(4, 15, 'H').candle(28, 15).candle(46, 8, '$').candle(56, 8, 'H').candle(66, 8).candle(88, 15, 'W').candle(104, 15)
+      .enemy('raven', 30, 5).enemy('raven', 84, 4)
+      .chest(2, 8, 'big').prop('vessel', { x: 56, y: 10 })
+      .music('stage1').label('BAHNHOF KRAT').start(2, 17).done();
+    station.puppets = [[20, 17], [50, 10], [63, 10], [70, 17], [92, 17], [102, 17]];
+    const rail = 18 * T + 10, plat = 18 * T; // Gleis hinter der Bahnsteigkante: die Räder verschwinden unter der Kante
+    station.decor = [
+      ['wagon', 400, rail, false, plat], ['wagon', 626, rail, false, plat], ['loco', 892, rail, false, plat],
+      ...[64, 192, 320, 448, 1344, 1472, 1600, 1728].map(x => ['canopy', x, plat, false]),
+      ['sign', 256, plat - 62, false], ['sign', 1536, plat - 62, false], ['clock', 56 * T + 8, 12 * T, false],
+      ...[160, 352, 1408, 1632].map((x, i) => ['bench', x, plat, i % 2 === 1]), ...[96, 480, 1296, 1696].map(x => ['lamppost', x, plat, false]),
+      ['board', 56 * T + 8, 40],
+    ];
+    add('bahnhof', 0, 2, [-7, -2], station);
+    LINKS.push(
+      [[0, 0], { x: 50, y: 10, door: 'hotel' }, ['side', 'hotel'], { x: 3, y: 17, door: 'hotel' }, {}], // Burghof → Hotel Krat
+      [['side', 'bahnhof'], 'right', ['side', 'hotel'], 'start', {}],                                  // Bahnhof ↔ Hotel-Lobby
+    );
     LINKS.push( // Schleifen: das Schloss als 2D-Open-World, Regionen über Nebenwege verzahnt
       [['side', 'kolosseum'], 'right', [1, 1], { x: 4, y: 27, door: 'side' }, {}],              // Kolosseum → Geheimgang → Brunnenschacht
       [[2, 0], { x: 40, y: 10, door: 'side' }, ['side', 'wehrgang'], 'start', {}],              // Bergfried → Wehrgang
@@ -396,6 +435,7 @@ const Castle = (() => {
         ctx.globalAlpha = 1;
         return;
       }
+      if (this.d.place && this.d.place.door === 'hotel') { drawHotelDoor(this, ctx); return; } // Hoteltür
       // Torbogen aus Stein wie die Speicherkammer: Quaderring, Schlussstein, dunkler Gang mit Fackelschein; verschlossen: Fallgitter
       const cx = x + this.w / 2, bot = y + this.h, r = this.w / 2 - 4, t = this.t;
       arch(ctx, cx, y + 2, r + 5, bot, '#1c1824'); arch(ctx, cx, y + 3, r + 4, bot, '#5c5468'); arch(ctx, cx, y + 4, r + 3, bot, '#4c4458');
@@ -442,6 +482,7 @@ const Castle = (() => {
     [['sun', 0], 'save', 6, 15], [['sun', 0], 'warp', 11, 15],     // Sonnenkathedrale: Vorplatz
     [['expo', 0], 'save', 5, 27], [['expo', 0], 'warp', 63, 27],   // Wintergarten: Eingang und jenseits des Beckens
     [[3, 0], 'save', 57, 10], [[3, 2], 'warp', 3, 8],              // Thron: Ende des Strudels, Torbogen vor der Brücke
+    [['side', 'hotel'], 'save', 9, 17], [['side', 'hotel'], 'warp', 44, 17], // Hotel Krat: Sternlampe und Aufzug
   ];
   function spotOk(def, x, y) { // ebener Boden unter beiden Kacheln, darüber drei Reihen frei
     if (y < 3 || y + 1 >= def.h || x < 1 || x + 1 >= def.w) return false;
@@ -493,9 +534,14 @@ const Castle = (() => {
     update() { this.t++; if (this.pulse > 0) this.pulse--; }
     lightUp(L, cx, cy) {
       const save = this.c.kind === 'save', on = save || warp[this.c.key];
+      if (S()[this.c.s].rooms[this.c.r].side === 'hotel') { // Sternlampe: kühles Sternenlicht oben; Aufzug: warmes Licht aus der Kabine
+        L.push(save ? { x: this.cx - cx, y: this.y + 15 - cy, r: 40 + Math.sin(this.t * 0.05) * 3 + this.pulse, c: [190, 205, 255], a: 0.35 } : { x: this.cx - cx, y: this.y + 30 - cy, r: 28, c: [252, 190, 110], a: on ? 0.3 : 0.12 });
+        return;
+      }
       L.push({ x: this.cx - cx, y: this.y - cy + 34, r: (save ? 32 : 40) + Math.sin(this.t * 0.05) * 3 + this.pulse, c: save ? [252, 196, 130] : on ? [110, 200, 255] : [90, 110, 160], a: save ? 0.45 : 0.55 });
     }
     draw(ctx) {
+      if (S()[this.c.s].rooms[this.c.r].side === 'hotel' && drawHotelChamber(this, ctx)) return; // Hotel: Sternlampe und Aufzug
       const x = Math.round(this.x - W.cam.x), y = Math.round(this.y - W.cam.y), cx = x + 20, bot = y + 52, save = this.c.kind === 'save', t = this.t;
       const fr = save ? '#5c5468' : '#2c6cb0', dk = save ? '#1c1824' : '#0c1c3c', hi = save ? '#a8a0b8' : '#a8dcfc';
       arch(ctx, cx, y, 20, bot, dk); arch(ctx, cx, y + 1, 19, bot, fr); arch(ctx, cx, y + 2, 18, bot, hi); arch(ctx, cx, y + 3, 17, bot, fr);
@@ -559,11 +605,14 @@ const Castle = (() => {
   // bleiben); im Prolog auf dem Schiff kann er noch alles. Die Relikte liegen im Schloss: Doppelsprung am Ende des Kolosseums,
   // Dash bei der Riesenfledermaus, Ring-Greifen in der Eishöhle, Wandsprung beim Knochenriesen, Steinbrecher bei Medusa
   // (zerschlägt rissiges Gestein vor Kanal, Schatzkammer und Verlies). So führt ein Relikt zum nächsten.
-  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker', 'bat', 'mist'];
-  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460', bat: '#c8a0fc', mist: '#a4b4d8' };
+  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker', 'bat', 'mist', 'wolf'];
+  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460', bat: '#c8a0fc', mist: '#a4b4d8', wolf: '#8ca4c8' };
   const RELIC_AT = [[['side', 'kolosseum'], 'jump2', 81, 10], [[1, 2], 'ring', 12, 10]];        // fest liegende Relikte
   // Belohnung der Regionsbosse (Sonnenwächter: Fledermausgestalt, Menschenfalle: Nebelgestalt)
   const BOSS_RELIC = [[[0, -1], 'dash'], [[1, -1], 'wall'], [[2, -1], 'breaker'], [['sun', -1], 'bat'], [['expo', -1], 'mist']];
+  // Lohn eines Zwischengegners: [Raum, Relikt, x, Standreihe, Ersatzplatz]. Eishexe: Seele des Wolfs neben dem Eistor. Aus dem
+  // Eisturm führt kein Weg zurück – wer am Relikt vorbeiläuft (oder einen Spielstand von vorher hat), findet es in der Gruft
+  const MINI_RELIC = [[[1, 3], 'wolf', 29, 104, [[1, 4], 6, 10]]];
   const inPrologue = () => !!(S()[W.stage] && S()[W.stage].id === 'arrival');
   const has = (k) => !on || !!relic[k] || inPrologue();
   if (on) { // Bewegungen hängen an den Relikten (Doppelsprung: siehe update)
@@ -611,10 +660,134 @@ const Castle = (() => {
       for (const [a, b] of [[6, 8], [7, 12], [9, 15], [8, 20], [11, 24], [13, 29], [16, 12], [18, 17], [17, 22], [20, 27]]) ctx.fillRect(x + a, y + b, 2, 3);
     }
   }
+  // ---------------- Blender-Modelle im PS2-Look (Hotel Krat, Bahnhof Krat) ----------------
+  // img/krat3d.png, je Bild: [x, y, w, h, Anker x, Anker y, Zusatzpunkte x/y …]. Anker = Standpunkt (Boden, Gleis) bzw. Aufhängung.
+  // Zusatzpunkte: Lok – Schornstein, Zylinderhahn, Dampfdom, Führerhaus; Laterne – Licht; Tresen – Klingel, Lampe;
+  // Grammophon – Trichter; Sternlampe – Stern; Aufzug – Stockwerkanzeige. Fehlt das Bild, zeichnet der Raum einfach ohne.
+  const K3 = {"loco":[129,0,237,71,155,68,218,4,203,56,158,13,118,24],"wagon":[0,78,226,70,113,67],"canopy":[0,0,128,77,64,74],"bench":[16,149,31,19,16,18],"lamppost":[227,78,12,57,6,56,6,8],"clock":[0,149,15,23,8,1],"sign":[48,149,46,19,23,1],"desk":[388,78,92,29,46,28,60,8,21,4],"keys":[343,78,44,31,22,30],"gramo":[321,78,21,34,8,32,3,6],"starlamp":[277,78,16,49,8,47,8,10],"chair":[481,78,21,24,10,23],"lift":[240,78,36,52,18,51,18,8],"cart":[294,78,26,35,13,34]};
+  let k3 = null;
+  if (on) {
+    const img = new Image();
+    img.onload = () => {
+      const out = {};
+      for (const k in K3) {
+        const r = K3[k], c = Sprites.canvas(r[2], r[3]);
+        c.getContext('2d').drawImage(img, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]);
+        out[k] = Sprites.fromCanvas(c, k !== 'canopy'); // das Bahnsteigdach wird aneinandergereiht: ohne Kontur
+      }
+      k3 = out;
+    };
+    img.src = 'img/krat3d.png?v=' + (window.BUILD || '');
+  }
+  function k3at(ctx, k, sx, sy, flip, flash) { // Bildschirmkoordinaten des Ankers
+    const s = k3 && k3[k], r = K3[k];
+    if (!s) return false;
+    Sprites.draw(ctx, s, Math.round(sx - (flip ? r[2] - r[4] : r[4])), Math.round(sy - r[5]), flip, flash);
+    return true;
+  }
+  function k3draw(ctx, k, wx, wy, flip, clipY) { // Weltkoordinaten; clipY: alles darunter bleibt verdeckt (Räder hinter der Bahnsteigkante)
+    if (clipY === undefined) return k3at(ctx, k, wx - W.cam.x, wy - W.cam.y, flip);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, View.w, Math.round(clipY - W.cam.y)); ctx.clip();
+    const ok = k3at(ctx, k, wx - W.cam.x, wy - W.cam.y, flip);
+    ctx.restore();
+    return ok;
+  }
+  const k3pt = (k, i, wx, wy, flip) => { const r = K3[k], px = r[6 + i * 2], py = r[7 + i * 2]; return { x: wx + (flip ? r[4] - px : px - r[4]), y: wy + py - r[5] }; };
+  // Abfahrtstafel (Fallblattanzeiger): alle paar Sekunden klappert eine Zeile durch und bleibt beim alten Ziel stehen
+  function drawBoard(ctx, wx, wy, t) {
+    const rows = tr('boardRows'), w = Math.max(...rows.map(r => Font.width(r))) + 16, x = Math.round(wx - W.cam.x - w / 2), y = Math.round(wy - W.cam.y), h = 18 + rows.length * 11;
+    if (x > View.w || x + w < 0 || y > 240 || y + h < 0) return;
+    ctx.fillStyle = '#1c1c24'; ctx.fillRect(x + w / 2 - 30, y - 40, 1, 40); ctx.fillRect(x + w / 2 + 30, y - 40, 1, 40); // Aufhängung
+    ctx.fillStyle = '#2c3c36'; ctx.fillRect(x - 3, y - 3, w + 6, h + 6); ctx.fillStyle = '#7c9488'; ctx.fillRect(x - 3, y - 3, w + 6, 1);
+    ctx.fillStyle = '#08080c'; ctx.fillRect(x, y, w, h);
+    Font.draw(ctx, tr('boardTitle'), x + w / 2, y + 3, '#f8b800', { align: 'center' });
+    const flip = Math.floor(t / 200) % rows.length, ph = t % 200;
+    rows.forEach((r, i) => {
+      const ry = y + 15 + i * 11;
+      ctx.fillStyle = '#16161c'; ctx.fillRect(x + 4, ry - 1, w - 8, 10); ctx.fillStyle = '#000'; ctx.fillRect(x + 4, ry + 4, w - 8, 1); // Klappe mit Mittelspalt
+      let s = r;
+      if (i === flip && ph < 24) { s = [...r].map((ch, k) => ch === ' ' || k < ph / 2 ? ch : 'ABCDEFGHKLMNRSTUZ0123456789'[(t * 7 + k * 13) % 27]).join(''); if (ph % 3 === 0) Audio8.sfx('tick'); }
+      Font.draw(ctx, s, x + 8, ry, '#e8dcc0');
+    });
+  }
+  class CastleDecor extends Ent { // alle Modelle eines Raums in der Reihenfolge der Liste (hinten zuerst), dazu Dampf und Licht
+    constructor(list) { super(0, 0, 1, 1); this.kind = 'prop'; this.list = list; this.noWrap = true; }
+    update() {
+      this.t++;
+      for (const d of this.list) {
+        if (d[0] !== 'loco') continue;
+        if (this.t % 6 === 0) { // Dampf aus dem Schornstein: steigt, wird heller, verweht
+          const c = k3pt('loco', 0, d[1], d[2], d[3]);
+          W.spawn(new Particle(c.x + rnd(-2, 2), c.y - 2, rnd(-0.1, 0.45), rnd(-1.0, -0.55), (this.t / 6) % 3 ? '#8c8898' : '#c8c4d4', 80, 3, -0.003));
+        }
+        if (this.t % 300 < 34 && this.t % 2 === 0) { // Zylinderhähne zischen
+          const k = k3pt('loco', 1, d[1], d[2], d[3]);
+          W.spawn(new Particle(k.x, k.y, rnd(0.8, 1.8) * (d[3] ? -1 : 1), rnd(-0.4, 0.05), '#dcdce8', 28, 2, -0.01));
+          if (this.t % 300 === 0 && Math.abs(W.player.cx - k.x) < 260) Audio8.sfx('whoosh', k.x);
+        }
+      }
+    }
+    lightUp(L, cx, cy) {
+      for (const d of this.list) {
+        if (d[0] === 'lamppost') { const p = k3pt('lamppost', 0, d[1], d[2]); L.push({ x: p.x - cx, y: p.y - cy, r: 44 + Math.sin(this.t * 0.07 + d[1]) * 2, c: [252, 200, 120], a: 0.55 }); }
+        else if (d[0] === 'loco') { const p = k3pt('loco', 3, d[1], d[2], d[3]); L.push({ x: p.x - cx, y: p.y - cy, r: 30 + Math.sin(this.t * 0.23) * 4, c: [252, 140, 50], a: 0.5 }); } // Feuerschein im Führerhaus
+        else if (d[0] === 'wagon') L.push({ x: d[1] - cx, y: d[2] - 40 - cy, r: 80, c: [252, 170, 90], a: 0.25 });
+        else if (d[0] === 'board') L.push({ x: d[1] - cx, y: d[2] + 30 - cy, r: 60, c: [252, 220, 160], a: 0.25 });
+      }
+    }
+    draw(ctx) {
+      for (const d of this.list) {
+        if (d[0] === 'board') drawBoard(ctx, d[1], d[2], this.t);
+        else k3draw(ctx, d[0], d[1], d[2], d[3], d[4]);
+      }
+    }
+  }
+  // Puppe (Bahnhof Krat): Gepäckträger aus Holz, die Fäden gerissen. Ruckt in Schüben auf den Helden zu, zittert beim Ausholen
+  // und springt mit einem Satz nach vorn. Rote Mütze, Gelenkkugeln, Knopfaugen, ein abgerissener Faden über dem Kopf.
+  class Puppet extends Enemy {
+    constructor(tx, ty) { super(tx * T + 3, (ty + 1) * T - 28, 10, 28, 4, 2, 400); this.st = 'walk'; this.timer = Math.floor(rnd(0, 30)); this.face = -1; this.vy = 0; }
+    update() {
+      super.update();
+      const p = W.player, dx = p.cx - this.cx;
+      if (!this.onScreen(24)) { this.vx = 0; this.physics(); return; }
+      this.timer++;
+      if (this.st === 'walk') {
+        this.face = Math.sign(dx) || this.face;
+        this.vx = this.timer % 28 < 10 && this.groundAhead(this.face) ? this.face * 1.1 : 0; // ruckartig: Schub, Pause
+        if (this.timer > 30 && Math.abs(dx) < 54 && Math.abs(p.feet - (this.y + this.h)) < 24) { this.st = 'wind'; this.timer = 0; this.vx = 0; Audio8.sfx('creak', this.cx); }
+      } else if (this.st === 'wind') {
+        this.vx = 0;
+        if (this.timer > 22) { this.st = 'lunge'; this.timer = 0; this.vx = this.face * 3.2; this.vy = -2.2; Audio8.sfx('whoosh', this.cx); }
+      } else if (this.timer > 8 && this.onGround) { this.st = 'walk'; this.timer = -24; this.vx = 0; }
+      else this.vx *= 0.97;
+      if (this.physics()) this.vx = 0;
+      this.touch();
+    }
+    draw(ctx) {
+      const f = this.face, x = Math.round(this.cx - W.cam.x) + (this.st === 'wind' ? ((this.t >> 1) & 1) * 2 - 1 : 0), y = Math.round(this.y + this.h - W.cam.y), fl = this.flash;
+      const R = (a, b, w, h, c) => { ctx.fillStyle = fl ? '#fcfcfc' : c; ctx.fillRect(f > 0 ? x + a : x - a - w, y + b, w, h); };
+      const WD = '#c89c64', WL = '#e8c088', JT = '#8c6438', st = this.st, step = st === 'walk' && this.vx !== 0 ? (this.t >> 2) & 1 : 0;
+      ctx.fillStyle = 'rgba(200,200,220,0.5)'; for (let k = 0; k < 7; k++) ctx.fillRect(x + Math.round(Math.sin((this.t + k * 5) * 0.12) * 1.5), y - 36 - k, 1, 1); // abgerissener Faden
+      R(-4 - step, -9, 2, 9, WD); R(2 + step, -9, 2, 9, WD); R(-4 - step, -10, 2, 2, JT); R(2 + step, -10, 2, 2, JT); R(-5 - step, -1, 4, 1, '#2c1c10'); R(1 + step, -1, 4, 1, '#2c1c10'); // Beine, Knie, Schuhe
+      R(-5, -20, 10, 11, '#7c1c1c'); R(-5, -20, 10, 1, '#a83030'); R(0, -18, 1, 1, '#f8b800'); R(0, -15, 1, 1, '#f8b800'); R(0, -12, 1, 1, '#f8b800'); R(-5, -10, 10, 1, '#3c0c0c'); // Jacke mit Messingknöpfen
+      if (st === 'lunge') { R(4, -19, 7, 2, WD); R(10, -19, 2, 2, WL); } // Arme nach vorn
+      else { const sw = st === 'wind' ? -3 : step; R(-7, -19 + sw, 2, 8, WD); R(5, -19 - sw, 2, 8, WD); R(-7, -12 + sw, 2, 2, JT); R(5, -12 - sw, 2, 2, JT); }
+      R(-1, -22, 3, 2, JT); // Hals
+      R(-4, -30, 8, 8, WD); R(-4, -30, 8, 1, WL); R(-4, -23, 8, 1, JT); // Holzkopf
+      R(0, -27, 2, 2, '#140c08'); R(3, -27, 1, 2, '#140c08'); R(0, -27, 1, 1, '#fcfcfc'); R(-1, -25, 2, 1, '#e86060'); R(1, -24, 3, 1, '#5c2c18'); // Knopfaugen, Wange, Mund
+      R(-2, -29, 1, 3, '#8c6438'); // Riss im Holz
+      R(-5, -33, 10, 3, '#a81c1c'); R(-4, -34, 8, 1, '#c83030'); R(2, -31, 5, 1, '#1c1414'); R(-1, -33, 2, 1, '#f8b800'); // Gepäckträgermütze mit Schild
+    }
+  }
   function spawnRelics(s, r, def, arrive) {
     const here = ([R]) => same(ref(R), s, r);
     for (const e of RELIC_AT) if (here(e) && !relic[e[1]]) W.spawn(new RelicStone(e[1], e[2], e[3]));
     for (const [R, k] of BOSS_RELIC) if (same(ref(R), s, r) && boss[roomKey(s, r)] && !relic[k]) W.spawn(new RelicStone(k, def.w - 10, def.start.y));
+    for (const [R, k, x, y, F] of MINI_RELIC) {
+      const a = ref(R);
+      if (relic[k] || !a || !mini[roomKey(a.s, a.r)]) continue;
+      if (here([R])) W.spawn(new RelicStone(k, x, y)); else if (F && here(F)) W.spawn(new RelicStone(k, F[1], F[2]));
+    }
     for (const d of doorsOf(s, r)) {
       if (!d.gate || !d.gate.crack || crack[d.gate.crack]) continue;
       const p = arrive && arrive.place;
@@ -642,10 +815,12 @@ const Castle = (() => {
   let guard = false, push = 0, lastX = 0, lockT = 0, roomT = 0;
   function settle(arrive) {
     const s = W.stage, r = W.roomIdx, def = S()[s].rooms[r], key = roomKey(s, r);
-    if (W.player && (W.player.batForm || W.player.mistForm)) { W.player.batForm = false; W.player.mistForm = false; W.player.h = HERO_H; } // Raumwechsel: wieder in Menschengestalt (reset hat Ort und Größe gesetzt)
+    if (W.player && (W.player.batForm || W.player.mistForm || W.player.wolfForm)) { W.player.batForm = false; W.player.mistForm = false; W.player.wolfForm = false; W.player.h = HERO_H; } // Raumwechsel: wieder in Menschengestalt (reset hat Ort und Größe gesetzt)
     if (boss[key] && s < S().length - 1) W.room.arena = null; // Bossarena: Boss besiegt, der Raum ist frei
     if (mini[key]) W.miniDone[s + ':' + r] = true;
-    W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber) && !(e instanceof CastleNPC) && !(e instanceof CastleLoot) && !(e instanceof CastleGrate));
+    W.ents = W.ents.filter(e => !(e instanceof CastleDoor) && !(e instanceof CastleChamber) && !(e instanceof CastleNPC) && !(e instanceof CastleLoot) && !(e instanceof CastleGrate) && !(e instanceof CastleDecor) && !(e instanceof Puppet));
+    if (def.decor) W.ents.unshift(new CastleDecor(def.decor)); // Blender-Modelle ganz hinten (vor Türen und Figuren)
+    for (const [x, y] of def.puppets || []) W.spawn(new Puppet(x, y)); // Puppen im Bahnhof
     for (const d of doorsOf(s, r)) W.spawn(new CastleDoor(d, def));
     for (const g of def.grates || []) W.spawn(new CastleGrate(g)); // Gitter (nur Nebel kommt durch)
     for (const c of chambersOf(s, r)) W.spawn(new CastleChamber(c));
@@ -709,7 +884,10 @@ const Castle = (() => {
     let dirty = false;
     const set = seen[key] || (seen[key] = new Set()), i = c.y * c.cw + c.x;
     if (!set.has(i)) { set.add(i); dirty = true; }
-    if (W.miniDone[s + ':' + r] && !mini[key]) { mini[key] = 1; dirty = true; }
+    if (W.miniDone[s + ':' + r] && !mini[key]) { // Zwischengegner besiegt: gemerkt, sein Relikt erscheint
+      mini[key] = 1; dirty = true;
+      for (const [R, k, x, y] of MINI_RELIC) if (same(ref(R), s, r) && !relic[k]) W.spawn(new RelicStone(k, x, y));
+    }
     if (dirty) save();
     if (guard && !inExit()) { guard = false; W.exiting = false; }
     if (lockT > 0) lockT--;
@@ -720,6 +898,7 @@ const Castle = (() => {
     for (const e of W.ents) { // Figuren: neue Szene beim Herantreten, danach ↑ für den Rat
       if (!(e instanceof CastleNPC) || e.go || !p.onGround || Math.abs(p.feet - (e.y + e.h)) > 16) continue;
       const dx = Math.abs(p.cx - e.cx), fresh = !beatDone(e.b);
+      if (e.b.who === 'gramo') { if (dx < 18 && P.up) { push = 0; openShop('gramo'); Game.go('shop'); Audio8.sfx('select'); return; } continue; } // Grammophon
       if ((fresh && dx < (e.b.reach || 48) && roomT > (e.b.wait || 40)) || (!fresh && dx < (e.b.reach ? e.b.reach - 20 : 18) && P.up)) { push = 0; startTalk(e, !fresh); return; }
     }
     for (const c of chambersOf(s, r)) { // Speicherkammer: hineingehen = speichern; Warpkammer: betreten schaltet frei, ↑ reist
@@ -866,15 +1045,24 @@ const Castle = (() => {
     book_spirit: { spell: 'spirit', price: 2500, col: '#a4e4fc' },      // Zauberbücher (Laden): lehren je einen Zauber
     book_hellfire: { spell: 'hellfire', price: 6000, col: '#fc7c1c' },
     book_soulsteal: { spell: 'soulsteal', price: 12000, col: '#d880fc' },
+    robe: { slot: 'armor', def: 3, regen: 1, price: 4500, col: '#f0e8e0' },     // Hotelbademantel (Portier): weich, heilt langsam
+    // Schallplatten fürs Grammophon im Hotel (spielen ein Stück des Schlosses): gefunden, gekauft, eine liegt schon auf dem Teller
+    rec_hotel: { rec: 'hotel', col: '#c89020' }, rec_title: { rec: 'title', col: '#9c6cfc' }, rec_stage1: { rec: 'stage1', price: 1500, col: '#fc7460' },
+    rec_sea: { rec: 'sea', price: 1500, col: '#3cbcfc' }, rec_boss: { rec: 'boss', price: 3000, col: '#fc3c3c' }, rec_stage2: { rec: 'stage2', col: '#58f898' },
+    rec_library: { rec: 'library', col: '#e8b070' }, rec_expo: { rec: 'expo', col: '#88d8a0' }, rec_chapel: { rec: 'chapel', col: '#d880fc' }, rec_sun: { rec: 'sun', col: '#f8b800' },
   };
+  const RECORDS = ['hotel', 'title', 'stage1', 'sea', 'boss', 'stage2', 'library', 'expo', 'chapel', 'sun'];
+  const hasRec = (id) => id === 'hotel' || !!inv['rec_' + id];
   const SLOTS = ['weapon', 'armor', 'acc', 'fam'], DRINKS = ['potion', 'elixir'];
   const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'fairy', 'map', 'book_spirit', 'book_hellfire', 'book_soulsteal'];
-  const once = (g) => !!(g.slot || g.key || g.spell); // gibt es nur einmal
+  const once = (g) => !!(g.slot || g.key || g.spell || g.rec); // gibt es nur einmal
   const BOSS_LOOT = [[[0, -1], 'batcard']];
   const FINDS = [ // Einzelstücke: [Raum, Gegenstand, Kachel-x, Standreihe]
     [['side', 'kolosseum'], 'leather', 12, 7], [['side', 'kanal'], 'bloodstone', 43, 7], [['side', 'schatz'], 'greedring', 25, 6],
     [['side', 'verlies'], 'dragonfang', 28, 6], [['side', 'wehrgang'], 'luckcoin', 37, 6], [['side', 'himmel'], 'mirror', 44, 5],
     [['side', 'attic'], 'chicken', 12, 7],
+    [['side', 'schatz'], 'rec_library', 19, 6], [['side', 'kanal'], 'rec_expo', 81, 7], [['side', 'verlies'], 'rec_chapel', 13, 7],
+    [['side', 'himmel'], 'rec_sun', 66, 8], [['side', 'hotel'], 'rec_title', 58, 16], [['side', 'bahnhof'], 'rec_stage2', 66, 10],
   ];
   const DROPS = [['potion', 'potion', 'leather', 'silver'], ['potion', 'potion', 'chain', 'bloodrune', 'elixir'], ['potion', 'elixir', 'elixir', 'chain', 'bloodrune']];
   function gear(stat) { let n = 0; for (const s of SLOTS) { const g = eq[s] && GEAR[eq[s]]; if (g && g[stat]) n += g[stat]; } return n; }
@@ -900,6 +1088,7 @@ const Castle = (() => {
     else if (g.slot === 'acc') { R(2, 3, 6, 1, '#c89020'); R(2, 8, 6, 1, '#c89020'); R(1, 4, 1, 4, '#c89020'); R(8, 4, 1, 4, '#c89020'); R(3, 0, 4, 3, c); R(4, 1, 1, 1, '#fcfcfc'); }
     else if (g.slot === 'fam') { R(1, 0, 8, 10, c); R(2, 1, 6, 8, '#1c1028'); R(3, 3, 4, 3, c); R(4, 2, 2, 1, c); R(3, 7, 4, 1, '#c89020'); } // Begleiterkarte wie in SotN
     else if (g.spell) { R(1, 1, 8, 8, '#3c1c5c'); R(1, 1, 8, 1, '#c89020'); R(1, 8, 8, 1, '#c89020'); R(2, 2, 6, 6, '#24103c'); R(4, 3, 2, 3, c); R(3, 4, 4, 1, c); R(8, 2, 1, 6, '#e8e0c8'); } // Zauberbuch
+    else if (g.rec) { R(1, 1, 8, 8, '#141418'); R(0, 2, 10, 6, '#141418'); R(2, 0, 6, 10, '#141418'); R(2, 2, 1, 1, '#4c4c5c'); R(3, 3, 4, 4, c); R(4, 4, 2, 2, '#fcfcfc'); } // Schallplatte
     else if (g.heal) { R(4, 0, 2, 1, '#8c5c2c'); R(4, 1, 2, 2, '#c8d8e8'); R(2, 3, 6, 6, '#c8d8e8'); R(3, 5, 4, 4, c); R(3, 4, 1, 2, '#fcfcfc'); }
     else { R(1, 2, 8, 6, c); R(0, 1, 2, 8, '#a89060'); R(8, 1, 2, 8, '#a89060'); R(3, 4, 4, 1, '#6c4410'); R(3, 6, 3, 1, '#6c4410'); }
   }
@@ -934,8 +1123,7 @@ const Castle = (() => {
   // Trefferzonen der Gegner, aber nie auf Kerzen, Geschosse oder Geheimwände.
   const famLv = (id) => Math.min(9, 1 + Math.floor((famx[id] || 0) / 12));
   let famHits = 0;
-  function famStrike(box, dmg) {
-    const id = 'fam' + (++famHits);
+  function famStrike(box, dmg, id = 'fam' + (++famHits)) { // id: ein Biss trifft jeden Gegner nur einmal
     let hit = false;
     for (const e of W.ents) {
       if (e.dead || (e.kind !== 'enemy' && e.kind !== 'boss')) continue;
@@ -1048,7 +1236,7 @@ const Castle = (() => {
   };
   const SPELL_IDS = ['spirit', 'hellfire', 'soulsteal'];
   const known = (id) => !!inv['book_' + id];
-  const mpMax = () => SPELL_IDS.some(known) || relic.bat || relic.mist ? 24 + 3 * (rpg.lv - 1) : 0;
+  const mpMax = () => SPELL_IDS.some(known) || relic.bat || relic.mist || relic.wolf ? 24 + 3 * (rpg.lv - 1) : 0;
   let mp = 0, lastDir = '';
   const hist = [];
   const absDir = (s, face) => s.replace('F', face > 0 ? 'R' : 'L').replace('B', face > 0 ? 'L' : 'R');
@@ -1066,7 +1254,12 @@ const Castle = (() => {
     mp = Math.min(mp, max);
     const I = Input.held, c = (I.up ? 'U' : I.down ? 'D' : '') + (I.right ? 'R' : I.left ? 'L' : '');
     if (c !== lastDir) { if (c) { hist.push({ c, f: rpg.frames }); if (hist.length > 16) hist.shift(); } lastDir = c; }
-    if (p.batForm || p.mistForm) return; // verwandelt: keine Zauber (zurück mit Sprung/Angriff)
+    if (p.batForm || p.mistForm || p.wolfForm) return; // verwandelt: keine Zauber (zurück mit Sprung/Angriff, der Wolf mit ↑)
+    if (P.jump && relic.wolf && p.state === 'normal' && cmdMatch(['D', 'DF', 'F'], p.face)) { // ↓ ↘ → + Sprung: Wolfsgestalt
+      hist.length = 0; P.jump = false;
+      if (mp < WOLF_COST) { W.popup(p.cx, p.y - 10, 'MP!', '#7c84a8'); Audio8.sfx('wall'); return; }
+      toWolf(p); return;
+    }
     if (P.jump && relic.mist && p.state === 'normal' && cmdMatch(['U', 'D'], p.face)) { // ↑ ↓ + Sprung: Nebelgestalt
       hist.length = 0; P.jump = false;
       if (mp < MIST_COST) { W.popup(p.cx, p.y - 10, 'MP!', '#7c84a8'); Audio8.sfx('wall'); return; }
@@ -1202,11 +1395,21 @@ const Castle = (() => {
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#fc3c3c'; ctx.fillRect(Math.round(x) - 2 + p.face, Math.round(y) - 1, 1, 1); ctx.fillRect(Math.round(x) + 1 + p.face, Math.round(y) - 1, 1, 1); // zwei Augen im Nebel
   }
-  // Gitter: Eisenstäbe über einige Kachelreihen; schiebt jeden Helden zurück, der kein Nebel ist (Gegner und Geschosse stört es nicht)
+  // Gitter: Eisenstäbe über einige Kachelreihen; schiebt jeden Helden zurück, der kein Nebel ist (Gegner und Geschosse stört es nicht).
+  // pet: Haustierklappe (eine Kachel hoch, in einer Wand) – nur der Wolf kommt durch, sie schwingt hinter ihm nach
   class CastleGrate extends Ent {
-    constructor(g) { super(g.x * T + 4, g.y0 * T, 8, (g.y1 - g.y0 + 1) * T); this.kind = 'prop'; }
+    constructor(g) { super(g.x * T + 4, g.y0 * T, 8, (g.y1 - g.y0 + 1) * T); this.kind = 'prop'; this.pet = !!g.pet; this.swing = 0; }
+    update() { this.t++; const p = W.player; if (this.pet && p && p.wolfForm && Phys.overlap(this, p)) { if (this.swing < 8) Audio8.sfx('creak'); this.swing = 24; } else if (this.swing > 0) this.swing--; }
     draw(ctx) {
       const x = Math.round(this.x - W.cam.x) - 4, y = Math.round(this.y - W.cam.y), h = this.h;
+      if (this.pet) { // Rahmen aus Messing, Klappe aus Holz mit Pfote; schwingt, wenn der Wolf durchläuft
+        const a = Math.round(Math.sin(this.swing * 0.5) * this.swing / 3);
+        ctx.fillStyle = '#5c3a14'; ctx.fillRect(x, y, 16, h); ctx.fillStyle = '#c8a050'; ctx.fillRect(x, y, 16, 1); ctx.fillRect(x, y, 1, h); ctx.fillRect(x + 15, y, 1, h);
+        ctx.fillStyle = '#2c1a0a'; ctx.fillRect(x + 2, y + 2, 12, h - 2);
+        ctx.fillStyle = '#7c5428'; ctx.fillRect(x + 2 + Math.max(0, a), y + 2, 12 - Math.abs(a), h - 2); ctx.fillStyle = '#9c6c34'; ctx.fillRect(x + 2 + Math.max(0, a), y + 2, 12 - Math.abs(a), 1);
+        if (!a) { ctx.fillStyle = '#e8c070'; ctx.fillRect(x + 7, y + 8, 3, 3); ctx.fillRect(x + 6, y + 6, 1, 1); ctx.fillRect(x + 8, y + 5, 1, 1); ctx.fillRect(x + 10, y + 6, 1, 1); } // Pfote
+        return;
+      }
       ctx.fillStyle = '#1c1c24'; for (let i = 0; i < 4; i++) ctx.fillRect(x + 1 + i * 4, y, 3, h);
       ctx.fillStyle = '#4c4c5c'; for (let i = 0; i < 4; i++) ctx.fillRect(x + 1 + i * 4, y, 2, h);
       ctx.fillStyle = '#8c8c9c'; for (let i = 0; i < 4; i++) ctx.fillRect(x + 1 + i * 4, y, 1, h);
@@ -1215,9 +1418,8 @@ const Castle = (() => {
     }
   }
   const grateAt = (x, y, w, h) => W.ents.some(e => e instanceof CastleGrate && x < e.x + e.w && x + w > e.x && y < e.y + e.h && y + h > e.y);
-  function grateBlock(p) { // nach der Bewegung: wer kein Nebel ist, wird vor das Gitter zurückgeschoben
-    if (p.mistForm) return;
-    for (const g of W.ents) if (g instanceof CastleGrate && Phys.overlap(p, g)) { p.x = p.cx < g.cx ? g.x - p.w : g.x + g.w; p.vx = 0; p.dashT = 0; }
+  function grateBlock(p) { // nach der Bewegung: wer kein Nebel ist, wird vor das Gitter zurückgeschoben (an der Klappe: wer kein Wolf ist)
+    for (const g of W.ents) if (g instanceof CastleGrate && (g.pet ? !p.wolfForm : !p.mistForm) && Phys.overlap(p, g)) { p.x = p.cx < g.cx ? g.x - p.w : g.x + g.w; p.vx = 0; p.dashT = 0; }
   }
   // Der Gefangene (Kerker): Skelett in Lumpen, Kette am Knöchel, eine Teetasse in der Hand – sitzt dort seit 1391
   function drawPrisoner(ctx, cx, feet, t, flip) {
@@ -1259,13 +1461,92 @@ const Castle = (() => {
     R(-11, wy, 8, 1, wh); R(4, wy, 8, 1, wh);
     if (p.batT % 6 < 3) R(-1, 4, 1, 1, '#9c6cfc'); // Schimmer
   }
+  // ---------------- Wolfsgestalt (Relikt „Seele des Wolfs“, Lohn der Eishexe) ----------------
+  // ↓ ↘ → + Sprung (4 MP, dann 1 MP je Sekunde): flach und schnell am Boden, springt, Angriff = Biss mit einem Satz nach vorn.
+  // ↑ am Boden verwandelt zurück, wenn über dem Wolf Platz ist; bei 0 MP von selbst, sobald es geht. Nur der Wolf passt durch
+  // Haustierklappen (CastleGrate mit pet). Raumwechsel verwandelt zurück.
+  const WOLF_H = 12, WOLF_COST = 4, WOLF_RUN = 2.7, WOLF_JUMP = -4.4, WOLF_GRAV = 0.21, WOLF_FALL = 4.2;
+  function toWolf(p) {
+    p.wolfForm = true; p.batT = 0; p.biteT = 0; p.wolfHurt = 0; p.state = 'normal'; p.atkT = 0; p.dashT = 0; p.ledge = null; p.wallSlide = 0;
+    p.crouch = false; p.crouchAtk = false; p.slideT = 0;
+    const feet = p.y + p.h; p.h = WOLF_H; p.y = feet - WOLF_H; p.vy = Math.min(p.vy, 0); // ab den Füßen
+    mp -= WOLF_COST; Audio8.sfx('growl'); Input.rumble(0.3, 0.2, 100);
+    for (let i = 0; i < 16; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.feet - rnd(0, 20), rnd(-1, 1), rnd(-1.2, 0.2), i % 2 ? '#8ca4c8' : '#2c3448', 26, 1, 0));
+  }
+  function fromWolf(p, quiet) { // zurück: stehend, sonst geduckt – im Tunnel oder in der Klappe geht es nicht
+    const feet = p.y + p.h;
+    for (const h of [HERO_H, 20]) {
+      const y = feet - h;
+      if (!freeBox(p.x, y, p.w, h) || grateAt(p.x, y, p.w, h)) continue;
+      p.wolfForm = false; p.h = h; p.y = y; p.crouch = h < HERO_H; p.biteT = 0; p.vx *= 0.3;
+      Audio8.sfx('bat');
+      for (let i = 0; i < 12; i++) W.spawn(new Particle(p.cx + rnd(-6, 6), p.feet - rnd(0, 24), rnd(-1, 1), rnd(-1, 0.4), '#8ca4c8', 22, 1, 0));
+      return true;
+    }
+    if (!quiet) { W.popup(p.cx, p.y - 8, '!', '#fc7460'); Audio8.sfx('wall'); }
+    return false;
+  }
+  const biteBox = (p) => ({ x: p.face > 0 ? p.x + p.w - 2 : p.x - 14, y: p.y - 2, w: 16, h: p.h + 2 });
+  function wolfUpdate(p) {
+    const I = Input.held, P = Input.pressed;
+    if (p.inv > 0) p.inv--;
+    if (p.state === 'hurt') { p.state = 'normal'; p.wolfHurt = 18; p.biteT = 0; } // Treffer: kurz zurückgeworfen (Schwung aus hurt)
+    if (p.plat) { const [cdx, cdy] = p.plat.carryAt ? p.plat.carryAt(p.cx) : [p.plat.dx, p.plat.dy || 0]; Phys.moveX(p, cdx); p.y += cdy; p.plat = null; }
+    if (P.up && p.onGround && p.batT > 10 && !p.wolfHurt && fromWolf(p)) return;
+    p.batT++;
+    if (p.batT % 60 === 0) { if (mp > 0) mp--; if (mp <= 0 && fromWolf(p, true)) return; } // leer: zurück, sobald Platz ist
+    const ctl = p.wolfHurt > 0 ? 0 : 1, tx = ctl * ((I.right ? 1 : 0) - (I.left ? 1 : 0));
+    if (p.wolfHurt > 0) p.wolfHurt--;
+    if (p.biteT > 0) { // Biss: Satz nach vorn, die Schnauze trifft jeden Gegner einmal
+      p.biteT--;
+      if (p.biteT > 4 && famStrike(biteBox(p), 1.5 + 0.1 * rpg.lv, p.biteId) && !p.biteHit) { p.biteHit = true; Audio8.sfx('chomp'); Input.rumble(0.3, 0.3, 80); }
+    } else if (tx) { p.face = tx; p.vx += (tx * WOLF_RUN - p.vx) * (p.onGround ? 0.22 : 0.1); }
+    else p.vx *= p.onGround ? 0.72 : 0.97;
+    if (ctl && P.attack && p.biteT <= 0) { p.biteT = 16; p.biteHit = false; p.biteId = 'wolf' + (++famHits); p.vx = p.face * 4.2; if (p.onGround) p.vy = -1.4; Audio8.sfx('whoosh'); }
+    if (ctl && P.jump && p.onGround) { p.vy = WOLF_JUMP; p.onGround = false; Audio8.sfx('djump'); }
+    if (!I.jump && p.vy < -1.6 && p.biteT <= 0) p.vy = -1.6; // kurz gedrückt = kleiner Sprung
+    p.vy = Math.min(p.vy + WOLF_GRAV, WOLF_FALL);
+    if (Phys.moveX(p, p.vx)) { p.vx = 0; if (p.biteT > 4) p.biteT = 4; }
+    const r = Phys.moveY(p, p.vy);
+    p.onGround = r === 1;
+    if (r) p.vy = 0;
+    p.checkPlatforms(); p.clampRoom(); p.hazards(); p.trackSafe();
+    if (p.onGround && Math.abs(p.vx) > 0.6) { p.walkT += Math.abs(p.vx) / 1.6; if (p.batT % 14 === 0) Audio8.sfx('step'); }
+  }
+  // Wolf (seitlich, gut 30×16): dunkles Fell, heller Rücken, rotes Auge; Laufen in vier Bildern, im Sprung gestreckt, beim Biss offene Schnauze
+  const WOLF_LEGS = [ // [x, Anhebung, Länge] für Hinterbein, Hinterbein, Vorderbein, Vorderbein
+    [[-9, 0, 4], [-6, 1, 3], [4, 1, 3], [7, 0, 4]], [[-8, 0, 4], [-4, 0, 4], [2, 0, 4], [6, 0, 4]],
+    [[-7, 1, 3], [-4, 0, 4], [3, 0, 4], [8, 1, 3]], [[-8, 0, 4], [-5, 0, 4], [5, 0, 4], [7, 0, 4]],
+    [[-8, 0, 4], [-5, 0, 4], [3, 0, 4], [6, 0, 4]], // steht
+    [[-11, 2, 3], [-9, 3, 3], [6, 3, 3], [9, 2, 3]], // im Sprung gestreckt
+  ];
+  function wolfDraw(p, ctx, cam) {
+    if (p.inv > 0 && (W.frame & 2)) return;
+    const x = Math.round(p.cx - cam.x), y = Math.round(p.y + p.h - cam.y), f = p.face;
+    const R = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(f > 0 ? x + a : x - a - w, y + b, w, h); };
+    const D = '#1c2030', M = '#3c4660', L = '#7c8cac', HI = '#b8c8e4', air = !p.onGround, bite = p.biteT > 4;
+    const ph = air ? 5 : Math.abs(p.vx) > 0.6 ? Math.floor(p.walkT / 3) & 3 : 4, bob = ph === 1 || ph === 3 ? -1 : 0;
+    for (const [lx, up, lh] of WOLF_LEGS[ph]) { R(lx, -lh - up, 2, lh, D); R(lx, -1 - up, 3, 1, D); } // Beine, Pfoten
+    R(-10, -10 + bob, 16, 6, M); R(-9, -11 + bob, 13, 1, L); R(-7, -10 + bob, 8, 1, HI); // Rumpf, heller Rücken
+    R(-10, -5 + bob, 14, 1, D); R(-8, -4 + bob, 10, 1, '#2c3448'); // Bauch
+    const sw = air ? 1 : (p.batT >> 3) & 1; // Rute weht
+    R(-15, -12 + bob - sw, 3, 2, M); R(-13, -11 + bob - sw, 3, 2, M); R(-11, -10 + bob, 2, 2, M); R(-16, -12 + bob - sw, 1, 1, HI);
+    const hx = bite ? 2 : 0, hy = bite ? 1 : 0; // Kopf: beim Biss nach vorn gestreckt
+    R(4 + hx, -13 + bob + hy, 6, 6, M); R(4 + hx, -13 + bob + hy, 5, 1, L); R(5 + hx, -15 + bob + hy, 2, 2, M); R(5 + hx, -15 + bob + hy, 1, 1, L); // Kopf, Ohr
+    R(10 + hx, -11 + bob + hy, 4, 2, M); R(13 + hx, -11 + bob + hy, 1, 1, D); // Schnauze, Nase
+    if (bite) { R(10 + hx, -8 + bob + hy, 4, 1, M); R(10 + hx, -9 + bob + hy, 1, 1, '#fcfcfc'); R(12 + hx, -9 + bob + hy, 1, 1, '#fcfcfc'); } // offener Kiefer, Zähne
+    else R(10 + hx, -9 + bob + hy, 3, 1, D);
+    R(7 + hx, -11 + bob + hy, 2, 1, (p.batT >> 2) % 20 === 0 ? M : '#fc3c3c'); // Auge (blinzelt)
+    R(3, -8 + bob, 2, 3, L); // Halskrause
+  }
   if (on) {
-    const up = Player.prototype.update, dr = Player.prototype.draw;
+    const up = Player.prototype.update, dr = Player.prototype.draw, sc = Player.prototype.setCrouch;
     Player.prototype.update = function (...a) {
-      if ((this.batForm || this.mistForm) && this.state === 'dead') { this.y -= HERO_H - this.h; this.batForm = false; this.mistForm = false; this.h = HERO_H; }
-      return this.batForm ? batUpdate(this) : this.mistForm ? mistUpdate(this) : up.apply(this, a);
+      if ((this.batForm || this.mistForm || this.wolfForm) && this.state === 'dead') { this.y -= HERO_H - this.h; this.batForm = false; this.mistForm = false; this.wolfForm = false; this.h = HERO_H; }
+      return this.batForm ? batUpdate(this) : this.mistForm ? mistUpdate(this) : this.wolfForm ? wolfUpdate(this) : up.apply(this, a);
     };
-    Player.prototype.draw = function (ctx, cam) { return this.batForm ? batDraw(this, ctx, cam) : this.mistForm ? mistDraw(this, ctx, cam) : dr.call(this, ctx, cam); };
+    Player.prototype.draw = function (ctx, cam) { return this.batForm ? batDraw(this, ctx, cam) : this.mistForm ? mistDraw(this, ctx, cam) : this.wolfForm ? wolfDraw(this, ctx, cam) : dr.call(this, ctx, cam); };
+    Player.prototype.setCrouch = function (on) { if (!this.batForm && !this.mistForm && !this.wolfForm) return sc.call(this, on); }; // Treffer und Stürze ändern die Tiergestalt nicht
   }
   // Statusbildschirm, Seite 2: gelernte Zauber mit Befehl (Blick nach rechts) und MP-Kosten
   function drawSpells(ctx) {
@@ -1281,19 +1562,15 @@ const Castle = (() => {
         Font.draw(ctx, itemDesc('book_' + id), lx + 8, y + 21, '#b0a080');
       } else Font.draw(ctx, tr('spellUnknown'), lx + 8, y + 11, '#5c5c6c');
     });
-    if (relic.mist) { // Nebel
-      const y = 186;
-      Font.draw(ctx, tr('relic_mist'), lx, y, RELIC_COL.mist, { shadow: '#000' });
-      Font.draw(ctx, MIST_COST + '+ MP', rx, y, '#7cdcfc', { align: 'right', shadow: '#000' });
-      Font.draw(ctx, '↑ ↓  + ' + tr('spellJump'), lx + 8, y + 10, '#fcfcfc', { shadow: '#000' });
-    }
-    if (relic.bat) { // Verwandlung
-      const y = 162;
-      Font.draw(ctx, tr('relic_bat'), lx, y, RELIC_COL.bat, { shadow: '#000' });
-      Font.draw(ctx, BAT_COST + '+ MP', rx, y, '#7cdcfc', { align: 'right', shadow: '#000' });
-      Font.draw(ctx, '↓ ↑  + ' + tr('spellJump') + '   (' + tr('spellJump') + '/' + tr('spellAttack') + ': ' + tr('batBack') + ')', lx + 8, y + 11, '#fcfcfc', { shadow: '#000' });
-    }
-    Font.draw(ctx, tr('spellNote'), cx, 200, '#7c7c8c', { align: 'center' });
+    const forms = [['bat', '↓ ↑', BAT_COST], ['mist', '↑ ↓', MIST_COST], ['wolf', '↓ ↘ →', WOLF_COST]].filter(([k]) => relic[k]);
+    forms.forEach(([k, cmd, cost], i) => { // Verwandlungen: eine Zeile je Gestalt (Befehl + Sprung)
+      const y = 160 + i * 12;
+      Font.draw(ctx, tr('relic_' + k), lx, y, RELIC_COL[k], { shadow: '#000' });
+      Font.draw(ctx, cmd + ' + ' + tr('spellJump'), rx - 44, y, '#fcfcfc', { align: 'right', shadow: '#000' });
+      Font.draw(ctx, cost + '+ MP', rx, y, '#7cdcfc', { align: 'right', shadow: '#000' });
+    });
+    if (forms.length) Font.draw(ctx, tr('formBack'), cx, 198, '#b0a080', { align: 'center' });
+    Font.draw(ctx, tr('spellNote'), cx, forms.length ? 210 : 200, '#7c7c8c', { align: 'center' });
   }
   let famEnt = null;
   function famTick() { // genau ein Begleiter, passend zum belegten Platz; nach Raumwechsel neu beim Helden
@@ -1368,14 +1645,29 @@ const Castle = (() => {
   // Speicherkammer (der Gegenstand ist ja sofort weg).
   const SELL = { bloodrune: 2000, dragonfang: 6000, mirror: 6000, bloodstone: 4000, luckcoin: 3000, greedring: 5000, chicken: 2500 };
   const sellPrice = (id) => SELL[id] || Math.floor((GEAR[id].price || 1000) / 2);
-  const sellable = () => Object.keys(GEAR).filter(id => { const g = GEAR[id]; if (!inv[id] || g.spell || g.key || g.slot === 'fam') return false; return !(g.slot && eq[g.slot] === id && inv[id] <= 1); });
-  const shop = { sel: 0, say: 'shopHi', mode: 'buy' };
-  function openShop() { shop.sel = 0; shop.say = 'shopHi'; shop.mode = 'buy'; }
+  const sellable = () => Object.keys(GEAR).filter(id => { const g = GEAR[id]; if (!inv[id] || g.spell || g.key || g.rec || g.slot === 'fam') return false; return !(g.slot && eq[g.slot] === id && inv[id] <= 1); });
+  // Der Portier im Hotel Krat führt einen eigenen Laden (Texte conc*), das Grammophon zeigt die Schallplatten (gramo*)
+  const STOCKS = { lib: STOCK, conc: ['potion', 'elixir', 'robe', 'rec_stage1', 'rec_sea', 'rec_boss'] };
+  const shop = { sel: 0, say: 'shopHi', mode: 'buy', who: 'lib' };
+  const sayKey = (k) => shop.who === 'conc' ? k.replace('shop', 'conc') : k;
+  function openShop(who = 'lib') { shop.sel = 0; shop.who = who; shop.mode = who === 'gramo' ? 'play' : 'buy'; shop.say = who === 'gramo' ? 'gramoHi' : sayKey('shopHi'); }
+  function gramoInput(P) { // Grammophon: ↑↓ wählt, Sprung/Angriff legt die Platte auf (sie spielt, bis man die Lobby verlässt)
+    if (P.start) return true;
+    const n = RECORDS.length;
+    if (P.up || P.down) { shop.sel = (shop.sel + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
+    if (P.jump || P.attack) {
+      const id = RECORDS[shop.sel];
+      if (!hasRec(id)) { shop.say = 'gramoMissing'; Audio8.sfx('wall'); }
+      else { Audio8.play(id); shop.say = 'gramoPlay'; Audio8.sfx('tink'); }
+    }
+    return false;
+  }
   function saveGold(d) { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && typeof s.score === 'number') { s.score = Math.max(0, s.score + d); localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } } catch (e) { /* privat */ } }
   function shopInput(P) { // true = Laden verlassen
+    if (shop.who === 'gramo') return gramoInput(P);
     if (P.start) return true;
     if (P.left || P.right) { shop.mode = shop.mode === 'buy' ? 'sell' : 'buy'; shop.sel = 0; Audio8.sfx('select'); }
-    const list = shop.mode === 'buy' ? STOCK : sellable(), n = list.length;
+    const stock = STOCKS[shop.who] || STOCK, list = shop.mode === 'buy' ? stock : sellable(), n = list.length;
     if (n && (P.up || P.down)) { shop.sel = (shop.sel + (P.down ? 1 : n - 1)) % n; Audio8.sfx('select'); }
     shop.sel = Math.min(shop.sel, Math.max(0, n - 1));
     if ((P.jump || P.attack) && shop.mode === 'sell') {
@@ -1383,28 +1675,46 @@ const Castle = (() => {
       if (!id) { Audio8.sfx('wall'); return false; }
       const v = sellPrice(id);
       inv[id]--; if (!inv[id]) delete inv[id]; save();
-      W.score += v; saveGold(v); Audio8.sfx('money'); shop.say = 'shopSold';
+      W.score += v; saveGold(v); Audio8.sfx('money'); shop.say = sayKey('shopSold');
       return false;
     }
     if (P.jump || P.attack) {
-      const id = STOCK[shop.sel], g = GEAR[id];
-      if (once(g) && inv[id]) { shop.say = 'shopOwned'; Audio8.sfx('wall'); }
-      else if (W.score < g.price) { shop.say = 'shopPoor'; Audio8.sfx('wall'); }
+      const id = stock[shop.sel], g = GEAR[id];
+      if (once(g) && inv[id]) { shop.say = sayKey('shopOwned'); Audio8.sfx('wall'); }
+      else if (W.score < g.price) { shop.say = sayKey('shopPoor'); Audio8.sfx('wall'); }
       else {
         W.score -= g.price; giveItem(id, false); Audio8.sfx('money');
         saveGold(-g.price); // auch im Spielstand der Speicherkammer bezahlen
-        shop.say = 'shopThanks' + (1 + Math.floor(Math.random() * 3));
+        shop.say = sayKey('shopThanks' + (1 + Math.floor(Math.random() * 3)));
       }
     }
     return false;
   }
-  function drawShop(ctx, t) {
+  function drawGramo(ctx, t) { // Plattenliste: unbekannte Platten als ???, die aufgelegte leuchtet
     const cx = View.cx, lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16);
-    panel(ctx, tr('shopTitle'), '#9c6cfc');
-    ctx.save(); ctx.translate(lx + 4, 72); ctx.scale(1, 1); drawLibrarian(ctx, 0, 0, t, false); ctx.restore();
+    panel(ctx, tr('gramoTitle'), '#c89020');
+    k3at(ctx, 'gramo', lx + 8, 70);
+    wrap(tr(shop.say), rx - lx - 28).slice(0, 2).forEach((l, i) => Font.draw(ctx, l, lx + 24, 38 + i * 10, '#fce0a8', { shadow: '#000' }));
+    const top = clamp(shop.sel - 4, 0, Math.max(0, RECORDS.length - 9));
+    RECORDS.slice(top, top + 9).forEach((id, n) => {
+      const i = top + n, y = 76 + n * 12, on = i === shop.sel, own = hasRec(id), now = Audio8.current === id;
+      if (on) { ctx.fillStyle = 'rgba(200,144,32,0.2)'; ctx.fillRect(lx - 6, y - 3, rx - lx + 12, 12); if ((t >> 4) % 2 === 0) Sprites.draw(ctx, Sprites.S.heartS, lx - 4, y - 1); }
+      if (own) itemIcon(ctx, 'rec_' + id, lx + 8, y - 2);
+      Font.draw(ctx, own ? itemName('rec_' + id) : '???', lx + 22, y, now ? '#f8b800' : own ? (on ? '#fcfcfc' : '#c8c8d8') : '#5c5c6c', { shadow: '#000' });
+      if (now) Font.draw(ctx, tr('gramoNow'), rx, y, '#f8b800', { align: 'right', shadow: '#000' });
+    });
+    const id = RECORDS[shop.sel];
+    if (hasRec(id)) Font.draw(ctx, itemDesc('rec_' + id), cx, 190, '#fce0a8', { align: 'center', shadow: '#000' });
+    Font.draw(ctx, tr('gramoHelp'), cx, 218, '#7c7c8c', { align: 'center' });
+  }
+  function drawShop(ctx, t) {
+    if (shop.who === 'gramo') return drawGramo(ctx, t);
+    const cx = View.cx, lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16), conc = shop.who === 'conc';
+    panel(ctx, tr(conc ? 'concTitle' : 'shopTitle'), conc ? '#58a878' : '#9c6cfc');
+    ctx.save(); ctx.translate(lx + 4, 72); if (conc) drawConcierge(ctx, 0, 0, t, false); else drawLibrarian(ctx, 0, 0, t, false); ctx.restore();
     const say = wrap(tr(shop.say), rx - lx - 24);
-    say.slice(0, 3).forEach((l, i) => Font.draw(ctx, l, lx + 20, 36 + i * 10, '#c8a0fc', { shadow: '#000' }));
-    const sell = shop.mode === 'sell', list = sell ? sellable() : STOCK;
+    say.slice(0, 3).forEach((l, i) => Font.draw(ctx, l, lx + 20, 36 + i * 10, conc ? '#a8e8c0' : '#c8a0fc', { shadow: '#000' }));
+    const sell = shop.mode === 'sell', list = sell ? sellable() : STOCKS[shop.who] || STOCK;
     ['shopBuy', 'shopSell'].forEach((k, i) => { const on = (i === 1) === sell, x = cx + (i ? 40 : -40); Font.draw(ctx, tr(k), x, 66, on ? '#fcfcfc' : '#5c5c6c', { align: 'center', shadow: '#000' }); if (on) { ctx.fillStyle = '#9c6cfc'; ctx.fillRect(x - Font.width(tr(k)) / 2, 74, Font.width(tr(k)), 1); } });
     Font.draw(ctx, '←', cx - 84, 66, '#7c7c8c'); Font.draw(ctx, '→', cx + 80, 66, '#7c7c8c');
     const top = clamp(shop.sel - 3, 0, Math.max(0, list.length - 8)); // acht Zeilen sichtbar, die Liste rollt mit
@@ -1425,7 +1735,7 @@ const Castle = (() => {
 
   // ---------------- Bestiarium wie die Gegnerliste in SotN (Status, dritte Seite): Siege je Gegnerart, absurde Einträge ----------------
   const BEASTS = ['Bat', 'Skeleton', 'Ghoul', 'Raven', 'Knight', 'LivingArmor', 'Panther', 'Skull', 'Fishman', 'Ghost', 'Snake', 'FlyBook', 'Tome',
-    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon',
+    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon', 'Puppet',
     'TentacleBoss', 'GiantBat', 'IceWitch', 'GiantSkeleton', 'Medusa', 'SunWarden', 'ManTrap', 'Count'];
   const BEAST_BOSS = { TentacleBoss: 'bossTentacle', GiantBat: 'boss1', IceWitch: 'bossWitch', GiantSkeleton: 'boss2', Medusa: 'boss3', SunWarden: 'bossKnight', ManTrap: 'bossTrap', Count: 'boss4' };
   const BEAST_SET = new Set(BEASTS);
@@ -1501,6 +1811,7 @@ const Castle = (() => {
     { done: () => bossDone([0, -1]), verb: 'castleGoalBeat', obj: () => bossName(0), where: 'whereHall', at: [[0, -1], 'arena'] },
     { done: () => relic.dash, verb: 'castleGoalFind', obj: () => tr('relic_dash'), where: 'whereHall', at: [[0, -1], 'arena'] },
     { done: () => relic.ring, verb: 'castleGoalFind', obj: () => tr('relic_ring'), where: 'whereIce', at: [[1, 2], 12, 10] },
+    { done: () => relic.wolf, verb: 'castleGoalFind', obj: () => tr('relic_wolf'), get where() { return witchDone() ? 'whereCrypt' : 'whereWitch'; }, get at() { return witchDone() ? [[1, 4], 6, 10] : [[1, 3], 29, 104]; } },
     { done: () => bossDone([1, -1]), verb: 'castleGoalBeat', obj: () => bossName(1), where: 'whereCrypt', at: [[1, -1], 'arena'] },
     { done: () => relic.wall, verb: 'castleGoalFind', obj: () => tr('relic_wall'), where: 'whereCrypt', at: [[1, -1], 'arena'] },
     { done: () => bossDone([2, -1]), verb: 'castleGoalBeat', obj: () => bossName(2), where: 'whereGallery', at: [[2, -1], 'arena'] },
@@ -1512,6 +1823,7 @@ const Castle = (() => {
     { done: () => S().some((st, s) => st.id === 3 && layout(s).some(r => seen[r.key] && seen[r.key].size)), verb: 'castleGoalGate', obj: () => '', where: 'whereSeal', at: [[0, 1], SEAL.x, SEAL.y] },
     { done: () => false, verb: 'castleGoalBeat', obj: () => bossName(3), where: 'whereThrone', at: [[3, -1], 'arena'] },
   ];
+  const witchDone = () => { const a = ref(MINI_RELIC[0][0]); return !!(a && mini[roomKey(a.s, a.r)]); }; // Eishexe besiegt: der Wolf wartet in der Gruft
   const goal = () => GOALS.find(g => !g.done()) || null;
   const goalText = (g) => tr(g.verb, g.obj());
   function goalCell(g) { // Kartenzelle des Ziels (absolut)
@@ -1559,6 +1871,7 @@ const Castle = (() => {
     { id: 'wait', who: 'ally', at: [[0, 1], 40, 17], when: () => flag.story_meet, lines: false },     // Eingangshalle: wartet
     { id: 'feather', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.jump2 },
     { id: 'cloak', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.dash },
+    { id: 'howl', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.wolf },                         // Wolfsgestalt: Haustierklappe im Hotel
     { id: 'claw', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.wall },
     { id: 'stone', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.breaker },
     { id: 'wings', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.bat },                         // Fledermausgestalt: Sims unter der Decke
@@ -1571,8 +1884,11 @@ const Castle = (() => {
     { id: 'tent2', who: 'tent', at: [['side', 'himmel'], 14, 8], when: () => relic.breaker && (flag.story_tent3 || inv.tentling), gold: 1000 }, // Himmelsbrücke: erobert die Wolken
     { id: 'pris1', who: 'pris', at: [['side', 'kerker'], 37, 10], when: () => true, reach: 84 },        // Kerker: der Gefangene hinter dem Gitter
     { id: 'pris2', who: 'pris', at: [['side', 'kerker'], 37, 10], when: () => relic.mist, give: 'keyring' }, // als Nebel in der Zelle
+    { id: 'conc1', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => true, reach: 40 },          // Hotel Krat: der Portier
+    { id: 'conc2', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => relic.wolf },               // ... und Haustiere
+    { id: 'gramo', who: 'gramo', at: [['side', 'hotel'], 14, 17], when: () => true, lines: false },      // Grammophon (↑: Platten)
   ];
-  const WHO = ['ally', 'lib', 'tent', 'pris'], VOICE = { ally: 'A', lib: 'L', tent: 'T', pris: 'P' };
+  const WHO = ['ally', 'lib', 'tent', 'pris', 'conc', 'gramo'], VOICE = { ally: 'A', lib: 'L', tent: 'T', pris: 'P', conc: 'C' };
   const allyId = () => { const ids = HEROES.list.map(d => d.id), i = Math.max(0, ids.indexOf(Options.character)); return ids[(i + 1) % ids.length]; };
   const beatDone = (b) => b.lines === false || !!flag['story_' + b.id];
   function beatNow(who) { let b = null; for (const x of BEATS) if (x.who === who && x.when()) b = x; return b; }
@@ -1615,21 +1931,88 @@ const Castle = (() => {
     R(-7, -9, 14, 1, '#8c8c9c'); R(-7, -3, 14, 1, '#8c8c9c'); // Eisenbänder
     if (t % 90 < 4) R(5, -15 - (t % 90), 1, 1, '#a4e4fc'); // ein Tropfen spritzt
   }
+  // Der Portier (Hotel Krat): eine Holzpuppe im grünen Frack mit Monokel und Fliege. Er kann nicht lügen – also, er kann schon,
+  // aber dann wächst seine Nase (nose: 0 … 9 px). Steht hinter dem Tresen (Blender-Modell davor).
+  function drawConcierge(ctx, cx, feet, t, flip, nose = 0) {
+    const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(flip ? cx - x - w : cx + x, feet + y, w, h); };
+    const bob = (t >> 5) & 1, WD = '#d8a86c', WL = '#f0c890', JT = '#9c6c3c';
+    R(-4, -2, 3, 2, '#1c1410'); R(1, -2, 3, 2, '#1c1410'); R(-3, -10, 2, 8, '#1c1c24'); R(1, -10, 2, 8, '#1c1c24'); // Schuhe, Hose
+    R(-5, -21 + bob, 10, 12, '#1c4c34'); R(-5, -21 + bob, 2, 12, '#14382a'); R(4, -12 + bob, 2, 5, '#1c4c34'); R(-6, -12 + bob, 2, 5, '#1c4c34'); // Frack mit Schößen
+    R(-1, -21 + bob, 3, 7, '#e8e4dc'); R(-2, -20 + bob, 5, 2, '#a81c28'); R(0, -16 + bob, 1, 1, '#f8b800'); R(0, -13 + bob, 1, 1, '#f8b800'); // Hemd, Fliege, Knöpfe
+    R(-7, -20 + bob, 2, 8, '#1c4c34'); R(5, -20 + bob, 2, 6, '#1c4c34'); R(-7, -12 + bob, 2, 2, WD); R(6, -14 + bob, 3, 2, WD); // Arme, Holzhände (eine zeigt einladend)
+    R(-1, -23 + bob, 3, 2, JT); // Hals mit Gelenk
+    R(-4, -31 + bob, 8, 8, WD); R(-4, -31 + bob, 8, 1, WL); R(-4, -24 + bob, 8, 1, JT); // Kopf
+    R(-4, -33 + bob, 8, 3, '#141414'); R(-5, -31 + bob, 2, 3, '#141414'); R(2, -33 + bob, 2, 1, '#3c3c4c'); // gemaltes, pomadiges Haar
+    R(0, -28 + bob, 1, 2, '#140c08'); R(3, -28 + bob, 1, 2, '#140c08'); R(2, -29 + bob, 3, 3, '#c89020'); R(3, -28 + bob, 1, 1, '#fce0a8'); // Augen, Monokel
+    R(-2, -26 + bob, 2, 1, '#e87070'); R(0, -25 + bob, 3, 1, '#7c3c20'); // Wange, Lächeln
+    const n = Math.round(nose); R(4, -27 + bob, 2 + n, 2, WD); R(4, -27 + bob, 2 + n, 1, WL); if (n > 4) R(4 + n, -28 + bob, 1, 1, '#58a838'); // Nase (wächst beim Lügen; ab und zu treibt sie aus)
+  }
+  const noseOf = (npc) => { if (!talk || talk.npc !== npc) return 0; const pg = talk.pages[talk.i]; return pg && pg.lie ? Math.min(9, (Game.t - (talk.lieAt || 0)) * 0.35) : 0; };
+  // Kammern im Hotel: Sternlampe (Speichern) und Aufzug (Schnellreise) statt Steinnische – Blender-Modelle
+  function drawHotelChamber(ch, ctx) {
+    const c = ch.c, cx = Math.round((c.x + 1) * T - W.cam.x), feet = Math.round((c.y + 1) * T - W.cam.y), t = ch.t;
+    if (c.kind === 'save') {
+      if (!k3at(ctx, 'starlamp', cx, feet)) return false;
+      const sy = feet - 37, r = 14 + Math.sin(t * 0.06) * 2 + ch.pulse / 3, g = ctx.createRadialGradient(cx, sy, 0, cx, sy, r);
+      g.addColorStop(0, 'rgba(255,214,120,0.28)'); g.addColorStop(1, 'rgba(120,150,255,0)');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.fillRect(cx - r, sy - r, r * 2, r * 2); ctx.globalCompositeOperation = 'source-over';
+      if ((t >> 3) % 5 === 0) { ctx.fillStyle = '#fcfcfc'; ctx.fillRect(cx + 3, sy - 4, 1, 1); } // Funkeln
+      return true;
+    }
+    if (!k3at(ctx, 'lift', cx, feet)) return false;
+    const on = warp[c.key], dy = feet - 42, a = Math.PI + (on ? 0.5 + 0.5 * Math.sin(t * 0.02) : 0.15) * Math.PI; // Stockwerkanzeiger: der Zeiger wandert
+    ctx.strokeStyle = '#1c1410'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx + 0.5, dy + 0.5); ctx.lineTo(cx + 0.5 + Math.cos(a) * 4, dy + 0.5 + Math.sin(a) * 4); ctx.stroke();
+    if (on) { ctx.globalAlpha = 0.08 + 0.03 * Math.sin(t * 0.05); ctx.fillStyle = '#fcc860'; ctx.fillRect(cx - 12, feet - 38, 24, 37); ctx.globalAlpha = 1; } // Licht in der Kabine
+    const p = W.player;
+    if (on && Math.abs(p.cx - (c.x + 1) * T) < 14 && Math.abs(p.feet - (c.y + 1) * T) < 8) Font.draw(ctx, '↑', cx - 2, feet - 62 + Math.round(Math.sin(t * 0.12) * 2), '#fcfcfc', { shadow: '#000' });
+    return true;
+  }
+  // Hoteltür (Burghof und Lobby): Flügeltür aus Mahagoni mit Glasoberlicht und Messinggriffen, darüber das Schild
+  function drawHotelDoor(d, ctx) {
+    const x = Math.round(d.x - W.cam.x), y = Math.round(d.y - W.cam.y), cx = x + 16, bot = y + d.h, t = d.t, outside = W.room.theme !== 'hotel';
+    ctx.fillStyle = '#2c1206'; ctx.fillRect(cx - 15, y + 4, 30, bot - y - 4); ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 15, y + 4, 30, 1); ctx.fillRect(cx - 15, y + 4, 1, bot - y - 4); ctx.fillRect(cx + 14, y + 4, 1, bot - y - 4); // Rahmen
+    arch(ctx, cx, y + 6, 12, y + 18, '#5c2c10'); arch(ctx, cx, y + 7, 11, y + 18, '#e8a848'); // Oberlicht, innen warm
+    ctx.fillStyle = '#5c2c10'; ctx.fillRect(cx, y + 7, 1, 11); ctx.fillRect(cx - 11, y + 13, 22, 1);
+    for (const s of [-1, 1]) { // Türflügel mit Glasfeld und Griff
+      const fx = s < 0 ? cx - 12 : cx + 1;
+      ctx.fillStyle = '#5c2810'; ctx.fillRect(fx, y + 19, 11, bot - y - 19); ctx.fillStyle = '#7c3c18'; ctx.fillRect(fx, y + 19, 11, 1);
+      ctx.fillStyle = '#c87830'; ctx.fillRect(fx + 2, y + 21, 7, 9); ctx.fillStyle = '#e8a848'; ctx.fillRect(fx + 2, y + 21, 7, 1);
+      ctx.fillStyle = '#3c1c08'; ctx.fillRect(fx + 2, y + 33, 7, 7); ctx.fillStyle = '#f8b800'; ctx.fillRect(s < 0 ? fx + 9 : fx + 1, y + 30, 1, 3);
+    }
+    ctx.globalAlpha = 0.2 + 0.05 * Math.sin(t * 0.07); ctx.fillStyle = '#fcc860'; ctx.fillRect(cx - 10, y + 21, 20, 9); ctx.globalAlpha = 1;
+    if (outside) { // Schild mit Sternen über der Tür
+      const s = tr('hotelSign'), w = Font.width(s) + 8;
+      ctx.fillStyle = '#14100c'; ctx.fillRect(cx - w / 2, y - 12, w, 11); ctx.fillStyle = '#c89020'; ctx.fillRect(cx - w / 2, y - 12, w, 1); ctx.fillRect(cx - w / 2, y - 2, w, 1);
+      Font.draw(ctx, s, cx, y - 10, (t >> 5) % 8 ? '#fce0a8' : '#f8b800', { align: 'center' });
+    }
+    const p = W.player;
+    if (Math.abs(p.cx - d.cx) < 14 && Math.abs(p.feet - (d.y + d.h)) < 8) Font.draw(ctx, '↑', cx - 2, y - (outside ? 24 : 12) + Math.round(Math.sin(t * 0.12) * 2), '#fcfcfc', { shadow: '#000' });
+  }
   class CastleNPC extends Ent {
     constructor(b) { super(b.at[1] * T, (b.at[2] + 1) * T - 30, 16, 30); this.kind = 'prop'; this.b = b; this.face = -1; this.go = 0; this.walk = 0; }
     update() {
       this.t++;
       if (this.go) { this.x += 1.6 * this.go; this.walk++; if (this.t > 36) this.dead = true; return; } // geht davon und verschwindet in den Schatten
-      const p = W.player; if (p) this.face = p.cx < this.cx ? -1 : 1;
+      const p = W.player; if (p && this.b.who !== 'gramo') this.face = p.cx < this.cx ? -1 : 1;
+      if (this.b.who === 'gramo' && Audio8.current !== 'hotel' && RECORDS.includes(Audio8.current) && this.t % 24 === 0) { // Noten steigen aus dem Trichter
+        const h = k3pt('gramo', 0, this.cx, this.y + this.h); W.spawn(new Particle(h.x + rnd(-2, 2), h.y, rnd(-0.3, 0.3), -0.5, this.t % 48 ? '#f8b800' : '#fce0a8', 60, 2, 0));
+      }
       const b = beatNow(this.b.who); // neue Szene am selben Platz (z. B. Relikt im selben Raum gefunden): gleich übernehmen
       if (b && b !== this.b && same(ref(b.at[0]), W.stage, W.roomIdx) && b.at[1] === this.b.at[1] && b.at[2] === this.b.at[2]) this.b = b;
     }
-    lightUp(L, cx, cy) { L.push({ x: this.cx - cx, y: this.y - cy + 10, r: 30 + Math.sin(this.t * 0.05) * 2, c: this.b.who === 'lib' ? [252, 200, 130] : this.b.who === 'tent' ? [200, 110, 250] : [190, 200, 255], a: 0.4 }); }
+    lightUp(L, cx, cy) {
+      if (this.b.who === 'conc') { const l = k3pt('desk', 1, this.cx, this.y + this.h); L.push({ x: l.x - cx, y: l.y - cy, r: 36, c: [140, 252, 160], a: 0.35 }); } // grüne Tresenlampe
+      L.push({ x: this.cx - cx, y: this.y - cy + 10, r: 30 + Math.sin(this.t * 0.05) * 2, c: this.b.who === 'lib' || this.b.who === 'conc' || this.b.who === 'gramo' ? [252, 200, 130] : this.b.who === 'tent' ? [200, 110, 250] : [190, 200, 255], a: 0.4 });
+    }
     draw(ctx) {
       const cam = W.cam, feet = this.y + this.h;
       if (this.b.who === 'lib') drawLibrarian(ctx, Math.round(this.cx - cam.x), Math.round(feet - cam.y), this.t, this.face < 0);
       else if (this.b.who === 'tent') drawTentacle(ctx, Math.round(this.cx - cam.x), Math.round(feet - cam.y), this.t, this.face < 0);
       else if (this.b.who === 'pris') drawPrisoner(ctx, Math.round(this.cx - cam.x), Math.round(feet - cam.y), this.t, this.face < 0);
+      else if (this.b.who === 'conc') { // hinter dem Tresen (etwas erhöht), der Tresen davor
+        drawConcierge(ctx, Math.round(this.cx - cam.x), Math.round(feet - cam.y) - 4, this.t, this.face < 0, noseOf(this));
+        k3draw(ctx, 'desk', this.cx, feet);
+      } else if (this.b.who === 'gramo') k3draw(ctx, 'gramo', this.cx, feet);
       else {
         const H = HEROES.get(allyId()), spr = this.go ? H.walk[Math.floor(this.walk / 5) % 8] : H.idle[Math.floor(this.t / 40) % 2];
         if (this.go) ctx.globalAlpha = clamp(1 - (this.t - 10) / 26, 0, 1);
@@ -1675,11 +2058,12 @@ const Castle = (() => {
     const b = npc.b, ally = HEROES.def(allyId()).name, hero = HEROES.def(Options.character).name;
     const raw = again ? VOICE[b.who] + ':' + tr('story_' + (b.again || b.id) + 'Again') : tr('story_' + b.id);
     const pages = (Array.isArray(raw) ? raw : [raw]).filter(s => s[0] !== 'K' || Options.character === 'kaspar')
-      .map(s => ({ who: s[0] === 'K' ? 'H' : s[0], text: s.slice(2).replace(/\{0\}/g, ally).replace(/\{1\}/g, hero) }));
+      .map(s => ({ who: s[0] === 'K' ? 'H' : s[0], lie: s[2] === '~', text: s.slice(s[2] === '~' ? 3 : 2).replace(/\{0\}/g, ally).replace(/\{1\}/g, hero) })); // ~ = gelogen (die Nase wächst)
     const p = W.player;
-    talk = { npc, b, again, pages, i: 0, n: 0 };
+    talk = { npc, b, again, pages, i: 0, n: 0, lieAt: Game.t };
+    if (pages[0] && pages[0].lie) Audio8.sfx('squeak');
     npc.face = p.cx < npc.cx ? -1 : 1; p.face = -npc.face; p.vx = 0;
-    Audio8.sfx(b.who === 'lib' ? 'page' : b.who === 'tent' ? 'slime' : 'select');
+    Audio8.sfx(b.who === 'lib' ? 'page' : b.who === 'tent' ? 'slime' : b.who === 'conc' ? 'bell' : 'select');
     Game.go('talk');
   }
   function endTalk() {
@@ -1699,7 +2083,7 @@ const Castle = (() => {
       W.popup(p.cx, p.y - 8, 'HP MAX', '#58f898'); Audio8.sfx('heart');
       for (let i = 0; i < 14; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.y + rnd(0, 28), rnd(-0.4, 0.4), rnd(-1.4, -0.3), i % 2 ? '#58f898' : '#fce0a8', 40, 1, 0));
     }
-    if (b.who === 'lib') { openShop(); return 'shop'; } // danach sein Laden
+    if (b.who === 'lib' || b.who === 'conc') { openShop(b.who); return 'shop'; } // danach sein Laden
     return true;
   }
   function talkInput(P) { // true = Gespräch vorbei, 'shop' = weiter in den Laden (Sprung/Angriff/↑: Seite fertig schreiben bzw. weiterblättern, Start: alles überspringen)
@@ -1711,18 +2095,19 @@ const Castle = (() => {
     if (P.jump || P.attack || P.up) {
       if (talk.n < pg.len) talk.n = pg.len;
       else if (++talk.i >= talk.pages.length) return endTalk();
-      else { talk.n = 0; Audio8.sfx('select'); }
+      else { talk.n = 0; Audio8.sfx('select'); if (talk.pages[talk.i].lie) { talk.lieAt = Game.t; Audio8.sfx('squeak'); } }
     }
     return false;
   }
   function portrait(ctx, who, x, y, t) { // 40×40: Figur in doppelter Größe, Kopf und Schultern
     ctx.fillStyle = '#c89020'; ctx.fillRect(x - 2, y - 2, 44, 44);
     ctx.fillStyle = '#000'; ctx.fillRect(x - 1, y - 1, 42, 42);
-    ctx.fillStyle = who === 'L' ? '#24183c' : who === 'H' ? '#0c1c34' : who === 'T' ? '#0c2434' : '#1c1028'; ctx.fillRect(x, y, 40, 40);
+    ctx.fillStyle = who === 'L' ? '#24183c' : who === 'H' ? '#0c1c34' : who === 'T' ? '#0c2434' : who === 'C' ? '#0c2418' : '#1c1028'; ctx.fillRect(x, y, 40, 40);
     ctx.save(); ctx.beginPath(); ctx.rect(x, y, 40, 40); ctx.clip();
     if (who === 'L') { ctx.translate(x + 20, y + 70); ctx.scale(2, 2); drawLibrarian(ctx, 0, 0, t, false); }
     else if (who === 'T') { ctx.translate(x + 18, y + 80); ctx.scale(2, 2); drawTentacle(ctx, 0, 0, t, false); }
     else if (who === 'P') { ctx.translate(x + 20, y + 66); ctx.scale(2, 2); drawPrisoner(ctx, 0, 0, t, false); }
+    else if (who === 'C') { ctx.translate(x + 18, y + 70); ctx.scale(2, 2); drawConcierge(ctx, 0, 0, t, false, talk ? noseOf(talk.npc) : 0); }
     else {
       const H = HEROES.get(who === 'A' ? allyId() : Options.character), spr = H.idle[0], img = who === 'H' ? spr.f : spr.c;
       ctx.imageSmoothingEnabled = false;
@@ -1739,8 +2124,8 @@ const Castle = (() => {
     ctx.fillStyle = '#fce0a8'; for (const [ex, ey] of [[x, y], [x + w - 1, y], [x, y + h - 1], [x + w - 1, y + h - 1]]) { ctx.fillRect(ex - 1, ey, 3, 1); ctx.fillRect(ex, ey - 1, 1, 3); }
     const px = hero ? x + w - 48 : x + 8, tx = hero ? x + 10 : x + 56;
     portrait(ctx, pg.who, px, y + 10, t);
-    const name = pg.who === 'L' ? tr('npcLib') : pg.who === 'T' ? tr('bossTentacle') : pg.who === 'P' ? tr('npcPrisoner') : HEROES.def(pg.who === 'A' ? allyId() : Options.character).name;
-    Font.draw(ctx, name, tx, y + 7, hero ? '#7cdcfc' : pg.who === 'L' ? '#c8a0fc' : pg.who === 'T' ? '#d880fc' : pg.who === 'P' ? '#e8e0c8' : '#f8b800', { shadow: '#000' });
+    const name = pg.who === 'L' ? tr('npcLib') : pg.who === 'T' ? tr('bossTentacle') : pg.who === 'P' ? tr('npcPrisoner') : pg.who === 'C' ? tr('npcConcierge') : HEROES.def(pg.who === 'A' ? allyId() : Options.character).name;
+    Font.draw(ctx, name, tx, y + 7, hero ? '#7cdcfc' : pg.who === 'L' ? '#c8a0fc' : pg.who === 'T' ? '#d880fc' : pg.who === 'P' ? '#e8e0c8' : pg.who === 'C' ? '#a8e8c0' : '#f8b800', { shadow: '#000' });
     let left = Math.floor(talk.n);
     pg.lines.forEach((l, i) => {
       const ch = [...l], s = ch.slice(0, Math.max(0, left)).join('');
@@ -2010,9 +2395,9 @@ const Castle = (() => {
     { at: [0, 0], lv: 1, gold: 0, relics: [], bosses: [], name: ['msGate'] },
     { at: [0, 1], lv: 4, gold: 3000, relics: ['jump2'], bosses: [], name: ['msRelic', () => tr('relic_jump2')] },
     { at: [0, -1], lv: 7, gold: 6000, relics: ['jump2', 'dash'], bosses: [0], name: ['msBeaten', () => bossName(0)] },
-    { at: [1, -1], lv: 11, gold: 9000, relics: ['jump2', 'dash', 'ring', 'wall'], bosses: [0, 1], name: ['msBeaten', () => bossName(1)] },
-    { at: [2, -1], lv: 15, gold: 15000, relics: ['jump2', 'dash', 'ring', 'wall', 'breaker'], bosses: [0, 1, 2], name: ['msBeaten', () => bossName(2)] },
-    { at: ['sun', -1], lv: 19, gold: 20000, relics: ['jump2', 'dash', 'ring', 'wall', 'breaker', 'bat'], bosses: [0, 1, 2, 'sun'], name: ['msBeaten', () => bossName('sun')] },
+    { at: [1, -1], lv: 11, gold: 9000, relics: ['jump2', 'dash', 'ring', 'wolf', 'wall'], bosses: [0, 1], name: ['msBeaten', () => bossName(1)] },
+    { at: [2, -1], lv: 15, gold: 15000, relics: ['jump2', 'dash', 'ring', 'wolf', 'wall', 'breaker'], bosses: [0, 1, 2], name: ['msBeaten', () => bossName(2)] },
+    { at: ['sun', -1], lv: 19, gold: 20000, relics: ['jump2', 'dash', 'ring', 'wolf', 'wall', 'breaker', 'bat'], bosses: [0, 1, 2, 'sun'], name: ['msBeaten', () => bossName('sun')] },
     { at: [0, 1], lv: 23, gold: 25000, relics: RELICS, bosses: [0, 1, 2, 'sun', 'expo'], name: ['msSeals'] },
     { at: [3, -1], lv: 28, gold: 30000, relics: RELICS, bosses: [0, 1, 2, 'sun', 'expo'], name: ['msBefore', () => bossName(3)] },
   ];
@@ -2139,7 +2524,15 @@ const Castle = (() => {
     need.push('story_epilogue', 'endTitle', 'endNgPlus', 'endCredits', ...RANKS.map(([, r]) => 'endRank' + r));
     need.push('beastTitle', 'beastCount', 'beastUnknown', 'beastNew', 'shopBuy', 'shopSell', 'shopSold', 'shopNothing');
     for (const k of BEASTS) { need.push('beastD_' + k); if (!BEAST_BOSS[k]) need.push('beast_' + k); }
-    need.push('npcPrisoner');
+    need.push('npcPrisoner', 'npcConcierge', 'concTitle', 'concHi', 'concSold', 'concOwned', 'concPoor', 'concThanks1', 'concThanks2', 'concThanks3', 'gramoTitle', 'gramoHi',
+      'gramoPlay', 'gramoMissing', 'gramoNow', 'gramoHelp', 'hotelSign', 'boardTitle', 'formBack', 'whereWitch');
+    if (!Array.isArray(tr('boardRows'))) out.push('Text fehlt: boardRows');
+    for (const k of RECORDS) if (!GEAR['rec_' + k]) out.push('Schallplatte ohne Gegenstand: ' + k);
+    S().forEach((st, s) => st.rooms.forEach((def, r) => {
+      for (const d of def.decor || []) if (d[0] !== 'board' && !K3[d[0]]) out.push('Modell fehlt: ' + d[0] + ' in ' + roomKey(s, r));
+      for (const [x, y] of def.puppets || []) if (!ground(def, x, y)) out.push('Puppe ohne Boden: ' + roomKey(s, r) + ' ' + x + ',' + y);
+    }));
+    for (const [R, k, x, y, F] of MINI_RELIC) for (const [A, X, Y] of [[R, x, y], F]) { const a = ref(A); if (!a || !ground(S()[a.s].rooms[a.r], X, Y)) out.push('Relikt ohne Boden: ' + k + ' ' + JSON.stringify(A)); }
     S().forEach((st, s) => st.rooms.forEach((def, r) => (def.grates || []).forEach(g => { // Gitter: Durchgang frei, Boden darunter, Wand darüber
       for (let y = g.y0; y <= g.y1; y++) if (SOLID.includes(def.grid[y][g.x])) out.push('Gitter steht in der Wand: ' + roomKey(s, r));
       if (!SOLID.includes(def.grid[g.y1 + 1][g.x]) || (g.y0 > 0 && !SOLID.includes(def.grid[g.y0 - 1][g.x]))) out.push('Gitter nicht dicht: ' + roomKey(s, r));

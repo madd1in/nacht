@@ -307,6 +307,17 @@ const Audio8 = (() => {
   const DKD = 'k:1 d:1 s:1 d:1 k:1 d:1 s:1 d:1 k:1 d:1 s:1 d:1 k:1 d:1 s:1 d:1'; // Doppel-Kick unter Snare-Achteln
   const GDKD = 'g:1' + DKD.slice(3), BDKD = 'b:1' + DKD.slice(3); // mit Gong bzw. Glocke auf der Eins
 
+  // Hotel Krat: ruhiger Walzer in d-Moll wie aus einer Spieluhr (Hommage an die Lobby aus „Lies of P“) – kein Schlagzeug,
+  // nur Melodie, „pah-pah“ auf Schlag 2 und 3, Bass auf der Eins, Streicherfläche. A-Teil d-Moll, B-Teil F-Dur
+  const HW_C = ['Dm', 'A7', 'Dm', 'Bb', 'Gm', 'Dm', 'E7', 'A7', 'Dm', 'A7', 'Dm', 'D7', 'Gm', 'Dm', 'A7', 'Dm',
+    'F', 'C', 'Dm', 'Am', 'Bb', 'F', 'Gm', 'C', 'F', 'C', 'Dm', 'A7', 'Bb', 'Gm', 'A7', 'Dm'];
+  const HW = { Dm: ['d4', 'f4', 'a4'], A7: ['c#4', 'e4', 'g4'], Bb: ['a#3', 'd4', 'f4'], Gm: ['g3', 'a#3', 'd4'], E7: ['g#3', 'b3', 'd4'], D7: ['f#3', 'a3', 'c4'], F: ['f3', 'a3', 'c4'], C: ['e3', 'g3', 'c4'], Am: ['e3', 'a3', 'c4'] };
+  const HW_B = { Dm: 'd2', A7: 'a1', Bb: 'a#1', Gm: 'g1', E7: 'e2', D7: 'd2', F: 'f2', C: 'c2', Am: 'a1' };
+  const HW_P1 = ['a5:6 f5:2 e5:2 d5:2', 'c#5:8 e5:4', 'd5:6 e5:2 f5:2 g5:2', 'a5:8 g5:4', 'g5:6 a#5:2 a5:2 g5:2', 'f5:8 a5:4', 'g#5:4 b5:4 d6:4', 'c#6:8 -:4',
+    'd6:6 c6:2 a#5:2 a5:2', 'g5:6 f5:2 e5:2 c#5:2', 'd5:4 f5:4 a5:4', 'c6:8 a5:4', 'a#5:6 a5:2 g5:2 f5:2', 'f5:4 e5:4 d5:4', 'e5:6 c#5:2 e5:2 g5:2', 'd5:12',
+    'c6:6 a5:2 f5:2 a5:2', 'g5:8 e5:4', 'f5:6 a5:2 d6:2 c6:2', 'c6:8 e5:4', 'd6:6 c6:2 a#5:2 a5:2', 'a5:8 f5:4', 'g5:4 a#5:4 d6:4', 'c6:8 -:4',
+    'f6:6 e6:2 d6:2 c6:2', 'e6:6 d6:2 c6:2 g5:2', 'd6:4 a5:4 f5:4', 'e6:8 c#6:4', 'd6:6 c6:2 a#5:2 a5:2', 'g5:6 a#5:2 a5:2 g5:2', 'a5:4 c#6:4 e6:4', 'd6:12'];
+
   const SONGS = {
     title: {
       bpm: 104, loop: true,
@@ -507,6 +518,13 @@ const Audio8 = (() => {
       // B-Teil ein Doppel-Kick in Dauer-16teln – das nervte. B-Teil jetzt: Snare auf 2 und 3, Hi-Hat in 16teln, keine Kick-Flut
       dr: EX_C.map((c, i) => i % 8 === 7 ? 'k:2 h:2 s:2 t:1 t:1 u:1 u:1 s:2' : i % 8 === 0 ? 'x:2 h:2 o:2 h:2 o:2 h:2' : 'k:2 h:2 o:2 h:2 o:2 h:2').join(' ') + ' ' +
         EX_C.map((c, i) => i === 31 ? 'k:2 h:2 s:2 w:6' : i % 8 === 7 ? 'k:2 s:1 s:1 s:2 t:1 t:1 u:1 u:1 s:2' : i % 8 === 0 ? 'x:2 h:1 h:1 s:2 h:2 s:2 h:1 h:1' : 'k:2 h:1 h:1 s:2 h:2 s:2 h:1 h:1').join(' '),
+    },
+    hotel: {
+      bpm: 132, loop: true, echo: { delay: 3, vol: 0.32 },
+      p1: HW_P1.join(' '),
+      p2: HW_C.map(c => `-:4 ${HW[c][1]}:4 ${HW[c][2]}:4`).join(' '),
+      tri: HW_C.map(c => `${HW_B[c]}:12`).join(' '),
+      pad: HW_C.map(c => HW[c].join('+') + ':12').join(' '),
     },
     clear: {
       bpm: 150, loop: false,
@@ -759,7 +777,7 @@ const Audio8 = (() => {
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 4200; hp.connect(lp); lp.connect(out);
       const bp = ambNoise(nodes, out, 'bandpass', 480, 6); ambLfo(nodes, bp.frequency, 0.06, 220);
       ambLfo(nodes, out.gain, 0.1, 0.01); level = 0.028;
-    } else if (theme === 'library') { // Bibliothek: gedämpfter Regen an den hohen Fenstern, tiefer Raumklang
+    } else if (theme === 'library' || theme === 'hotel' || theme === 'station') { // Bibliothek, Hotel-Lobby, Bahnhofshalle: gedämpfter Regen an den hohen Fenstern, tiefer Raumklang
       const hp = ambNoise(nodes, out, 'highpass', 1200), lp = ac.createBiquadFilter();
       hp.disconnect(); lp.type = 'lowpass'; lp.frequency.value = 3000; hp.connect(lp); lp.connect(out);
       ambDrone(nodes, out, 'sine', 65.4, 0.25);
@@ -839,7 +857,7 @@ const Audio8 = (() => {
       tone('sine', 1800 + Math.random() * 1600, 0, 0.5, 0.02, 0, t);
     } else if (theme === 'ship' && Math.random() < 0.004) { // Schiffsrumpf ächzt
       tone('sawtooth', 60 + Math.random() * 25, 45, 0.7, 0.03, 0, t);
-    } else if (theme === 'library') { // Standuhr tickt gemächlich, irgendwo raschelt eine Seite
+    } else if (theme === 'library' || theme === 'hotel') { // Standuhr tickt gemächlich, irgendwo raschelt eine Seite
       if (ambT % 45 === 0) tone('triangle', ambT % 90 ? 820 : 640, 0, 0.05, 0.03, 0, t);
       if (Math.random() < 0.002) noise(0.18, 0.025, 'highpass', 3000, 6000, t);
     } else if (theme === 'hall' && Math.random() < 0.0015) { // Gebälk knarzt

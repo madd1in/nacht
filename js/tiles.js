@@ -31,6 +31,8 @@ const Tiles = (() => {
     forest: { a: ['#8c7454', '#5c4a34', '#3e3022', '#271d14', '#100a06'], b: ['#a08060', '#76583c', '#523a24', '#33230f', '#140c04'], moss: ['#1e4a22', '#3a7a2c', '#86c050'] },
     spire: { a: ['#fcf0d4', '#e8cc98', '#c09c60', '#846438', '#382412'], b: ['#fce8b0', '#e8c070', '#b8883c', '#7c5420', '#2c1808'] },
     ballroom: { a: ['#fcf4e4', '#e4d4b8', '#bca480', '#806848', '#2c1c10'], b: ['#fce0a8', '#f8b800', '#a80020', '#680010', '#1c0008'] },
+    station: { a: ['#c8705c', '#9c4c34', '#7c3824', '#4c1c10', '#1c0804'], b: ['#9cb4a8', '#5c7c70', '#3c5448', '#1c2c26', '#0a1410'] },
+    hotel: { a: ['#e8b070', '#a86c34', '#7c4820', '#4c2810', '#180a04'], b: ['#c89058', '#8c5428', '#5c3014', '#3c1c08', '#140804'] },
   };
 
   // ---------------- Kacheln ----------------
@@ -205,6 +207,24 @@ const Tiles = (() => {
         if (!edge && d === 2 && lx % 8 === 3) px(x, '#f8b800', X, y);
       }
     }
+    return c;
+  }
+  function platformTop() { // Bahnsteigkante: weiße Sicherheitslinie, graue Granitplatten mit Fugen, darunter Ziegel der Bahnsteigmauer
+    const c = C(16, 16), x = c.getContext('2d'), sd = ri(0, 999);
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 16; X++) {
+      const n = hn(X, y, sd);
+      let col = y < 2 ? (n > 0.85 ? '#b8b4a4' : '#e4e0d0') : y < 7 ? ((X === 15 || y === 6) ? '#3c3c44' : n > 0.8 ? '#6c6c74' : n > 0.3 ? '#8c8c94' : '#7c7c84') : y === 7 ? '#1c1c24'
+        : ((y - 8) % 4 === 0 || (X + ((y - 8) >> 2) % 2 * 4) % 8 === 0) ? '#2c1008' : n > 0.6 ? '#6c2c1c' : '#5c2416';
+      px(x, col, X, y);
+    }
+    return c;
+  }
+  function hotelCarpet() { // Hotel-Lobby: roter Läufer mit Goldborte und Rautenmuster über dunklem Mahagoni
+    const c = C(16, 16), x = c.getContext('2d');
+    px(x, '#2c1206', 0, 0, 16, 16); for (let y = 8; y < 16; y++) for (let X = 0; X < 16; X++) if ((X + y * 3) % 7 === 0) px(x, '#3c1a0a', X, y);
+    px(x, '#8c1424', 0, 0, 16, 7); px(x, '#c83040', 0, 0, 16, 1); px(x, '#c89020', 0, 1, 16, 1); px(x, '#c89020', 0, 6, 16, 1); px(x, '#4c0810', 0, 7, 16, 1);
+    px(x, '#e8b848', 7, 2, 2, 1); px(x, '#c89020', 6, 3, 4, 1); px(x, '#e8b848', 7, 4, 2, 1); px(x, '#6c0c1a', 0, 3, 2, 1); px(x, '#6c0c1a', 14, 3, 2, 1); // Raute, Ornament
+    px(x, '#140602', 0, 15, 16, 1);
     return c;
   }
   // Schiffsplanken: waagrechte Bohlen mit Stoßfugen, Nägeln und Maserung; top = Deck (helle Kante), hull = Rumpf
@@ -1594,6 +1614,159 @@ const Tiles = (() => {
       add('wall', c, 0.5, { vtile: true });
       L.push({ name: 'stacks', custom: drawStacks3D, par: 1, c: C(1, 1) }); // PS2-3D: frei stehende Regale ragen aus den Pilastern
       L.push({ name: 'books', custom: drawBookFlock, par: 0.7, c: C(1, 1) }); // in der Ferne kreisen Bücherschwärme
+    } else if (theme === 'station') { // Bahnhof Krat: Bahnhofshalle aus Eisen und Glas – Bogenbinder, Glasdach mit Nachthimmel, hinten Backsteinwand mit Bogenfenstern
+      const sky = C(640, 208), xs = sky.getContext('2d');
+      smooth(xs, 640, 208, ['#020208', '#050412', '#0a081c', '#100c24', '#160f2a', '#1c122e', '#221632', '#2a1a34', '#321e34']);
+      for (let i = 0; i < 70; i++) px(xs, rand() < 0.3 ? '#fcfcfc' : '#7c7c9c', ri(0, 639), ri(0, 120));
+      moon(xs, 470, 46, 15);
+      add('sky', sky, 0, { wrap: false });
+      const cl = C(512, 208), xc = cl.getContext('2d'); // Rauchschwaden der Loks unter dem Dach
+      for (let i = 0; i < 26; i++) {
+        const cx = ri(0, 511), cy = ri(20, 110), rx = ri(20, 50), ry = ri(6, 14);
+        for (let y = -ry; y <= ry; y++) for (let X = -rx; X <= rx; X++) {
+          const q = (X * X) / (rx * rx) + (y * y) / (ry * ry);
+          if (q > 1 || bay(X + cx, y + cy) < (q - 0.5) * 2.4) continue;
+          px(xc, y < 0 ? '#2c2838' : '#201c2c', (cx + X + 512) % 512, cy + y);
+        }
+      }
+      add('clouds', cl, 0.05, { drift: 0.12 });
+      L.push({ name: 'rainOut', custom: drawRainOut, par: 0, c: C(1, 1) });
+      const H = 320, c = C(512, H), x = c.getContext('2d');
+      // Glasdach: Sprossenraster (durchsichtig), darüber gespannte Bogenbinder aus genietetem Eisen
+      for (let Y = 0; Y < 176; Y++) for (let X = 0; X < 512; X++) {
+        const rib = X % 32 < 2 || Y % 24 < 2, dirt = hn(X >> 2, Y >> 2, 17);
+        if (rib) px(x, (X % 32 === 0 || Y % 24 === 0) ? '#1c2a26' : '#2c3c36', X, Y);
+        else if (dirt > 0.93) px(x, 'rgba(60,60,70,0.55)', X, Y); // Ruß auf dem Glas
+        else if (dirt > 0.86) px(x, 'rgba(120,140,170,0.18)', X, Y);
+      }
+      for (const ax of [0, 256]) { // Bogenbinder: zwei Gurte, dazwischen Gitterstreben, Nieten
+        for (let k = 0; k <= 256; k++) {
+          const t = k / 256, X = ax + k - 128, top = Math.round(8 + 150 * Math.pow(2 * t - 1, 2)), bot = top + 16;
+          const XX = (X + 512) % 512;
+          px(x, '#14201c', XX, top, 1, 3); px(x, '#3c544a', XX, top, 1, 1); px(x, '#14201c', XX, bot, 1, 3); px(x, '#2c4038', XX, bot, 1, 1);
+          if (k % 12 < 6) { const d = k % 12; px(x, '#1c2c26', XX, top + 3 + Math.round(d * 2.1), 1, 2); } else { const d = 11 - (k % 12); px(x, '#1c2c26', XX, top + 3 + Math.round(d * 2.1), 1, 2); }
+          if (k % 8 === 0) { px(x, '#7c9488', XX, top + 1, 1, 1); px(x, '#7c9488', XX, bot + 1, 1, 1); }
+        }
+      }
+      for (let X = 0; X < 512; X++) { px(x, '#10181a', X, 170, 1, 8); px(x, '#3c544a', X, 170, 1, 1); if (X % 16 === 0) px(x, '#7c9488', X, 174, 1, 1); } // Traufträger
+      // Backsteinwand hinten mit Bogenfenstern (dunkel, ab und zu eins erleuchtet), Plakaten und einem Fahrplan
+      for (let Y = 178; Y < H; Y++) for (let X = 0; X < 512; X++) {
+        const row = Math.floor((Y - 178) / 6), off = (row % 2) * 6, mortar = (Y - 178) % 6 === 0 || (X + off) % 12 === 0;
+        px(x, mortar ? '#1c0e0c' : ((X + off) >> 2) % 7 === 0 ? '#5c2c1c' : '#4a2216', X, Y);
+      }
+      for (let k = 0; k < 4; k++) { // Bogenfenster
+        const wx = 24 + k * 128, wy = 196, ww = 56, wh = 70, r = ww / 2, lit = k === 2;
+        for (let Y = wy - 4; Y < wy + wh + 3; Y++) for (let X = wx - 4; X < wx + ww + 4; X++) {
+          const inA = (X0, Y0, rr) => Y0 >= wy + r || (X0 + 0.5 - wx - r) ** 2 + (Y0 + 0.5 - wy - r) ** 2 <= rr * rr;
+          if (X < wx || X >= wx + ww || Y > wy + wh || !inA(X, Y, r)) { if (inA(X, Y, r + 4) && Y <= wy + wh + 2 && X >= wx - 4 && X < wx + ww + 4) px(x, (X + Y) % 3 ? '#8c7c68' : '#6c5c4c', X, Y); continue; }
+          const lx = X - wx, ly = Y - wy, bar = lx % 14 === 0 || ly % 14 === 0;
+          px(x, bar ? '#2c2420' : lit ? (ly > 30 ? '#c88430' : '#e8a848') : (ly + lx) % 5 ? '#0c0c18' : '#121226', X, Y);
+        }
+      }
+      const poster = (px0, py0, c1, c2) => { px(x, '#14100c', px0 - 1, py0 - 1, 26, 36); px(x, c1, px0, py0, 24, 34); px(x, c2, px0 + 3, py0 + 4, 18, 14); px(x, '#e8dcc0', px0 + 3, py0 + 22, 18, 2); px(x, '#e8dcc0', px0 + 3, py0 + 26, 12, 2); };
+      poster(96, 214, '#a83420', '#e8c070'); poster(352, 214, '#24406c', '#e8dcc0'); poster(452, 214, '#2c5c34', '#c89020');
+      shade(x, 512, H, '#04040a', 0, 30);
+      add('wall', c, 0.5, { vtile: true });
+    } else if (theme === 'hotel') { // Hotel-Lobby (Belle Époque): grüne Damasttapete, Mahagoni, Messing-Gaslampen, hohe Bogenfenster – dahinter die verregnete Stadt
+      const sky = C(640, 208), xs = sky.getContext('2d');
+      smooth(xs, 640, 208, ['#020208', '#060414', '#0c0820', '#120c28', '#1a1030', '#221434', '#2a1836', '#341c36', '#3c2034']);
+      for (let i = 0; i < 40; i++) px(xs, rand() < 0.3 ? '#fcfcfc' : '#7c7c9c', ri(0, 639), ri(0, 60));
+      add('sky', sky, 0, { wrap: false });
+      // Stadt: Dächer mit Giebeln und Mansarden, Schornsteine, ein Kirchturm mit Uhr, erleuchtete Fenster, Gaslaternen im Regen
+      const city = C(512, 208), xc = city.getContext('2d');
+      for (let X = 0; X < 512;) {
+        const w = ri(18, 40), top = ri(78, 124), roof = ri(0, 2);
+        for (let k = 0; k < w; k++) {
+          let t = top;
+          if (roof === 1) t = top - Math.round((w / 2 - Math.abs(k - w / 2)) * 0.6); // Giebel
+          else if (roof === 2 && k > w * 0.25 && k < w * 0.75) t = top - 7; // Mansarde
+          px(xc, k === 0 ? '#140c1c' : '#0a0612', (X + k) % 512, t, 1, 208 - t);
+        }
+        if (rand() < 0.55) { const cx = X + ri(3, Math.max(4, w - 7)); px(xc, '#0a0612', cx % 512, top - 13, 4, 13); px(xc, '#0a0612', (cx - 1) % 512, top - 14, 6, 2); } // Schornstein
+        for (let wy = top + 8; wy < 196; wy += 11) for (let wx = X + 3; wx < X + w - 4; wx += 6) if (rand() < 0.3) { px(xc, rand() < 0.7 ? '#b07828' : '#fcd070', wx % 512, wy, 2, 4); px(xc, '#3c2410', wx % 512, wy + 4, 2, 1); }
+        X += w;
+      }
+      for (let k = 0; k < 20; k++) { const t = 26 + Math.abs(k - 10) * 5; px(xc, '#08040e', 300 + k, t, 1, 208 - t); } // Kirchturm
+      px(xc, '#08040e', 309, 6, 2, 22); px(xc, '#c89020', 306, 58, 8, 8); px(xc, '#fce0a8', 307, 59, 6, 6); px(xc, '#3c2410', 309, 60, 1, 3); px(xc, '#3c2410', 310, 62, 2, 1); // Spitze, Turmuhr
+      [40, 150, 230, 380, 470].forEach(lx => { // Gaslaternen vor den Häusern
+        px(xc, '#140c10', lx, 160, 1, 48); px(xc, '#140c10', lx - 2, 158, 5, 3);
+        for (let r = 9; r > 0; r--) { xc.globalAlpha = 0.05; xc.fillStyle = '#fcc860'; xc.beginPath(); xc.arc(lx + 0.5, 156, r, 0, Math.PI * 2); xc.fill(); }
+        xc.globalAlpha = 1; px(xc, '#fcd070', lx - 1, 154, 3, 4); px(xc, '#fcf4c0', lx, 155, 1, 2);
+      });
+      add('city', city, 0.1);
+      L.push({ name: 'rainOut', custom: drawRainOut, par: 0, c: C(1, 1) });
+      const H = 320, c = C(512, H), x = c.getContext('2d');
+      const WINS = [[154, 34, 60, 172], [410, 34, 60, 172]]; // x, Oberkante, Breite, Höhe
+      const inWin = (X, Y, [wx, wy, ww, wh]) => { const r = ww / 2; if (X < wx || X >= wx + ww || Y < wy || Y >= wy + wh) return false; return Y >= wy + r || (X + 0.5 - wx - r) ** 2 + (Y + 0.5 - wy - r) ** 2 <= r * r; };
+      // Tapete: dunkelgrüner Damast mit Lilienmuster, unten Mahagoni-Vertäfelung mit Füllungen und Stuhlleiste
+      for (let Y = 0; Y < H; Y++) for (let X = 0; X < 512; X++) {
+        const u = (X % 20) - 10, v = (Y % 30) - 15, fl = Math.abs(u) < 7 - Math.abs(v) * 0.42 && Math.abs(Math.sin(u * 0.55) * 4 - v * 0.55) < 3.5;
+        let col = fl ? '#1e463a' : (X + Y * 2) % 9 === 0 ? '#0e2620' : '#122e26';
+        if (Y >= 236) { // Vertäfelung
+          const pX = X % 64, pY = Y - 236;
+          col = pY < 3 ? (pY === 0 ? '#c89020' : '#5c2c10') : (pX < 4 || pX > 59 || pY < 8 || pY > 74) ? '#2c1206' : (pX < 6 || pX > 57 || pY < 10 || pY > 72) ? '#4c2210' : (X + Y) % 11 === 0 ? '#3c1a0a' : '#341608';
+          if (pY >= 8 && pY <= 74 && (pX === 4 || pY === 8)) col = '#6c3418'; // Lichtkante der Füllung
+        }
+        px(x, col, X, Y);
+      }
+      shade(x, 512, H, '#040a08', 0, 46);
+      // Bogenfenster: Messingrahmen, Sprossen, Regentropfen am Glas; schwere bordeauxrote Vorhänge mit Goldquasten
+      WINS.forEach(([wx, wy, ww, wh]) => {
+        for (let Y = wy - 7; Y < wy + wh + 6; Y++) for (let X = wx - 7; X < wx + ww + 7; X++) {
+          const inside = inWin(X, Y, [wx, wy, ww, wh]), near = inWin(X - 5, Y, [wx, wy, ww, wh]) || inWin(X + 5, Y, [wx, wy, ww, wh]) || inWin(X, Y + 6, [wx, wy, ww, wh]) || inWin(X, Y - 5, [wx, wy, ww, wh]);
+          if (!inside && near) { px(x, (X + Y) % 6 ? '#3c1c0a' : '#5c2c10', X, Y); continue; } // Mahagoni-Laibung
+          if (!inside) continue;
+          const lx = X - wx, ly = Y - wy, mull = Math.abs(lx - ww / 2 + 0.5) < 1.5, bar = ly > ww / 2 && (ly - ww / 2) % 34 < 2, side = lx % 20 === 0;
+          if (mull || bar || side) px(x, mull || bar ? '#a87c34' : '#7c5824', X, Y);
+          else if (hn(X, Y, 31) > 0.985) px(x, 'rgba(180,200,255,0.5)', X, Y); // Tropfen am Glas
+          else x.clearRect(X, Y, 1, 1);
+        }
+        px(x, '#a87c34', wx - 9, wy + wh + 3, ww + 18, 2); px(x, '#2c1206', wx - 9, wy + wh + 5, ww + 18, 3); // Fensterbank
+        px(x, '#c89020', wx - 34, 22, ww + 68, 3); px(x, '#fce0a8', wx - 34, 22, ww + 68, 1); // Vorhangstange
+        [[wx - 34, 1], [wx + ww + 6, -1]].forEach(([cx0, s]) => {
+          for (let Y = 25; Y < 236; Y++) {
+            const tie = 140, g = Y < tie ? 1 - (Y - 25) / (tie - 25) * 0.5 : 0.5 + (Y - tie) / (236 - tie) * 0.55, w = Math.round(28 * g), X0 = s > 0 ? cx0 : cx0 + 28 - w;
+            for (let X = 0; X < w; X++) { const f = Math.sin((X / Math.max(1, w)) * Math.PI * 4 + Y * 0.012) * 0.5 + 0.5; px(x, f > 0.8 ? '#8c1828' : f > 0.45 ? '#6c0c1c' : f > 0.15 ? '#4c0614' : '#2c020a', X0 + X, Y); }
+            if (Y > tie - 2 && Y < tie + 2) px(x, '#c89020', X0 - 1, Y, w + 2, 1);
+          }
+          const tx = cx0 + 13; px(x, '#f8b800', tx, 143, 3, 4); for (let k = 0; k < 9; k++) px(x, k % 2 ? '#c89020' : '#fce0a8', tx - 1 + (k % 5), 147 + (k >> 1), 1, 3);
+        });
+      });
+      // Gemälde in Goldrahmen zwischen den Fenstern: ein Herr mit Zwirbelbart (der Hotelier?) und ein Mondschein über dem Schloss
+      const frame = (fx, fy, fw, fh) => { px(x, '#5c3c10', fx - 4, fy - 4, fw + 8, fh + 8); px(x, '#c89020', fx - 3, fy - 3, fw + 6, fh + 6); px(x, '#f8d878', fx - 3, fy - 3, fw + 6, 1); px(x, '#7c5414', fx - 1, fy - 1, fw + 2, fh + 2); px(x, '#140c08', fx, fy, fw, fh); };
+      frame(40, 70, 54, 70);
+      for (let Y = 0; Y < 70; Y++) for (let X = 0; X < 54; X++) px(x, Y < 40 ? (bay(X, Y) < Y / 50 ? '#2c1c24' : '#1c1018') : '#24140c', 40 + X, 70 + Y); // dunkler Grund
+      px(x, '#d8a070', 58, 86, 18, 20); px(x, '#b07848', 58, 102, 18, 4); px(x, '#1c1410', 56, 80, 22, 8); px(x, '#1c1410', 60, 76, 14, 4); // Gesicht, Haar
+      px(x, '#140c08', 62, 92, 3, 2); px(x, '#140c08', 69, 92, 3, 2); px(x, '#3c1c10', 60, 99, 14, 2); px(x, '#3c1c10', 57, 98, 4, 1); px(x, '#3c1c10', 73, 98, 4, 1); px(x, '#3c1c10', 56, 97, 2, 1); px(x, '#3c1c10', 76, 97, 2, 1); // Augen, Zwirbelbart
+      px(x, '#141018', 48, 108, 38, 32); px(x, '#e8e0d0', 63, 108, 8, 12); px(x, '#a80020', 65, 110, 4, 3); px(x, '#c89020', 66, 116, 2, 2); // Frack, Hemd, Fliege, Orden
+      frame(300, 82, 70, 44);
+      for (let Y = 0; Y < 44; Y++) for (let X = 0; X < 70; X++) px(x, Y > 32 ? '#0c140c' : bay(X, Y) < Y / 40 ? '#1c2440' : '#141a34', 300 + X, 82 + Y); // Nachthimmel, Hügel
+      for (let r = 6; r >= 0; r--) { px(x, r === 0 ? '#fcf4c0' : '#e8d898', 352 - r, 92 - r, 1 + 2 * r, 1); } px(x, '#fcf4c0', 349, 89, 7, 7); // Mond
+      for (let k = 0; k < 22; k++) { const t = 18 + Math.abs(k - 11) * 1.2; px(x, '#06080c', 310 + k, 82 + Math.round(t), 1, 44 - Math.round(t)); } px(x, '#06080c', 320, 92, 2, 10); px(x, '#06080c', 314, 98, 2, 6); px(x, '#fcd070', 318, 112, 1, 2); // Schloss
+      // Messing-Wandlampen (Gas): Arm, Tulpenglas, warmer Schein auf der Tapete
+      const sconce = (lx, ly) => {
+        for (let r = 22; r > 0; r -= 2) { x.globalAlpha = 0.035; x.fillStyle = '#fcc860'; x.beginPath(); x.arc(lx + 0.5, ly, r, 0, Math.PI * 2); x.fill(); }
+        x.globalAlpha = 1;
+        px(x, '#7c5414', lx - 3, ly + 8, 7, 3); px(x, '#c89020', lx - 2, ly + 8, 5, 1); px(x, '#a87c34', lx, ly + 2, 1, 7); px(x, '#c89020', lx - 4, ly + 4, 9, 1); // Wandplatte, Arm
+        px(x, '#e8d8a8', lx - 2, ly - 3, 5, 6); px(x, '#fcf4d0', lx - 1, ly - 2, 3, 3); px(x, '#c89020', lx - 3, ly + 3, 7, 1); // Tulpenglas
+      };
+      [10, 122, 246, 266, 378, 502].forEach(lx => sconce(lx, 120));
+      // Pilaster aus Mahagoni mit vergoldeten Kapitellen zwischen den Feldern
+      const PT = ['#140602', '#2c1206', '#4c2210', '#6c3418', '#8c4c24', '#6c3418', '#4c2210', '#2c1206'];
+      for (const bx of [0, 256]) for (let X = -8; X < 8; X++) {
+        const XX = (bx + X + 512) % 512, col = PT[(X + 8) >> 1];
+        px(x, col, XX, 20, 1, 216);
+        px(x, (X + 8) % 4 === 1 ? '#f8d878' : '#c89020', XX, 20, 1, 7); px(x, '#5c3c10', XX, 27, 1, 1); px(x, '#c89020', XX, 228, 1, 4); // Kapitell, Sockel
+      }
+      // große Wanduhr über dem Empfang (zeigt immer kurz vor Mitternacht)
+      const ux = 228, uy = 52;
+      for (let r = 15; r >= 0; r--) for (let a = 0; a < 64; a++) { const X = Math.round(ux + Math.cos(a / 64 * Math.PI * 2) * r), Y = Math.round(uy + Math.sin(a / 64 * Math.PI * 2) * r); px(x, r > 13 ? '#c89020' : r > 12 ? '#5c3c10' : '#e8dcc0', X, Y); }
+      for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; px(x, '#3c2410', Math.round(ux + Math.cos(a) * 10), Math.round(uy + Math.sin(a) * 10), 1, 1); }
+      for (let k = 0; k < 8; k++) px(x, '#140c08', ux, uy - k, 1, 1); for (let k = 0; k < 6; k++) px(x, '#140c08', ux - Math.round(k * 0.5), uy - k, 1, 1); // Zeiger: fünf vor zwölf
+      // Kassettendecke mit Goldleisten und Zahnschnitt
+      px(x, '#140602', 0, 0, 512, 20); for (let X = 0; X < 512; X += 32) { px(x, '#2c1206', X + 3, 2, 26, 10); px(x, '#4c2210', X + 5, 4, 22, 6); px(x, '#c89020', X + 3, 2, 26, 1); }
+      for (let X = 0; X < 512; X += 6) px(x, '#5c2c10', X, 14, 4, 3); px(x, '#c89020', 0, 18, 512, 1); px(x, '#5c3c10', 0, 19, 512, 1);
+      add('wall', c, 0.5, { vtile: true });
     } else if (theme === 'ballroom') { // Ballsaal: Spiegelsaal in PS2-3D (js/ballroom.js)
       L.push({ name: 'hall3d', custom: (c2, cam, f) => Ball.drawHall(c2, cam, f), par: 0.5, c: C(1, 1) });
     } else if (theme === 'expo') {
@@ -2039,21 +2212,23 @@ const Tiles = (() => {
     if (cache[theme]) return cache[theme];
     seed = 42;
     const p = PALS[theme];
-    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), forest: () => earth(p.a), expo: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }), cathedral: (o) => marble(p.a, o), spire: (o) => marble(p.a, o), ballroom: (o) => marble(p.a, o), ice: (o) => iceTile(p.a, o) }[theme];
+    const gen = { gallery: (o) => marble(p.a, o), bridge: (o) => stone(p.a, o), vortex: (o) => stone(p.a, o), courtyard: (o) => stone(p.a, o), forest: () => earth(p.a), expo: (o) => stone(p.a, o), hall: (o) => bricks(p.a, o), cave: () => rock(p.a), crypt: (o) => bricks(p.a, o), tower: (o) => stone(p.a, o), throne: (o) => bricks(p.a, o), glass: (o) => marble(p.a, o), foyer: (o) => checker(o), library: (o) => parquet(o), ship: () => planks(p.a, { hull: true }), cathedral: (o) => marble(p.a, o), spire: (o) => marble(p.a, o), ballroom: (o) => marble(p.a, o), ice: (o) => iceTile(p.a, o), hotel: () => parquet({}), station: (o) => bricks(p.a, o) }[theme];
     const ground = [gen({}), gen({ crack: true }), gen({ chip: true }), gen({})];
     const groundTop = theme === 'throne' ? [0, 1, 2, 3].map(() => bricks(p.a, { carpet: true }))
       : theme === 'ship' ? [0, 1, 2, 3].map(() => planks(p.a, { top: true }))
       : theme === 'glass' || theme === 'gallery' || theme === 'cathedral' || theme === 'spire' || theme === 'ballroom' ? [0, 1, 2, 3].map(() => marble(p.a, { inlay: true }))
       : theme === 'library' ? [0, 1, 2, 3].map(() => parquet({ top: true }))
+      : theme === 'hotel' ? [0, 1, 2, 3].map(() => hotelCarpet())
+      : theme === 'station' ? [0, 1, 2, 3].map(() => platformTop())
       : theme === 'forest' ? [0, 1, 2, 3].map(() => earth(p.a, { top: true }))
       : theme === 'expo' ? [0, 1, 2, 3].map(() => tilesTop())
       : theme === 'ice' ? [0, 1, 2, 3].map(i => iceTile(p.a, { top: true, crack: i === 1 }))
       : theme === 'foyer' ? [checker({ top: true }), checker({ top: true, crack: true }), checker({ top: true }), checker({ top: true })] : ground;
-    const alt = theme === 'ice' ? [0, 1, 2].map(() => iceTile(p.b, { top: true })) : theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [balcony(), balcony(), balcony()] : theme === 'throne' || theme === 'ballroom' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : theme === 'forest' ? [logTile(), logTile(), logTile()] : theme === 'expo' ? [ironGrate(), ironGrate(), ironGrate()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
+    const alt = theme === 'ice' ? [0, 1, 2].map(() => iceTile(p.b, { top: true })) : theme === 'gallery' || theme === 'cathedral' || theme === 'spire' ? [balcony(), balcony(), balcony()] : theme === 'throne' || theme === 'ballroom' ? [goldLedge(), goldLedge(), goldLedge()] : theme === 'bridge' ? [bridgeDeck(), bridgeDeck(), bridgeDeck()] : theme === 'ship' ? [beam(p.b), beam(p.b), beam(p.b)] : theme === 'glass' ? [balcony(), balcony(), balcony()] : theme === 'foyer' || theme === 'hotel' ? [gallery(), gallery(), gallery()] : theme === 'library' ? [shelfWalk(), shelfWalk(), shelfWalk()] : theme === 'forest' ? [logTile(), logTile(), logTile()] : theme === 'expo' || theme === 'station' ? [ironGrate(), ironGrate(), ironGrate()] : [stone(p.b, {}), stone(p.b, { crack: true }), stone(p.b, {})];
     const t = {
       ground, groundTop, alt,
       X: stone(p.b, { crack: true, chip: true }), Y: stone(p.b, { crack: true, chip: true }),
-      spikes: spikes(), up: theme === 'library' ? stairTile(p.b, 1, '#e8c070') : theme === 'foyer' ? carpetStair(1) : theme === 'ship' ? ratline(1) : theme === 'glass' ? stairTile(p.a, 1, '#fce0a8') : stairTile(p.b, 1), down: theme === 'library' ? stairTile(p.b, -1, '#e8c070') : theme === 'foyer' ? carpetStair(-1) : theme === 'ship' ? ratline(-1) : theme === 'glass' ? stairTile(p.a, -1, '#fce0a8') : stairTile(p.b, -1),
+      spikes: spikes(), up: theme === 'library' ? stairTile(p.b, 1, '#e8c070') : theme === 'foyer' || theme === 'hotel' ? carpetStair(1) : theme === 'ship' ? ratline(1) : theme === 'glass' ? stairTile(p.a, 1, '#fce0a8') : stairTile(p.b, 1), down: theme === 'library' ? stairTile(p.b, -1, '#e8c070') : theme === 'foyer' || theme === 'hotel' ? carpetStair(-1) : theme === 'ship' ? ratline(-1) : theme === 'glass' ? stairTile(p.a, -1, '#fce0a8') : stairTile(p.b, -1),
       toppers: [0, 1, 2, 3].map(v => topper(theme, v)), hangers: [0, 1, 2].map(v => hanger(theme, v)),
       bg: buildBg(theme), crate: theme === 'ship' ? crate(p.b) : null,
       B: theme === 'library' ? [0, 1, 2, 3].map(() => bookcase(false)) : null, Btop: theme === 'library' ? [0, 1, 2, 3].map(() => bookcase(true)) : null,
@@ -2984,6 +3159,12 @@ const Tiles = (() => {
       px(x, '#0a0402', 0, 0, 640, 6);
       [0, 160, 320, 480].forEach(bx => { px(x, '#0a0402', bx, 0, 14, 12); for (let k = 0; k < 8; k++) px(x, '#0a0402', bx + 2 + k, 12 + k, 10 - k, 1); px(x, '#2c1406', bx + 13, 0, 1, 12); });
       [96, 416].forEach(lx => { for (let y = 6; y < 38; y += 3) px(x, '#1c1418', lx, y, 1, 2); px(x, '#140c08', lx - 4, 38, 9, 7); px(x, '#5c3c1c', lx - 3, 39, 7, 1); px(x, '#fcd040', lx - 1, 41, 3, 3); px(x, '#140c08', lx - 2, 45, 5, 2); });
+    } else if (theme === 'station') { // vorn: Gitterträger unter dem Dach (Fachwerk aus Eisen)
+      px(x, '#05080a', 0, 0, 640, 5); px(x, '#05080a', 0, 14, 640, 3); px(x, '#2c403a', 0, 14, 640, 1);
+      for (let X = 0; X < 640; X += 12) for (let k = 0; k < 9; k++) { px(x, '#05080a', X + k, 5 + k, 2, 1); px(x, '#05080a', X + 12 - k, 5 + k, 2, 1); }
+    } else if (theme === 'hotel') { // dunkler Deckenbalken mit Goldleiste, zwei Glaskugellampen an Messingketten
+      px(x, '#0a0402', 0, 0, 640, 7); px(x, '#5c3c10', 0, 7, 640, 1);
+      [150, 470].forEach(lx => { for (let y = 8; y < 34; y += 3) px(x, '#2c2010', lx, y, 1, 2); px(x, '#1c1408', lx - 5, 34, 11, 2); px(x, '#3c2c14', lx - 4, 36, 9, 7); px(x, '#fcd070', lx - 2, 38, 5, 3); px(x, '#1c1408', lx - 3, 43, 7, 2); });
     } else if (theme === 'hall' || theme === 'throne') {
       [0, 320].forEach(cx => {
         for (let X = 0; X < 120; X++) { const h = 10 + Math.round(Math.sin(X / 120 * Math.PI) * -6 + 6 + (X % 8 < 4 ? 1 : 0)); px(x, '#1c0006', cx + X, 0, 1, h + 10); px(x, '#3c0010', cx + X, h + 9, 1, 1); }
