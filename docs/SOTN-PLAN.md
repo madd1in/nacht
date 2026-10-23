@@ -174,7 +174,7 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
 | **1 (Prototyp erledigt)** | Kapitel werden Regionen eines Schlosses: Türen in beide Richtungen, Knoten Eingangshalle (Keller-, Turm-, Siegeltor), Wege hinter den Bossen, Einbahnen mit Rückweg, eine Karte für das ganze Schloss, Bosse geben Siegel und bleiben besiegt, kein Zeitlimit | alle Regionen frei begehbar, Thron hinter 5 Siegeln |
 | **1b (teilweise erledigt)** | erledigt: Speicherkammern mit Spielstand, „Fortsetzen" im Titel und nach Game Over, Warpkammern mit Schnellreise über die Karte. Offen: feste Raum-IDs, Regionsmusik ohne Neustart, Spielstand-Slots | Spielstand überlebt Umsortieren von `levels.js` |
 | **2 Relikte (erledigt bis auf den Prüfer)** | Fluch am Burgtor, 9 Relikte (Doppelsprung, Dash, Ring-Greifen, Wandsprung, Steinbrecher, Fledermaus-, Nebel-, Wolfsgestalt, Dampfstiefel) auf Sockeln, bei Bossen und bei den Zwischengegnern Eishexe und Zugführer, rissiges Gestein vor Zusatzräumen, Dachboden nur fliegend, Kerkerzelle nur als Nebel, Gepäckraum im Hotel nur als Wolf. Selbsttest prüft Türen/Figuren/Gitter/Texte/Modelle/Puppen und die Erreichbarkeit aller Räume über Türen. Offen: Erreichbarkeit innerhalb der Räume (Sprunghöhen) | ganzes Schloss ohne Softlock durchspielbar |
-| **3 RPG (fast erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand, Ausrüstung (Waffe/Rüstung/Amulett) mit Drops und Einzelstücken, Tränke, Laden des Bibliothekars, Schlosskarte, drei Begleiter mit Stufen, MP und drei Zauber per Befehlseingabe, Bestiarium, Verkaufen. Offen: weitere Zauber und Gestalten | Statusbildschirm, Shop |
+| **3 RPG (fast erledigt)** | erledigt: EXP/Stufe mit LEVEL UP, max. HP/STR/CON je Stufe, Schadenszahlen, Beute, Statusbildschirm, Stufe im Spielstand, Ausrüstung (Waffe/Rüstung/Amulett) mit Drops und Einzelstücken, Tränke, Laden des Bibliothekars, Schlosskarte, drei Begleiter mit Stufen, MP und drei Zauber per Befehlseingabe, Bestiarium, Verkaufen. vier Zauber (mit Tetra-Seelen), Nebenaufträge mit Auftragsbuch. Offen: weitere Gestalten | Statusbildschirm, Shop |
 | **4 Bosse & Siegel (erledigt)** | Arenen mit Hintertür, Siegeltor, eigenes Ende (Epilog der drei Figuren, Ergebnis mit Rang nach Erkundungsgrad, Neues Spiel+), neue Verbindungsräume | Abspann im Schloss-Modus |
 | **4b Geschichte & Verzahnung (erledigt)** | drei Figuren mit absurden Gesprächen im Maniac-Mansion-Ton (zweiter Held, Bibliothekar, lila Tentakel), elf Szenen entlang der Relikte und Siegel; drei Schleifen (Geheimgang Kolosseum ↔ Brunnenschacht, Wehrgang Bergfried ↔ Glockenturm, Himmelsbrücke Kathedralendach ↔ Kuppel). Offen: weitere Figuren, Szene nach dem Grafen | jede Region über mindestens zwei Wege erreichbar |
 | 5 Kür | Warp-Spiegel, Schlosskarte, Geheimwände (`X`/`Y` gibt es schon), „Umgedrehtes Schloss" als Mode-7-Spiegelung | 200 % |
@@ -305,6 +305,13 @@ heute pro Kapitel (`W.songName()`), Regionsname als Einblendung beim ersten Betr
   Wahl: **NEUES SPIEL+** (Stufe, EXP, Gold, Ausrüstung, Begleiter, Zauber und gesehene Szenen bleiben; Karte, Relikte, Bosse,
   Gefäße, Warpkammern und rissige Wände auf Anfang; der Fluch schlägt wieder zu; je Runde +2 Gefahrenstufen; Start am Burgtor)
   oder der bekannte **Abspann**. Test: Pause → TEST-WERKZEUGE → ZUM ENDE.
+- **Nebenaufträge** (Status, vierte Seite „AUFTRÄGE“: Auftraggeber, gefundene Stücke, erledigt):
+  **Die Ausreißer** (Bibliothekar: Kochbuch im Hotel, Liebesroman auf dem Wehrgang, Telefonbuch im Bahnhof → Zauberbuch
+  **Tetra-Seelen**, ↑ ↗ → ↘ ↓ + Angriff, 20 MP, vier Seelen), **Die Koffer aus Zimmer 7** (Portier: Kolosseum, Dachboden,
+  Kanal → Portiersmütze, MP +12), **Die Untertasse** (Gefangener, seit 1391 vermisst, liegt in der Minibar von Zimmer 13 →
+  Eisenkugel, ATT +4). `QUESTS`, Szenen mit `give`/`take`; die Stücke bleiben beim Auftraggeber. Ausrüstung kann jetzt
+  auch MP geben (`gear('mp')`).
+- **Karte:** Figuren als Marke (blinkt gelb, wenn sie etwas Neues zu erzählen haben).
 - **Spiegelkabinett und der Doppelgänger** (Tür in der Marmorgalerie, x 34, Stufe 4): Marmorsaal mit Standspiegeln aus
   Blender, die den Helden spiegeln – solange der Doppelgänger lebt, mit Verzögerung. Er tritt aus dem rechten Spiegel: dein
   eigenes Bild in Dunkelviolett mit roten Augen, deine Waffe und Reichweite, hält Abstand, springt, weicht deinen Hieben mit

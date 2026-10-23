@@ -1402,7 +1402,14 @@ const Castle = (() => {
     book_hellfire: { spell: 'hellfire', price: 6000, col: '#fc7c1c' },
     book_soulsteal: { spell: 'soulsteal', price: 12000, col: '#d880fc' },
     robe: { slot: 'armor', def: 3, regen: 1, price: 4500, col: '#f0e8e0' },
-    pillow: { slot: 'armor', def: 5, col: '#e8e4f8' },                       // Daunenkissen aus Zimmer 13 (Geschenk des Tentakels)     // Hotelbademantel (Portier): weich, heilt langsam
+    pillow: { slot: 'armor', def: 5, col: '#e8e4f8' },                       // Daunenkissen aus Zimmer 13 (Geschenk des Tentakels)
+    // Nebenaufträge: drei entlaufene Bücher (Bibliothekar), drei Koffer aus Zimmer 7 (Portier), die Untertasse (Gefangener)
+    qbook_cook: { quest: 'book', col: '#e8a848' }, qbook_love: { quest: 'book', col: '#fc7cc8' }, qbook_phone: { quest: 'book', col: '#7cb8fc' },
+    qcase1: { quest: 'case', col: '#a86c34' }, qcase2: { quest: 'case', col: '#7c4c24' }, qcase3: { quest: 'case', col: '#c8884c' },
+    saucer: { quest: 'saucer', col: '#f0f0f8' },
+    book_tetra: { spell: 'tetra', col: '#58f8f8' },                          // Lohn des Bibliothekars: Tetra-Seelen
+    porter: { slot: 'acc', mp: 12, def: 1, col: '#c83040' },                  // Portiersmütze (Lohn für die Koffer)
+    ironball: { slot: 'acc', atk: 4, col: '#8c8c9c' },                        // Eisenkugel des Gefangenen (Lohn für die Untertasse)     // Hotelbademantel (Portier): weich, heilt langsam
     // Schallplatten fürs Grammophon im Hotel (spielen ein Stück des Schlosses): gefunden, gekauft, eine liegt schon auf dem Teller
     rec_hotel: { rec: 'hotel', col: '#c89020' }, rec_title: { rec: 'title', col: '#9c6cfc' }, rec_stage1: { rec: 'stage1', price: 1500, col: '#fc7460' },
     rec_sea: { rec: 'sea', price: 1500, col: '#3cbcfc' }, rec_boss: { rec: 'boss', price: 3000, col: '#fc3c3c' }, rec_stage2: { rec: 'stage2', col: '#58f898' },
@@ -1413,7 +1420,7 @@ const Castle = (() => {
   const hasRec = (id) => id === 'hotel' || !!inv['rec_' + id];
   const SLOTS = ['weapon', 'armor', 'acc', 'fam'], DRINKS = ['potion', 'elixir'];
   const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'fairy', 'map', 'book_spirit', 'book_hellfire', 'book_soulsteal'];
-  const once = (g) => !!(g.slot || g.key || g.spell || g.rec); // gibt es nur einmal
+  const once = (g) => !!(g.slot || g.key || g.spell || g.rec || g.quest); // gibt es nur einmal
   const BOSS_LOOT = [[[0, -1], 'batcard']];
   const MINI_LOOT = [[['side', 'spiegel'], 'shadowcard', 20, 10]]; // nach dem Doppelgänger: sein Schatten als Begleiter
   const FINDS = [ // Einzelstücke: [Raum, Gegenstand, Kachel-x, Standreihe]
@@ -1423,7 +1430,18 @@ const Castle = (() => {
     [['side', 'schatz'], 'rec_library', 19, 6], [['side', 'kanal'], 'rec_expo', 81, 7], [['side', 'verlies'], 'rec_chapel', 13, 7],
     [['side', 'himmel'], 'rec_sun', 66, 8], [['side', 'hotel'], 'rec_title', 58, 16], [['side', 'bahnhof'], 'rec_stage2', 66, 10],
     [['side', 'bahnhof'], 'rec_ending', 76, 3],
+    [['side', 'hotel'], 'qbook_cook', 54, 10], [['side', 'wehrgang'], 'qbook_love', 38, 6], [['side', 'bahnhof'], 'qbook_phone', 5, 8],
+    [['side', 'kolosseum'], 'qcase1', 57, 6], [['side', 'attic'], 'qcase2', 30, 10], [['side', 'kanal'], 'qcase3', 100, 10],
+    [['side', 'zimmer13'], 'saucer', 7, 10],
   ];
+  // Nebenaufträge (Status, vierte Seite): Auftraggeber, Stücke, Szene zum Annehmen und zum Abgeben
+  const QUESTS = [
+    { id: 'books', who: 'lib', items: ['qbook_cook', 'qbook_love', 'qbook_phone'], start: 'libq', end: 'libq2' },
+    { id: 'cases', who: 'conc', items: ['qcase1', 'qcase2', 'qcase3'], start: 'concq', end: 'concq2' },
+    { id: 'saucer', who: 'pris', items: ['saucer'], start: 'pris2', end: 'pris3' },
+  ];
+  const questHas = (q) => q.items.every(i => inv[i]);
+  const questState = (q) => flag['story_' + q.end] ? 'done' : flag['story_' + q.start] || q.items.some(i => inv[i]) ? 'open' : null;
   const DROPS = [['potion', 'potion', 'leather', 'silver'], ['potion', 'potion', 'chain', 'bloodrune', 'elixir'], ['potion', 'elixir', 'elixir', 'chain', 'bloodrune']];
   function gear(stat) { let n = 0; for (const s of SLOTS) { const g = eq[s] && GEAR[eq[s]]; if (g && g[stat]) n += g[stat]; } return n; }
   const itemName = (id) => tr('item_' + id), itemDesc = (id) => tr('itemD_' + id);
@@ -1448,6 +1466,9 @@ const Castle = (() => {
     else if (g.slot === 'acc') { R(2, 3, 6, 1, '#c89020'); R(2, 8, 6, 1, '#c89020'); R(1, 4, 1, 4, '#c89020'); R(8, 4, 1, 4, '#c89020'); R(3, 0, 4, 3, c); R(4, 1, 1, 1, '#fcfcfc'); }
     else if (g.slot === 'fam') { R(1, 0, 8, 10, c); R(2, 1, 6, 8, '#1c1028'); R(3, 3, 4, 3, c); R(4, 2, 2, 1, c); R(3, 7, 4, 1, '#c89020'); } // Begleiterkarte wie in SotN
     else if (g.spell) { R(1, 1, 8, 8, '#3c1c5c'); R(1, 1, 8, 1, '#c89020'); R(1, 8, 8, 1, '#c89020'); R(2, 2, 6, 6, '#24103c'); R(4, 3, 2, 3, c); R(3, 4, 4, 1, c); R(8, 2, 1, 6, '#e8e0c8'); } // Zauberbuch
+    else if (g.quest === 'book') { R(1, 1, 8, 8, c); R(1, 1, 8, 1, '#fce0a8'); R(2, 2, 6, 6, '#3c2410'); R(3, 3, 4, 1, c); R(3, 5, 3, 1, c); R(8, 2, 1, 6, '#e8e0c8'); R(0, 8, 2, 2, c); R(8, 8, 2, 2, c); } // entlaufenes Buch (mit Beinchen)
+    else if (g.quest === 'case') { R(1, 3, 8, 6, c); R(1, 3, 8, 1, '#e8c088'); R(3, 1, 4, 2, '#3c2410'); R(4, 1, 2, 1, '#c89020'); R(1, 6, 8, 1, '#3c2410'); R(4, 5, 2, 2, '#f8b800'); } // Koffer
+    else if (g.quest === 'saucer') { R(0, 5, 10, 2, c); R(1, 7, 8, 1, '#a8a8b8'); R(3, 4, 4, 1, '#d8d8e8'); R(1, 5, 2, 1, '#7c9cd8'); } // Untertasse mit blauem Rand
     else if (g.rec) { R(1, 1, 8, 8, '#141418'); R(0, 2, 10, 6, '#141418'); R(2, 0, 6, 10, '#141418'); R(2, 2, 1, 1, '#4c4c5c'); R(3, 3, 4, 4, c); R(4, 4, 2, 2, '#fcfcfc'); } // Schallplatte
     else if (g.heal) { R(4, 0, 2, 1, '#8c5c2c'); R(4, 1, 2, 2, '#c8d8e8'); R(2, 3, 6, 6, '#c8d8e8'); R(3, 5, 4, 4, c); R(3, 4, 1, 2, '#fcfcfc'); }
     else { R(1, 2, 8, 6, c); R(0, 1, 2, 8, '#a89060'); R(8, 1, 2, 8, '#a89060'); R(3, 4, 4, 1, '#6c4410'); R(3, 6, 3, 1, '#6c4410'); }
@@ -1615,10 +1636,11 @@ const Castle = (() => {
     spirit: { mp: 5, cmd: ['B', 'F', 'U', 'D'], col: '#a4e4fc' },
     hellfire: { mp: 12, cmd: ['U', 'D', 'DF', 'F'], col: '#fc7c1c' },
     soulsteal: { mp: 24, cmd: ['B', 'F', 'DF', 'D', 'DB', 'B', 'F'], col: '#d880fc' },
+    tetra: { mp: 20, cmd: ['U', 'UF', 'F', 'DF', 'D'], col: '#58f8f8' },      // Tetra-Seelen: vier Seelen auf einmal (Lohn des Bibliothekars)
   };
-  const SPELL_IDS = ['spirit', 'hellfire', 'soulsteal'];
+  const SPELL_IDS = ['spirit', 'hellfire', 'tetra', 'soulsteal'];
   const known = (id) => !!inv['book_' + id];
-  const mpMax = () => SPELL_IDS.some(known) || relic.bat || relic.mist || relic.wolf ? 24 + 3 * (rpg.lv - 1) : 0;
+  const mpMax = () => SPELL_IDS.some(known) || relic.bat || relic.mist || relic.wolf ? 24 + 3 * (rpg.lv - 1) + gear('mp') : 0;
   let mp = 0, lastDir = '';
   const hist = [];
   const absDir = (s, face) => s.replace('F', face > 0 ? 'R' : 'L').replace('B', face > 0 ? 'L' : 'R');
@@ -1653,7 +1675,7 @@ const Castle = (() => {
       toBat(p); return;
     }
     if (!P.attack || p.state !== 'normal') return;
-    for (const id of ['soulsteal', 'hellfire', 'spirit']) {
+    for (const id of ['soulsteal', 'tetra', 'hellfire', 'spirit']) {
       if (!known(id) || !cmdMatch(SPELLS[id].cmd, p.face)) continue;
       hist.length = 0; P.attack = false; // kein Hieb dazu
       if (mp < SPELLS[id].mp) { W.popup(p.cx, p.y - 10, 'MP!', '#7c84a8'); Audio8.sfx('wall'); return; }
@@ -1666,6 +1688,10 @@ const Castle = (() => {
     W.popup(p.cx, p.y - 14, tr('spell_' + id), col); p.powerT = Math.max(p.powerT || 0, 16); Input.rumble(0.3, 0.3, 120);
     for (let i = 0; i < 14; i++) W.spawn(new Particle(p.cx + rnd(-10, 10), p.y + rnd(0, 30), rnd(-0.6, 0.6), rnd(-1.6, -0.2), i % 2 ? col : '#fcfcfc', 30, 1, 0));
     if (id === 'spirit') { W.spawn(new CastleSpell('spirit', p.cx, p.y + 4, p.face * 1.5, -1.2, 2 + 0.12 * lv)); Audio8.sfx('holy'); }
+    else if (id === 'tetra') { // vier Seelen fächern aus, jede sucht sich einen Gegner
+      for (let k = 0; k < 4; k++) { const a = -Math.PI / 2 + (k - 1.5) * 0.7; W.spawn(new CastleSpell('spirit', p.cx, p.y + 4, Math.cos(a) * 1.8 * (k < 2 ? -1 : 1) * p.face + p.face * 0.6, Math.sin(a) * 1.6, 1.8 + 0.1 * lv)); }
+      Audio8.sfx('holy'); Audio8.sfx('rosary');
+    }
     else if (id === 'hellfire') {
       for (const a of [-0.28, 0, 0.28]) W.spawn(new CastleSpell('fire', p.cx + p.face * 8, p.y + 12, Math.cos(a) * 3.4 * p.face, Math.sin(a) * 3.4, 2.2 + 0.1 * lv));
       Audio8.sfx('fire'); Audio8.sfx('boom'); W.shake = Math.max(W.shake, 4);
@@ -1934,26 +1960,26 @@ const Castle = (() => {
   // Statusbildschirm, Seite 2: gelernte Zauber mit Befehl (Blick nach rechts) und MP-Kosten
   function drawSpells(ctx) {
     const cx = View.cx, lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16);
-    const ARROW = { F: '→', B: '←', U: '↑', D: '↓', DF: '↘', DB: '↙' };
-    Font.draw(ctx, 'MP ' + mp + '/' + mpMax(), cx, 40, '#7cdcfc', { align: 'center', shadow: '#000' });
+    const ARROW = { F: '→', B: '←', U: '↑', D: '↓', DF: '↘', DB: '↙', UF: '↗' };
+    Font.draw(ctx, 'MP ' + mp + '/' + mpMax(), cx, 38, '#7cdcfc', { align: 'center', shadow: '#000' });
     SPELL_IDS.forEach((id, i) => {
-      const y = 60 + i * 34, k = known(id), s = SPELLS[id];
+      const y = 52 + i * 27, k = known(id), s = SPELLS[id];
       Font.draw(ctx, k ? tr('spell_' + id) : '???', lx, y, k ? s.col : '#5c5c6c', { shadow: '#000' });
       Font.draw(ctx, s.mp + ' MP', rx, y, k ? '#7cdcfc' : '#5c5c6c', { align: 'right', shadow: '#000' });
       if (k) {
-        Font.draw(ctx, s.cmd.map(c => ARROW[c]).join(' ') + '  + ' + tr('spellAttack'), lx + 8, y + 11, '#fcfcfc', { shadow: '#000' });
-        Font.draw(ctx, itemDesc('book_' + id), lx + 8, y + 21, '#b0a080');
-      } else Font.draw(ctx, tr('spellUnknown'), lx + 8, y + 11, '#5c5c6c');
+        Font.draw(ctx, s.cmd.map(c => ARROW[c]).join(' ') + '  + ' + tr('spellAttack'), lx + 8, y + 9, '#fcfcfc', { shadow: '#000' });
+        Font.draw(ctx, itemDesc('book_' + id), lx + 8, y + 18, '#b0a080');
+      } else Font.draw(ctx, tr('spellUnknown'), lx + 8, y + 9, '#5c5c6c');
     });
     const J = ' + ' + tr('spellJump'), forms = [['bat', '↓ ↑' + J, BAT_COST], ['mist', '↑ ↓' + J, MIST_COST], ['wolf', '↓ ↘ →' + J, WOLF_COST], ['boots', '↑ + ' + tr('dashKey'), 0]].filter(([k]) => relic[k]);
     forms.forEach(([k, cmd, cost], i) => { // Verwandlungen und Supersprung: eine Zeile je Relikt (Befehl, MP)
-      const y = 156 + i * 11;
+      const y = 162 + i * 10;
       Font.draw(ctx, tr('relic_' + k), lx, y, RELIC_COL[k], { shadow: '#000' });
       Font.draw(ctx, cmd, rx - 44, y, '#fcfcfc', { align: 'right', shadow: '#000' });
       if (cost) Font.draw(ctx, cost + '+ MP', rx, y, '#7cdcfc', { align: 'right', shadow: '#000' });
     });
-    if (forms.some(f => f[2])) Font.draw(ctx, tr('formBack'), cx, 201, '#b0a080', { align: 'center' });
-    Font.draw(ctx, tr('spellNote'), cx, forms.length ? 212 : 200, '#7c7c8c', { align: 'center' });
+    if (forms.some(f => f[2])) Font.draw(ctx, tr('formBack'), cx, 203, '#b0a080', { align: 'center' });
+    Font.draw(ctx, tr('spellNote'), cx, forms.length ? 213 : 200, '#7c7c8c', { align: 'center' });
   }
   let famEnt = null;
   function famTick() { // genau ein Begleiter, passend zum belegten Platz; nach Raumwechsel neu beim Helden
@@ -2028,7 +2054,7 @@ const Castle = (() => {
   // Speicherkammer (der Gegenstand ist ja sofort weg).
   const SELL = { bloodrune: 2000, dragonfang: 6000, mirror: 6000, bloodstone: 4000, luckcoin: 3000, greedring: 5000, chicken: 2500 };
   const sellPrice = (id) => SELL[id] || Math.floor((GEAR[id].price || 1000) / 2);
-  const sellable = () => Object.keys(GEAR).filter(id => { const g = GEAR[id]; if (!inv[id] || g.spell || g.key || g.rec || g.slot === 'fam') return false; return !(g.slot && eq[g.slot] === id && inv[id] <= 1); });
+  const sellable = () => Object.keys(GEAR).filter(id => { const g = GEAR[id]; if (!inv[id] || g.spell || g.key || g.rec || g.quest || g.slot === 'fam') return false; return !(g.slot && eq[g.slot] === id && inv[id] <= 1); });
   // Der Portier im Hotel Krat führt einen eigenen Laden (Texte conc*), das Grammophon zeigt die Schallplatten (gramo*)
   const STOCKS = { lib: STOCK, conc: ['potion', 'elixir', 'robe', 'rec_stage1', 'rec_sea', 'rec_boss'] };
   const shop = { sel: 0, say: 'shopHi', mode: 'buy', who: 'lib' };
@@ -2142,15 +2168,29 @@ const Castle = (() => {
   }
 
   // Statusbildschirm (Pause → STATUS): Werte wie in SotN in zwei Spalten, darunter EXP-Leiste, Karte, Siegel, Warpkammern
-  let statusPage = 0; // 0 = Werte, 1 = Zauber, 2 = Bestiarium (←→ blättert, im Bestiarium ↑↓ wählen)
+  let statusPage = 0; // 0 = Werte, 1 = Zauber, 2 = Bestiarium, 3 = Aufträge (←→ blättert, im Bestiarium ↑↓ wählen)
   function statusInput(P) {
-    if (P.left || P.right) { statusPage = (statusPage + (P.right ? 1 : 2)) % 3; Audio8.sfx('select'); }
+    if (P.left || P.right) { statusPage = (statusPage + (P.right ? 1 : 3)) % 4; Audio8.sfx('select'); }
     if (statusPage === 2 && (P.up || P.down)) { beasts.sel = clamp(beasts.sel + (P.down ? 1 : -1), 0, BEASTS.length - 1); Audio8.sfx('select'); }
+  }
+  function drawQuests(ctx, t) { // Auftragsbuch: Name, Auftraggeber, Stücke (gefundene farbig), erledigt
+    const cx = View.cx, lx = cx - Math.min(130, View.w / 2 - 16), rx = cx + Math.min(130, View.w / 2 - 16), NPC = { lib: 'npcLib', conc: 'npcConcierge', pris: 'npcPrisoner' };
+    const list = QUESTS.filter(questState);
+    if (!list.length) { Font.draw(ctx, tr('questNone'), cx, 100, '#7c7c8c', { align: 'center' }); return; }
+    list.forEach((q, i) => {
+      const y = 44 + i * 52, st = questState(q), done = st === 'done';
+      Font.draw(ctx, tr('quest_' + q.id), lx, y, done ? '#58f898' : '#f8b800', { shadow: '#000' });
+      Font.draw(ctx, done ? tr('questDone') : q.items.filter(id => inv[id]).length + '/' + q.items.length, rx, y, done ? '#58f898' : '#fcfcfc', { align: 'right', shadow: '#000' });
+      Font.draw(ctx, tr('questFrom', tr(NPC[q.who])), lx + 8, y + 11, '#b0a080');
+      q.items.forEach((id, k) => { const x = lx + 8 + k * 14; if (inv[id] || done) itemIcon(ctx, id, x, y + 22); else { ctx.fillStyle = '#2c2c3c'; ctx.fillRect(x, y + 22, 10, 10); Font.draw(ctx, '?', x + 3, y + 23, '#5c5c6c'); } });
+      if (!done) Font.draw(ctx, tr('questHint_' + q.id), lx + 8 + q.items.length * 14 + 6, y + 23, '#7c7c8c');
+    });
   }
   function drawStatus(ctx, t) {
     const w = View.w, cx = View.cx, p = W.player, v = values();
     if (statusPage === 1) { panel(ctx, tr('spellTitle'), '#7cdcfc'); drawSpells(ctx); Font.draw(ctx, tr('statusHelp'), cx, 222, '#7c7c8c', { align: 'center' }); return; }
     if (statusPage === 2) { panel(ctx, tr('beastTitle'), '#9c6cfc'); drawBeasts(ctx, t); Font.draw(ctx, tr('statusHelp'), cx, 222, '#7c7c8c', { align: 'center' }); return; }
+    if (statusPage === 3) { panel(ctx, tr('questTitle'), '#f8b800'); drawQuests(ctx, t); Font.draw(ctx, tr('statusHelp'), cx, 222, '#7c7c8c', { align: 'center' }); return; }
     ctx.fillStyle = 'rgba(2,4,18,0.97)'; ctx.fillRect(0, 0, w, 240);
     ctx.fillStyle = '#c89020';
     ctx.fillRect(6, 6, w - 12, 1); ctx.fillRect(6, 233, w - 12, 1); ctx.fillRect(6, 6, 1, 228); ctx.fillRect(w - 7, 6, 1, 228);
@@ -2262,15 +2302,20 @@ const Castle = (() => {
     { id: 'fog', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.mist },                          // Nebelgestalt: Gitter im Kerker
     { id: 'seals', who: 'ally', at: [[0, 1], 32, 11], when: () => seals() >= sealRooms().length },  // auf der Galerie am Siegeltor
     { id: 'lib', who: 'lib', at: [[2, 1], 15, 47], when: () => true, heal: true },                    // Bibliothek: neben dem Lesepult
+    { id: 'libq', who: 'lib', at: [[2, 1], 15, 47], when: () => !!flag.story_lib, heal: true },                       // Auftrag: die Ausreißer
     { id: 'lib2', who: 'lib', at: [[2, 1], 15, 47], when: () => relic.breaker, heal: true, again: 'lib' },
+    { id: 'libq2', who: 'lib', at: [[2, 1], 15, 47], when: () => questHas(QUESTS[0]) || !!flag.story_libq2, heal: true, give: 'book_tetra', take: QUESTS[0].items },
     { id: 'tent', who: 'tent', at: [['side', 'kolosseum'], 8, 10], when: () => flag.curse },          // Kolosseum: der gefeuerte Tentakel im Eimer
     { id: 'tent3', who: 'tent', at: [['side', 'kolosseum'], 8, 10], when: () => relic.jump2, give: 'tentling' }, // gibt seinen Neffen mit
     { id: 'tent2', who: 'tent', at: [['side', 'himmel'], 14, 8], when: () => relic.breaker && (flag.story_tent3 || inv.tentling), gold: 1000 }, // Himmelsbrücke: erobert die Wolken
     { id: 'pris1', who: 'pris', at: [['side', 'kerker'], 37, 10], when: () => true, reach: 84 },        // Kerker: der Gefangene hinter dem Gitter
     { id: 'pris2', who: 'pris', at: [['side', 'kerker'], 37, 10], when: () => relic.mist, give: 'keyring' }, // als Nebel in der Zelle
+    { id: 'pris3', who: 'pris', at: [['side', 'kerker'], 37, 10], when: () => !!inv.saucer || !!flag.story_pris3, reach: 84, give: 'ironball', take: ['saucer'] }, // die Untertasse
     { id: 'conc1', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => true, reach: 40 },          // Hotel Krat: der Portier
+    { id: 'concq', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => !!flag.story_conc1 },         // Auftrag: die Koffer aus Zimmer 7
     { id: 'conc2', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => relic.wolf },               // ... und Haustiere
     { id: 'conc3', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => !!inv.keyring },            // ... erkennt den Schlüsselbund
+    { id: 'concq2', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => questHas(QUESTS[1]) || !!flag.story_concq2, give: 'porter', take: QUESTS[1].items },
     { id: 'tent4', who: 'tent', at: [['side', 'zimmer13'], 21, 10], when: () => !!inv.keyring, give: 'pillow' }, // Zimmer 13: der Tentakel wohnt jetzt hier
     { id: 'gramo', who: 'gramo', at: [['side', 'hotel'], 14, 17], when: () => true, lines: false },      // Grammophon (↑: Platten)
   ];
@@ -2461,6 +2506,7 @@ const Castle = (() => {
       W.addScore(b.gold); W.popup(p.cx, p.y - 8, '+' + b.gold + ' G', '#f8b800'); Audio8.sfx('money');
     }
     if (b.give && !inv[b.give]) giveItem(b.give, true); // Geschenk (Begleiter)
+    if (b.take && !again) { for (const id of b.take) delete inv[id]; save(); } // Auftrag abgegeben: die Stücke bleiben beim Auftraggeber
     if (!again && !beatDone(b)) { flag['story_' + b.id] = 1; save(); announceGoal(50); }
     if (b.leave && !again) { npc.go = 1; npc.t = 0; } // macht sich auf den Weg
     if (b.heal) { // Bibliothekar: Kerzenschein heilt
@@ -2715,6 +2761,14 @@ const Castle = (() => {
         ctx.fillStyle = c.kind === 'save' ? '#d04858' : warp[c.key] ? '#7cdcfc' : '#5c6c8c';
         ctx.fillRect(ox + (r.ax + cc.x) * cs + (c.kind === 'warp' ? cs - half : 0), oy + (r.ay + cc.y) * cs + Math.floor((cs - half) / 2), half, half);
       }
+      for (const who of WHO) { // Figuren: gelb, wenn sie etwas Neues zu erzählen haben
+        const b = who !== 'gramo' && beatNow(who), a = b && ref(b.at[0]);
+        if (!a || a.s !== r.s || a.r !== r.i || (b.leave && beatDone(b))) continue;
+        const nc = placeCell(r, { x: b.at[1], y: b.at[2] });
+        if (!set.has(nc.y * r.cw + nc.x)) continue;
+        const fresh = !beatDone(b) && ((t >> 4) & 1);
+        ctx.fillStyle = fresh ? '#f8b800' : '#e8e0c8'; ctx.fillRect(ox + (r.ax + nc.x) * cs + Math.floor(cs / 2) - 1, oy + (r.ay + nc.y) * cs + 1, 2, Math.max(2, cs - 3));
+      }
     }
     ctx.fillStyle = '#f8b800'; // Türen zwischen benachbarten Zellen: goldene Lücke in der Wand
     for (const k of known) {
@@ -2913,7 +2967,8 @@ const Castle = (() => {
     need.push('npcPrisoner', 'npcConcierge', 'concTitle', 'concHi', 'concSold', 'concOwned', 'concPoor', 'concThanks1', 'concThanks2', 'concThanks3', 'gramoTitle', 'gramoHi',
       'gramoPlay', 'gramoMissing', 'gramoNow', 'gramoHelp', 'hotelSign', 'boardTitle', 'formBack', 'whereWitch',
       'bossConductor', 'bossConductorNote', 'bossConductorShout', 'bossConductorRage', 'castleLocked13', 'dashKey',
-      'bossDoppel', 'bossDoppelNote', 'bossDoppelShout', 'bossDoppelRage', 'famSay_shadow');
+      'bossDoppel', 'bossDoppelNote', 'bossDoppelShout', 'bossDoppelRage', 'famSay_shadow', 'questTitle', 'questDone', 'questNone', 'questFrom');
+    for (const q of QUESTS) need.push('quest_' + q.id, 'questHint_' + q.id);
     { // Erreichbarkeit: vom Wald aus über Türen und Ausgänge (alles geöffnet) – kein Raum darf abgeschnitten sein
       const key = (s, r) => s + ':' + r, seenR = new Set(), queue = [], s0 = sIdx('arrival');
       const push = (s, r) => { if (s >= 0 && !seenR.has(key(s, r))) { seenR.add(key(s, r)); queue.push([s, r]); } };
