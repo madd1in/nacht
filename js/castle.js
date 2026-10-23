@@ -221,6 +221,7 @@ const Castle = (() => {
       .ground(0, 111, 18)
       .stair(36, 17, 7, 1).fill(43, 11, 69, 11, '=').stair(76, 17, 7, -1)   // Fußgängerbrücke über die Halle
       .fill(0, 9, 7, 9, '=')                                                  // Sims am Stellwerk
+      .fill(70, 4, 84, 4, '=').chest(84, 3)                                   // Signalbrücke unter dem Dach (nur mit Supersprung)
       .candle(4, 15, 'H').candle(28, 15).candle(46, 8, '$').candle(56, 8, 'H').candle(66, 8).candle(88, 15, 'W').candle(104, 15)
       .enemy('raven', 30, 5).enemy('raven', 84, 4)
       .chest(2, 8, 'big').prop('vessel', { x: 56, y: 10 })
@@ -230,11 +231,33 @@ const Castle = (() => {
     station.decor = [
       ['wagon', 400, rail, false, plat], ['wagon', 626, rail, false, plat], ['loco', 892, rail, false, plat],
       ...[64, 192, 320, 448, 1344, 1472, 1600, 1728].map(x => ['canopy', x, plat, false]),
-      ['sign', 256, plat - 62, false], ['sign', 1536, plat - 62, false], ['clock', 56 * T + 8, 12 * T, false],
+      ['sign', 416, plat - 62, false], ['sign', 1536, plat - 62, false], ['clock', 56 * T + 8, 12 * T, false],
       ...[160, 352, 1408, 1632].map((x, i) => ['bench', x, plat, i % 2 === 1]), ...[96, 480, 1296, 1696].map(x => ['lamppost', x, plat, false]),
       ['board', 56 * T + 8, 40],
     ];
     add('bahnhof', 0, 2, [-7, -2], station);
+    // Lokschuppen (über dem Bahnhof, Tür am linken Bahnsteig): Arena des Zugführers, einer riesigen Schaffnerpuppe. Danach liegen
+    // die Dampfstiefel (Supersprung) im Schuppen, und gleich daneben ein Kransims, das man nur mit ihnen erreicht.
+    const shed = R(40, 'station', 20)
+      .ground(0, 39, 18)
+      .fill(5, 10, 10, 10, '=')                                   // Sims über dem Wasserkran (nur mit Supersprung)
+      .candle(3, 14, 'H').candle(16, 14).candle(30, 13, '$').candle(37, 14, 'H')
+      .prop('vessel', { x: 7, y: 9 })
+      .mini('conductor', 18, 38, 20, 0)
+      .music('stage1').label('LOKSCHUPPEN').start(2, 17).done();
+    shed.decor = [['loco', 150, 18 * T + 10, false, 18 * T], ['crane', 6 * T, 18 * T, false], ...[2 * T, 17 * T, 26 * T, 36 * T].map(x => ['lamppost', x, 18 * T, false])];
+    add('schuppen', 0, 3, [-7, -4], shed);
+    // Zimmer 13 (Hotel Krat, Galerie): seit 1391 abgeschlossen – der Schlüsselbund des Gefangenen passt nirgends, nur hier
+    const room13 = R(28, 'hotel', 13)
+      .ground(0, 27)
+      .candle(6, 7, 'H').candle(24, 7)
+      .music('hotel').label('ZIMMER 13').start(2, 10).done();
+    room13.decor = [D('bed', 15.5, 10), D('chair', 10, 10), D('cart', 25, 10, true)];
+    add('zimmer13', 0, 1, [2, -3], room13);
+    LINKS.push(
+      [['side', 'bahnhof'], { x: 14, y: 17, door: 'side' }, ['side', 'schuppen'], 'start', {}],                                 // Bahnsteig → Lokschuppen
+      [['side', 'hotel'], { x: 46, y: 10, door: 'room13' }, ['side', 'zimmer13'], { x: 3, y: 10, door: 'room13' }, { item: 'keyring' }], // Galerie → Zimmer 13
+    );
     LINKS.push(
       [[0, 0], { x: 50, y: 10, door: 'hotel' }, ['side', 'hotel'], { x: 3, y: 17, door: 'hotel' }, {}], // Burghof → Hotel Krat
       [['side', 'bahnhof'], 'right', ['side', 'hotel'], 'start', {}],                                  // Bahnhof ↔ Hotel-Lobby
@@ -375,6 +398,7 @@ const Castle = (() => {
     if (d.gate.seals) return seals() >= sealRooms().length;
     if (d.gate.crack) return !!crack[d.gate.crack];
     if (d.gate.beat) { const a = ref(d.gate.beat); return !!(a && boss[roomKey(a.s, a.r)]); }
+    if (d.gate.item) return !!inv[d.gate.item];
     return true;
   }
   // Art einer Tür: Rand (links/rechts durchgehen) oder ↑-Tür
@@ -436,6 +460,7 @@ const Castle = (() => {
         return;
       }
       if (this.d.place && this.d.place.door === 'hotel') { drawHotelDoor(this, ctx); return; } // Hoteltür
+      if (this.d.place && this.d.place.door === 'room13') { drawRoomDoor(this, ctx); return; } // Zimmer 13
       // Torbogen aus Stein wie die Speicherkammer: Quaderring, Schlussstein, dunkler Gang mit Fackelschein; verschlossen: Fallgitter
       const cx = x + this.w / 2, bot = y + this.h, r = this.w / 2 - 4, t = this.t;
       arch(ctx, cx, y + 2, r + 5, bot, '#1c1824'); arch(ctx, cx, y + 3, r + 4, bot, '#5c5468'); arch(ctx, cx, y + 4, r + 3, bot, '#4c4458');
@@ -605,19 +630,22 @@ const Castle = (() => {
   // bleiben); im Prolog auf dem Schiff kann er noch alles. Die Relikte liegen im Schloss: Doppelsprung am Ende des Kolosseums,
   // Dash bei der Riesenfledermaus, Ring-Greifen in der Eishöhle, Wandsprung beim Knochenriesen, Steinbrecher bei Medusa
   // (zerschlägt rissiges Gestein vor Kanal, Schatzkammer und Verlies). So führt ein Relikt zum nächsten.
-  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker', 'bat', 'mist', 'wolf'];
-  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460', bat: '#c8a0fc', mist: '#a4b4d8', wolf: '#8ca4c8' };
+  const RELICS = ['jump2', 'dash', 'ring', 'wall', 'breaker', 'bat', 'mist', 'wolf', 'boots'];
+  const RELIC_COL = { jump2: '#e8f0fc', dash: '#9c6cfc', ring: '#f8b800', wall: '#58f898', breaker: '#fc7460', bat: '#c8a0fc', mist: '#a4b4d8', wolf: '#8ca4c8', boots: '#e8e8f4' };
   const RELIC_AT = [[['side', 'kolosseum'], 'jump2', 81, 10], [[1, 2], 'ring', 12, 10]];        // fest liegende Relikte
   // Belohnung der Regionsbosse (Sonnenwächter: Fledermausgestalt, Menschenfalle: Nebelgestalt)
   const BOSS_RELIC = [[[0, -1], 'dash'], [[1, -1], 'wall'], [[2, -1], 'breaker'], [['sun', -1], 'bat'], [['expo', -1], 'mist']];
   // Lohn eines Zwischengegners: [Raum, Relikt, x, Standreihe, Ersatzplatz]. Eishexe: Seele des Wolfs neben dem Eistor. Aus dem
   // Eisturm führt kein Weg zurück – wer am Relikt vorbeiläuft (oder einen Spielstand von vorher hat), findet es in der Gruft
-  const MINI_RELIC = [[[1, 3], 'wolf', 29, 104, [[1, 4], 6, 10]]];
+  const MINI_RELIC = [[[1, 3], 'wolf', 29, 104, [[1, 4], 6, 10]], [['side', 'schuppen'], 'boots', 12, 17]];
   const inPrologue = () => !!(S()[W.stage] && S()[W.stage].id === 'arrival');
   const has = (k) => !on || !!relic[k] || inPrologue();
   if (on) { // Bewegungen hängen an den Relikten (Doppelsprung: siehe update)
     const sd = Player.prototype.startDash, wd = Player.prototype.wallDir, tl = Player.prototype.tryLatch;
-    Player.prototype.startDash = function (...a) { if (has('dash')) return sd.apply(this, a); };
+    Player.prototype.startDash = function (...a) { // ↑ + DASH am Boden mit den Dampfstiefeln: Supersprung statt Dash
+      if (on && relic.boots && Input.held.up && this.onGround && this.state === 'normal') return superJump(this);
+      if (has('dash')) return sd.apply(this, a);
+    };
     Player.prototype.wallDir = function () { return has('wall') ? wd.call(this) : 0; };
     Player.prototype.tryLatch = function (...a) { return has('ring') ? tl.apply(this, a) : false; };
   }
@@ -664,7 +692,7 @@ const Castle = (() => {
   // img/krat3d.png, je Bild: [x, y, w, h, Anker x, Anker y, Zusatzpunkte x/y …]. Anker = Standpunkt (Boden, Gleis) bzw. Aufhängung.
   // Zusatzpunkte: Lok – Schornstein, Zylinderhahn, Dampfdom, Führerhaus; Laterne – Licht; Tresen – Klingel, Lampe;
   // Grammophon – Trichter; Sternlampe – Stern; Aufzug – Stockwerkanzeige. Fehlt das Bild, zeichnet der Raum einfach ohne.
-  const K3 = {"loco":[129,0,237,71,155,68,218,4,203,56,158,13,118,24],"wagon":[0,78,226,70,113,67],"canopy":[0,0,128,77,64,74],"bench":[16,149,31,19,16,18],"lamppost":[227,78,12,57,6,56,6,8],"clock":[0,149,15,23,8,1],"sign":[48,149,46,19,23,1],"desk":[388,78,92,29,46,28,60,8,21,4],"keys":[343,78,44,31,22,30],"gramo":[321,78,21,34,8,32,3,6],"starlamp":[277,78,16,49,8,47,8,10],"chair":[481,78,21,24,10,23],"lift":[240,78,36,52,18,51,18,8],"cart":[294,78,26,35,13,34]};
+  const K3 = {"loco":[129,0,237,71,155,68,218,4,203,56,158,13,118,24],"wagon":[0,78,226,70,113,67],"canopy":[0,0,128,77,64,74],"bench":[170,149,31,19,16,18],"lamppost":[269,78,12,57,6,56,6,8],"clock":[154,149,15,23,8,1],"sign":[202,149,46,19,23,1],"desk":[0,149,92,29,46,28,60,8,21,4],"keys":[385,78,44,31,22,30],"gramo":[363,78,21,34,8,32,3,6],"starlamp":[319,78,16,49,8,47,8,10],"chair":[132,149,21,24,10,23],"lift":[282,78,36,52,18,51,18,8],"cart":[336,78,26,35,13,34],"bed":[93,149,38,27,19,26],"crane":[227,78,41,58,7,56]};
   let k3 = null;
   if (on) {
     const img = new Image();
@@ -779,6 +807,140 @@ const Castle = (() => {
       R(-5, -33, 10, 3, '#a81c1c'); R(-4, -34, 8, 1, '#c83030'); R(2, -31, 5, 1, '#1c1414'); R(-1, -33, 2, 1, '#f8b800'); // Gepäckträgermütze mit Schild
     }
   }
+  // ---------------- Der Zugführer (Zwischengegner im Lokschuppen) ----------------
+  // Riesige Schaffnerpuppe aus Holz (Blender, img/cond3d.png, zwölf Posen). Ruckt heran, holt mit der Fahrkartenzange aus und
+  // stürmt durch die Halle, wirft Glut aus der Laterne im Bogen und pfeift: eine Druckwelle läuft über den Boden (drüberspringen).
+  // Ab halber Energie schneller, mehr Glut, und der Pfiff ruft zwei Puppen. Bild je Pose: [x, y, w, h, Anker x, Anker y,
+  // Zange x/y, Laterne x/y]; ohne Bild bleibt eine schlichte Ersatzfigur.
+  const K3C = {"idle0":[0,0,30,68,12,66,25,25,16,49],"idle1":[31,0,30,68,12,66,26,23,17,49],"walk0":[62,0,34,67,15,66,30,22,12,46],"walk1":[97,0,30,68,12,65,25,25,12,48],"walk2":[128,0,40,66,21,66,34,30,33,49],"walk3":[169,0,35,67,17,65,31,25,17,48],"raise":[205,0,37,84,26,82,4,17,27,65],"lunge":[0,85,46,62,12,60,41,24,9,33],"swing0":[47,85,34,68,18,66,30,23,5,38],"swing1":[82,85,48,68,13,66,26,36,42,8],"whistle":[131,85,30,68,18,67,4,15,22,50],"slump":[162,85,48,49,21,48,16,37,14,20]};
+  let k3c = null;
+  if (on) {
+    const img = new Image();
+    img.onload = () => { const out = {}; for (const k in K3C) { const r = K3C[k], c = Sprites.canvas(r[2], r[3]); c.getContext('2d').drawImage(img, r[0], r[1], r[2], r[3], 0, 0, r[2], r[3]); out[k] = Sprites.fromCanvas(c, true); } k3c = out; };
+    img.src = 'img/cond3d.png?v=' + (window.BUILD || '');
+  }
+  class CondWave extends Ent { // Pfiff: Druckwelle aus Dampf läuft über den Boden bis an den Rand der Arena
+    constructor(x, feet, vx, x0, x1) { super(x - 6, feet - 14, 12, 14); this.kind = 'eproj'; this.vx = vx; this.x0 = x0; this.x1 = x1; this.unstoppable = true; this.dmg = 2; }
+    update() {
+      this.t++; this.x += this.vx;
+      if (this.x < this.x0 - 12 || this.x > this.x1 || this.t > 240) this.dead = true;
+      const p = W.player;
+      if (p.alive && Phys.overlap(this, p)) p.hurt(this.dmg, this.cx);
+      if (this.t % 3 === 0) W.spawn(new Particle(this.cx, this.y + this.h - 2, -this.vx * 0.2, rnd(-1.2, -0.4), '#d8d8e8', 20, 2, 0.04));
+    }
+    draw(ctx) {
+      const x = Math.round(this.cx - W.cam.x), y = Math.round(this.y + this.h - W.cam.y), d = Math.sign(this.vx);
+      for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? '#a8a8bc' : '#f0f0fc'; ctx.fillRect(x - d * k * 3 - 1, y - 14 + k * 2, 3, 14 - k * 2); }
+    }
+  }
+  class Conductor extends Boss {
+    constructor(ax, aw) {
+      const gy = (W.room.h - 2) * T;
+      super(ax + aw - 64, gy - 60, 24, 60, 26, 3); // steht hinten im Schuppen, der Held kommt von links
+      this.ax = ax; this.aw = aw; this.gy = gy; this.mini = true; this.score = 6000; this.nameKey = 'bossConductor'; this.music = 'boss';
+      this.face = -1; this.state = 'intro'; this.timer = 0; this.ph2 = false; this.lootY = gy - 40; this.walkF = 0; this.moving = false;
+    }
+    key() {
+      const s = this.state, t = this.timer;
+      if (this.dying) return 'slump';
+      if (s === 'intro' || s === 'whistle') return 'whistle';
+      if (s === 'raise' || s === 'lunge') return s;
+      if (s === 'swing') return t < 18 ? 'swing0' : 'swing1';
+      if (s === 'walk' && this.moving) return 'walk' + ((this.walkF >> 2) & 3);
+      return (this.t >> 5) & 1 ? 'idle1' : 'idle0';
+    }
+    pt(i) { const r = K3C[this.key()], fl = this.face < 0, px = r[6 + i * 2], py = r[7 + i * 2]; return { x: this.cx + (fl ? r[4] - px : px - r[4]), y: this.y + this.h + py - r[5] }; }
+    go(s) { this.state = s; this.timer = 0; }
+    say(k, col) { W.popup(clamp(this.cx, W.cam.x + 90, W.cam.x + View.w - 90), this.y - 12, tr(k), col); } // Ruf im Bild halten
+    update() {
+      this.tick();
+      if (this.dying) { this.y = this.gy - this.h; return this.updateDeath(110); }
+      const p = W.player, dx = p.cx - this.cx, sp = this.ph2 ? 1.35 : 1;
+      if (!this.ph2 && this.hp <= this.maxHp / 2) { // Phase 2: schneller, mehr Glut, der Pfiff ruft Puppen
+        this.ph2 = true; W.flash = 8; W.shake = Math.max(W.shake, 12); Audio8.sfx('roar'); Audio8.tempo(1.1); Input.rumble(0.6, 0.5, 400);
+        this.say('bossConductorRage', '#fc7460');
+      }
+      this.moving = false;
+      if (this.state === 'intro') {
+        if (this.timer === 12) { Audio8.sfx('bell'); this.say('bossConductorShout', '#f8b800'); }
+        if (this.timer > 70) this.go('walk');
+      } else if (this.state === 'walk') {
+        this.face = Math.sign(dx) || this.face;
+        if (this.timer % 24 < 12 && Math.abs(dx) > 30) { this.x += this.face * 1.1 * sp; this.moving = true; this.walkF++; } // ruckartig wie eine Puppe
+        if (this.timer > (this.ph2 ? 50 : 80)) {
+          const r = Math.random();
+          this.go(Math.abs(dx) < 110 ? (r < 0.55 ? 'raise' : r < 0.75 ? 'swing' : 'whistle') : (r < 0.5 ? 'swing' : r < 0.75 ? 'whistle' : 'raise'));
+          if (this.state === 'raise') Audio8.sfx('creak', this.cx);
+        }
+      } else if (this.state === 'raise') { // ausholen (Zange über dem Kopf), dann quer durch die Halle
+        this.face = Math.sign(dx) || this.face;
+        if (this.timer > (this.ph2 ? 16 : 26)) { this.go('lunge'); Audio8.sfx('whoosh', this.cx); W.shake = Math.max(W.shake, 4); }
+      } else if (this.state === 'lunge') {
+        this.x += this.face * 4.4 * sp;
+        if (this.timer % 3 === 0) W.dust(this.cx - this.face * 10, this.y + this.h, 2);
+        const tp = this.pt(0);
+        if (p.alive && Phys.overlap({ x: tp.x - 8, y: tp.y - 8, w: 16, h: 16 }, p)) p.hurt(this.dmg, this.cx);
+        if (this.timer > 30 || this.x <= this.ax + 3 || this.x + this.w >= this.ax + this.aw - 3) { this.go('recover'); W.shake = Math.max(W.shake, 6); Audio8.sfx('wall', this.cx); }
+      } else if (this.state === 'recover') { if (this.timer > (this.ph2 ? 26 : 44)) this.go('walk'); } // verschnauft: Gelegenheit
+      else if (this.state === 'swing') {
+        if (this.timer === 18) { // Laterne: Glut im Bogen auf den Helden
+          const l = this.pt(1), n = this.ph2 ? 5 : 3;
+          for (let i = 0; i < n; i++) W.spawn(new EProj('fire', l.x, l.y, dx * (0.45 + i * 0.35 / n) / 48 + rnd(-0.3, 0.3), -3.4 - i * 0.2, 0.14, this.dmg));
+          Audio8.sfx('fire', this.cx);
+        }
+        if (this.timer > 40) this.go('walk');
+      } else if (this.state === 'whistle') {
+        if (this.timer === 16) {
+          Audio8.sfx('bell'); W.shake = Math.max(W.shake, 6);
+          for (const d of [-1, 1]) W.spawn(new CondWave(this.cx, this.y + this.h, d * (this.ph2 ? 3 : 2.4), this.ax, this.ax + this.aw));
+          if (this.ph2 && W.ents.filter(e => e instanceof Puppet && !e.dead).length < 2) for (const tx of [this.ax / T + 1, (this.ax + this.aw) / T - 2]) W.spawn(new Puppet(Math.round(tx), Math.round(this.gy / T) - 1));
+        }
+        if (this.timer > 44) this.go('walk');
+      }
+      this.x = clamp(this.x, this.ax + 2, this.ax + this.aw - this.w - 2);
+      this.touch();
+    }
+    lightUp(L, cx, cy) { if (this.dying) return; const l = this.pt(1); L.push({ x: l.x - cx, y: l.y - cy, r: 26 + Math.sin(this.t * 0.2) * 3, c: [252, 90, 40], a: 0.6 }); }
+    draw(ctx) {
+      const X = Math.round(this.cx - W.cam.x), F = Math.round(this.y + this.h - W.cam.y), fl = this.face < 0, k = this.key(), s = k3c && k3c[k];
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(X, F - 1, 18, 3, 0, 0, Math.PI * 2); ctx.fill(); // Schatten
+      const shake = this.dying ? ((this.t >> 1) & 1) * 2 - 1 : this.state === 'raise' ? ((this.t >> 1) & 1) : 0;
+      if (s) { const r = K3C[k]; Sprites.draw(ctx, s, X - (fl ? r[2] - r[4] : r[4]) + shake, F - r[5], fl, this.flash); return; }
+      ctx.fillStyle = this.flash ? '#fcfcfc' : '#1c2848'; ctx.fillRect(X - 12, F - 60, 24, 60); ctx.fillStyle = '#c89c64'; ctx.fillRect(X - 7, F - 74, 14, 14); // Ersatzfigur
+    }
+  }
+  if (on && typeof BOSSES !== 'undefined') BOSSES.conductor = Conductor;
+  // Dampfstiefel (Relikt, Lohn des Zugführers): ↑ + DASH am Boden = Supersprung – eine Dampfsäule trägt den Helden gut acht
+  // Kacheln senkrecht hinauf (steuerbar nach links und rechts), danach ist der Doppelsprung noch frei. An der Decke prallt er ab.
+  const SUPER_T = 22, SUPER_V = 6;
+  function superJump(p) {
+    p.superT = SUPER_T; p.vy = 0; p.onGround = false; p.jumping = true; p.canDouble = true; p.dashT = 0; p.setCrouch(false);
+    Audio8.sfx('whoosh'); Audio8.sfx('djump'); Input.rumble(0.4, 0.3, 140); W.shake = Math.max(W.shake, 3);
+    for (let i = 0; i < 14; i++) W.spawn(new Particle(p.cx + rnd(-8, 8), p.feet - rnd(0, 4), rnd(-1.4, 1.4), rnd(-0.6, 0.2), i % 2 ? '#e8e8f4' : '#a8a8bc', 30, 2, -0.02));
+  }
+  function superUpdate(p) {
+    const I = Input.held, tx = (I.right ? 1 : 0) - (I.left ? 1 : 0);
+    if (p.inv > 0) p.inv--;
+    p.superT--;
+    if (tx) p.face = tx;
+    Phys.moveX(p, tx * 1.5);
+    const r = Phys.moveY(p, -SUPER_V);
+    if (p.superT % 2 === 0) W.spawn(new Particle(p.cx + rnd(-3, 3), p.feet, rnd(-0.3, 0.3), rnd(0.6, 1.4), '#d8d8e8', 18, 2, 0)); // Dampfspur
+    if (r === -1 || p.superT <= 0) { p.superT = 0; p.vy = r === -1 ? 0.5 : -2.4; }
+    p.onGround = false; p.state = 'normal'; p.clampRoom(); p.walkT++;
+  }
+  function drawRoomDoor(d, ctx) { // Zimmertür 13: Mahagoni mit Füllungen, Messingschild, Schild „Bitte nicht stören“ am Knauf
+    const x = Math.round(d.x - W.cam.x), y = Math.round(d.y - W.cam.y), cx = x + 16, bot = y + d.h, open = gateOpen(d.d), t = d.t;
+    ctx.fillStyle = '#2c1206'; ctx.fillRect(cx - 13, y + 2, 26, bot - y - 2); ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 13, y + 2, 26, 1);
+    ctx.fillStyle = '#5c2810'; ctx.fillRect(cx - 11, y + 4, 22, bot - y - 4);
+    ctx.fillStyle = '#3c1c08'; ctx.fillRect(cx - 9, y + 19, 18, 8); ctx.fillRect(cx - 9, y + 29, 18, 12); ctx.fillStyle = '#7c3c18'; ctx.fillRect(cx - 9, y + 19, 18, 1); ctx.fillRect(cx - 9, y + 29, 18, 1);
+    ctx.fillStyle = '#c89020'; ctx.fillRect(cx - 8, y + 6, 16, 10); ctx.fillStyle = '#7c5414'; ctx.fillRect(cx - 8, y + 15, 16, 1);
+    Font.draw(ctx, '13', cx, y + 7, '#2c1206', { align: 'center' });
+    ctx.fillStyle = '#f8b800'; ctx.fillRect(cx + 7, y + 25, 2, 2); // Knauf
+    ctx.fillStyle = '#a81c28'; ctx.fillRect(cx + 6 + ((t >> 6) & 1 ? 1 : 0), y + 27, 5, 7); ctx.fillStyle = '#fce0a8'; ctx.fillRect(cx + 7 + ((t >> 6) & 1 ? 1 : 0), y + 29, 3, 1); ctx.fillRect(cx + 7 + ((t >> 6) & 1 ? 1 : 0), y + 31, 3, 1);
+    const p = W.player;
+    if (Math.abs(p.cx - d.cx) < 14 && Math.abs(p.feet - (d.y + d.h)) < 8) Font.draw(ctx, '↑', cx - 2, y - 12 + Math.round(Math.sin(t * 0.12) * 2), open ? '#fcfcfc' : '#8c8c9c', { shadow: '#000' });
+  }
   function spawnRelics(s, r, def, arrive) {
     const here = ([R]) => same(ref(R), s, r);
     for (const e of RELIC_AT) if (here(e) && !relic[e[1]]) W.spawn(new RelicStone(e[1], e[2], e[3]));
@@ -815,6 +977,7 @@ const Castle = (() => {
   let guard = false, push = 0, lastX = 0, lockT = 0, roomT = 0;
   function settle(arrive) {
     const s = W.stage, r = W.roomIdx, def = S()[s].rooms[r], key = roomKey(s, r);
+    if (W.player) W.player.superT = 0;
     if (W.player && (W.player.batForm || W.player.mistForm || W.player.wolfForm)) { W.player.batForm = false; W.player.mistForm = false; W.player.wolfForm = false; W.player.h = HERO_H; } // Raumwechsel: wieder in Menschengestalt (reset hat Ort und Größe gesetzt)
     if (boss[key] && s < S().length - 1) W.room.arena = null; // Bossarena: Boss besiegt, der Raum ist frei
     if (mini[key]) W.miniDone[s + ':' + r] = true;
@@ -919,7 +1082,7 @@ const Castle = (() => {
       else use = I.right && (p.onGround || p.batForm || p.mistForm) && p.cx > (def.w - 2.5) * T && push >= 6; // Fledermaus und Nebel ziehen durch Seitenausgänge
       if (!use) continue;
       if (!gateOpen(d)) {
-        if (!lockT) { lockT = 90; if (d.gate.seals) Game.note('castleSeals', seals(), sealRooms().length); else if (d.gate.crack) Game.note('castleCrackHard'); else if (d.gate.beat) Game.note('castleBarred'); else Game.note('castleLocked'); Audio8.sfx('select'); }
+        if (!lockT) { lockT = 90; if (d.gate.seals) Game.note('castleSeals', seals(), sealRooms().length); else if (d.gate.crack) Game.note('castleCrackHard'); else if (d.gate.beat) Game.note('castleBarred'); else if (d.gate.item) Game.note('castleLocked13'); else Game.note('castleLocked'); Audio8.sfx('select'); }
         push = 0; break;
       }
       push = 0; Game.castleGo(d.to); return;
@@ -1045,13 +1208,15 @@ const Castle = (() => {
     book_spirit: { spell: 'spirit', price: 2500, col: '#a4e4fc' },      // Zauberbücher (Laden): lehren je einen Zauber
     book_hellfire: { spell: 'hellfire', price: 6000, col: '#fc7c1c' },
     book_soulsteal: { spell: 'soulsteal', price: 12000, col: '#d880fc' },
-    robe: { slot: 'armor', def: 3, regen: 1, price: 4500, col: '#f0e8e0' },     // Hotelbademantel (Portier): weich, heilt langsam
+    robe: { slot: 'armor', def: 3, regen: 1, price: 4500, col: '#f0e8e0' },
+    pillow: { slot: 'armor', def: 5, col: '#e8e4f8' },                       // Daunenkissen aus Zimmer 13 (Geschenk des Tentakels)     // Hotelbademantel (Portier): weich, heilt langsam
     // Schallplatten fürs Grammophon im Hotel (spielen ein Stück des Schlosses): gefunden, gekauft, eine liegt schon auf dem Teller
     rec_hotel: { rec: 'hotel', col: '#c89020' }, rec_title: { rec: 'title', col: '#9c6cfc' }, rec_stage1: { rec: 'stage1', price: 1500, col: '#fc7460' },
     rec_sea: { rec: 'sea', price: 1500, col: '#3cbcfc' }, rec_boss: { rec: 'boss', price: 3000, col: '#fc3c3c' }, rec_stage2: { rec: 'stage2', col: '#58f898' },
     rec_library: { rec: 'library', col: '#e8b070' }, rec_expo: { rec: 'expo', col: '#88d8a0' }, rec_chapel: { rec: 'chapel', col: '#d880fc' }, rec_sun: { rec: 'sun', col: '#f8b800' },
+    rec_ending: { rec: 'ending', col: '#fce0a8' },
   };
-  const RECORDS = ['hotel', 'title', 'stage1', 'sea', 'boss', 'stage2', 'library', 'expo', 'chapel', 'sun'];
+  const RECORDS = ['hotel', 'title', 'stage1', 'sea', 'boss', 'stage2', 'library', 'expo', 'chapel', 'sun', 'ending'];
   const hasRec = (id) => id === 'hotel' || !!inv['rec_' + id];
   const SLOTS = ['weapon', 'armor', 'acc', 'fam'], DRINKS = ['potion', 'elixir'];
   const STOCK = ['potion', 'elixir', 'leather', 'chain', 'silver', 'heartamulet', 'fairy', 'map', 'book_spirit', 'book_hellfire', 'book_soulsteal'];
@@ -1063,6 +1228,7 @@ const Castle = (() => {
     [['side', 'attic'], 'chicken', 12, 7],
     [['side', 'schatz'], 'rec_library', 19, 6], [['side', 'kanal'], 'rec_expo', 81, 7], [['side', 'verlies'], 'rec_chapel', 13, 7],
     [['side', 'himmel'], 'rec_sun', 66, 8], [['side', 'hotel'], 'rec_title', 58, 16], [['side', 'bahnhof'], 'rec_stage2', 66, 10],
+    [['side', 'bahnhof'], 'rec_ending', 76, 3],
   ];
   const DROPS = [['potion', 'potion', 'leather', 'silver'], ['potion', 'potion', 'chain', 'bloodrune', 'elixir'], ['potion', 'elixir', 'elixir', 'chain', 'bloodrune']];
   function gear(stat) { let n = 0; for (const s of SLOTS) { const g = eq[s] && GEAR[eq[s]]; if (g && g[stat]) n += g[stat]; } return n; }
@@ -1543,6 +1709,7 @@ const Castle = (() => {
     const up = Player.prototype.update, dr = Player.prototype.draw, sc = Player.prototype.setCrouch;
     Player.prototype.update = function (...a) {
       if ((this.batForm || this.mistForm || this.wolfForm) && this.state === 'dead') { this.y -= HERO_H - this.h; this.batForm = false; this.mistForm = false; this.wolfForm = false; this.h = HERO_H; }
+      if (this.superT > 0) { if (this.state === 'normal' && this.alive && !this.batForm && !this.mistForm && !this.wolfForm) return superUpdate(this); this.superT = 0; } // Supersprung
       return this.batForm ? batUpdate(this) : this.mistForm ? mistUpdate(this) : this.wolfForm ? wolfUpdate(this) : up.apply(this, a);
     };
     Player.prototype.draw = function (ctx, cam) { return this.batForm ? batDraw(this, ctx, cam) : this.mistForm ? mistDraw(this, ctx, cam) : this.wolfForm ? wolfDraw(this, ctx, cam) : dr.call(this, ctx, cam); };
@@ -1562,15 +1729,15 @@ const Castle = (() => {
         Font.draw(ctx, itemDesc('book_' + id), lx + 8, y + 21, '#b0a080');
       } else Font.draw(ctx, tr('spellUnknown'), lx + 8, y + 11, '#5c5c6c');
     });
-    const forms = [['bat', '↓ ↑', BAT_COST], ['mist', '↑ ↓', MIST_COST], ['wolf', '↓ ↘ →', WOLF_COST]].filter(([k]) => relic[k]);
-    forms.forEach(([k, cmd, cost], i) => { // Verwandlungen: eine Zeile je Gestalt (Befehl + Sprung)
-      const y = 160 + i * 12;
+    const J = ' + ' + tr('spellJump'), forms = [['bat', '↓ ↑' + J, BAT_COST], ['mist', '↑ ↓' + J, MIST_COST], ['wolf', '↓ ↘ →' + J, WOLF_COST], ['boots', '↑ + ' + tr('dashKey'), 0]].filter(([k]) => relic[k]);
+    forms.forEach(([k, cmd, cost], i) => { // Verwandlungen und Supersprung: eine Zeile je Relikt (Befehl, MP)
+      const y = 156 + i * 11;
       Font.draw(ctx, tr('relic_' + k), lx, y, RELIC_COL[k], { shadow: '#000' });
-      Font.draw(ctx, cmd + ' + ' + tr('spellJump'), rx - 44, y, '#fcfcfc', { align: 'right', shadow: '#000' });
-      Font.draw(ctx, cost + '+ MP', rx, y, '#7cdcfc', { align: 'right', shadow: '#000' });
+      Font.draw(ctx, cmd, rx - 44, y, '#fcfcfc', { align: 'right', shadow: '#000' });
+      if (cost) Font.draw(ctx, cost + '+ MP', rx, y, '#7cdcfc', { align: 'right', shadow: '#000' });
     });
-    if (forms.length) Font.draw(ctx, tr('formBack'), cx, 198, '#b0a080', { align: 'center' });
-    Font.draw(ctx, tr('spellNote'), cx, forms.length ? 210 : 200, '#7c7c8c', { align: 'center' });
+    if (forms.some(f => f[2])) Font.draw(ctx, tr('formBack'), cx, 201, '#b0a080', { align: 'center' });
+    Font.draw(ctx, tr('spellNote'), cx, forms.length ? 212 : 200, '#7c7c8c', { align: 'center' });
   }
   let famEnt = null;
   function famTick() { // genau ein Begleiter, passend zum belegten Platz; nach Raumwechsel neu beim Helden
@@ -1735,9 +1902,9 @@ const Castle = (() => {
 
   // ---------------- Bestiarium wie die Gegnerliste in SotN (Status, dritte Seite): Siege je Gegnerart, absurde Einträge ----------------
   const BEASTS = ['Bat', 'Skeleton', 'Ghoul', 'Raven', 'Knight', 'LivingArmor', 'Panther', 'Skull', 'Fishman', 'Ghost', 'Snake', 'FlyBook', 'Tome',
-    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon', 'Puppet',
+    'Pillar', 'MedusaHead', 'IceSkeleton', 'IceBoulder', 'SeaEagle', 'Snapper', 'Pitcher', 'Cocoon', 'Puppet', 'Conductor',
     'TentacleBoss', 'GiantBat', 'IceWitch', 'GiantSkeleton', 'Medusa', 'SunWarden', 'ManTrap', 'Count'];
-  const BEAST_BOSS = { TentacleBoss: 'bossTentacle', GiantBat: 'boss1', IceWitch: 'bossWitch', GiantSkeleton: 'boss2', Medusa: 'boss3', SunWarden: 'bossKnight', ManTrap: 'bossTrap', Count: 'boss4' };
+  const BEAST_BOSS = { TentacleBoss: 'bossTentacle', GiantBat: 'boss1', IceWitch: 'bossWitch', GiantSkeleton: 'boss2', Medusa: 'boss3', SunWarden: 'bossKnight', ManTrap: 'bossTrap', Count: 'boss4', Conductor: 'bossConductor' };
   const BEAST_SET = new Set(BEASTS);
   const beastName = (k) => tr(BEAST_BOSS[k] || 'beast_' + k);
   const beasts = { sel: 0 };
@@ -1872,6 +2039,7 @@ const Castle = (() => {
     { id: 'feather', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.jump2 },
     { id: 'cloak', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.dash },
     { id: 'howl', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.wolf },                         // Wolfsgestalt: Haustierklappe im Hotel
+    { id: 'steam', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.boots },                       // Dampfstiefel: Signalbrücke im Bahnhof
     { id: 'claw', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.wall },
     { id: 'stone', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.breaker },
     { id: 'wings', who: 'ally', at: [[0, 1], 40, 17], when: () => relic.bat },                         // Fledermausgestalt: Sims unter der Decke
@@ -1886,6 +2054,8 @@ const Castle = (() => {
     { id: 'pris2', who: 'pris', at: [['side', 'kerker'], 37, 10], when: () => relic.mist, give: 'keyring' }, // als Nebel in der Zelle
     { id: 'conc1', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => true, reach: 40 },          // Hotel Krat: der Portier
     { id: 'conc2', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => relic.wolf },               // ... und Haustiere
+    { id: 'conc3', who: 'conc', at: [['side', 'hotel'], 24, 17], when: () => !!inv.keyring },            // ... erkennt den Schlüsselbund
+    { id: 'tent4', who: 'tent', at: [['side', 'zimmer13'], 21, 10], when: () => !!inv.keyring, give: 'pillow' }, // Zimmer 13: der Tentakel wohnt jetzt hier
     { id: 'gramo', who: 'gramo', at: [['side', 'hotel'], 14, 17], when: () => true, lines: false },      // Grammophon (↑: Platten)
   ];
   const WHO = ['ally', 'lib', 'tent', 'pris', 'conc', 'gramo'], VOICE = { ally: 'A', lib: 'L', tent: 'T', pris: 'P', conc: 'C' };
@@ -2525,14 +2695,15 @@ const Castle = (() => {
     need.push('beastTitle', 'beastCount', 'beastUnknown', 'beastNew', 'shopBuy', 'shopSell', 'shopSold', 'shopNothing');
     for (const k of BEASTS) { need.push('beastD_' + k); if (!BEAST_BOSS[k]) need.push('beast_' + k); }
     need.push('npcPrisoner', 'npcConcierge', 'concTitle', 'concHi', 'concSold', 'concOwned', 'concPoor', 'concThanks1', 'concThanks2', 'concThanks3', 'gramoTitle', 'gramoHi',
-      'gramoPlay', 'gramoMissing', 'gramoNow', 'gramoHelp', 'hotelSign', 'boardTitle', 'formBack', 'whereWitch');
+      'gramoPlay', 'gramoMissing', 'gramoNow', 'gramoHelp', 'hotelSign', 'boardTitle', 'formBack', 'whereWitch',
+      'bossConductor', 'bossConductorNote', 'bossConductorShout', 'bossConductorRage', 'castleLocked13', 'dashKey');
     if (!Array.isArray(tr('boardRows'))) out.push('Text fehlt: boardRows');
     for (const k of RECORDS) if (!GEAR['rec_' + k]) out.push('Schallplatte ohne Gegenstand: ' + k);
     S().forEach((st, s) => st.rooms.forEach((def, r) => {
       for (const d of def.decor || []) if (d[0] !== 'board' && !K3[d[0]]) out.push('Modell fehlt: ' + d[0] + ' in ' + roomKey(s, r));
       for (const [x, y] of def.puppets || []) if (!ground(def, x, y)) out.push('Puppe ohne Boden: ' + roomKey(s, r) + ' ' + x + ',' + y);
     }));
-    for (const [R, k, x, y, F] of MINI_RELIC) for (const [A, X, Y] of [[R, x, y], F]) { const a = ref(A); if (!a || !ground(S()[a.s].rooms[a.r], X, Y)) out.push('Relikt ohne Boden: ' + k + ' ' + JSON.stringify(A)); }
+    for (const [R, k, x, y, F] of MINI_RELIC) for (const [A, X, Y] of [[R, x, y], F].filter(Boolean)) { const a = ref(A); if (!a || !ground(S()[a.s].rooms[a.r], X, Y)) out.push('Relikt ohne Boden: ' + k + ' ' + JSON.stringify(A)); }
     S().forEach((st, s) => st.rooms.forEach((def, r) => (def.grates || []).forEach(g => { // Gitter: Durchgang frei, Boden darunter, Wand darüber
       for (let y = g.y0; y <= g.y1; y++) if (SOLID.includes(def.grid[y][g.x])) out.push('Gitter steht in der Wand: ' + roomKey(s, r));
       if (!SOLID.includes(def.grid[g.y1 + 1][g.x]) || (g.y0 > 0 && !SOLID.includes(def.grid[g.y0 - 1][g.x]))) out.push('Gitter nicht dicht: ' + roomKey(s, r));
